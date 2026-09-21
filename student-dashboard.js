@@ -241,18 +241,12 @@ function buildStudentContent(email, teamId, teamStatusRow) {
        </a>`
     : `<p>${escapeHtml(d.githubText)}</p>`;
 
-  const githubCta = d.repoUrl
-    ? ''
-    : (
-        d.githubState === 'active'
-          ? `<a class="student-btn"
-                href="${escapeHtml(buildGithubUsernameLink(teamId))}"
-                target="_blank"
-                rel="noopener">
-                Submit GitHub username
-             </a>`
-          : ''
-      );
+  const githubCta = `<a class="student-btn"
+                        href="${escapeHtml(buildGithubUsernameLink(teamId))}"
+                        target="_blank"
+                        rel="noopener">
+                        Submit GitHub username
+                     </a>`;
 
   const githubCard = buildStepCard(
     1,
