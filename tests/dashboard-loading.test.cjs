@@ -1,0 +1,155 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const vm=require('node:vm');
+const fs=require('node:fs');
+function fixture(system=false) {
+ const requests=[], timers=new Map(); let id=0;
+ const panels=['guide','reviewer','coord'].map(key=>({innerHTML:'',getAttribute:()=>key,classList:{toggle(){}}}));
+ const announcement={innerHTML:'',setAttribute(){},querySelector:()=>null,querySelectorAll:()=>[]};
+ const systemContent={innerHTML:'',setAttribute(){},querySelectorAll:()=>[]};
+ const systemMessage={textContent:''}, systemRefresh={disabled:false};
+ const document={hidden:false,readyState:'loading',addEventListener(){},getElementById:id=>id==='announcementsContent'?announcement:system?({systemStatusContent:systemContent,systemStatusMessage:systemMessage,systemStatusRefresh:systemRefresh}[id]||null):null,
+ querySelector:selector=>panels.find(p=>selector.includes('"'+p.getAttribute()+'"'))||null,
+ querySelectorAll:selector=>selector==='[data-role-content]'?panels:[]};
+ function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({key,args,success,failure})}); }
+ const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
+ for(const file of ['lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
+ vm.runInContext(c.getDashboardClientScript(),c);
+ return {c,requests,systemContent,systemMessage,click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);}};
+}
+test('preload waits for announcements, loads one adjacent role, and is reused',()=>{
+ const f=fixture();f.click('guide');f.done('loadDashboardRoleContent');f.tick();
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
+ // Failure also releases the scheduler without automatically retrying announcements.
+ const announcement=f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser');announcement.failure(new Error('offline'));
+ f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
+ f.done('loadDashboardRoleContent');f.tick();
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+ f.click('reviewer');assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+});
+test('clicking a pending preload does not duplicate the request; hidden page skips preload',()=>{
+ const f=fixture();f.click('guide');f.c.document.hidden=true;f.done('loadDashboardRoleContent');
+ f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));f.tick();
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
+ f.c.document.hidden=false;f.click('guide');f.tick();f.click('reviewer');
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+});
+test('diagnostics record errors and preloading can be disabled for baseline measurements',()=>{
+ const f=fixture();f.c.window.DashboardPerformance.setPreloading(false);f.click('guide');
+ f.done('loadDashboardRoleContent');f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));f.tick();
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
+ assert(f.c.window.DashboardPerformance.snapshot().some(e=>e.event==='request'&&!e.ok));
+});
+test('Coordinator shell preload does not start expensive sections',()=>{
+ const f=fixture();f.click('reviewer');f.done('loadDashboardRoleContent');
+ f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));f.tick();
+ assert.equal(f.requests.at(-1).args[0],'coord');f.done('loadDashboardRoleContent');
+ assert(!f.requests.some(r=>['loadCoordinatorSection','loadAllTeamsWeeklyActivity','getCoordinatorReviewConfiguration'].includes(r.key)));
+});
+test('failed role can be retried by selecting it again',()=>{
+ const f=fixture();f.click('guide');f.requests[0].failure(new Error('offline'));f.click('guide');
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+});
+
+test('System Status waits for foreground requests, loads once and precedes adjacent preload',()=>{
+ const f=fixture(true);f.click('guide');f.done('loadDashboardRoleContent');f.tick();
+ assert(!f.requests.some(r=>r.key==='loadCoordinatorSystemStatus'));
+ f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));
+ f.tick();assert.equal(f.requests.at(-1).key,'loadCoordinatorSystemStatus');
+ f.click('system-status');assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,1);
+ f.done('loadCoordinatorSystemStatus','system cards');f.click('system-status');
+ assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,1);
+ assert.equal(f.systemContent.innerHTML,'system cards');
+});
+test('System Status click retries failures; failed refresh preserves cards',()=>{
+ const f=fixture(true);f.click('system-status');f.requests[0].failure(new Error('offline'));f.requests[0].done=true;
+ f.click('system-status');f.done('loadCoordinatorSystemStatus','cards');
+ vm.runInContext('DashboardUI.refreshSystemStatus()',f.c);
+ f.requests.at(-1).failure(new Error('refresh failed'));
+ assert.equal(f.systemContent.innerHTML,'cards');assert.match(f.systemMessage.textContent,/refresh failed/);
+});
+
+
+test('non-student dashboard refresh replaces content once and preserves content on failure',()=>{
+ const f=fixture();f.c.window.DashboardPerformance.setPreloading(false);
+ f.click('reviewer');f.done('loadDashboardRoleContent','original reviewer');
+ f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));
+ const panel=f.c.document.querySelector('[data-role-content="reviewer"]');
+ vm.runInContext("DashboardUI.refreshRoleDashboard('reviewer')",f.c);
+ vm.runInContext("DashboardUI.refreshRoleDashboard('reviewer')",f.c);
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+ const refresh=f.requests.at(-1);refresh.done=true;refresh.failure(new Error('offline'));
+ assert.equal(panel.innerHTML,'original reviewer');
+ vm.runInContext("DashboardUI.refreshRoleDashboard('reviewer')",f.c);
+ f.done('loadDashboardRoleContent','updated reviewer');
+ assert.equal(panel.innerHTML,'updated reviewer');
+});
+
+test('shared refresh entry point excludes the student dashboard',()=>{
+ const f=fixture();
+ vm.runInContext("DashboardUI.refreshRoleDashboard('student')",f.c);
+ assert.equal(f.requests.length,0);
+});
+
+
+test('reviewer assigned table includes all assigned stages and excludes other committees',()=>{
+ const keys=['TEAM_ID','COMMITTEE_NUMBER','GUIDE_DECISION','REVIEWER_DECISION','GUIDE_NAME','TITLE','S1_REGNO'];
+ const columns=Object.fromEntries(keys.map((key,i)=>[key,i]));
+ const rows=[['T1','C1','Approved','','Guide','<script>title</script>','R1'],['T2','C1','Approved','Approved','Guide','Approved title'],['T3','C1','','Revise','Guide','Revision title'],['OTHER','C2','','']];
+ const c=vm.createContext({buildTeamPagination_:()=>'',SHEET_NAMES:{},FIELD_DEFINITIONS:{},getColumnMap:()=>columns,getSheetRows:()=>rows,getCommitteeNumbersForReviewer:()=>['C1'],getCommitteeInfo:()=>null,normalizeText_:v=>String(v||'').toLowerCase(),textEquals_:(a,b)=>String(a||'').toLowerCase()===b.toLowerCase(),escapeHtml:v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')});
+ vm.runInContext(fs.readFileSync('reviewer-dashboard.js','utf8'),c);
+ const data=c.getReviewerDashboardData('reviewer@example.com');
+ assert.equal(data.assigned.length,3);
+ const html=c.buildReviewerAssignedTeams_(data);
+ assert(html.includes('Assigned Teams (3 teams)'));assert(html.includes('T1'));assert(html.includes('T2'));assert(html.includes('T3'));assert(!html.includes('OTHER'));
+ assert(html.includes('R1'));assert(html.includes('&lt;script&gt;title&lt;/script&gt;'));assert(!html.includes('<script>'));
+ assert(html.includes('Pending review'));assert(html.includes('Approved'));assert(html.includes('Revision requested'));
+ const unsubmitted=c.buildReviewerAssignedTeams_({assigned:[['T4','C1','','','Guide','   ']]});
+ assert(unsubmitted.includes('status-badge gray">Not submitted</span>'));assert(!unsubmitted.includes('Awaiting guide'));
+ const submitted=c.buildReviewerAssignedTeams_({assigned:[['T5','C1','','','Guide','Submitted title']]});
+ assert(submitted.includes('Awaiting guide'));
+ assert(c.buildReviewerAssignedTeams_({assigned:[]}).includes('No teams are assigned to you.'));
+});
+
+
+test('shared team pagination handles All, empty results, page clamping and navigation',()=>{
+ const nodes={demoPaginationInfo:{},demoPageSize:{},demoPaginationButtons:{children:[],set innerHTML(value){this.children=[];},appendChild(node){this.children.push(node);}}};
+ let changes=0;
+ const c=vm.createContext({byId:id=>nodes[id],document:{createElement:()=>({classList:{add(){}},setAttribute(){},addEventListener(event,fn){this.click=fn;}})}});
+ const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
+ for(const file of ['lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ vm.runInContext(source.slice(source.indexOf('  function renderTeamPagination('),source.indexOf('  function changeTeamPageSize(')),c);
+ const state={page:1,size:10};
+ let bounds=c.renderTeamPagination(15,state,'demo',()=>changes++);
+ assert.equal(bounds.start,0);assert.equal(bounds.end,10);
+ nodes.demoPaginationButtons.children.at(-1).click();assert.equal(state.page,2);assert.equal(changes,1);
+ bounds=c.renderTeamPagination(15,state,'demo',()=>{});assert.equal(bounds.start,10);assert.equal(bounds.end,15);
+ state.size='all';bounds=c.renderTeamPagination(57,state,'demo',()=>{});
+ assert.equal(state.page,1);assert.equal(bounds.end,57);assert.equal(nodes.demoPageSize.value,'all');
+ assert(nodes.demoPaginationButtons.children.at(-1).disabled);
+ state.size=25;state.page=9;bounds=c.renderTeamPagination(26,state,'demo',()=>{});
+ assert.equal(state.page,2);assert.equal(bounds.start,25);assert.equal(bounds.end,26);
+ bounds=c.renderTeamPagination(0,state,'demo',()=>{});assert.equal(state.page,1);assert.equal(bounds.start,0);assert.equal(bounds.end,0);
+ assert.equal(nodes.demoPaginationInfo.textContent,'Showing 0 - 0 of 0 teams');
+});
+
+
+test('responsive menu toggles, dismisses and resets focus across breakpoints',()=>{
+ const f=fixture(), events={}, classes=new Set();let expanded='false',focused=null,resize;
+ const selected={focus(){focused=selected;}};
+ const toggle={getAttribute:()=>expanded,setAttribute:(key,value)=>{expanded=value;},focus(){focused=toggle;f.c.document.activeElement=toggle;}};
+ const icon={innerHTML:''};
+ const nav={classList:{toggle(name,on){if(on)classes.add(name);else classes.delete(name);}},contains:node=>node===toggle||node===selected,querySelector:()=>selected,addEventListener:(name,fn)=>{events[name]=fn;}};
+ const original=f.c.document.getElementById;
+ f.c.document.getElementById=id=>({dashboardNavigation:nav,roleMenuToggle:toggle,roleMenuIcon:icon}[id]||original(id));
+ f.c.document.addEventListener=(name,fn)=>{events[name]=fn;};
+ f.c.window.matchMedia=()=>({addEventListener:(name,fn)=>{resize=fn;}});
+ vm.runInContext('DashboardUI.initializeRoleMenu(); DashboardUI.toggleRoleMenu();',f.c);
+ assert.equal(expanded,'true');assert(classes.has('menu-open'));assert.match(icon.innerHTML,/lucide-x/);
+ events.keydown({key:'Escape',preventDefault(){}});assert.equal(expanded,'false');assert.equal(focused,toggle);
+ vm.runInContext('DashboardUI.toggleRoleMenu()',f.c);events.click({target:{}});assert.equal(expanded,'false');
+ vm.runInContext('DashboardUI.toggleRoleMenu()',f.c);resize({matches:false});assert.equal(expanded,'false');assert.equal(focused,selected);
+ f.c.document.activeElement=selected;resize({matches:true});assert.equal(focused,toggle);
+ assert.equal(f.requests.length,0);
+});
