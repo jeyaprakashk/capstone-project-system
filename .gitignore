@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Local credentials and environment
+.env
+.env.*
+!.env.example
+.clasprc.json
+.clasprc.*.json
+
+# Logs and test output
+*.log
+coverage/
+.nyc_output/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor history
+.history/
