@@ -22,6 +22,12 @@ course aggregation remain outside this workflow.
 
 ## Guide workflow
 
+The dashboard's Guide Evaluation button is disabled until five calendar days
+before the scheduled `guide_eval` date, using the spreadsheet timezone. While
+disabled, it shows its opening date; a missing date keeps it disabled. Refresh
+the dashboard to update the button after the opening date or a schedule change.
+The button remains available on and after the assessment date.
+
 Open **My Teams → Guide Evaluation** on the assigned team. Select a student,
 expand criterion descriptors, select each level and enter marks within the
 shown range. Marks accept two decimals. Select **Save Draft** for incomplete

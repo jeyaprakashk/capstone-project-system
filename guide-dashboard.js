@@ -54,6 +54,9 @@ function submitGuideDecision(teamId, decision, notes, editedTitle) {
 function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
   const schedule = timing && timing.schedule ? timing.schedule : getProjectSchedule_();
   const clock = timing && timing.clock ? timing.clock : getProjectClock_(schedule);
+  const evaluationOpens = Number.isFinite(schedule.guide_eval) ? schedule.guide_eval - 5 : null;
+  const evaluationEnabled = evaluationOpens !== null && clock.today >= evaluationOpens;
+  const evaluationNotice = evaluationOpens === null ? 'Guide Eval assessment date is not configured.' : 'Available from ' + formatProjectDay_(evaluationOpens) + ' (5 days before Guide Eval).';
   const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const teamId = escapeHtml(r[TS.TEAM_ID]);
   const badge = STATUS_LABEL[status];
@@ -73,7 +76,8 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
   const top = `
     <div class="card-accent ${badge.cls}"></div>
     <div class="card-body">
-      <button type="button" class="btn-outline" data-team="${teamId}" onclick="GuideEvaluation.open(this.dataset.team)">Guide Evaluation</button>
+      <button type="button" class="btn-outline" data-team="${teamId}" ${evaluationEnabled ? 'onclick="GuideEvaluation.open(this.dataset.team)"' : 'disabled title="' + escapeHtml(evaluationNotice) + '"'}>Guide Evaluation</button>
+      ${evaluationEnabled ? '' : '<p class="card-sub">' + escapeHtml(evaluationNotice) + '</p>'}
       <div class="card-top-row">
         <span class="tag ${badge.cls}">${renderLucideIcon_('tag', '', 'icon-leading')}${badge.text}</span>
         <span class="team-chip">Team ${teamId}</span>
