@@ -56,12 +56,9 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
     : textEquals_(r[TS.GUIDE_DECISION], 'Rejected') ? r[TS.GUIDE_NOTES]
     : '';
 
-  // Repo URL is now an operational field in TeamStatus. Read it from the
-  // TeamStatus row already in memory; no extra sheet call when migrated.
   const statusSheetForRepo = getSheet(SHEET_NAMES.TEAM_STATUS);
   const repoCol = getOptionalHeaderIndex_(statusSheetForRepo, 'Repo URL');
-  let repoUrl = repoCol >= 0 ? String(r[repoCol] || '').trim() : '';
-  if (!repoUrl) repoUrl = getRepoUrlForTeamFast_(teamId); // migration compatibility only
+  const repoUrl = repoCol >= 0 ? String(r[repoCol] || '').trim() : '';
   perfLap = studentPerfLog_('Repository URL lookup', perfLap);
 
   const rosterSlots = [
@@ -71,47 +68,8 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
     { name: r[TS.S4_NAME], email: r[TS.S4_EMAIL], regno: r[TS.S4_REGNO] },
   ].filter(s => s.email);
 
-  let githubState, githubText;
-  if (repoUrl) {
-    // Repository exists: username submission data is irrelevant to display.
-    githubState = 'done';
-    githubText = 'Repository ready';
-    studentPerfLog_('GitHub username lookup (skipped)', perfLap);
-  } else {
-    // Only teams without a repository need username-submission state.
-    const usernameStart = Date.now();
-    const usernameSheet = getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW);
-    const submittedEmails = new Set();
-    if (usernameSheet && usernameSheet.getLastRow() >= 2) {
-      const matches = usernameSheet
-        .getRange(2, 3, usernameSheet.getLastRow() - 1, 1)
-        .createTextFinder(normalizedTextPattern_(String(teamId))).useRegularExpression(true)
-        .matchEntireCell(true)
-        .matchCase(false)
-        .findAll();
-      readMatchedRows_(usernameSheet, matches, 2, 1).forEach(row => {
-        const submittedEmail = row[0];
-        if (submittedEmail) submittedEmails.add(String(submittedEmail).trim().toLowerCase());
-      });
-    }
-    studentPerfLog_('GitHub username lookup', usernameStart);
-
-    const missingRegnos = rosterSlots
-      .filter(s => !submittedEmails.has(String(s.email).trim().toLowerCase()))
-      .map(s => s.regno);
-    const mySubmission = submittedEmails.has(String(email).trim().toLowerCase());
-
-    if (!mySubmission) {
-      githubState = 'active';
-      githubText = 'Not submitted yet';
-    } else if (missingRegnos.length > 0) {
-      githubState = 'waiting';
-      githubText = `Submitted — waiting on teammate(s): ${missingRegnos.join(', ')}`;
-    } else {
-      githubState = 'waiting';
-      githubText = 'All teammates submitted — waiting for your repository to be created';
-    }
-  }
+  const github = getStudentGithubState_(email, teamId, rosterSlots, repoUrl);
+  const { githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup } = github;
 
   // Targeted log lookup: search the Email column instead of transferring RawLog.
   const studentLogs = [];
@@ -139,22 +97,11 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
   return {
     teamId, title: r[TS.TITLE], problem: r[TS.PROBLEM],
     titleStatus, note,
-    githubState, githubText, repoUrl,
+    githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup, repoUrl,
     rosterSlots, schedule, clock, logWeeks: getLogWeekSummary_(studentLogs, schedule, clock)
   };
 }
 
-function getRepoUrlForTeamFast_(teamId) {
-  const sheet = getSheet(SHEET_NAMES.GITHUB_PROVISIONING);
-  if (!sheet || sheet.getLastRow() < 2) return '';
-  const match = sheet
-    .getRange(2, GP.TEAM_ID + 1, sheet.getLastRow() - 1, 1)
-    .createTextFinder(normalizedTextPattern_(String(teamId))).useRegularExpression(true)
-    .matchEntireCell(true)
-    .matchCase(false)
-    .findNext();
-  return match ? String(sheet.getRange(match.getRow(), GP.REPO_URL + 1).getValue() || '') : '';
-}
 function initialsOf(name) {
   const parts = String(name || '?').trim().split(/\s+/);
   return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '?';
@@ -217,7 +164,8 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   const d = getStudentDashboardData(email, teamId, teamStatusRow);
   contentLap = studentPerfLog_('Student core data', contentLap);
 
-  const githubDone = !!d.repoUrl;
+  const githubDone = d.githubReady;
+  const githubTiming = githubSubmissionTiming_(d.githubSetup, d.schedule, d.clock);
   const titleApproved = d.titleStatus === 'APPROVED';
 
   const doneCount = [
@@ -231,28 +179,27 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   // GITHUB SETUP
   // ===============================================================
 
-  const githubBody = d.repoUrl
+  const githubBody = (d.repoUrl
     ? `<p>Your repository is live:</p>
-       <a class="mono-detail link"
-          href="${escapeHtml(d.repoUrl)}"
-          target="_blank"
-          rel="noopener">
-          ${escapeHtml(d.repoUrl)}
-       </a>`
-    : `<p>${escapeHtml(d.githubText)}</p>`;
+       <a class="mono-detail link" href="${escapeHtml(d.repoUrl)}" target="_blank" rel="noopener">${escapeHtml(d.repoUrl)}</a>`
+    : '') + `<p>${escapeHtml(d.githubText || '')}</p>`;
 
-  const githubCta = `<a class="student-btn"
-                        href="${escapeHtml(buildGithubUsernameLink(teamId))}"
-                        target="_blank"
-                        rel="noopener">
-                        Submit GitHub username
-                     </a>`;
+  const githubCta = (d.githubNeedsUsername
+    ? `<form class="github-username-form" onsubmit="DashboardUI.submitGithubUsername(event, this)">
+         <label for="studentGithubUsername">Your GitHub username</label>
+         <input id="studentGithubUsername" name="username" type="text" required maxlength="39"
+                autocomplete="off" autocapitalize="none" spellcheck="false"
+                value="${escapeHtml(d.githubUsername || '')}" aria-describedby="githubSubmitStatus"
+                placeholder="e.g. octocat">
+         <button class="student-btn" type="submit">Submit GitHub username</button>
+       </form>`
+    : '') + (d.githubCanRetry ? '<button class="student-btn" type="button" onclick="DashboardUI.retryGithubSetup(this)">Retry GitHub setup</button>' : '') + '<p id="githubSubmitStatus" role="status" aria-live="polite"></p><button id="githubStatusRefresh" class="student-btn secondary" type="button" hidden onclick="DashboardUI.refreshGithubStatus(this)">Refresh GitHub status</button>';
 
   const githubCard = buildStepCard(
     1,
     'GitHub setup',
     d.githubState,
-    githubBody + `<p class="step-detail">Team & GitHub setup due ${formatProjectDay_(d.schedule.formation)}${!githubDone && d.clock.today > d.schedule.formation ? ' · Overdue' : ''}</p>`,
+    githubBody + `<p class="step-detail">Team & GitHub setup due ${formatProjectDay_(d.schedule.formation)} · ${escapeHtml(githubTiming.text)}</p>`,
     githubCta,
     false
   );
@@ -270,7 +217,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
       2,
       'Project title',
       'locked',
-      buildLockedBody('Finish GitHub setup first.'),
+      buildLockedBody('Finish GitHub setup first.') + (d.title ? '<p><strong>Current title:</strong> ' + escapeHtml(d.title) + '</p><p>' + escapeHtml(STUDENT_TITLE_LABEL[d.titleStatus].text) + '</p>' : ''),
       '',
       false
     );
@@ -334,7 +281,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
       `<p>The logging period ended on ${formatProjectDay_(d.schedule.end)}.</p>${missingNote}`, '', true);
   } else if (!githubDone || !titleApproved) {
     logCard = buildStepCard(3, weekLabel, 'locked', buildLockedBody(!githubDone
-      ? 'Finish GitHub setup first.' : 'Your project title must be approved before weekly logging.') + missingNote, '', true);
+      ? 'Finish GitHub setup first.' : 'Your project title must be approved before weekly logging.') + missingNote + (d.logWeeks.currentLogged ? '<p>Your existing log for this week is recorded.</p>' : ''), '', true);
   } else {
     const logBody = `<p>${formatProjectDay_(d.clock.start)} – ${formatProjectDay_(d.clock.end)}</p>
       <p>${d.logWeeks.currentLogged ? 'Your log for this week is recorded.' : 'Submit your weekly log by ' + formatProjectDay_(d.clock.end) + '.'}</p>${missingNote}`;

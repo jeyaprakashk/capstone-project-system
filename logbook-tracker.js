@@ -12,6 +12,12 @@ function onFormSubmit(e) {
 
   const [timestamp, email, teamId, weeklyNotes, hoursSpent, commits, blockers] = e.values.slice(0, 7);
 
+  try { requireTeamGithubReady_(teamId, email); }
+  catch (err) {
+    MailApp.sendEmail(email, `Weekly log not recorded — Team ${teamId}`, err.message);
+    return;
+  }
+
   const RAW_LOG = getColumnMap(SHEET_NAMES.RAW_LOG, {
     TIMESTAMP: 'Timestamp', EMAIL: 'Email', TEAM_ID: 'Team ID',
     WEEKLY_NOTES: 'Weekly Notes', HOURS_SPENT: 'Hours Spent',

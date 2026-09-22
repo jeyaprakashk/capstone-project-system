@@ -1,12 +1,13 @@
 /** Add actionable event definitions here; rendering and filtering remain generic. */
 const DEADLINE_PILL_LEAD_DAYS_ = 5;
 
-function getTeamDeadlineEvents_(row, columns, repoUrl, logs, reviews, schedule, clock, logSummary) {
+function getTeamDeadlineEvents_(row, columns, repoUrl, logs, reviews, schedule, clock, logSummary, githubSetup) {
   if (!schedule || !clock) return [];
+  githubSetup = githubSetup || getTeamGithubSetup_(row[columns.TEAM_ID], { row, columns, repoUrl });
   const events = [
     {key:'formation', label:'Team Formation Pending', due:schedule.formation,
       complete:[1,2,3,4].some(number => row[columns['S' + number + '_EMAIL']])},
-    {key:'repository', label:'Repo Pending', due:schedule.formation, complete:!!repoUrl},
+    {key:'repository', label:'GitHub Usernames Pending', due:schedule.formation, complete:githubSetup.usernamesComplete || githubSetup.verificationUnavailable},
     {key:'title', label:'Title Pending', due:schedule.title, complete:textEquals_(row[columns.REVIEWER_DECISION], 'Approved')}
   ];
   for (const {key,label,day} of schedule.reviews) {

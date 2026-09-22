@@ -30,6 +30,8 @@ function fixture(overrides = {}, runtime = {}) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
   const schedule = c.getProjectSchedule_();
+  c.getTeamGithubSetup_=(id, options)=>({ready:!!options.repoUrl,usernamesComplete:!!options.repoUrl,message:'GitHub setup pending',verificationUnavailable:false});
+  c.githubSubmissionTiming_=(setup, schedule, clock)=>({state:setup && !setup.usernamesComplete && clock.today>schedule.formation?'overdue':'on-time',text:'Submission timing'});
   const clock = day => c.getProjectClock_(schedule,new Date(day+'T12:00:00+05:30'));
   return {c,schedule,clock,entries,milestoneRows,properties,sheet,reads:()=>reads};
 }
@@ -166,7 +168,7 @@ test('attention waits until the day after each configured deadline',()=>{
   const review={review1:{completed:true},review2:{completed:true}};
   const health=(day,row=['student','Approved'],repo='url',r=review)=>c.assessProjectTeam_(row,columns,repo,[],r,s,clock(day));
   assert.equal(health('2026-09-11',['student',''],'').health,'monitor');
-  assert(health('2026-09-12',['student',''],'').issue.includes('GitHub setup overdue'));
+  assert(health('2026-09-12',['student',''],'').issue.includes('GitHub username submissions overdue'));
   assert(!health('2026-09-16',['student','']).issue.includes('Title'));
   assert(health('2026-09-17',['student','']).issue.includes('Title'));
   assert.equal(health('2026-09-27').health,'monitor');
@@ -208,12 +210,12 @@ test('team health requires a log from every rostered student',()=>{
 
 test('student cards follow scheduled weeks and approval, not rolling inactivity',()=>{
   const {c,schedule:s,clock}=fixture();
-  c.buildGithubUsernameLink=()=> 'https://example.com/github';
+
   c.buildTeamIntakeLink=()=> 'https://example.com/title';
   c.buildWeeklyLogLink=()=> 'https://example.com/log';
   function render(day,approved=true,logs=[]) {
     const current=clock(day);
-    c.getStudentDashboardData=()=>({repoUrl:'https://example.com/repo',githubState:'done',titleStatus:approved?'APPROVED':'AWAITING_REVIEWER',title:'Project',rosterSlots:[],schedule:s,clock:current,logWeeks:c.getLogWeekSummary_(logs,s,current)});
+    c.getStudentDashboardData=()=>({repoUrl:'https://example.com/repo',githubReady:true,githubState:'done',titleStatus:approved?'APPROVED':'AWAITING_REVIEWER',title:'Project',rosterSlots:[],schedule:s,clock:current,logWeeks:c.getLogWeekSummary_(logs,s,current)});
     return c.buildStudentContent('student@example.com','T1');
   }
   assert(render('2026-09-20').includes('Week 1 starts on 21 Sept 2026'));
@@ -221,6 +223,25 @@ test('student cards follow scheduled weeks and approval, not rolling inactivity'
   assert(render('2026-09-21',false).includes('must be approved'));
   assert(render('2026-09-23',true,[['2026-09-22']]).includes('Your log for this week is recorded'));
   assert(render('2026-11-23').includes('logging period ended'));
+});
+
+test('student locks depend on team readiness while preserving repository and recorded work',()=>{
+  const {c,schedule,clock}=fixture();
+  const data={repoUrl:'https://github.com/org/repo',githubReady:false,githubCanRetry:true,githubState:'waiting',githubText:'Waiting for teammate R2',
+    titleStatus:'APPROVED',title:'Existing title',rosterSlots:[],schedule,clock:clock('2026-09-23'),logWeeks:{missing:0,currentLogged:true}};
+  c.getStudentDashboardData=()=>data;
+  c.buildWeeklyLogLink=()=> 'https://example.com/log';
+  let html=c.buildStudentContent('student@example.com','T1');
+  assert(html.includes('https://github.com/org/repo'));
+  assert(html.includes('Current title:</strong> Existing title'));
+  assert(html.includes('Your existing log for this week is recorded.'));
+  assert(html.includes('Retry GitHub setup'));
+  assert(!html.includes('https://example.com/log'));
+  assert(html.includes('1 of 3 milestones complete'));
+  data.githubReady=true;data.githubCanRetry=false;data.githubState='done';
+  html=c.buildStudentContent('student@example.com','T1');
+  assert(html.includes('https://example.com/log'));
+  assert(html.includes('2 of 3 milestones complete'));
 });
 
 test('coordinator statistics, attention list and tracker share one health result',()=>{
@@ -246,6 +267,14 @@ test('coordinator statistics, attention list and tracker share one health result
   assert.equal(data.teamTrackerData[0].weeklyActivity,null);
   assert.equal(data.needsAttentionTeams[0].daysOverdue,1);
   assert(data.needsAttentionTeams[0].issue.includes('1 student weekly log(s) overdue'));
+  const originalGithub=c.getTeamGithubSetup_;
+  c.getTeamGithubSetup_=()=>({ready:false,usernamesComplete:false,verificationUnavailable:false,message:'Waiting for R2'});
+  const incomplete=c.getCoordinatorDashboardData_();
+  assert.equal(incomplete.stats.reposReady,1,'repository availability is counted separately');
+  assert.equal(incomplete.stages.setup.completed,0);
+  assert.equal(incomplete.teamTrackerData[0].repoStatus,'pending');
+  assert(incomplete.needsAttentionTeams[0].issue.includes('GitHub username submissions overdue'));
+  c.getTeamGithubSetup_=originalGithub;
   const readActivity=c.readActivityRows_, readReviews=c.getAllReviewCompletionStatus_;
   c.readActivityRows_=()=>{throw Error('Overview must not read historical logs');};
   let overviewMarksReads=0;
@@ -710,6 +739,7 @@ test('dashboard headers, rows and repository map share one TeamStatus read',()=>
   const names=vm.runInContext('SHEET_NAMES',c);
   let reads=0;
   c.getSheet=name=>({getName:()=>name,getDataRange:()=>({getValues:()=>{
+    assert.equal(name,names.TEAM_STATUS,'repository lookups must not read a second registry');
     if(name===names.TEAM_STATUS) { reads++;return [['Team ID','Repo URL'],['T1','https://example.com/repo']]; }
     return [[]];
   }}),getRange:()=>{throw Error('Unexpected extra range read');}});
@@ -718,7 +748,8 @@ test('dashboard headers, rows and repository map share one TeamStatus read',()=>
     assert.equal(c.getSheetRows(names.TEAM_STATUS).length,1);
     const timings=[];
     assert.equal(c.getRepoUrlMap(timings).t1,'https://example.com/repo');
-    for (const phase of ['repository_detail_total','repository_detail_fallback_read','repository_detail_fallback_merge']) assert(timings.some(t=>t.phase===phase&&t.success&&t.calls===1));
+    assert(timings.some(t=>t.phase==='repository_detail_total'&&t.success&&t.calls===1));
+    assert(!timings.some(t=>t.phase.includes('fallback')));
     assert.equal(reads,1);
   });
   c.withDashboardRead_(()=>c.getSheetRows(names.TEAM_STATUS));
@@ -750,7 +781,7 @@ test('Coordinator tracking uses small cards without a separate progress panel',(
  const {c}=fixture();
  const html=c.buildCoordinatorHeaderStats({total:62,titleApproved:6,reposReady:50,needsAttention:56,reviews:{review1:{completed:0,unavailable:4},review2:{completed:3}}});
  assert.equal((html.match(/class="stat-card stat-card-/g)||[]).length,8);
- for(const label of ['Total Teams','Title Approved','Repositories Ready','Active This Week','Review 1 Completed','Review 2 Completed','Need Attention']) assert(html.includes(label));
+ for(const label of ['Total Teams','Title Approved','Repositories Available','Active This Week','Review 1 Completed','Review 2 Completed','Need Attention']) assert(html.includes(label));
  assert(html.includes('4 unavailable'));
  const shell=c.buildCoordinatorAsyncShell_();
  assert(!shell.includes('coordinatorCompletion'));assert(!shell.includes('coordinatorAssessment'));

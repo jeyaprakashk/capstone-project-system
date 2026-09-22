@@ -370,8 +370,7 @@ function getRepoUrlMap(timings) {
     finally { timings.push({phase, durationMs:Date.now() - started, calls:1, success}); }
   };
   return measure('repository_detail_total', () => {
-  // Primary operational source: TeamStatus.
-  // Compatibility fallback: GithubProvisioning for teams not yet migrated.
+  // TeamStatus is the only repository registry.
   const statusSheet = getSheet(SHEET_NAMES.TEAM_STATUS);
   const snapshotRows = dashboardReadSnapshot_ ? getSheetRows(SHEET_NAMES.TEAM_STATUS) : null;
   const headers = snapshotRows ? dashboardHeaderSnapshot_[normalizeText_(SHEET_NAMES.TEAM_STATUS)] : null;
@@ -388,12 +387,6 @@ function getRepoUrlMap(timings) {
     });
   }
 
-  // During migration only, fill any missing values from the audit sheet.
-  const provRows = measure('repository_detail_fallback_read', () => getSheetRows(SHEET_NAMES.GITHUB_PROVISIONING));
-  measure('repository_detail_fallback_merge', () => provRows.forEach(r => {
-    const teamId = normalizeText_(r[GP.TEAM_ID]);
-    if (teamId && !map[teamId]) map[teamId] = String(r[GP.REPO_URL] || '').trim();
-  }));
   return map;
   });
 }
@@ -414,12 +407,7 @@ function getRepoUrlForTeam(teamId) {
     }
   }
 
-  // Compatibility fallback until migration is complete.
-  const gpSheet = getSheet(SHEET_NAMES.GITHUB_PROVISIONING);
-  if (!gpSheet || gpSheet.getLastRow() < 2) return '';
-  const match = gpSheet.getRange(2, GP.TEAM_ID + 1, gpSheet.getLastRow() - 1, 1)
-    .createTextFinder(normalizedTextPattern_(wanted)).useRegularExpression(true).matchEntireCell(true).matchCase(false).findNext();
-  return match ? String(gpSheet.getRange(match.getRow(), GP.REPO_URL + 1).getValue() || '').trim() : '';
+  return '';
 }
 
 function updateTeamStatusRepoUrl_(teamId, repoUrl) {
@@ -435,39 +423,6 @@ function updateTeamStatusRepoUrl_(teamId, repoUrl) {
     .createTextFinder(normalizedTextPattern_(String(teamId))).useRegularExpression(true).matchEntireCell(true).matchCase(false).findNext();
   if (!match) throw new Error('Team not found in TeamStatus: ' + teamId);
   sheet.getRange(match.getRow(), repoCol + 1).setValue(repoUrl);
-}
-
-/** Run ONCE after deploying this version. Copies existing Repo URLs into TeamStatus. */
-function migrateRepoUrlsToTeamStatus() {
-  const statusSheet = getSheet(SHEET_NAMES.TEAM_STATUS);
-  let repoCol = getOptionalHeaderIndex_(statusSheet, 'Repo URL');
-  if (repoCol < 0) {
-    repoCol = statusSheet.getLastColumn();
-    statusSheet.getRange(1, repoCol + 1).setValue('Repo URL');
-  }
-  const teamCol = getOptionalHeaderIndex_(statusSheet, 'Team ID');
-  if (teamCol < 0) throw new Error('Team ID column not found in TeamStatus.');
-
-  const gpRows = getSheetRows(SHEET_NAMES.GITHUB_PROVISIONING);
-  const gpMap = {};
-  gpRows.forEach(r => {
-    const id = normalizeText_(r[GP.TEAM_ID]);
-    const url = String(r[GP.REPO_URL] || '').trim();
-    if (id && url) gpMap[id] = url;
-  });
-
-  if (statusSheet.getLastRow() < 2) return { updated: 0, alreadyPresent: 0, noRepo: 0 };
-  const rows = statusSheet.getRange(2, 1, statusSheet.getLastRow() - 1, statusSheet.getLastColumn()).getValues();
-  let updated = 0, alreadyPresent = 0, noRepo = 0;
-  rows.forEach((r, i) => {
-    if (String(r[repoCol] || '').trim()) { alreadyPresent++; return; }
-    const id = normalizeText_(r[teamCol]);
-    const url = gpMap[id] || '';
-    if (!url) { noRepo++; return; }
-    statusSheet.getRange(i + 2, repoCol + 1).setValue(url);
-    updated++;
-  });
-  return { updated, alreadyPresent, noRepo };
 }
 
 // ===================================================================
@@ -637,12 +592,6 @@ function getStudentTeamId(email) {
 function buildTeamIntakeLink(teamId) {
   const base = getConfig('TEAM_INTAKE_FORM_URL_BASE');
   const entry = getConfig('TEAM_INTAKE_TEAMID_ENTRY');
-  return `${base}?usp=pp_url&${entry}=${encodeURIComponent(teamId)}`;
-}
-
-function buildGithubUsernameLink(teamId) {
-  const base = getConfig('GITHUB_USERNAME_FORM_URL_BASE');
-  const entry = getConfig('GITHUB_USERNAME_TEAMID_ENTRY');
   return `${base}?usp=pp_url&${entry}=${encodeURIComponent(teamId)}`;
 }
 

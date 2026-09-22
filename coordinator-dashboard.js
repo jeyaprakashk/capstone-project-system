@@ -44,6 +44,14 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
   const rosterRows = measure('roster_rows', () => getSheetRows(SHEET_NAMES.TEAM_ROSTER));
   const committeeRows = skipAccess ? [] : measure('committee_rows', () => getSheetRows(SHEET_NAMES.REVIEW_COMMITTEE));
   const repoUrlMap = measure('repository_map', () => getRepoUrlMap(repositoryTimings));
+  const githubByTeam = {};
+  const usernameRows = deferAssessments ? [] : getSheetRows(SHEET_NAMES.GITHUB_USERNAME_RAW);
+  const validationCache = new Map();
+  statusRows.forEach(row => {
+    const id = normalizeText_(row[TS.TEAM_ID]);
+    githubByTeam[id] = deferAssessments ? { ready:false, message:'Checking GitHub setup…' }
+      : getTeamGithubSetup_(row[TS.TEAM_ID], { row, columns: TS, repoUrl: repoUrlMap[id] || '', usernameRows, validationCache });
+  });
   const logRows = deferAssessments ? [] : measure('historical_logs', () => readActivityRows_(SHEET_NAMES.RAW_LOG, null, null, 3));
 
   const rosterByTeamId = groupBy(rosterRows, r => r[TR.TEAM_ID]);
@@ -73,13 +81,13 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
   statusRows.forEach(r => {
     const id = normalizeText_(r[TS.TEAM_ID]);
     if (!deferAssessments && schedule && clock) logSummaryByTeam[id] = getTeamLogWeekSummary_(r, TS, logsByTeam[id] || [], schedule, clock);
-    healthByTeam[id] = deferAssessments ? {health:'loading', severity:'low', issue:'', daysOverdue:0} : assessProjectTeam_(r, TS, repoUrlMap[id], logsByTeam[id] || [], reviewCompletion[id], schedule, clock, logSummaryByTeam[id]);
+    healthByTeam[id] = deferAssessments ? {health:'loading', severity:'low', issue:'', daysOverdue:0} : assessProjectTeam_(r, TS, repoUrlMap[id], logsByTeam[id] || [], reviewCompletion[id], schedule, clock, logSummaryByTeam[id], githubByTeam[id]);
   });
   const needsAttention = Object.values(healthByTeam).filter(h => h.health === 'attention').length;
 
 
   const stages = {
-    setup:{completed:reposReady,total}, titleApproval:{completed:titleApproved,total},
+    setup:{completed:Object.values(githubByTeam).filter(setup => setup.ready).length,total}, titleApproval:{completed:titleApproved,total},
     ...reviewStats, guideEval:{completed:0,total}, see:{completed:0,total}
   };
   const assessmentProgress = {
@@ -114,7 +122,7 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
     const rosterRow = rosterByTeamId[normalizeText_(r[TS.TEAM_ID])] ? rosterByTeamId[normalizeText_(r[TS.TEAM_ID])][0] : null;
     const guide = rosterRow ? rosterRow[TR.GUIDE_NAME] : '—';
     const committee = r[TS.COMMITTEE_NUMBER];
-    const deadlineEvents = deferAssessments ? [] : getTeamDeadlineEvents_(r, TS, repoUrlMap[teamId], logsByTeam[teamId] || [], teamReview, schedule, clock, logSummaryByTeam[teamId]);
+    const deadlineEvents = deferAssessments ? [] : getTeamDeadlineEvents_(r, TS, repoUrlMap[teamId], logsByTeam[teamId] || [], teamReview, schedule, clock, logSummaryByTeam[teamId], githubByTeam[teamId]);
 
     return {
       teamId: r[TS.TEAM_ID],
@@ -123,7 +131,9 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
       title: r[TS.TITLE],
       registerNumbers: [1,2,3,4].map(number => String(r[TS['S' + number + '_REGNO']] || '').trim()).filter(Boolean),
       titleStatus: getTeamStatus(r),
-      repoStatus: repoUrlMap[normalizeText_(r[TS.TEAM_ID])] ? 'ready' : 'pending',
+      repoStatus: deferAssessments ? 'loading' : githubByTeam[teamId].ready ? 'ready' : 'pending',
+      githubMessage: githubByTeam[teamId].message,
+      githubTiming: deferAssessments ? '' : schedule && clock ? githubSubmissionTiming_(githubByTeam[teamId], schedule, clock).text : 'Schedule unavailable',
       repoUrl: repoUrlMap[normalizeText_(r[TS.TEAM_ID])],
       deadlineEvents,
       pendingDeadlines:deadlineEvents.filter(event => !event.complete && clock && clock.today >= event.due - DEADLINE_PILL_LEAD_DAYS_).map(event => event.key),
@@ -212,11 +222,12 @@ function getCoordinatorTeamDetails_(teamId, section) {
     const context = weeklyActivityContext_();
     const logs = readActivityRows_(SHEET_NAMES.RAW_LOG, 3, teamId, 3);
     const progressRepoUrl = getRepoUrlForTeam(teamId);
+    const progressSetup = getTeamGithubSetup_(teamId, { row: statusRow, columns: TS, repoUrl: progressRepoUrl });
     return {
       titleStatus:getTeamStatus(statusRow), guideDecision:String(statusRow[TS.GUIDE_DECISION] || ''),
       reviewerDecision:String(statusRow[TS.REVIEWER_DECISION] || ''),
-      repoStatus:progressRepoUrl ? 'Ready' : 'Pending',
-      health:assessProjectTeam_(statusRow, TS, progressRepoUrl, logs, reviews, context.schedule, context.clock).health,
+      repoStatus:progressSetup.message + (context.schedule && context.clock ? ' ' + githubSubmissionTiming_(progressSetup, context.schedule, context.clock).text : ''),
+      health:assessProjectTeam_(statusRow, TS, progressRepoUrl, logs, reviews, context.schedule, context.clock, null, progressSetup).health,
       reviews:getInternalReviews_().map(review => ({label:review.label, available:!!reviews[review.key] && reviews[review.key].available !== false, completed:!!reviews[review.key]?.completed}))
     };
   }
@@ -226,6 +237,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
   });
 
   const repoUrl = getRepoUrlForTeam(teamId);
+  const githubSetup = getTeamGithubSetup_(teamId, { row: statusRow, columns: TS, repoUrl });
 
   // -----------------------------
   // Students
@@ -297,7 +309,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
   const weekLogs = activity.logs === null ? 'Unavailable' : activity.logs;
   const weekCommits = activity.commits === null ? 'Unavailable' : activity.commits;
 
-  const health = assessProjectTeam_(statusRow, TS, repoUrl, logs, teamReview, schedule, clock).health;
+  const health = assessProjectTeam_(statusRow, TS, repoUrl, logs, teamReview, schedule, clock, null, githubSetup).health;
 
   return {
     teamId: teamId,
@@ -327,7 +339,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
     reviewerDecision: String(statusRow[TS.REVIEWER_DECISION] || '').trim(),
 
     repoUrl: repoUrl || '',
-    repoStatus: repoUrl ? 'Ready' : 'Pending',
+    repoStatus: githubSetup.message + (schedule && clock ? ' ' + githubSubmissionTiming_(githubSetup, schedule, clock).text : ''),
 
     weekLogs: weekLogs,
     weekCommits: weekCommits,
@@ -341,7 +353,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
 // HELPER FUNCTIONS
 // ===================================================================
 /** Evaluate deadlines once per team; commits never substitute for required logs. */
-function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock, logSummary) {
+function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock, logSummary, githubSetup) {
   if (!schedule || !clock) return {health:"monitor", severity:"low", issue:"Schedule unavailable; check configuration", daysOverdue:0};
   const issues = [];
   function overdue(due, complete, label) {
@@ -349,7 +361,9 @@ function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock
   }
   const hasMembers = ['S1_EMAIL','S2_EMAIL','S3_EMAIL','S4_EMAIL'].some(key => row[columns[key]]);
   overdue(schedule.formation, hasMembers, 'Team formation overdue');
-  overdue(schedule.formation, !!repoUrl, 'GitHub setup overdue');
+  githubSetup = githubSetup || getTeamGithubSetup_(row[columns.TEAM_ID], { row, columns, repoUrl });
+  const timing = githubSubmissionTiming_(githubSetup, schedule, clock);
+  overdue(schedule.formation, timing.state !== 'overdue', 'GitHub username submissions overdue');
   overdue(schedule.title, textEquals_(row[columns.REVIEWER_DECISION], 'Approved'), 'Title approval overdue');
   for (const {key,label,day} of schedule.reviews) {
     if (review && review[key] && review[key].available !== false) overdue(day, review[key].completed, label + ' marks overdue');
@@ -360,8 +374,8 @@ function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock
   if (issues.length) return { health:'attention', severity:issues[0].daysOverdue >= 14 ? 'high' : issues[0].daysOverdue >= 7 ? 'medium' : 'low',
     issue:issues.map(item => item.issue).join('; '), daysOverdue:issues[0].daysOverdue };
   const unavailable = schedule.reviews.some(({key}) => !review || !review[key] || review[key].available === false);
-  const pending = unavailable || !repoUrl || !textEquals_(row[columns.REVIEWER_DECISION], 'Approved') || (clock.active && !weeks.currentLogged);
-  return { health:pending ? 'monitor' : 'ontrack', severity:'low', issue:'', daysOverdue:0 };
+  const pending = unavailable || !githubSetup.ready || timing.state === 'unknown' || !textEquals_(row[columns.REVIEWER_DECISION], 'Approved') || (clock.active && !weeks.currentLogged);
+  return { health:pending ? 'monitor' : 'ontrack', severity:'low', issue:!githubSetup.ready ? githubSetup.message : timing.state === 'late' || timing.state === 'unknown' ? timing.text : '', daysOverdue:0 };
 }
 
 function refreshCoordinatorContent() {
@@ -387,7 +401,7 @@ function buildCoordinatorHeaderStats(stats) {
       <div class="stat-label">Total Teams</div>
     </div>
 
-    ${smallCard('Repositories Ready', stats.reposReady || 0, 'purple', '(' + pct(stats.reposReady || 0) + '%)', renderLucideIcon_('git-branch', '', 'stat-icon'))}
+    ${smallCard('Repositories Available', stats.reposReady || 0, 'purple', '(' + pct(stats.reposReady || 0) + '%)', renderLucideIcon_('git-branch', '', 'stat-icon'))}
     ${smallCard('Title Approved', stats.titleApproved || 0, 'green', '(' + pct(stats.titleApproved || 0) + '%)', renderLucideIcon_('check', '', 'stat-icon'))}
     <div class="stat-card stat-card-orange">
       <div class="stat-header">
@@ -420,7 +434,7 @@ function buildTeamCompletionProgress(stages) {
   let reviews = [];
   let configurationUnavailable = false;
   try { reviews = getInternalReviews_(); } catch (err) { configurationUnavailable = true; }
-  const rows = [{label:'Repository Setup', stage:stages.setup},
+  const rows = [{label:'GitHub Setup', stage:stages.setup},
     {label:'Title Approval', stage:stages.titleApproval},
     ...reviews.map(review => ({label:review.label, stage:stages[review.key]})),
     {label:'Guide Evaluation', untracked:true}, {label:'SEE', untracked:true}];
@@ -540,12 +554,12 @@ function buildTeamTrackerTable(teamData, deadlinePills) {
   const onTrackCount = teamData.filter(t => t.health === 'ontrack').length;
   const rows = teamData.map(t => {
     const titleBadge = t.titleStatus === 'APPROVED' ? `<span class="status-badge green">${renderLucideIcon_('check', 'Title approved')}</span>` : t.titleStatus === 'NEEDS_REVIEW' ? `<span class="status-badge orange">Review</span>` : t.titleStatus === 'REJECTED_BY_GUIDE' ? `<span class="status-badge red">Reject</span>` : `<span class="status-badge gray">—</span>`;
-    const repoBadge = t.repoStatus === 'ready' ? `<span class="status-badge green" tabindex="0" role="img" aria-label="Repository ready" title="Repository ready">${renderLucideIcon_('check')}</span>` : `<span class="status-badge red" tabindex="0" role="img" aria-label="Pending" title="Pending">${renderLucideIcon_('x')}</span>`;
+    const repoBadge = t.repoStatus === 'loading' ? getSkeletonMarkup_('inline', 'Checking GitHub setup') : t.repoStatus === 'ready' ? `<span class="status-badge green" tabindex="0" role="img" aria-label="GitHub setup complete" title="GitHub setup complete">${renderLucideIcon_('check')}</span>` : `<span class="status-badge red" tabindex="0" role="img" aria-label="Pending" title="Pending">${renderLucideIcon_('x')}</span>`;
     const health = t.health === 'ontrack' ? {color:'green', label:'On track', icon:'check'} : t.health === 'monitor' ? {color:'orange', label:'Monitor', icon:'clock'} : {color:'red', label:'Needs attention', icon:'triangle-alert'};
     const healthBadge = t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading health') : `<span class="tracker-health ${health.color}" tabindex="0" role="img" aria-label="${health.label}" title="${health.label}">${renderLucideIcon_(health.icon)}</span>`;
     const registers = t.registerNumbers || [];
 
-    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td class="col-team"><strong>${escapeHtml(t.teamId)}</strong></td><td class="col-guide">${escapeHtml(t.guide)}</td><td class="col-registers"><div class="tracker-registers">${registers.length ? registers.map(value => `<span>${escapeHtml(value)}</span>`).join('') : '—'}</div></td><td class="col-repo">${repoBadge}</td><td class="col-status">${titleBadge}</td><td class="col-activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation">${buildCompletionIndicator_(t.guideEvaluation)}</td><td class="col-health">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
+    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td class="col-team"><strong>${escapeHtml(t.teamId)}</strong></td><td class="col-guide">${escapeHtml(t.guide)}</td><td class="col-registers"><div class="tracker-registers">${registers.length ? registers.map(value => `<span>${escapeHtml(value)}</span>`).join('') : '—'}</div></td><td class="col-repo">${repoBadge}<span class="sr-only">${escapeHtml(t.githubMessage || '')}</span><div class="step-detail">${escapeHtml(t.githubTiming || '')}</div>${t.repoUrl ? '<span class="step-detail">Repository available</span>' : ''}</td><td class="col-status">${titleBadge}</td><td class="col-activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation">${buildCompletionIndicator_(t.guideEvaluation)}</td><td class="col-health">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
   }).join('');
 
   return `<div class="team-tracker-section"><div class="tracker-header"><h3 class="assessment-title tracker-title">Team Tracker (${teamData.length} teams)</h3></div>

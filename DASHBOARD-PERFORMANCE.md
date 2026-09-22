@@ -293,7 +293,7 @@ phase details are returned only when the section response succeeds.
 Read-only dashboard scopes now retain headers alongside their row snapshot.
 Column maps and repository mapping reuse that snapshot instead of requesting
 TeamStatus headers and rows again. Outside those scopes, row reads remain live.
-GithubProvisioning compatibility fallback remains intact. No persistent marks
+Repository lookups now use TeamStatus exclusively. No persistent marks
 cache is introduced. A column-map phase can now include the initial full sheet
 read, so compare combined column/row totals across deployments, not either alone.
 
@@ -310,12 +310,11 @@ Further drill-down timings are available in the same progress table:
 `review_read_values` split the review-tab read operation. Missing tabs count as
 lookup attempts but do not perform dimension or value reads. Failures propagate
 through the same existing partial-data handling and mark the affected timings
-unsuccessful. `repository_detail_fallback_read` and
-`repository_detail_fallback_merge` isolate GithubProvisioning fallback work;
-`repository_detail_total` includes primary-source work and both fallback phases.
+unsuccessful. `repository_detail_total` measures the TeamStatus repository lookup;
+the former repository fallback phases have been removed.
 These are nested diagnostics: review read children are included in
 `review_detail_read`, and all repository details are included in `repository_map`.
-Do not sum parent and child durations. No caching or fallback semantics changed.
+Do not sum parent and child durations. No persistent caching is introduced.
 
 ## Coordinator System Status tab
 

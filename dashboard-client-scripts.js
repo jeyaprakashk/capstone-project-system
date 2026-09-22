@@ -173,11 +173,17 @@ const DashboardUI = (function() {
     }
     loadRoleContent(key, false, true);
   }
-  function loadRoleContent(activeKey, background, refresh) {
-    if ((!refresh && loadedRoleTabs[activeKey]) || loadingRoleTabs[activeKey]) return;
+  function loadRoleContent(activeKey, background, refresh, onLoaded, onError) {
+    if ((!refresh && loadedRoleTabs[activeKey]) || loadingRoleTabs[activeKey]) {
+      if (onError) onError(new Error('A dashboard refresh is already in progress. Please retry shortly.'));
+      return;
+    }
 
     const target = document.querySelector('[data-role-content="' + activeKey + '"]');
-    if (!target) return;
+    if (!target) {
+      if (onError) onError(new Error('The dashboard panel is unavailable. Reload the page.'));
+      return;
+    }
 
     const hadContent = !!loadedRoleTabs[activeKey];
     const refreshButton = byId(activeKey + 'Refresh');
@@ -189,6 +195,7 @@ const DashboardUI = (function() {
     dashboardRun()
       .withSuccessHandler(function(html) {
         target.innerHTML = html;
+        if (onLoaded) onLoaded();
         if (refresh) activatedRoles[activeKey] = false;
         if (activeKey === 'coord') console.log(JSON.stringify({event:'coordinator_core_render', durationMs:Date.now() - requestStarted, htmlCharacters:html.length}));
         loadedRoleTabs[activeKey] = true;
@@ -206,6 +213,7 @@ const DashboardUI = (function() {
       })
       .withFailureHandler(function(err) {
         loadingRoleTabs[activeKey] = false;
+        if (onError) { onError(err); return; }
         if (refreshButton) { refreshButton.disabled = false; refreshButton.innerHTML = renderLucideIcon_('refresh-cw', '', 'icon-leading') + 'Refresh'; }
         if (hadContent) {
           setText(activeKey + 'RefreshStatus', 'Could not refresh: ' + errorMessage(err) + '. Previous content is still shown.');
@@ -1289,7 +1297,85 @@ const DashboardUI = (function() {
       .syncCoordinatorGithubAccess();
   }
 
+  function refreshGithubStatus(button, message) {
+    const statusButton = byId('githubStatusRefresh');
+    if (statusButton) { statusButton.hidden = false; statusButton.disabled = true; }
+    setText('githubSubmitStatus', message || 'Refreshing GitHub status…');
+    loadRoleContent('student', false, true, function() {
+      setText('githubSubmitStatus', message || '');
+    }, function(err) {
+      if (statusButton) { statusButton.hidden = false; statusButton.disabled = false; }
+      setText('githubSubmitStatus', (message ? message + ' ' : '') + 'Dashboard refresh failed: ' + errorMessage(err) + '. Use Refresh GitHub status to retry.');
+    });
+  }
+
+  function markGithubUsernameSaved(form) {
+    form.hidden = true;
+    const card = form.closest('.step-card');
+    if (!card) return;
+    const body = card.querySelector('.step-body');
+    const badge = card.querySelector('.step-badge');
+    if (body) {
+      const text = body.querySelector('p');
+      if (text) text.textContent = 'Your valid GitHub username is saved. Checking the latest team status…';
+      body.querySelectorAll('.step-detail').forEach(function(detail) { detail.hidden = true; });
+    }
+    if (badge) { badge.textContent = 'Waiting'; badge.classList.remove('active', 'done'); badge.classList.add('waiting'); }
+    card.classList.remove('step-card-active', 'step-card-done');
+    card.classList.add('step-card-waiting');
+    const statusButton = byId('githubStatusRefresh');
+    if (statusButton) statusButton.hidden = false;
+  }
+
+  function retryGithubSetup(button) {
+    if (button.disabled) return;
+    button.disabled = true;
+    setText('githubSubmitStatus', 'Checking team usernames and repository access…');
+    function finish(message) {
+      button.disabled = false;
+      refreshGithubStatus(null, message);
+    }
+    dashboardRun().withSuccessHandler(function(result) { finish(result.message || ''); })
+      .withFailureHandler(function(err) { finish(errorMessage(err)); }).completeStudentGithubSetup();
+  }
+
+  function submitGithubUsername(event, form) {
+    event.preventDefault();
+    const input = form.elements.username;
+    if (input.disabled || !form.reportValidity()) return;
+    input.disabled = true;
+    setButtonsDisabled(form, true);
+    setText('githubSubmitStatus', 'Checking your GitHub username…');
+    function retry(message) {
+      input.disabled = false;
+      setButtonsDisabled(form, false);
+      setText('githubSubmitStatus', message);
+      input.focus();
+    }
+    function refresh(message) {
+      refreshGithubStatus(null, message);
+    }
+    dashboardRun().withSuccessHandler(function(result) {
+      if (result.alreadySubmitted) {
+        markGithubUsernameSaved(form);
+        refresh(result.message);
+        return;
+      }
+      if (!result.ok) { retry(result.message); return; }
+      markGithubUsernameSaved(form);
+      setText('githubSubmitStatus', result.message + ' Checking repository setup…');
+      dashboardRun().withSuccessHandler(function(setup) {
+        refresh(setup.message || '');
+      }).withFailureHandler(function(err) {
+        refresh('Your valid username is saved. Repository setup failed: ' + errorMessage(err));
+      }).completeStudentGithubSetup();
+    }).withFailureHandler(function(err) { retry(errorMessage(err)); }).submitStudentGithubUsername(input.value);
+  }
+
   return {
+    refreshGithubStatus,
+    retryGithubSetup,
+    submitGithubUsername,
     guideRun: dashboardRun,
     refreshRoleDashboard,
     refreshSystemStatus: function() { ensureSystemStatusLoaded(true); },

@@ -8,7 +8,7 @@
   "description": "",
   "main": "common-constants.js",
   "scripts": {
-    "test": "node --test tests/milestone-config.test.cjs tests/guide-evaluation.test.cjs tests/dashboard-loading.test.cjs tests/project-schedule.test.cjs tests/review-completion.test.cjs tests/rubric-config.test.cjs tests/reviewer-sheet-provisioning.test.cjs tests/weekly-activity.test.cjs tests/lucide-icons.test.cjs tests/reviewer-evaluation.test.cjs",
+    "test": "node --test tests/milestone-config.test.cjs tests/guide-evaluation.test.cjs tests/dashboard-loading.test.cjs tests/project-schedule.test.cjs tests/review-completion.test.cjs tests/rubric-config.test.cjs tests/reviewer-sheet-provisioning.test.cjs tests/weekly-activity.test.cjs tests/lucide-icons.test.cjs tests/reviewer-evaluation.test.cjs tests/student-github.test.cjs tests/team-github-setup.test.cjs",
     "pull": "npx @google/clasp pull",
     "push": "npx @google/clasp push",
     "watch": "npx @google/clasp push --watch",

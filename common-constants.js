@@ -10,7 +10,6 @@ const SHEET_NAMES = {
   TEAM_ROSTER: 'TeamRoster',
   TEAM_STATUS: 'TeamStatus',
   REVIEW_COMMITTEE: 'ReviewCommittee',
-  GITHUB_PROVISIONING: 'GithubProvisioning',
   GITHUB_USERNAME_RAW: 'GithubUsernameRaw',
   TEAM_INTAKE_RAW: 'TeamIntakeRaw',
   MASTER_REGISTRY: 'MasterRegistry',
@@ -85,15 +84,6 @@ const FIELD_DEFINITIONS = {
     STUDENT_EMAIL: 'Student Email',
     MARKS: 'Marks'
   }
-};
-
-// ===================================================================
-// GITHUB PROVISIONING COLUMNS (array-based indices, not headers)
-// ===================================================================
-const GP = {
-  TEAM_ID: 0,
-  REPO_URL: 1,
-  PROVISIONED_DATE: 2
 };
 
 // ===================================================================

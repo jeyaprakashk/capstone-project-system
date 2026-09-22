@@ -30,6 +30,11 @@ function onTeamIntakeSubmit(e) {
   const needAnalysisLink = driveFileUrl(nv('Need Analysis Report'));
 
   const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  try { requireTeamGithubReady_(teamId, submitterEmail, { requireAcceptedInvitations: true }); }
+  catch (err) {
+    notifyGithubIntakeRejection_(teamId, submitterEmail, err);
+    return;
+  }
   const statusSheet = getSheet(SHEET_NAMES.TEAM_STATUS);
   const statusRow = findTeamStatusRow(statusSheet, teamId, TS);
 
@@ -75,7 +80,7 @@ function onTeamIntakeSubmit(e) {
     if (score > bestMatchHub.score) bestMatchHub = { score, title: r[4], context: `${r[0]} - ${r[1]}` };
   });
 
-  if (bestMatchHub.score >= 0.30) {
+  if (bestMatchHub.score >= 0.75) {
     MailApp.sendEmail(submitterEmail, `Title Too Similar to a Past Project — Team ${teamId}`,
       `Your proposed title is ${Math.round(bestMatchHub.score * 100)}% similar to: "${bestMatchHub.title}" (${bestMatchHub.context}). ` +
       `Please revise and resubmit via your team dashboard:\n\n${getDashboardUrl()}`);
@@ -91,7 +96,7 @@ function onTeamIntakeSubmit(e) {
   });
 
   setStatusFields(statusSheet, statusRow, {
-    TITLE: title.toUpperCase(), PROBLEM: problem,
+    TITLE: title.replace(/^[\s'"\u2018\u2019\u201c\u201d]+|[\s'"\u2018\u2019\u201c\u201d]+$/g, '').toUpperCase(), PROBLEM: problem,
     WORK_BREAKDOWN_LINK: workBreakdownLink, NEED_ANALYSIS_LINK: needAnalysisLink
   }, TS);
   setStatusFields(statusSheet, statusRow, {
@@ -106,40 +111,6 @@ function onTeamIntakeSubmit(e) {
   const guideEmail = statusSheet.getRange(statusRow, TS.GUIDE_EMAIL + 1).getValue();
   MailApp.sendEmail(guideEmail, `New/Updated Title Submission — Team ${teamId}`,
     `Team ${teamId} submitted "${title}" for your review.\n\nReview it here:\n${getDashboardUrl()}`);
-}
-
-// ===================================================================
-// GITHUB USERNAME REGISTRATION FORM HANDLER
-// ===================================================================
-function onGithubUsernameSubmit(e) {
-  if (!textEquals_(e.range.getSheet().getName(), SHEET_NAMES.GITHUB_USERNAME_RAW)) return;
-  const [, submitterEmail, teamId, githubUsername] = e.values;
-
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const statusSheet = getSheet(SHEET_NAMES.TEAM_STATUS);
-  const statusRow = findTeamStatusRow(statusSheet, teamId, TS);
-
-  if (statusRow === -1) {
-    MailApp.sendEmail(submitterEmail, 'Team ID Not Recognized',
-      `The Team ID "${teamId}" does not match any team on record. Please check with your guide and resubmit.`);
-    return;
-  }
-
-  const rosterRow = statusSheet.getRange(statusRow, 1, 1, TS.S4_EMAIL + 1).getValues()[0];
-  const validEmails = [rosterRow[TS.S1_EMAIL], rosterRow[TS.S2_EMAIL], rosterRow[TS.S3_EMAIL], rosterRow[TS.S4_EMAIL]]
-    .filter(Boolean).map(normalizeEmail);
-
-  if (!validEmails.includes(normalizeEmail(submitterEmail))) {
-    MailApp.sendEmail(submitterEmail, `Team ID Mismatch — Not a Member of Team ${teamId}`,
-      `Your email is not on record as a member of Team ${teamId}. This submission was NOT applied.`);
-    return;
-  }
-
-  MailApp.sendEmail(submitterEmail, `GitHub Username Recorded — Team ${teamId}`,
-    `Your GitHub username (${githubUsername}) has been recorded. Once every teammate has submitted theirs, ` +
-    `your team's private repository will be created.`);
-
-  provisionAllTeamRepos();
 }
 
 // ===================================================================

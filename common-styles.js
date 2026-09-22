@@ -748,6 +748,21 @@ function getStudentPageStyles() {
   .student-btn:hover {
     background: var(--sd-accent-hover);
   }
+  .student-btn[hidden] { display: none; }
+  .student-btn[hidden] { display: none; }
+
+  .github-username-form { margin-top: 14px; }
+  .github-username-form[hidden] { display: none; }
+  .github-username-form label { display: block; margin-bottom: 6px; }
+  .github-username-form input {
+    display: block; box-sizing: border-box; width: 100%; max-width: 360px;
+    padding: 10px 12px; border: 1px solid var(--sd-border); border-radius: 8px;
+    background: var(--sd-surface); color: var(--sd-text); font: inherit;
+  }
+  .github-username-form input:focus-visible { outline: 2px solid var(--sd-accent); outline-offset: 2px; }
+  .github-username-form button { border: 0; cursor: pointer; font-family: inherit; }
+  .github-username-form :disabled { opacity: .65; cursor: wait; }
+  #githubSubmitStatus { font-size: 13px; }
 
   .student-btn.secondary {
     background: transparent;

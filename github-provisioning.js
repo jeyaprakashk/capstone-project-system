@@ -200,301 +200,43 @@ function getAllGithubOrgRepos_() {
 // BULK PROVISIONING
 // ===================================================================
 function provisionAllTeamRepos() {
-  const TS = getColumnMap(
-    SHEET_NAMES.TEAM_STATUS,
-    FIELD_DEFINITIONS.TEAM_STATUS
-  );
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try { return provisionTeamRepos_(); }
+  finally { lock.releaseLock(); }
+}
 
-  const TR = getColumnMap(
-    SHEET_NAMES.TEAM_ROSTER,
-    FIELD_DEFINITIONS.TEAM_ROSTER
-  );
-
-  const gpSheet = getSheet(SHEET_NAMES.GITHUB_PROVISIONING);
-
-  // Ensure GithubProvisioning headers exist
-  if (gpSheet.getLastRow() === 0) {
-    gpSheet.appendRow([
-      'Team ID',
-      'Repo URL',
-      'Provisioned Date'
-    ]);
-    Logger.log('✓ Created headers in GithubProvisioning sheet');
-  }
-
-  const statusRows = getSheetRows(SHEET_NAMES.TEAM_STATUS);
-  const rosterRows = getSheetRows(SHEET_NAMES.TEAM_ROSTER);
-  const gpRows = getSheetRows(SHEET_NAMES.GITHUB_PROVISIONING);
-  const usernameRows = getSheetRows(SHEET_NAMES.GITHUB_USERNAME_RAW);
-
-  const rosterByTeamId = groupBy(
-    rosterRows,
-    row => row[TR.TEAM_ID]
-  );
-
-  const provisionedTeams = new Set(
-    gpRows
-      .map(row => normalizeText_(row[GP.TEAM_ID]))
-      .filter(Boolean)
-  );
-
-  const toProvision = statusRows.filter(row =>
-    row[TS.TEAM_ID] &&
-    !provisionedTeams.has(normalizeText_(row[TS.TEAM_ID]))
-  );
-
-  /*
-   * Configuration values are constant for the entire provisioning run,
-   * so read them once rather than once per team.
-   */
-  const orgName = String(
-    getConfig('GITHUB_ORG_NAME')
-  ).trim();
-
-  const guideRepoPermission = String(
-    getConfig('GUIDE_REPO_PERMISSION')
-  ).trim();
-
-  const coordinatorUsername = String(
-    getConfig('COLLABORATOR_GITHUB_USERNAME') || ''
-  ).trim();
-
-  const coordinatorRepoPermission = String(
-    getConfig('COLLABORATOR_REPO_PERMISSION') || 'maintain'
-  ).trim();
-
-  const results = {
-    success: [],
-    failed: [],
-    waiting: []
-  };
-
-  toProvision.forEach(statusRow => {
-    const teamId = statusRow[TS.TEAM_ID];
-    const semester = statusRow[TS.SEMESTER];
-
-    const rosterRow =
-      rosterByTeamId[normalizeText_(teamId)] &&
-      rosterByTeamId[normalizeText_(teamId)].length > 0
-        ? rosterByTeamId[normalizeText_(teamId)][0]
-        : null;
-
-    if (!rosterRow) {
-      results.failed.push({
-        teamId,
-        reason: 'No matching roster entry'
-      });
-      return;
-    }
-
-    const repoName =
-      `capstone-${String(semester)
-        .replace(/\s+/g, '-')
-        .toLowerCase()}-team-${teamId}`;
-
-    const repoSlug = `${orgName}/${repoName}`;
-
-    const title =
-      statusRow[TS.TITLE] ||
-      `Team ${teamId} Capstone`;
-
-    const guideUsername = String(
-      rosterRow[TR.GUIDE_GITHUB_USERNAME] || ''
-    ).trim();
-
-    const studentEmails = [
-      rosterRow[TR.S1_EMAIL],
-      rosterRow[TR.S2_EMAIL],
-      rosterRow[TR.S3_EMAIL],
-      rosterRow[TR.S4_EMAIL]
-    ].filter(Boolean);
-
-    const studentUsernames = studentEmails
-      .map(email => {
-        const match = [...usernameRows]
-          .reverse()
-          .find(row =>
-            emailsMatch(row[1], email) &&
-            textEquals_(row[2], teamId)
-          );
-
-        return match
-          ? String(match[3]).trim()
-          : null;
-      })
-      .filter(Boolean);
-
-    /*
-     * Do not provision the repository until every student
-     * in the team has submitted a GitHub username.
-     */
-    if (studentUsernames.length !== studentEmails.length) {
-      results.waiting.push({
-        teamId,
-        reason:
-          `Waiting for GitHub usernames ` +
-          `(${studentUsernames.length}/${studentEmails.length} submitted)`
-      });
-      return;
-    }
-
+// Callers hold the script lock; an omitted team ID runs the coordinator batch.
+function provisionTeamRepos_(onlyTeamId) {
+  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const TR = getColumnMap(SHEET_NAMES.TEAM_ROSTER, FIELD_DEFINITIONS.TEAM_ROSTER);
+  const roster = getSheetRows(SHEET_NAMES.TEAM_ROSTER);
+  const results = { success: [], failed: [], waiting: [] };
+  getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID] && (!onlyTeamId || textEquals_(row[TS.TEAM_ID], onlyTeamId))).forEach(row => {
+    const teamId = row[TS.TEAM_ID];
     try {
-      // ---------------------------------------------------------------
-      // 1. Create repository
-      // ---------------------------------------------------------------
-      const createResp = createTeamRepo(
-        repoName,
-        teamId
-      );
-
-      if (createResp.status !== 201) {
-        results.failed.push({
-          teamId,
-          reason: `GitHub API error: ${createResp.status}`
-        });
+      const setup = repairTeamGithubSetup_(teamId);
+      if (!setup.ready) {
+        (setup.verificationUnavailable || setup.usernamesComplete ? results.failed : results.waiting).push({ teamId, reason: setup.message });
         return;
       }
-
-      const repoUrl = createResp.body.html_url;
-
-      // ---------------------------------------------------------------
-      // 2. Configure README
-      // ---------------------------------------------------------------
-      setReadmeHeading(
-        repoSlug,
-        repoName,
-        teamId,
-        title
-      );
-
-      // ---------------------------------------------------------------
-      // 3. Add student collaborators
-      // ---------------------------------------------------------------
-      studentUsernames.forEach(username => {
-        addCollaborator(
-          repoSlug,
-          username,
-          'push'
-        );
-      });
-
-      // ---------------------------------------------------------------
-      // 4. Add guide
-      // ---------------------------------------------------------------
-      if (guideUsername) {
-        addCollaborator(
-          repoSlug,
-          guideUsername,
-          guideRepoPermission
-        );
+      // Preserve the existing guide/coordinator provisioning behavior without changing student membership.
+      const team = roster.find(item => textEquals_(item[TR.TEAM_ID], teamId));
+      const guide = String(team && team[TR.GUIDE_GITHUB_USERNAME] || '').trim();
+      const coordinator = String(getConfig('COLLABORATOR_GITHUB_USERNAME') || '').trim();
+      const slug = getGithubRepoSlug_(setup.repoUrl);
+      const staff = [[guide, getConfig('GUIDE_REPO_PERMISSION')], [coordinator, getConfig('COLLABORATOR_REPO_PERMISSION') || 'maintain']];
+      if (staff.some(item => item[0])) {
+        const invitations = getGithubInvitations_(slug);
+        staff.filter(item => item[0]).forEach(([username, permission]) => ensureGithubPermission_(slug, username, permission, invitations));
       }
-
-      // ---------------------------------------------------------------
-      // 5. Add coordinator
-      // ---------------------------------------------------------------
-      if (coordinatorUsername) {
-        addCollaborator(
-          repoSlug,
-          coordinatorUsername,
-          coordinatorRepoPermission
-        );
-      }
-
-      // ---------------------------------------------------------------
-      // 6. Record successful provisioning
-      // ---------------------------------------------------------------
-      try {
-        Logger.log(
-          `📝 Appending to GithubProvisioning: ` +
-          `Team ${teamId}, URL: ${repoUrl}`
-        );
-
-        /*
-         * Refetch the sheet immediately before writing.
-         */
-        const freshGpSheet = getSheet(
-          SHEET_NAMES.GITHUB_PROVISIONING
-        );
-
-        freshGpSheet.appendRow([
-          teamId,
-          repoUrl,
-          new Date()
-        ]);
-
-        // Keep TeamStatus current-state Repo URL synchronized.
-        updateTeamStatusRepoUrl_(teamId, repoUrl);
-
-        Logger.log(
-          '✓ Successfully appended to GithubProvisioning sheet'
-        );
-
-      } catch (appendErr) {
-        Logger.log(
-          `❌ ERROR appending to GithubProvisioning sheet: ` +
-          `${appendErr.message}`
-        );
-
-        Logger.log(
-          `Stack: ${appendErr.stack || ''}`
-        );
-      }
-
-      results.success.push({
-        teamId,
-        repoUrl,
-        students: studentUsernames.length
-      });
-
-    } catch (err) {
-      results.failed.push({
-        teamId,
-        reason: err.message
-      });
-    }
+      results.success.push({ teamId, repoUrl: setup.repoUrl, students: setup.members.length, message: setup.message });
+    } catch (err) { results.failed.push({ teamId, reason: err.message }); }
   });
-
-  // -------------------------------------------------------------------
-  // Provisioning report
-  // -------------------------------------------------------------------
-  const successLog = results.success
-    .map(result =>
-      `Team ${result.teamId}: ${result.repoUrl} ` +
-      `(${result.students} students)`
-    )
-    .join('\n');
-
-  const failedLog = results.failed
-    .map(result =>
-      `Team ${result.teamId}: ${result.reason}`
-    )
-    .join('\n');
-
-  Logger.log(
-    `✓ Successfully provisioned: ${results.success.length}\n` +
-    `${successLog}\n\n` +
-    `✗ Failed: ${results.failed.length}\n` +
-    `${failedLog}`
-  );
-
-  if (results.failed.length > 0) {
-    MailApp.sendEmail(
-      getCoordinatorEmail(),
-      `GitHub Provisioning Report — ` +
-        `${results.success.length} successful, ` +
-        `${results.failed.length} failed`,
-      `Successfully provisioned:\n` +
-        `${successLog || '(none)'}\n\n\n` +
-        `Failed:\n` +
-        `${failedLog || '(none)'}`
-    );
-  }
-
+  Logger.log(JSON.stringify(results));
   return results;
 }
-// ===================================================================
-// GUIDE BACKFILL
-// ===================================================================
+
 function addMissingGuideCollaborators() {
   const TR = getColumnMap(
     SHEET_NAMES.TEAM_ROSTER,
@@ -727,92 +469,43 @@ function backfillReadmeToAllRepos() {
 }
 
 // ===================================================================
-// BACKFILL EXISTING GITHUB REPOS INTO GithubProvisioning
+// BACKFILL EXISTING GITHUB REPOS INTO TeamStatus
 // ===================================================================
 function backfillExistingRepos() {
-  const gpSheet = getSheet(SHEET_NAMES.GITHUB_PROVISIONING);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try { return backfillExistingRepos_(); }
+  finally { lock.releaseLock(); }
+}
 
-  if (gpSheet.getLastRow() === 0) {
-    gpSheet.appendRow([
-      'Team ID',
-      'Repo URL',
-      'Provisioned Date'
-    ]);
-  }
-
-  const results = {
-    added: [],
-    skipped: [],
-    failed: []
-  };
-
+function backfillExistingRepos_() {
+  const results = { added: [], skipped: [], failed: [] };
   try {
+    const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+    const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]);
+    const repoMap = getRepoUrlMap();
     const repos = getAllGithubOrgRepos_();
-    const teamRepos = repos.filter(repo =>
-      normalizeText_(repo.name).includes('capstone') && normalizeText_(repo.name).includes('team')
-    );
-
-    const existingRows = getSheetRows(
-      SHEET_NAMES.GITHUB_PROVISIONING
-    );
-
-    const existingUrls = new Set(
-      existingRows
-        .map(row => String(row[GP.REPO_URL] || '').trim())
-        .filter(Boolean)
-    );
-
-    teamRepos.forEach(repo => {
-      if (existingUrls.has(repo.html_url)) {
-        results.skipped.push({
-          repo: repo.name,
-          reason: 'Already recorded'
-        });
+    rows.forEach(row => {
+      const teamId = row[TS.TEAM_ID];
+      if (repoMap[normalizeText_(teamId)]) {
+        results.skipped.push({ teamId, reason: 'Already recorded in TeamStatus' });
         return;
       }
-
-      const match = repo.name.match(/team-([A-Z0-9]+)/i);
-      const teamId = match ? match[1] : repo.name;
-
+      const expectedName = `capstone-${String(row[TS.SEMESTER]).replace(/\s+/g, '-').toLowerCase()}-team-${teamId}`;
+      const repo = repos.find(repo => textEquals_(repo.name, expectedName));
+      if (!repo) {
+        results.skipped.push({ teamId, reason: 'No matching GitHub repository' });
+        return;
+      }
       try {
-        gpSheet.appendRow([
-          teamId,
-          repo.html_url,
-          new Date()
-        ]);
-
-        // Keep TeamStatus current-state Repo URL synchronized.
         updateTeamStatusRepoUrl_(teamId, repo.html_url);
-
-        existingUrls.add(repo.html_url);
-
-        results.added.push({
-          teamId,
-          repoUrl: repo.html_url
-        });
-
+        results.added.push({ teamId, repoUrl: repo.html_url });
       } catch (err) {
-        results.failed.push({
-          teamId,
-          repoUrl: repo.html_url,
-          reason: err.message
-        });
+        results.failed.push({ teamId, repoUrl: repo.html_url, reason: err.message });
       }
     });
-
-  } catch (err) {
-    results.failed.push({
-      reason: err.message
-    });
-  }
-
-  Logger.log(
-    `Existing repository backfill complete — ` +
-    `${results.added.length} added, ` +
-    `${results.skipped.length} skipped, ` +
-    `${results.failed.length} failed.`
-  );
-
+  } catch (err) { results.failed.push({ reason: err.message }); }
+  Logger.log(`Existing repository backfill complete — ${results.added.length} added, ${results.skipped.length} skipped, ${results.failed.length} failed.`);
   return results;
 }
 
@@ -821,232 +514,10 @@ function backfillExistingRepos() {
 // Adds missing student collaborators to already-provisioned repos
 // ===================================================================
 function backfillMissingStudentCollaborators() {
-
-  const TR = getColumnMap(
-    SHEET_NAMES.TEAM_ROSTER,
-    FIELD_DEFINITIONS.TEAM_ROSTER
-  );
-
-  const rosterRows = getSheetRows(SHEET_NAMES.TEAM_ROSTER);
-  const usernameRows = getSheetRows(SHEET_NAMES.GITHUB_USERNAME_RAW);
-  const repoMap = getRepoUrlMap();
-
-  // -----------------------------------------------------------------
-  // GithubFailures sheet
-  // -----------------------------------------------------------------
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let failureSheet = ss.getSheetByName('GithubFailures');
-
-  if (!failureSheet) {
-    failureSheet = ss.insertSheet('GithubFailures');
-  }
-
-  // Clear previous results and recreate headers
-  failureSheet.clearContents();
-  failureSheet.getRange(1, 1, 1, 3).setValues([
-    ['Email address', 'Team ID', 'GitHub Username']
-  ]);
-
-  const githubFailures = [];
-
-  const results = {
-    added: [],
-    skipped: [],
-    failed: []
-  };
-
-  rosterRows.forEach(rosterRow => {
-
-    const teamId = rosterRow[TR.TEAM_ID];
-    const repoUrl = repoMap[normalizeText_(teamId)];
-
-    // ---------------------------------------------------------------
-    // Repository must already be provisioned
-    // ---------------------------------------------------------------
-    if (!repoUrl) {
-      results.skipped.push({
-        teamId,
-        reason: 'No provisioned repository'
-      });
-      return;
-    }
-
-    // ---------------------------------------------------------------
-    // Parse repository URL
-    // ---------------------------------------------------------------
-    const repoSlug = getGithubRepoSlug_(repoUrl);
-
-    if (!repoSlug) {
-      results.failed.push({
-        teamId,
-        reason: `Invalid GitHub repository URL: ${repoUrl}`
-      });
-      return;
-    }
-
-
-    // ---------------------------------------------------------------
-    // Students belonging to this team
-    // ---------------------------------------------------------------
-    const studentEmails = [
-      rosterRow[TR.S1_EMAIL],
-      rosterRow[TR.S2_EMAIL],
-      rosterRow[TR.S3_EMAIL],
-      rosterRow[TR.S4_EMAIL]
-    ]
-      .filter(Boolean)
-      .map(email => String(email).trim());
-
-    studentEmails.forEach(email => {
-
-      /*
-       * Search newest submission first.
-       *
-       * Column B = Email
-       * Column C = Team ID
-       * Column D = GitHub Username
-       */
-      const usernameRow = [...usernameRows]
-        .reverse()
-        .find(row =>
-          emailsMatch(row[1], email) &&
-          textEquals_(row[2], teamId)
-        );
-
-      if (!usernameRow) {
-        results.skipped.push({
-          teamId,
-          email,
-          reason: 'GitHub username not submitted'
-        });
-        return;
-      }
-
-      const githubUsername = String(
-        usernameRow[3] || ''
-      ).trim();
-
-      if (!githubUsername) {
-        results.skipped.push({
-          teamId,
-          email,
-          reason: 'GitHub username is blank'
-        });
-        return;
-      }
-
-      try {
-        // -----------------------------------------------------------
-        // Add or update student collaborator access
-        // -----------------------------------------------------------
-        const response = addCollaborator(
-          repoSlug,
-          githubUsername,
-          'push'
-        );
-
-        /*
-         * GitHub normally returns:
-         *
-         * 201 = invitation created
-         * 204 = collaborator already present / permission updated
-         */
-        if (
-          response.status === 201 ||
-          response.status === 204
-        ) {
-
-          results.added.push({
-            teamId,
-            email,
-            githubUsername
-          });
-
-          Logger.log(
-            `✓ Team ${teamId}: ` +
-            `${githubUsername} added/already accessible`
-          );
-
-        } else {
-
-          const reason =
-            `GitHub API status ${response.status}`;
-
-          results.failed.push({
-            teamId,
-            email,
-            githubUsername,
-            reason
-          });
-
-          githubFailures.push([
-            email,
-            teamId,
-            githubUsername
-          ]);
-
-          Logger.log(
-            `❌ Team ${teamId}: ` +
-            `Could not add ${githubUsername} — ${reason}`
-          );
-        }
-
-      } catch (err) {
-
-        results.failed.push({
-          teamId,
-          email,
-          githubUsername,
-          reason: err.message
-        });
-
-        githubFailures.push([
-          email,
-          teamId,
-          githubUsername
-        ]);
-
-        Logger.log(
-          `❌ Team ${teamId}: ` +
-          `Error adding ${githubUsername}: ${err.message}`
-        );
-      }
-
-    });
-
-  });
-
-  // -----------------------------------------------------------------
-  // Write failures
-  // -----------------------------------------------------------------
-  if (githubFailures.length > 0) {
-    failureSheet
-      .getRange(2, 1, githubFailures.length, 3)
-      .setValues(githubFailures);
-
-    failureSheet.autoResizeColumns(1, 3);
-  }
-
-  // -----------------------------------------------------------------
-  // Summary
-  // -----------------------------------------------------------------
-  Logger.log(
-    '\n=== STUDENT COLLABORATOR BACKFILL COMPLETE ==='
-  );
-
-  Logger.log(
-    `✓ Added / already accessible: ${results.added.length}`
-  );
-
-  Logger.log(
-    `⏭️ Skipped: ${results.skipped.length}`
-  );
-
-  Logger.log(
-    `❌ Failed: ${results.failed.length}`
-  );
-
-  return results;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try { return provisionTeamRepos_(); }
+  finally { lock.releaseLock(); }
 }
 // ===================================================================
 // COORDINATOR REPOSITORY ACCESS SYNC
@@ -1094,13 +565,7 @@ function syncCoordinatorGithubAccess() {
     // ---------------------------------------------------------------
     // Get all provisioned repository URLs
     // ---------------------------------------------------------------
-    const gpRows = getSheetRows(
-      SHEET_NAMES.GITHUB_PROVISIONING
-    );
-
-    const repoUrls = gpRows
-      .map(row => String(row[GP.REPO_URL] || '').trim())
-      .filter(Boolean);
+    const repoUrls = [...new Set(Object.values(getRepoUrlMap()).filter(Boolean))];
 
     let verifiedAccess = 0;
     let alreadyAccessible = 0;
