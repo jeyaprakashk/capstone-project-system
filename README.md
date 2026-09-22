@@ -70,8 +70,10 @@ Coordinator indicators distinguish repository availability from setup completion
 - All repository workflows now use `TeamStatus` as their only registry. Before
   retiring the old repository tab, ensure existing URLs are present in
   `TeamStatus`. `backfillExistingRepos()` can recover missing URLs directly from
-  GitHub by matching the current team's semester and team ID. Existing URLs are
-  preserved; no legacy-sheet fallback or migration function remains.
+  GitHub by matching the configured academic year, semester, and team ID.
+  Existing URLs are preserved.
+- Set Config `ACADEMIC_YEAR` to `2026-27` (format `YYYY-YY`). New repositories
+  use `capstone-2026-27-odd-team-G2`, with the semester and team ID from TeamStatus.
 - Provisioning retries recover an existing GitHub repository if a previous
   sheet write failed. Repository creation dates are not stored; valid member
   submission timestamps remain in `GithubUsernameRaw`.

@@ -159,7 +159,7 @@ function repairTeamGithubSetup_(teamId) {
   const row = getSheetRows(SHEET_NAMES.TEAM_STATUS).find(row => textEquals_(row[columns.TEAM_ID], teamId));
   const setup = getTeamGithubSetup_(teamId, { row, columns, inspectAccess: false });
   if (!setup.usernamesComplete) return setup;
-  const name = `capstone-${String(row[columns.SEMESTER]).replace(/\s+/g, '-').toLowerCase()}-team-${teamId}`;
+  const name = getTeamRepoName_(teamId, row[columns.SEMESTER]);
   const expectedSlug = String(getConfig('GITHUB_ORG_NAME')).trim() + '/' + name;
   const slug = setup.repoUrl ? getGithubRepoSlug_(setup.repoUrl) : expectedSlug;
   if (!slug) throw new Error('The saved repository URL is invalid. Contact your coordinator.');

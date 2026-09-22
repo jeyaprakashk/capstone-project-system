@@ -7,7 +7,7 @@ const vm=require('node:vm');
 function fixture() {
   const columns={TEAM_ID:0,SEMESTER:1,TITLE:2,S1_EMAIL:3,S2_EMAIL:4,S3_EMAIL:5,S4_EMAIL:6,S1_REGNO:8,S2_REGNO:9,
     GUIDE_EMAIL:10,REVIEWER_NOTES:11,GUIDE_DECISION:12,REVIEWER_DECISION:13};
-  const team=['T1','Odd','','one@example.com','two@example.com','','','https://github.com/org/capstone-odd-team-T1','R1','R2','guide@example.com'];
+  const team=['T1','Odd','','one@example.com','two@example.com','','','https://github.com/org/capstone-2026-27-odd-team-T1','R1','R2','guide@example.com'];
   const usernames=[[new Date('2026-09-01T10:00:00Z'),'one@example.com','T1','one'],[new Date('2026-09-02T10:00:00Z'),'two@example.com','T1','two']];
   const invitations=[], calls=[], writes=[], mails=[], logs=[];
   const permissions=new Map([['one','write'],['two','write']]);
@@ -22,7 +22,7 @@ function fixture() {
     Session:{getActiveUser:()=>({getEmail:()=>team[3]})},
     LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},SpreadsheetApp:{flush(){}},
     getConfig:key=>key==='GITHUB_ORG_NAME'?'org':key==='GUIDE_REPO_PERMISSION'?'push':key==='COLLABORATOR_REPO_PERMISSION'?'maintain':'',
-    getCoordinatorEmail:()=> 'coord@example.com',getAcademicYear:()=> '2026',Logger:{log(){}},
+    getCoordinatorEmail:()=> 'coord@example.com',getAcademicYear:()=> '2026-27',Logger:{log(){}},
     MailApp:{sendEmail:(...args)=>mails.push(args)},driveFileUrl:x=>x,findTeamStatusRow:()=>2,
     getDashboardUrl:()=> 'https://dashboard',getHubRegistrySheet:()=>({getDataRange:()=>({getValues:()=>[[]]})}),
     setStatusFields:(sheet,row,fields)=>writes.push(fields),
@@ -42,7 +42,7 @@ function fixture() {
       const name=path.split('/').pop();
       return name==='invalid'?{status:404}:{status:200,body:{login:name,type:'User'}};
     }
-    if(method==='POST'){repository=true;return {status:201,body:{html_url:'https://github.com/org/capstone-odd-team-T1'}};}
+    if(method==='POST'){repository=true;return {status:201,body:{html_url:'https://github.com/org/capstone-2026-27-odd-team-T1'}};}
     if(path.includes('/invitations?')) return {status:200,body:invitations};
     if(method==='PATCH') {
       if(apiFailure)return {status:apiFailure};
@@ -58,7 +58,7 @@ function fixture() {
       }
       return permissions.has(name)?{status:200,body:{permission:permissions.get(name)}}:{status:404};
     }
-    return repository?{status:200,body:{html_url:'https://github.com/org/capstone-odd-team-T1'}}:{status:404};
+    return repository?{status:200,body:{html_url:'https://github.com/org/capstone-2026-27-odd-team-T1'}}:{status:404};
   };
   return {c,team,usernames,invitations,permissions,calls,writes,mails,logs,
     state:()=>c.getTeamGithubSetup_('T1'),repair:()=>c.repairTeamGithubSetup_('T1'),
@@ -151,7 +151,7 @@ test('final valid member enables new creation; failed sheet write recovers exist
   assert.throws(()=>f.repair(),/Sheet write failed/);
   f.failWrite(false);assert.equal(f.repair().ready,true);
   assert.equal(f.calls.filter(call=>call.method==='POST').length,1);
-  assert.equal(f.team[7],'https://github.com/org/capstone-odd-team-T1');
+  assert.equal(f.team[7],'https://github.com/org/capstone-2026-27-odd-team-T1');
 });
 
 test('repository and invitation API failures fail closed without creating replacement repos',()=>{

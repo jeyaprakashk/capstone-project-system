@@ -107,23 +107,78 @@ const DashboardUI = (function() {
       : data.today < data.schedule.week1 ? 'Weekly logging starts ' + data.milestones.find(function(m) { return m.key === 'week1'; }).date
       : 'Weekly logging ended';
     const next = data.milestones.findIndex(function(m) { return m.day >= data.today; });
-    target.innerHTML = '<div class="timeline-heading"><div class="timeline-title-group"><span class="timeline-eyebrow">CAPSTONE JOURNEY</span><h2>Project timeline</h2><p class="timeline-note">Your semester, milestone by milestone</p></div>' +
+    const imminent = next >= 0 && data.milestones[next].day <= data.today + 1;
+    const highlighted = imminent ? data.milestones.findIndex(function(m) { return m.day > data.today + 1; }) : next;
+    target.innerHTML = '<div class="timeline-heading"><h2>Project timeline</h2>' +
       '<div class="timeline-meta"><span class="timeline-today">Today · ' + escapeClientHtml(data.todayLabel) + '</span><span class="timeline-week">' + escapeClientHtml(phase) + '</span></div></div>' +
+      '<div class="timeline-body"><div class="timeline-navigation" hidden><button type="button" class="timeline-nav timeline-prev" aria-label="Scroll to earlier milestones">' + renderLucideIcon_('chevron-left') + '</button><button type="button" class="timeline-nav timeline-forward" aria-label="Scroll to later milestones">' + renderLucideIcon_('chevron-right') + '</button></div>' +
       '<div class="timeline-scroll" role="region" aria-label="Project milestones, scroll horizontally to see all dates" tabindex="0"><ol class="timeline-track" style="--timeline-stops:' + data.milestones.length + '">' + data.milestones.map(function(m, index) {
-        const state = m.day < data.today ? 'past' : m.day === data.today ? 'today' : index === next ? 'next' : 'future';
-        const label = state === 'past' ? 'Date passed' : state === 'today' ? 'Today' : state === 'next' ? 'Up next' : 'Scheduled';
-        return '<li class="timeline-stop timeline-' + state + '"><span class="timeline-dot" aria-hidden="true"></span><strong>' + escapeClientHtml(m.label) + '</strong><span class="timeline-date">' + escapeClientHtml(m.date) + '</span><span class="timeline-state">' + label + '</span></li>';
-      }).join('') + '</ol></div><p class="timeline-scroll-hint" hidden>Scroll Horizontally to see all dates ' + renderLucideIcon_('arrow-left-right') + '</p>';
+        const state = m.day < data.today ? 'past' : m.day <= data.today + 1 ? 'imminent' : index === highlighted ? 'next' : 'future';
+        const label = m.day === data.today ? 'Today' : m.day === data.today + 1 ? 'Tomorrow' : index === highlighted ? 'Up Next' : '';
+        return '<li class="timeline-stop timeline-' + state + (index === highlighted ? ' timeline-current' + (imminent ? ' timeline-upcoming' : '') : '') + (index === highlighted - 1 ? ' timeline-approaching' : '') + '"' + (index === next ? ' aria-current="step"' : '') + '><span class="timeline-dot" aria-hidden="true">' + (index === highlighted ? '<span class="timeline-node-core"></span>' : '') + '</span><strong>' + escapeClientHtml(m.label) + '</strong><span class="timeline-date" title="' + escapeClientHtml(m.date) + '" aria-label="' + escapeClientHtml(m.date) + '">' + escapeClientHtml(String(m.date).replace(/ [0-9]{4}$/, '')) + '</span>' + (label ? '<span class="timeline-state">' + label + '</span>' : '') + '</li>';
+      }).join('') + '</ol></div></div>';
     const scroll = target.querySelector('.timeline-scroll');
-    const hint = target.querySelector('.timeline-scroll-hint');
-    function updateScrollHint() {
-      hint.hidden = scroll.scrollWidth - scroll.clientWidth <= 1;
+    const navigation = target.querySelector('.timeline-navigation');
+    const previous = target.querySelector('.timeline-prev');
+    const forward = target.querySelector('.timeline-forward');
+    function updateScrollControls() {
+      const maximum = Math.max(0, scroll.scrollWidth - scroll.clientWidth);
+      navigation.hidden = maximum <= 1;
+      previous.disabled = scroll.scrollLeft <= 1;
+      forward.disabled = scroll.scrollLeft >= maximum - 1;
+    }
+    function scrollMilestones(direction) {
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      scroll.scrollBy({left:direction * Math.max(132, scroll.clientWidth * 0.75), behavior:reducedMotion ? 'auto' : 'smooth'});
+    }
+    previous.addEventListener('click', function() { scrollMilestones(-1); });
+    forward.addEventListener('click', function() { scrollMilestones(1); });
+    scroll.addEventListener('scroll', updateScrollControls, {passive:true});
+    let drag = null;
+    scroll.addEventListener('pointerdown', function(event) {
+      // Touch uses the browser's native swipe inertia and vertical page scrolling.
+      if (event.pointerType === 'touch' || event.button !== 0 || event.isPrimary === false || scroll.scrollWidth <= scroll.clientWidth) return;
+      drag = {pointerId:event.pointerId, x:event.clientX, left:scroll.scrollLeft};
+      scroll.setPointerCapture(event.pointerId);
+      scroll.setAttribute('data-dragging', 'true');
+      event.preventDefault();
+    });
+    scroll.addEventListener('pointermove', function(event) {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      scroll.scrollLeft = Math.max(0, Math.min(drag.left + drag.x - event.clientX, scroll.scrollWidth - scroll.clientWidth));
+      updateScrollControls();
+      event.preventDefault();
+    });
+    function endTimelineDrag(event) {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      const pointerId = drag.pointerId;
+      drag = null;
+      scroll.setAttribute('data-dragging', 'false');
+      if (scroll.hasPointerCapture(pointerId)) scroll.releasePointerCapture(pointerId);
+    }
+    scroll.addEventListener('pointerup', endTimelineDrag);
+    scroll.addEventListener('pointercancel', endTimelineDrag);
+    scroll.addEventListener('lostpointercapture', endTimelineDrag);
+    let initialViewSet = false;
+    function updateTimelineLayout() {
+      updateScrollControls();
+      if (!initialViewSet && scroll.clientWidth > 0) {
+        initialViewSet = true;
+        const milestone = scroll.querySelector(next >= 0 ? '[aria-current="step"]' : '.timeline-stop:last-child');
+        if (milestone) {
+          const bounds = milestone.getBoundingClientRect();
+          const viewport = scroll.getBoundingClientRect();
+          const centered = scroll.scrollLeft + bounds.left - viewport.left + bounds.width / 2 - scroll.clientWidth / 2;
+          scroll.scrollLeft = Math.max(0, Math.min(centered, scroll.scrollWidth - scroll.clientWidth));
+          updateScrollControls();
+        }
+      }
     }
     if (target.timelineResizeObserver) target.timelineResizeObserver.disconnect();
-    target.timelineResizeObserver = new ResizeObserver(updateScrollHint);
+    target.timelineResizeObserver = new ResizeObserver(updateTimelineLayout);
     target.timelineResizeObserver.observe(scroll);
     target.timelineResizeObserver.observe(scroll.querySelector('.timeline-track'));
-    updateScrollHint();
+    updateTimelineLayout();
   }
 
   function loadSharedTimeline() {
@@ -174,7 +229,9 @@ const DashboardUI = (function() {
       dashboardRun().withSuccessHandler(function(data) {
         try {
           target.innerHTML = '<h2 id="sharedRubricsHeading">Assessment rubrics</h2><div class="rubric-assessments">' + data.assessments.map(function(item) {
-            return '<button type="button" class="rubric-assessment" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-weight">' + escapeClientHtml(item.weight) + '% contribution</span><span>' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></button>';
+            const desktopCard = '<button type="button" class="rubric-assessment" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span class="rubric-header"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-weight">' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span class="rubric-footer"><span class="rubric-metadata">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span class="rubric-action"><span class="rubric-mobile-hidden">View rubric</span> <span aria-hidden="true">→</span></span>' : '') + '</span></button>';
+            const mobileRow = '<div class="rubric-mobile-row"><div class="rubric-mobile-details"><div class="rubric-mobile-title"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-mobile-weight" aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span class="rubric-mobile-meta">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="rubric-view-button" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
+            return desktopCard + mobileRow;
           }).join('') + '</div>' + (data.assessments.length ? '' : '<p>No graded assessments configured.</p>');
           sharedRubrics = data;
           target.querySelectorAll('[data-rubric-key]').forEach(function(button) {
@@ -321,7 +378,7 @@ const DashboardUI = (function() {
       .loadStudentMarksSection();
   }
 
-  const announcementsState = { loading: false, loaded: false, query: '', page: 1, pageSize: 10 };
+  const announcementsState = { loading: false, loaded: false, query: '', page: 1, pageSize: 5 };
 
   function initializeAnnouncementSearch(target) {
     const search = target.querySelector('#announcementSearch');

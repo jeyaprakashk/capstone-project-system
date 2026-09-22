@@ -47,7 +47,15 @@ test('rubrics start alongside pending role and timeline, deduplicate and survive
  f.done('loadSharedRubrics',f.data);await promise;
  f.click('reviewer');await f.ui.loadSharedRubrics();
  assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
- assert.match(f.nodes.sharedRubrics.innerHTML,/12.5% contribution/);
+ assert.match(f.nodes.sharedRubrics.innerHTML,/12.5%<span class="rubric-mobile-hidden"> weight<\/span>/);
+ assert.match(f.nodes.sharedRubrics.innerHTML,/<span class="rubric-mobile-hidden">View rubric<\/span>/);
+ const mobileRows=[...f.nodes.sharedRubrics.innerHTML.matchAll(/<div class="rubric-mobile-row">([\s\S]*?)<\/button><\/div>/g)];
+ assert.equal(mobileRows.length,2);
+ assert.match(mobileRows[0][1],/<strong>Review 1<\/strong><span class="rubric-mobile-weight"/);
+ assert.match(mobileRows[0][1],/<button type="button" class="rubric-view-button" data-rubric-key="review1"/);
+ assert.equal((mobileRows[0][1].match(/data-rubric-key=/g)||[]).length,1,'only the action button opens the mobile rubric');
+ assert.match(mobileRows[1][1],/Rubric not configured/);
+ assert.match(mobileRows[1][1],/ disabled>View rubric/);
  assert.match(f.nodes.sharedRubrics.innerHTML,/disabled/);
 });
 

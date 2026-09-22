@@ -447,6 +447,10 @@ function timelineBrowser() {
   const {c}=fixture();
   const requests=[];
   const target=()=>({innerHTML:'',attributes:{},nodes:{},listeners:{},scrollLeft:0,scrollWidth:1000,clientWidth:400,
+    getBoundingClientRect(){return {left:0,width:132};},
+    setPointerCapture(id){this.capturedPointer=id;},
+    hasPointerCapture(id){return this.capturedPointer===id;},
+    releasePointerCapture(){this.capturedPointer=null;},
     setAttribute(key,value){this.attributes[key]=value;},
     addEventListener(event,fn){this.listeners[event]=fn;},
     querySelector(selector){return this.nodes[selector] ||= target();},
@@ -494,20 +498,104 @@ test('timeline is single-flight and never blocks either role dashboard',async()=
   assert.equal(f.timeline.attributes['aria-busy'],'false');
 });
 
-test('timeline shows a text hint only when milestones overflow',()=>{
+test('timeline moves the highlight past Today and Tomorrow and handles the final milestone',()=>{
+  for (const offsets of [[-2,0,1,5,9],[-2,1,5],[-2,0],[-2,5,9],[-3,-2]]) {
+    const f=timelineBrowser(); f.initialize();
+    const data=JSON.parse(JSON.stringify(f.c.getSharedProjectTimelineData_()));
+    data.active=true;
+    data.milestones=offsets.map((offset,index)=>({key:'m'+index,label:'Milestone '+index,day:data.today+offset,date:'Date '+index}));
+    f.requests[1].success(data);
+    const items=[...f.timeline.innerHTML.matchAll(/<li class="([^"]+)"[^>]*>(.*?)<\/li>/g)];
+    const imminent=offsets.some(offset=>offset===0||offset===1);
+    const highlighted=offsets.findIndex(offset=>offset>(imminent?1:-1));
+    items.forEach((item,index)=>{
+      const offset=offsets[index];
+      assert.equal(item[1].includes('timeline-current'),index===highlighted);
+      assert.equal(item[1].includes('timeline-upcoming'),imminent&&index===highlighted);
+      assert.equal(item[1].includes('timeline-imminent'),offset===0||offset===1);
+      assert.equal(item[2].includes('timeline-node-core'),index===highlighted);
+      const label=offset===0?'Today':offset===1?'Tomorrow':index===highlighted?'Up Next':null;
+      if(label) assert(item[2].includes('class="timeline-state">'+label+'</span>'));
+      else assert(!item[2].includes('timeline-state'));
+    });
+  }
+});
+
+test('timeline centers the nearest event once and shows larger short dates with full-date context',()=>{
+  const f=timelineBrowser(); f.initialize();
+  const scroll=f.timeline.querySelector('.timeline-scroll');
+  scroll.querySelector('[aria-current="step"]').getBoundingClientRect=()=>({left:600,width:132});
+  const data=JSON.parse(JSON.stringify(f.c.getSharedProjectTimelineData_()));
+  data.active=true;
+  data.milestones=[{key:'next',label:'Next event',day:data.today+1,date:'30 Sep 2026'}];
+  f.requests[1].success(data);
+  assert.equal(scroll.scrollLeft,466);
+  assert(f.timeline.innerHTML.includes('title="30 Sep 2026" aria-label="30 Sep 2026">30 Sep</span>'));
+  scroll.scrollLeft=100;
+  f.timeline.timelineResizeObserver.callback();
+  assert.equal(scroll.scrollLeft,100,'resizing must not reset manual scrolling');
+  assert(!scroll.focused,'initial positioning must not steal keyboard focus');
+});
+
+test('timeline supports captured dragging, clamps at edges, and leaves touch swiping native',()=>{
   const f=timelineBrowser(); f.initialize();
   f.requests[1].success(JSON.parse(JSON.stringify(f.c.getSharedProjectTimelineData_())));
   const scroll=f.timeline.querySelector('.timeline-scroll');
-  const hint=f.timeline.querySelector('.timeline-scroll-hint');
-  assert.equal(hint.hidden,false);
-  assert(f.timeline.innerHTML.includes('Scroll Horizontally to see all dates'));
-  assert(!f.timeline.innerHTML.includes('<button'));
+  let prevented=0;
+  const pointer={pointerId:1,pointerType:'mouse',button:0,clientX:200,preventDefault(){prevented++;}};
+  scroll.scrollLeft=100;
+  scroll.listeners.pointerdown(pointer);
+  assert.equal(scroll.capturedPointer,1);
+  scroll.listeners.pointermove({...pointer,clientX:80});
+  assert.equal(scroll.scrollLeft,220);
+  scroll.listeners.pointermove({...pointer,clientX:-900});
+  assert.equal(scroll.scrollLeft,600);
+  assert.equal(f.timeline.querySelector('.timeline-forward').disabled,true);
+  scroll.listeners.pointercancel(pointer);
+  assert.equal(scroll.capturedPointer,null);
+  assert.equal(scroll.attributes['data-dragging'],'false');
+  scroll.listeners.pointermove({...pointer,clientX:500});
+  assert.equal(scroll.scrollLeft,600);
+  const before=prevented;
+  scroll.listeners.pointerdown({...pointer,pointerType:'touch'});
+  scroll.listeners.pointermove({...pointer,pointerType:'touch',clientX:10});
+  assert.equal(prevented,before,'touch must retain native gesture handling');
+  assert.equal(scroll.capturedPointer,null);
+  scroll.listeners.pointerdown(pointer);
+  scroll.listeners.pointermove({...pointer,clientX:2000});
+  assert.equal(scroll.scrollLeft,0);
+  scroll.listeners.pointerup(pointer);
+  assert.equal(scroll.attributes['data-dragging'],'false');
+});
+
+test('timeline arrows track overflow, scroll position and reduced motion',()=>{
+  const f=timelineBrowser(); f.initialize();
+  f.requests[1].success(JSON.parse(JSON.stringify(f.c.getSharedProjectTimelineData_())));
+  const scroll=f.timeline.querySelector('.timeline-scroll');
+  const navigation=f.timeline.querySelector('.timeline-navigation');
+  const previous=f.timeline.querySelector('.timeline-prev');
+  const forward=f.timeline.querySelector('.timeline-forward');
+  assert.equal(navigation.hidden,false);
+  assert.equal(previous.disabled,true);
+  assert.equal(forward.disabled,false);
+  forward.listeners.click();
+  assert.equal(scroll.lastScroll.left,300);
+  assert.equal(scroll.lastScroll.behavior,'smooth');
+  scroll.scrollLeft=600;
+  scroll.listeners.scroll();
+  assert.equal(previous.disabled,false);
+  assert.equal(forward.disabled,true);
+  f.browser.window.matchMedia=()=>({matches:true});
+  previous.listeners.click();
+  assert.equal(scroll.lastScroll.left,-300);
+  assert.equal(scroll.lastScroll.behavior,'auto');
+  scroll.scrollLeft=0;
   scroll.scrollWidth=400;
   f.timeline.timelineResizeObserver.callback();
-  assert.equal(hint.hidden,true);
+  assert.equal(navigation.hidden,true);
   scroll.scrollWidth=1000;
   f.timeline.timelineResizeObserver.callback();
-  assert.equal(hint.hidden,false);
+  assert.equal(navigation.hidden,false);
   assert.equal(f.requests.filter(r=>r.type==='timeline').length,1);
 });
 

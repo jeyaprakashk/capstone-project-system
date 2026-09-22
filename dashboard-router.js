@@ -187,16 +187,40 @@ ${getLucideStyles_()}
 .role-panel { display: none; }
 .role-panel.active { display: block; }
 .role-load-error { margin:20px 0; padding:14px 16px; border:1px solid #fecaca; background:#fef2f2; color:#991b1b; border-radius:10px; }
-.shared-rubrics { margin:0 0 20px; padding:20px 24px; border:1px solid #30324d; border-radius:16px; background:radial-gradient(ellipse at top right,rgba(139,92,246,.16),transparent 60%),#101523; color:#c5cee0; color-scheme:dark; box-shadow:0 8px 24px rgba(11,15,23,.14),inset 0 1px 0 rgba(255,255,255,.04); }
+.shared-rubrics { container:rubrics / inline-size; margin:0 0 20px; padding:20px 24px; border:1px solid #30324d; border-radius:16px; background:radial-gradient(ellipse at top right,rgba(139,92,246,.16),transparent 60%),#101523; color:#c5cee0; color-scheme:dark; box-shadow:0 8px 24px rgba(11,15,23,.14),inset 0 1px 0 rgba(255,255,255,.04); }
 .shared-rubrics h2 { margin:0 0 12px; font-family:'Space Grotesk','Inter',sans-serif; font-size:16px; color:#f5f7fa; }
-.rubric-assessments { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
-.rubric-assessment { display:flex; flex-direction:column; gap:7px; padding:14px; border:1px solid #354057; border-radius:10px; background:#1b2335; color:#c5cee0; font:inherit; text-align:left; cursor:pointer; overflow-wrap:anywhere; transition:background .18s ease,border-color .18s ease; }
-.rubric-assessment strong { color:#f5f7fa; }
+.rubric-assessments { display:grid; grid-template-columns:1fr; grid-auto-rows:1fr; gap:12px; }
+.rubric-assessment { display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; min-width:0; gap:18px; padding:18px; border:1px solid #45526b; border-radius:10px; background:#1b2335; color:#c5cee0; font:inherit; text-align:left; cursor:pointer; overflow-wrap:anywhere; transition:background .18s ease,border-color .18s ease; }
+.rubric-assessment strong { flex:1 1 100px; min-width:0; font-size:16px; line-height:1.4; color:#f5f7fa; }
 .rubric-assessment:hover:enabled { border-color:#9e77ed; background:#302747; }
 .rubric-assessment:disabled { cursor:default; color:#a8b3c7; background:#171e2c; opacity:1; }
 .rubric-assessment:disabled strong { color:#bdc7da; }
-.rubric-assessment span { font-size:12px; }
-.rubric-assessment .rubric-weight { color:#c4b5fd; font-weight:600; }
+.rubric-assessment span { font-size:14px; line-height:1.5; }
+.rubric-assessment .rubric-weight { flex:0 0 auto; max-width:100%; box-sizing:border-box; padding:3px 9px; border:1px solid #705494; border-radius:6px; background:#332647; color:#e2d9ff; font-size:14px; font-weight:700; }
+.rubric-assessment .rubric-header, .rubric-assessment .rubric-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; width:100%; min-width:0; text-align:left; }
+.rubric-assessment .rubric-footer { margin-top:auto; }
+.rubric-assessment .rubric-metadata { color:#c5cee0; font-weight:400; }
+.rubric-assessment .rubric-action { display:inline-flex; align-items:center; gap:6px; color:#e2d9ff; font-weight:600; }
+.rubric-mobile-row { display:none; }
+@container rubrics (width < 480px) {
+  .rubric-assessments { gap:0; grid-auto-rows:auto; }
+  .shared-rubrics .rubric-assessment { display:none; }
+  .rubric-mobile-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; min-height:64px; box-sizing:border-box; padding:8px 0; gap:2px 10px; }
+  .rubric-mobile-row ~ .rubric-mobile-row { border-top:1px solid #354057; }
+  .rubric-mobile-details { display:contents; }
+  .rubric-mobile-title { display:contents; }
+  .rubric-mobile-title strong { grid-column:1; grid-row:1; min-width:0; overflow-wrap:anywhere; font-size:14px; line-height:1.4; color:#f5f7fa; }
+  .rubric-mobile-weight { grid-column:2; grid-row:1; justify-self:end; padding:2px 7px; border:1px solid #705494; border-radius:999px; background:#332647; color:#e2d9ff; font-size:12px; font-weight:700; line-height:1.4; white-space:nowrap; }
+  .rubric-mobile-meta { grid-column:1; grid-row:2; color:#c5cee0; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+  .shared-rubrics .rubric-view-button { grid-column:2; grid-row:2; justify-self:end; position:relative; isolation:isolate; min-width:44px; min-height:44px; padding:6px 8px; border:0; border-radius:6px; background:transparent; color:#cbd5e1; font-family:inherit; font-size:12px; font-weight:600; line-height:1.4; white-space:nowrap; cursor:pointer; }
+  .shared-rubrics .rubric-view-button::before { content:''; position:absolute; inset:6px 0; z-index:-1; border:1px solid #3b4556; border-radius:6px; background:#0b101a; }
+  .shared-rubrics .rubric-view-button:hover:enabled { color:#f8fafc; }
+  .shared-rubrics .rubric-view-button:hover:enabled::before { background:#1b2433; border-color:#64748b; }
+  .shared-rubrics .rubric-view-button:focus-visible { outline:3px solid #cbd5e1; outline-offset:3px; }
+  .shared-rubrics .rubric-view-button:disabled { opacity:.5; cursor:default; }
+}
+@container rubrics (min-width:480px) { .rubric-assessments { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@container rubrics (min-width:960px) { .rubric-assessments { grid-template-columns:repeat(4,minmax(0,1fr)); } }
 .shared-rubrics > button { padding:8px 14px; border:1px solid #655192; border-radius:8px; background:#34274f; color:#e2d9ff; font:inherit; cursor:pointer; }
 .shared-rubrics > button:hover { background:#473568; }
 .shared-rubrics > button:focus-visible { outline:3px solid #c4b5fd; outline-offset:3px; }
@@ -206,7 +230,7 @@ ${getLucideStyles_()}
 .rubric-levels dt { margin-top:10px; font-size:12px; font-weight:600; color:#344054; }
 .rubric-levels dd { margin:4px 0 0; color:#667085; font-size:13px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
 #rubricDrawer .drawer-project-title { white-space:pre-wrap; overflow-wrap:anywhere; }
-@media(max-width:600px) { .shared-rubrics { padding:16px; } .rubric-assessments { grid-template-columns:1fr; } }
+@media(max-width:600px) { .shared-rubrics { padding:16px; } }
 </style>
 </head>
 <body>

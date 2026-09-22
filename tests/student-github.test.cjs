@@ -189,13 +189,16 @@ test('repository backfill writes only exact current-team matches to TeamStatus',
   vm.runInContext(fs.readFileSync('github-provisioning.js','utf8'),f.c);
   const saved=[];
   Object.assign(f.c,{
+    getAcademicYear:()=> '2026-27',
     getColumnMap:()=>({TEAM_ID:0,SEMESTER:1}),
     getSheetRows:name=>{assert.equal(name,'teams');return [['T1','Odd'],['T2','Odd'],['T3','Odd']];},
     getRepoUrlMap:()=>({t2:'https://github.com/org/keep'}),
     getAllGithubOrgRepos_:()=>[
-      {name:'capstone-even-team-T1',html_url:'wrong semester'},
-      {name:'capstone-odd-team-T1',html_url:'correct'},
-      {name:'capstone-odd-team-T99',html_url:'unknown team'}
+      {name:'capstone-2025-26-odd-team-T1',html_url:'wrong year'},
+      {name:'capstone-odd-team-T1',html_url:'old name'},
+      {name:'capstone-2026-27-even-team-T1',html_url:'wrong semester'},
+      {name:'capstone-2026-27-odd-team-T1',html_url:'correct'},
+      {name:'capstone-2026-27-odd-team-T99',html_url:'unknown team'}
     ],
     normalizeText_:value=>String(value).toLowerCase(),
     updateTeamStatusRepoUrl_:(id,url)=>saved.push([id,url]),Logger:{log(){}}

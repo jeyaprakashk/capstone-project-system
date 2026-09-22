@@ -61,6 +61,15 @@ function makeGithubRequest(method, path, payload) {
   };
 }
 
+function getTeamRepoName_(teamId, semester) {
+  const year = String(getAcademicYear() || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(year)) throw new Error('Set ACADEMIC_YEAR to YYYY-YY (for example, 2026-27) before provisioning repositories.');
+  const term = String(semester || '').trim().replace(/\s+/g, '-').toLowerCase();
+  const team = String(teamId || '').trim();
+  if (!term || !team) throw new Error('Semester and Team ID are required for repository naming.');
+  return `capstone-${year}-${term}-team-${team}`;
+}
+
 function createTeamRepo(repoName, teamId) {
   const ORG_NAME = getConfig('GITHUB_ORG_NAME');
   const payload = {
@@ -380,20 +389,19 @@ function backfillReadmeToAllRepos() {
 
   try {
     const repos = getAllGithubOrgRepos_();
-    const teamRepos = repos.filter(repo =>
-      normalizeText_(repo.name).includes('capstone') && normalizeText_(repo.name).includes('team')
-    );
+    const currentTeams = statusRows.filter(row => row[TS.TEAM_ID]);
+    const teamRepos = repos.filter(repo => currentTeams.some(row =>
+      textEquals_(repo.name, getTeamRepoName_(row[TS.TEAM_ID], row[TS.SEMESTER]))
+    ));
 
     Logger.log(`Found ${teamRepos.length} capstone team repos`);
 
     teamRepos.forEach(repo => {
       try {
-        const match = repo.name.match(/team-([A-Z0-9]+)/i);
-        const teamId = match ? match[1] : repo.name;
-
-        const teamStatus = statusRows.find(row =>
-          textEquals_(row[TS.TEAM_ID], teamId)
+        const teamStatus = currentTeams.find(row =>
+          textEquals_(repo.name, getTeamRepoName_(row[TS.TEAM_ID], row[TS.SEMESTER]))
         );
+        const teamId = teamStatus[TS.TEAM_ID];
 
         const title = teamStatus
           ? teamStatus[TS.TITLE]
@@ -491,7 +499,7 @@ function backfillExistingRepos_() {
         results.skipped.push({ teamId, reason: 'Already recorded in TeamStatus' });
         return;
       }
-      const expectedName = `capstone-${String(row[TS.SEMESTER]).replace(/\s+/g, '-').toLowerCase()}-team-${teamId}`;
+      const expectedName = getTeamRepoName_(teamId, row[TS.SEMESTER]);
       const repo = repos.find(repo => textEquals_(repo.name, expectedName));
       if (!repo) {
         results.skipped.push({ teamId, reason: 'No matching GitHub repository' });
