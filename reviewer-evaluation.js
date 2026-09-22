@@ -16,7 +16,7 @@ function reviewerReviewRows_(spreadsheet, committee, review) {
   if (!sheet) throw new Error('The marking sheet for ' + review.label + ' is not available.');
   const width = REVIEW_MARK_COLUMNS_.criteria + review.rubric.length;
   if (sheet.getLastColumn() < width) throw new Error('Rubric columns are missing. Ask the coordinator to check the marking sheet.');
-  const values = sheet.getRange(1,1,Math.max(1,sheet.getLastRow()),width).getValues();
+  const values = readSheetRows_(sheet, 1, Math.max(1, sheet.getLastRow()));
   const expected = buildHeaderRow(review.rubric);
   if (expected.some((header,index) => String(values[0][index]) !== String(header))) throw new Error('The marking sheet does not match the current rubric. Ask the coordinator to check it.');
   return {sheet,rows:values.slice(1)};

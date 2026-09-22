@@ -109,8 +109,9 @@ function createNextReviewerSpreadsheet(attempted) {
       ));
       const cell = committeeSheet.getRange(index + 2, RC.MARKS_SHEET_ID + 1);
       // Recheck the row immediately before writing; sheet editors do not honor script locks.
-      if (!textEquals_(committeeSheet.getRange(index + 2, RC.COMMITTEE_NUMBER + 1).getValue(), committee)) throw new Error('Committee row changed during setup. Retry.');
-      const current = String(cell.getValue() || '').trim();
+      const currentRow = readSheetRows_(committeeSheet, index + 2, 1)[0];
+      if (!textEquals_(currentRow[RC.COMMITTEE_NUMBER], committee)) throw new Error('Committee row changed during setup. Retry.');
+      const current = String(currentRow[RC.MARKS_SHEET_ID] || '').trim();
       if (current && current !== spreadsheetId) throw new Error('A different marks spreadsheet was linked during setup. Existing ID retained.');
       cell.setValue(spreadsheetId);
       SpreadsheetApp.flush();

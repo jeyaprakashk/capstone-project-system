@@ -7,7 +7,8 @@ function getTeamDeadlineEvents_(row, columns, repoUrl, logs, reviews, schedule, 
   const events = [
     {key:'formation', label:'Team Formation Pending', due:schedule.formation,
       complete:[1,2,3,4].some(number => row[columns['S' + number + '_EMAIL']])},
-    {key:'repository', label:'GitHub Usernames Pending', due:schedule.formation, complete:githubSetup.usernamesComplete || githubSetup.verificationUnavailable},
+    {key:'repository', label:githubSetup.repositoryOnly ? 'Repository URL Pending' : 'GitHub Usernames Pending', due:schedule.formation,
+      complete:githubSetup.repositoryOnly ? githubSetup.ready : githubSetup.usernamesComplete || githubSetup.verificationUnavailable},
     {key:'title', label:'Title Pending', due:schedule.title, complete:textEquals_(row[columns.REVIEWER_DECISION], 'Approved')}
   ];
   for (const {key,label,day} of schedule.reviews) {

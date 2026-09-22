@@ -1,3 +1,4 @@
+const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -21,12 +22,12 @@ function setup(options={}) {
  function sheet(name) {return {getName:()=>name,setName(value){sheets.delete(name);name=value;sheets.set(name,this);},
   getRange:(...position)=>({position,protect:()=>protection('inputs')}),protect:()=>protection('sheet')};}
  const spreadsheet={getId:()=> 'NewCaseSensitiveID',getUrl:()=> 'https://docs.google.com/spreadsheets/d/NewCaseSensitiveID/edit',getSheets:()=>[...sheets.values()],deleteSheet:s=>sheets.delete(s.getName())};
- const c=vm.createContext({checkReviewConfiguration_:()=>({valid:!options.invalidConfig,issues:[{message:"Fix configuration"}]}),Date,console,SHEET_ID:'hub',SHEET_NAMES:{REVIEW_COMMITTEE:'committee',TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{REVIEW_COMMITTEE:{},TEAM_STATUS:{}},
+ const c=createSheetReadContext({checkReviewConfiguration_:()=>({valid:!options.invalidConfig,issues:[{message:"Fix configuration"}]}),Date,console,SHEET_ID:'hub',SHEET_NAMES:{REVIEW_COMMITTEE:'committee',TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{REVIEW_COMMITTEE:{},TEAM_STATUS:{}},
   Session:{getActiveUser:()=>({getEmail:()=>options.denied?'outsider@example.com':'coord@example.com'}),getEffectiveUser:()=>owner},
   getCoordinatorEmail:()=> 'coord@example.com',getConfig:()=> 'pd@example.com',
   normalizeText_:v=>String(v??'').trim().toLowerCase(),normalizeEmail:v=>String(v??'').trim().toLowerCase(),emailsMatch:(a,b)=>String(a).trim().toLowerCase()===String(b).trim().toLowerCase(),textEquals_:(a,b)=>String(a).trim().toLowerCase()===String(b).trim().toLowerCase(),
   getColumnMap:name=>name==='committee'?RC:TS,getSheetRows:name=>name==='committee'?rows:[['T1','c1']],
-  getSheet:()=>({getRange:(r,col)=>({getValue:()=>rows[r-2][col-1],setValue:value=>{rows[r-2][col-1]=value;calls.push(['write-id',value]);}})}),
+  getSheet:()=>({getLastColumn:()=>3,getRange:(r,col,n,w)=>({getValues:()=>rows.slice(r-2,r-2+n).map(row=>row.slice(col-1,col-1+w)),getValue:()=>rows[r-2][col-1],setValue:value=>{rows[r-2][col-1]=value;calls.push(['write-id',value]);}})}),
   getStudentsFromTeamStatusRow_:()=>[{regNo:'A',name:'Student'}],getReviewDefinitions_:()=>Array.from({length:options.reviewCount || 2},(_,i)=>({key:'review'+(i+1),number:i+1,rubric})),
   getNamedSheet_:(ss,name)=>sheets.get(name)||null,
   seedCommitteeReviewTab:(ss,committee,key)=>{const name=`Committee ${committee} - ${key}`;sheets.set(name,sheet(name));calls.push(['seed',key]);},
@@ -112,7 +113,7 @@ test('attempted failures are skipped so the browser loop terminates',()=>{
 });
 
 test('new row formulas reference their own rows and support columns beyond Z',()=>{
- const c=vm.createContext({});vm.runInContext(fs.readFileSync(path.join(__dirname,'..','marks-tracker.js'),'utf8'),c);
+ const c=createSheetReadContext({});vm.runInContext(fs.readFileSync(path.join(__dirname,'..','marks-tracker.js'),'utf8'),c);
  const rubric=Array.from({length:21},(_,i)=>({pi:'PI'+(i+1),name:'Test',co:'CO1',maxMarks:5,type:'Team'}));
  const a=c.buildStudentMarkRow(1,'T1','C1',{regNo:'A',name:'Alice'},rubric);
  const b=c.buildStudentMarkRow(2,'T1','C1',{regNo:'B',name:'Bob'},rubric);

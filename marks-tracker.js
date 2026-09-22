@@ -250,7 +250,7 @@ function readReviewRows_(spreadsheet, committee, review, measure) {
   if (lastRow < 2) return [];
   const width = REVIEW_MARK_COLUMNS_.criteria + review.rubric.length;
   if (measure('review_read_column_count', () => sheet.getLastColumn()) < width) throw new Error('Missing rubric columns in ' + sheet.getName());
-  const values = measure('review_read_values', () => sheet.getRange(1, 1, lastRow, width).getValues());
+  const values = measure('review_read_values', () => readSheetRows_(sheet, 1, lastRow));
   if (normalizeText_(values[0][REVIEW_MARK_COLUMNS_.comments]) !== 'comments') {
     throw new Error('Expected Comments in column G: ' + sheet.getName());
   }

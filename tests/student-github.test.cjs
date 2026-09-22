@@ -1,3 +1,4 @@
+const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -14,13 +15,14 @@ function fixture() {
   const calls = [];
   const sheet = {
     getLastRow: () => rows.length,
+    getLastColumn: () => Math.max(0, ...rows.map(row => row.length)),
     appendRow: row => { assert(locked); writes++; rows.push(row); },
     getRange: (row, col, count, width) => ({
       getValues: () => rows.slice(row - 1, row - 1 + count).map(r => r.slice(col - 1, col - 1 + width)),
       setValues: values => { assert(locked); writes++; rows[row - 1] = values[0]; }
     })
   };
-  const c = vm.createContext({
+  const c = createSheetReadContext({
     console,
     SHEET_NAMES: { TEAM_STATUS: 'teams', GITHUB_USERNAME_RAW: 'usernames' },
     FIELD_DEFINITIONS: { TEAM_STATUS: {} },
@@ -236,7 +238,7 @@ function browserFixture() {
   function runner(success,failure) {
     return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({key,args,success,failure})});
   }
-  const c=vm.createContext({
+  const c=createSheetReadContext({
     console,window:{},performance:{now:()=>0},setTimeout:()=>1,clearTimeout(){},
     document:{hidden:false,readyState:'loading',addEventListener(){},getElementById:id=>id==='githubSubmitStatus'?status:id==='githubStatusRefresh'?refreshButton:null,
       querySelector:()=>panel,querySelectorAll:()=>[]},

@@ -46,7 +46,7 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
     const statusSheet = getSheet(SHEET_NAMES.TEAM_STATUS);
     const statusRow = findTeamStatusRow(statusSheet, teamId, TS);
     if (statusRow < 2) throw new Error('Student team was not found.');
-    r = statusSheet.getRange(statusRow, 1, 1, statusSheet.getLastColumn()).getValues()[0];
+    r = readSheetRows_(statusSheet, statusRow, 1)[0];
   }
 
   perfLap = studentPerfLog_('TeamStatus row + column map', perfLap);
@@ -84,7 +84,7 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
       .matchCase(false)
       .findAll();
 
-    readMatchedRows_(logSheet, matches, 1, 3).forEach(log => {
+    readMatchedRows_(logSheet, matches).forEach(log => {
       if (!textEquals_(log[2], teamId)) return;
       studentLogs.push(log);
     });
@@ -335,7 +335,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
     </div>
 
     ${marksSection}
-    <section id="studentGuideEvaluation" class="assessment-section" aria-live="polite">Loading guide evaluation…</section>
+    <section id="studentGuideEvaluation" class="assessment-section" aria-live="polite">${getSkeletonMarkup_('panel', 'Loading guide evaluation')}</section>
 
 
   </div>`;

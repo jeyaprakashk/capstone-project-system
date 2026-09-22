@@ -19,7 +19,7 @@ function guideEvaluationBrowser_() {
     let host=el('guideEvaluationEditor');
     if(!host) return;
     const version=++generation;
-    host.hidden=false;host.textContent='Loading guide evaluation…';busy=true;
+    host.hidden=false;host.innerHTML=DashboardUI.renderSkeleton('panel', 'Loading guide evaluation');busy=true;
     host.scrollIntoView({behavior:'smooth',block:'start'});
     rpc('loadGuideEvaluation',[team,register || ''],data=>{
       if(version!==generation)return;
@@ -75,7 +75,7 @@ function guideEvaluationBrowser_() {
   let adminBusy=false;
   function admin() {
     const host=el('guideEvaluationAdmin');if(!host || adminBusy)return;
-    adminBusy=true;host.textContent='Loading evaluations…';
+    adminBusy=true;host.innerHTML=DashboardUI.renderSkeleton('panel', 'Loading evaluations');
     rpc('loadCoordinatorGuideEvaluations',[],report=>{
       adminBusy=false;
       if(!report.ready){host.textContent=report.error;return;}

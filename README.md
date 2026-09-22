@@ -1,5 +1,27 @@
 # capstone-project-system
 
+## Sheet read boundaries
+
+Use `readSheetRows_(sheet, firstRow, rowCount)` for selected rows. It reads
+column A through `getLastColumn()`, including all headers and any additional
+populated columns, while preserving absolute column indexes. Omit `rowCount`
+to read through the last populated row. Empty ranges return `[]`. Complete-sheet
+reads may use `getDataRange().getValues()` or `getSheetRows()`.
+
+Do not derive read width from one field's position or a fixed schema length.
+Header-mapped consumers access fields through the column map. Searches may target
+one column to locate rows; `readMatchedRows_()` returns complete matched records
+in search-result order using one batched value read. Writes remain limited to the
+intended cells. Readers do not persist data or width caches between calls.
+
+Fixed-layout form, log, configuration, and marking consumers still use explicit
+column positions. Full-width reads prevent truncation; they do not make those
+layouts reorderable. Layout changes require updating readers and writers together.
+
+Deploy `sheet-reads.js` alongside all callers. `npm test` includes empty-sheet,
+reordered-header, trailing-column and matched-row checks, plus a source audit
+that rejects value reads outside the helper or a complete data-range read.
+
 ## Student GitHub registration
 
 Students enter their GitHub username on the dashboard. The server checks that

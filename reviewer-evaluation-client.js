@@ -33,7 +33,7 @@ const ReviewerMarks = (function() {
   function open(team,review,button) {
     ensureDialog(); trigger=button; model=null;dirty=false;saved=false;busy=false;
     const token=++request;
-    dialog.innerHTML=header('Review marks')+'<p role="status" data-marks-status>Loading rubric and marks…</p>';
+    dialog.innerHTML=header('Review marks')+'<p role="status" data-marks-status>' + DashboardUI.renderSkeleton('panel', 'Loading rubric and marks') + '</p>';
     if (!dialog.open) dialog.showModal();
     DashboardUI.guideRun().withSuccessHandler(function(data) {
       if (token!==request || !dialog.open) return;

@@ -25,6 +25,11 @@ function getCoordinatorDashboardData() {
   return coordinatorRead_('core', getCoordinatorDashboardData_);
 }
 
+function getCoordinatorRepositoryStatus_(repoUrl) {
+  const ready = !!String(repoUrl || '').trim();
+  return {repositoryOnly:true, ready, message:ready ? 'Repository URL recorded' : 'Repository URL missing'};
+}
+
 function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
   const measure = (phase, read) => {
     if (!timings) return read();
@@ -44,14 +49,10 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
   const rosterRows = measure('roster_rows', () => getSheetRows(SHEET_NAMES.TEAM_ROSTER));
   const committeeRows = skipAccess ? [] : measure('committee_rows', () => getSheetRows(SHEET_NAMES.REVIEW_COMMITTEE));
   const repoUrlMap = measure('repository_map', () => getRepoUrlMap(repositoryTimings));
-  const githubByTeam = {};
-  const usernameRows = deferAssessments ? [] : getSheetRows(SHEET_NAMES.GITHUB_USERNAME_RAW);
-  const validationCache = new Map();
-  statusRows.forEach(row => {
+  const githubByTeam = Object.fromEntries(statusRows.map(row => {
     const id = normalizeText_(row[TS.TEAM_ID]);
-    githubByTeam[id] = deferAssessments ? { ready:false, message:'Checking GitHub setup…' }
-      : getTeamGithubSetup_(row[TS.TEAM_ID], { row, columns: TS, repoUrl: repoUrlMap[id] || '', usernameRows, validationCache });
-  });
+    return [id, getCoordinatorRepositoryStatus_(repoUrlMap[id])];
+  }));
   const logRows = deferAssessments ? [] : measure('historical_logs', () => readActivityRows_(SHEET_NAMES.RAW_LOG, null, null, 3));
 
   const rosterByTeamId = groupBy(rosterRows, r => r[TR.TEAM_ID]);
@@ -131,9 +132,9 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
       title: r[TS.TITLE],
       registerNumbers: [1,2,3,4].map(number => String(r[TS['S' + number + '_REGNO']] || '').trim()).filter(Boolean),
       titleStatus: getTeamStatus(r),
-      repoStatus: deferAssessments ? 'loading' : githubByTeam[teamId].ready ? 'ready' : 'pending',
+      repoStatus: githubByTeam[teamId].ready ? 'ready' : 'pending',
       githubMessage: githubByTeam[teamId].message,
-      githubTiming: deferAssessments ? '' : schedule && clock ? githubSubmissionTiming_(githubByTeam[teamId], schedule, clock).text : 'Schedule unavailable',
+      githubTiming: '',
       repoUrl: repoUrlMap[normalizeText_(r[TS.TEAM_ID])],
       deadlineEvents,
       pendingDeadlines:deadlineEvents.filter(event => !event.complete && clock && clock.today >= event.due - DEADLINE_PILL_LEAD_DAYS_).map(event => event.key),
@@ -222,11 +223,11 @@ function getCoordinatorTeamDetails_(teamId, section) {
     const context = weeklyActivityContext_();
     const logs = readActivityRows_(SHEET_NAMES.RAW_LOG, 3, teamId, 3);
     const progressRepoUrl = getRepoUrlForTeam(teamId);
-    const progressSetup = getTeamGithubSetup_(teamId, { row: statusRow, columns: TS, repoUrl: progressRepoUrl });
+    const progressSetup = getCoordinatorRepositoryStatus_(progressRepoUrl);
     return {
       titleStatus:getTeamStatus(statusRow), guideDecision:String(statusRow[TS.GUIDE_DECISION] || ''),
       reviewerDecision:String(statusRow[TS.REVIEWER_DECISION] || ''),
-      repoStatus:progressSetup.message + (context.schedule && context.clock ? ' ' + githubSubmissionTiming_(progressSetup, context.schedule, context.clock).text : ''),
+      repoStatus:progressSetup.message,
       health:assessProjectTeam_(statusRow, TS, progressRepoUrl, logs, reviews, context.schedule, context.clock, null, progressSetup).health,
       reviews:getInternalReviews_().map(review => ({label:review.label, available:!!reviews[review.key] && reviews[review.key].available !== false, completed:!!reviews[review.key]?.completed}))
     };
@@ -237,7 +238,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
   });
 
   const repoUrl = getRepoUrlForTeam(teamId);
-  const githubSetup = getTeamGithubSetup_(teamId, { row: statusRow, columns: TS, repoUrl });
+  const githubSetup = getCoordinatorRepositoryStatus_(repoUrl);
 
   // -----------------------------
   // Students
@@ -339,7 +340,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
     reviewerDecision: String(statusRow[TS.REVIEWER_DECISION] || '').trim(),
 
     repoUrl: repoUrl || '',
-    repoStatus: githubSetup.message + (schedule && clock ? ' ' + githubSubmissionTiming_(githubSetup, schedule, clock).text : ''),
+    repoStatus: githubSetup.message,
 
     weekLogs: weekLogs,
     weekCommits: weekCommits,
@@ -362,8 +363,10 @@ function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock
   const hasMembers = ['S1_EMAIL','S2_EMAIL','S3_EMAIL','S4_EMAIL'].some(key => row[columns[key]]);
   overdue(schedule.formation, hasMembers, 'Team formation overdue');
   githubSetup = githubSetup || getTeamGithubSetup_(row[columns.TEAM_ID], { row, columns, repoUrl });
-  const timing = githubSubmissionTiming_(githubSetup, schedule, clock);
-  overdue(schedule.formation, timing.state !== 'overdue', 'GitHub username submissions overdue');
+  const timing = githubSetup.repositoryOnly
+    ? {state:githubSetup.ready ? 'recorded' : clock.today > schedule.formation ? 'overdue' : 'pending', text:githubSetup.message}
+    : githubSubmissionTiming_(githubSetup, schedule, clock);
+  overdue(schedule.formation, timing.state !== 'overdue', githubSetup.repositoryOnly ? 'Repository URL missing' : 'GitHub username submissions overdue');
   overdue(schedule.title, textEquals_(row[columns.REVIEWER_DECISION], 'Approved'), 'Title approval overdue');
   for (const {key,label,day} of schedule.reviews) {
     if (review && review[key] && review[key].available !== false) overdue(day, review[key].completed, label + ' marks overdue');
@@ -409,7 +412,7 @@ function buildCoordinatorHeaderStats(stats) {
         <div class="stat-num" id="coordinatorActiveTeams">${getSkeletonMarkup_('inline', 'Loading activity')}</div>
       </div>
       <div class="stat-label">Active This Week</div>
-      <div class="stat-pct" id="coordinatorActiveTeamsPct">Loading activity…</div>
+      <div class="stat-pct" id="coordinatorActiveTeamsPct">${getSkeletonMarkup_('inline', 'Loading activity')}</div>
     </div>
 
     ${reviews.map(review => {
@@ -543,7 +546,8 @@ function buildCoordinatorTeamActions_(team) {
 function buildCompletionIndicator_(status) {
   if (status === 'Completed') return renderLucideIcon_('check', 'Completed');
   if (status === 'Pending') return renderLucideIcon_('clock', 'Pending');
-  return escapeHtml(status || 'Unavailable');
+  if (/^loading/i.test(status || '')) return getSkeletonMarkup_('inline', 'Loading assessment');
+  return renderLucideIcon_('triangle-alert', status || 'Unavailable');
 }
 
 function buildTeamTrackerTable(teamData, deadlinePills) {
@@ -553,13 +557,14 @@ function buildTeamTrackerTable(teamData, deadlinePills) {
   const attentionCount = teamData.filter(t => t.health === 'attention').length;
   const onTrackCount = teamData.filter(t => t.health === 'ontrack').length;
   const rows = teamData.map(t => {
-    const titleBadge = t.titleStatus === 'APPROVED' ? `<span class="status-badge green">${renderLucideIcon_('check', 'Title approved')}</span>` : t.titleStatus === 'NEEDS_REVIEW' ? `<span class="status-badge orange">Review</span>` : t.titleStatus === 'REJECTED_BY_GUIDE' ? `<span class="status-badge red">Reject</span>` : `<span class="status-badge gray">—</span>`;
-    const repoBadge = t.repoStatus === 'loading' ? getSkeletonMarkup_('inline', 'Checking GitHub setup') : t.repoStatus === 'ready' ? `<span class="status-badge green" tabindex="0" role="img" aria-label="GitHub setup complete" title="GitHub setup complete">${renderLucideIcon_('check')}</span>` : `<span class="status-badge red" tabindex="0" role="img" aria-label="Pending" title="Pending">${renderLucideIcon_('x')}</span>`;
+    const titleBadge = t.titleStatus === 'APPROVED' ? `<span class="status-badge green">${renderLucideIcon_('check', 'Title approved')}</span>` : t.titleStatus === 'NEEDS_REVIEW' ? `<span class="status-badge orange">${renderLucideIcon_('clock', 'Title needs review')}</span>` : t.titleStatus === 'REJECTED_BY_GUIDE' ? `<span class="status-badge red">${renderLucideIcon_('x', 'Title rejected by guide')}</span>` : `<span class="status-badge gray">${renderLucideIcon_('clock', 'Title pending')}</span>`;
+    const repoLabel = escapeHtml([t.repoStatus === 'ready' ? 'Repository URL recorded' : 'Pending', t.githubMessage, t.githubTiming, t.repoUrl ? 'Repository available' : ''].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join(' ? '));
+    const repoBadge = t.repoStatus === 'loading' ? getSkeletonMarkup_('inline', 'Checking GitHub setup') : `<span class="status-badge ${t.repoStatus === 'ready' ? 'green' : 'red'}" tabindex="0" role="img" aria-label="${repoLabel}" title="${repoLabel}">${renderLucideIcon_(t.repoStatus === 'ready' ? 'check' : 'x')}</span>`;
     const health = t.health === 'ontrack' ? {color:'green', label:'On track', icon:'check'} : t.health === 'monitor' ? {color:'orange', label:'Monitor', icon:'clock'} : {color:'red', label:'Needs attention', icon:'triangle-alert'};
     const healthBadge = t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading health') : `<span class="tracker-health ${health.color}" tabindex="0" role="img" aria-label="${health.label}" title="${health.label}">${renderLucideIcon_(health.icon)}</span>`;
     const registers = t.registerNumbers || [];
 
-    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td class="col-team"><strong>${escapeHtml(t.teamId)}</strong></td><td class="col-guide">${escapeHtml(t.guide)}</td><td class="col-registers"><div class="tracker-registers">${registers.length ? registers.map(value => `<span>${escapeHtml(value)}</span>`).join('') : '—'}</div></td><td class="col-repo">${repoBadge}<span class="sr-only">${escapeHtml(t.githubMessage || '')}</span><div class="step-detail">${escapeHtml(t.githubTiming || '')}</div>${t.repoUrl ? '<span class="step-detail">Repository available</span>' : ''}</td><td class="col-status">${titleBadge}</td><td class="col-activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation">${buildCompletionIndicator_(t.guideEvaluation)}</td><td class="col-health">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
+    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td class="col-team"><strong>${escapeHtml(t.teamId)}</strong></td><td class="col-guide">${escapeHtml(t.guide)}</td><td class="col-registers"><div class="tracker-registers">${registers.length ? registers.map(value => `<span>${escapeHtml(value)}</span>`).join('') : '—'}</div></td><td class="col-repo">${repoBadge}</td><td class="col-status">${titleBadge}</td><td class="col-activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation">${buildCompletionIndicator_(t.guideEvaluation)}</td><td class="col-health">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
   }).join('');
 
   return `<div class="team-tracker-section"><div class="tracker-header"><h3 class="assessment-title tracker-title">Team Tracker (${teamData.length} teams)</h3></div>
@@ -591,7 +596,7 @@ function buildCommitteeDirectory_(committees) {
 
 function buildReviewConfigurationCard_() {
   return `<section id="reviewConfigurationCard" class="review-config-card" aria-labelledby="reviewConfigurationHeading" aria-busy="true">
-    <div class="review-config-heading"><h4 id="reviewConfigurationHeading">Assessment readiness</h4><span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">Checking…</span><button id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
+    <div class="review-config-heading"><h4 id="reviewConfigurationHeading">Assessment readiness</h4><span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span><button id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
     <ul id="reviewConfigurationIssues" hidden></ul>
     <div class="review-config-footer"><a id="reviewConfigLink" hidden target="_blank" rel="noopener">Milestones ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><a id="reviewRubricsLink" hidden target="_blank" rel="noopener">Rubric criteria ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><span id="reviewConfigurationCheckedAt"></span></div>
   </section>`;
@@ -1504,7 +1509,7 @@ function loadCoordinatorSystemStatus() {
       reposWithAccess:Number(getConfig('COLLABORATOR_REPOS_ACCESS')) || 0,
       totalRepos:rows.filter(row => repos[normalizeText_(row[TS.TEAM_ID])]).length};
     return `<div class="coordinator-container">
-      <div class="system-status-primary">${buildGithubAccessSection(access)}${buildRubricsStatusCard_()}</div>
+      <div class="system-status-primary">${buildGithubAccessSection(access)}</div>
       ${buildGuideEvaluationAdmin_()}
       <section class="assessment-section reviewer-setup" aria-label="Review committees and marking sheets">
         ${buildCommitteeDirectory_(committees)}

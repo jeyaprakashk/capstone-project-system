@@ -1,3 +1,4 @@
+const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -12,7 +13,7 @@ function fixture() {
   const permissions=new Map([['one','write'],['two','write']]);
   let repository=true, outage='', failWrite=false, apiFailure=0;
   const norm=value=>String(value||'').trim().toLowerCase();
-  const c=vm.createContext({console,Date,
+  const c=createSheetReadContext({console,Date,
     SHEET_NAMES:{TEAM_STATUS:'teams',TEAM_ROSTER:'roster',GITHUB_USERNAME_RAW:'users',TEAM_INTAKE_RAW:'intake',RAW_LOG:'logs'},
     FIELD_DEFINITIONS:{TEAM_STATUS:{},TEAM_ROSTER:{}},
     getColumnMap:()=>columns,getSheetRows:name=>name==='teams'?[team]:name==='users'?usernames:[],
@@ -25,7 +26,7 @@ function fixture() {
     MailApp:{sendEmail:(...args)=>mails.push(args)},driveFileUrl:x=>x,findTeamStatusRow:()=>2,
     getDashboardUrl:()=> 'https://dashboard',getHubRegistrySheet:()=>({getDataRange:()=>({getValues:()=>[[]]})}),
     setStatusFields:(sheet,row,fields)=>writes.push(fields),
-    getSheet:name=>name==='logs'?{appendRow:row=>logs.push(row)}:{getDataRange:()=>({getValues:()=>[[],team]}),getRange:()=>({getValues:()=>[team],getValue:()=>team[10]})},
+    getSheet:name=>name==='logs'?{appendRow:row=>logs.push(row)}:{getLastColumn:()=>team.length,getDataRange:()=>({getValues:()=>[[],team]}),getRange:()=>({getValues:()=>[team],getValue:()=>team[10]})},
     projectDay_:(date,tz)=>{
       const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).map(p=>[p.type,p.value]));
       return Date.parse(`${parts.year}-${parts.month}-${parts.day}T00:00:00Z`)/86400000;
@@ -63,6 +64,36 @@ function fixture() {
     state:()=>c.getTeamGithubSetup_('T1'),repair:()=>c.repairTeamGithubSetup_('T1'),
     outage:value=>{outage=value;},repository:value=>{repository=value;},failWrite:value=>{failWrite=value;},apiFailure:value=>{apiFailure=value;}};
 }
+
+test('bulk readiness batches 62 teams and preserves live access decisions',()=>{
+  const f=fixture(), batches=[];
+  const live=f.c.makeGithubRequest;
+  f.c.PropertiesService={getScriptProperties:()=>({getProperty:()=> 'test-token'})};
+  f.c.UrlFetchApp={fetchAll:requests=>{
+    batches.push(requests.length);
+    return requests.map(request=>{
+      const result=live('GET',request.url.replace('https://api.github.com',''));
+      return {getResponseCode:()=>result.status,getContentText:()=>JSON.stringify(result.body || {})};
+    });
+  }};
+  f.c.makeGithubRequest=()=>{throw Error('Serial GitHub request is forbidden');};
+  const rows=[],users=[],repos={};
+  for(let n=1;n<=62;n++) {
+    const row=[...f.team];row[0]='T'+n;rows.push(row);repos['t'+n]='https://github.com/org/team-'+n;
+    f.usernames.forEach(user=>{const copy=[...user];copy[2]=row[0];users.push(copy);});
+  }
+  const read=()=>f.c.getTeamsGithubSetup_(rows,f.c.getColumnMap(),repos,users);
+  const result=read();
+  assert.equal(Object.keys(result).length,62);
+  assert(Object.values(result).every(setup=>setup.ready));
+  assert.equal(batches.length,6); // Two usernames, then 248 repository/access reads in chunks of 50.
+  assert(batches.every(size=>size<=50));
+  f.permissions.set('two','read');
+  assert(Object.values(read()).every(setup=>!setup.ready));
+  f.c.UrlFetchApp.fetchAll=()=>{throw Error('GitHub unavailable');};
+  assert(Object.values(read()).every(setup=>!setup.ready && setup.verificationUnavailable));
+  assert.equal(f.writes.length,0);
+});
 
 test('an existing repository never bypasses missing, invalid or unverifiable team usernames',()=>{
   const f=fixture();

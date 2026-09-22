@@ -45,9 +45,7 @@ function getConfig(key) {
     );
   }
 
-  const rows = configSheet
-    .getRange(2, 1, lastRow - 1, 2)
-    .getValues();
+  const rows = readSheetRows_(configSheet, 2, lastRow - 1);
 
   configExecutionValues_ = Object.create(null);
   rows.forEach(row => {
@@ -90,9 +88,7 @@ function setConfig(key, value) {
     throw new Error('Config sheet contains no configuration entries.');
   }
 
-  const keys = configSheet
-    .getRange(2, 1, lastRow - 1, 1)
-    .getValues();
+  const keys = readSheetRows_(configSheet, 2, lastRow - 1);
 
   const targetKey = normalizeText_(key);
 
@@ -165,13 +161,13 @@ function getSheetRows(sheetName) {
   return rows;
 }
 
-/** Batch matched rows into one narrow read instead of one RPC per match. */
-function readMatchedRows_(sheet, matches, startColumn, columnCount) {
+/** Batch matched records into one full-width read instead of one RPC per match. */
+function readMatchedRows_(sheet, matches) {
   if (!matches.length) return [];
   const rows = matches.map(cell => cell.getRow());
   const first = rows.reduce((a,b) => Math.min(a,b));
   const last = rows.reduce((a,b) => Math.max(a,b));
-  const values = sheet.getRange(first, startColumn, last - first + 1, columnCount).getValues();
+  const values = readSheetRows_(sheet, first, last - first + 1);
   return rows.map(row => values[row - first]);
 }
 
@@ -182,9 +178,9 @@ function setStatusFields(sheet, row, fields, columnMap) {
 }
 
 function findTeamStatusRow(statusSheet, teamId, columnMap) {
-  const ids = statusSheet.getRange(2, columnMap.TEAM_ID + 1, statusSheet.getLastRow() - 1, 1).getValues();
+  const ids = readSheetRows_(statusSheet, 2);
   for (let i = 0; i < ids.length; i++) {
-    if (textEquals_(ids[i][0], teamId)) return i + 2;
+    if (textEquals_(ids[i][columnMap.TEAM_ID], teamId)) return i + 2;
   }
   return -1;
 }
@@ -193,7 +189,7 @@ function findTeamStatusRow(statusSheet, teamId, columnMap) {
 // COLUMN MAPPING — header-based, case-insensitive
 // ===================================================================
 function buildColumnMap(sheet, fieldNameMap, headers) {
-  const headerRow = headers || sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const headerRow = headers || (readSheetRows_(sheet, 1, 1)[0] || []);
   const normalize = s => String(s).trim().toLowerCase();
   const headerIndex = {};
   headerRow.forEach((h, i) => { headerIndex[normalize(h)] = i; });
@@ -356,7 +352,7 @@ function buildTeamMembersField(rowData, columnMap) {
 // ===================================================================
 function getOptionalHeaderIndex_(sheet, headerName) {
   if (!sheet || sheet.getLastColumn() < 1) return -1;
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const headers = (readSheetRows_(sheet, 1, 1)[0] || []);
   const target = String(headerName || '').trim().toLowerCase();
   return headers.findIndex(h => String(h || '').trim().toLowerCase() === target);
 }
@@ -379,7 +375,7 @@ function getRepoUrlMap(timings) {
   const map = {};
 
   if (repoCol >= 0 && teamCol >= 0 && (snapshotRows || statusSheet.getLastRow() >= 2)) {
-    const rows = snapshotRows || statusSheet.getRange(2, 1, statusSheet.getLastRow() - 1, statusSheet.getLastColumn()).getValues();
+    const rows = snapshotRows || readSheetRows_(statusSheet, 2);
     rows.forEach(r => {
       const teamId = normalizeText_(r[teamCol]);
       const repoUrl = String(r[repoCol] || '').trim();
@@ -402,7 +398,7 @@ function getRepoUrlForTeam(teamId) {
     const match = statusSheet.getRange(2, teamCol + 1, statusSheet.getLastRow() - 1, 1)
       .createTextFinder(normalizedTextPattern_(wanted)).useRegularExpression(true).matchEntireCell(true).matchCase(false).findNext();
     if (match) {
-      const value = String(statusSheet.getRange(match.getRow(), repoCol + 1).getValue() || '').trim();
+      const value = String(readSheetRows_(statusSheet, match.getRow(), 1)[0][repoCol] || '').trim();
       if (value) return value;
     }
   }

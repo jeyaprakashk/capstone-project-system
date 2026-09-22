@@ -1,9 +1,10 @@
+const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const {test}=require('node:test');const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');const crypto=require('node:crypto');
 function fixture(){
  let actor='guide@x',assigned='guide@x',locked=false,lockAllowed=true;
  const rows=[];const students=[{regNo:'S1',name:'One',email:'s1@x'},{regNo:'S2',name:'Two',email:'s2@x'}];
  const tables={};
- function sheet(name,data){tables[name]=data;return {getDataRange:()=>({getValues:()=>data.map(r=>r.slice())}),getLastRow:()=>data.length,getMaxRows:()=>1000,insertRowsAfter(){},getMaxColumns:()=>30,insertColumnsAfter(){},getRange:(r,col,n,w)=>({getValues:()=>data.slice(r-1,r-1+n).map(row=>row.slice(col-1,col-1+w)),setValues:values=>{values.forEach((row,i)=>{data[r-1+i]||=[];row.forEach((v,j)=>data[r-1+i][col-1+j]=v);});}})};}
+ function sheet(name,data){tables[name]=data;return {getDataRange:()=>({getValues:()=>data.map(r=>r.slice())}),getLastRow:()=>data.length,getLastColumn:()=>Math.max(0,...data.map(row=>row.length)),getMaxRows:()=>1000,insertRowsAfter(){},getMaxColumns:()=>30,insertColumnsAfter(){},getRange:(r,col,n,w)=>({getValues:()=>data.slice(r-1,r-1+n).map(row=>row.slice(col-1,col-1+w)),setValues:values=>{values.forEach((row,i)=>{data[r-1+i]||=[];row.forEach((v,j)=>data[r-1+i][col-1+j]=v);});}})};}
  const sheets={};let c;
  const context={Date,console,Session:{getActiveUser:()=>({getEmail:()=>actor})},activityIsCoordinator_:email=>email==='coord@x',normalizeText_:v=>String(v??'').trim().toLowerCase(),normalizeEmail:v=>String(v??'').trim().toLowerCase(),emailsMatch:(a,b)=>String(a).toLowerCase()===String(b).toLowerCase(),textEquals_:(a,b)=>String(a).toLowerCase()===String(b).toLowerCase(),
   SHEET_NAMES:{TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},getColumnMap:()=>({TEAM_ID:0,GUIDE_EMAIL:1}),getSheetRows:()=>[['T1',assigned]],getStudentsFromTeamStatusRow_:()=>students,
@@ -13,7 +14,7 @@ function fixture(){
   Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,text)=>crypto.createHash('sha256').update(text).digest(),base64EncodeWebSafe:buffer=>buffer.toString('base64url')},
   LockService:{getScriptLock:()=>({tryLock:()=>{if(!lockAllowed)return false;locked=true;return true;},releaseLock:()=>{locked=false;}})},SpreadsheetApp:{flush(){}},escapeHtml:v=>String(v)
  };
- c=vm.createContext(context);for(const file of ['rubric-config.js','guide-evaluation.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ c=createSheetReadContext(context);for(const file of ['rubric-config.js','guide-evaluation.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
  sheets.Milestones=sheet('Milestones',[['Milestone ID','Milestone Name','Due Date','Graded By','Weight (%)'],['guide_eval','Guide Eval','2020-01-01','Project Guide',20]]);
  vm.runInContext(fs.readFileSync('milestone-config.js','utf8'),c);
  c.getMilestones_=()=>c.parseMilestoneRows_(tables.Milestones,'UTC');
@@ -81,7 +82,7 @@ test('setup never seeds missing rubric rows',()=>{
 });
 
 test('browser module serializes as valid standalone script',()=>{
- const c=vm.createContext({});vm.runInContext(fs.readFileSync('guide-evaluation-client.js','utf8'),c);new vm.Script(c.getGuideEvaluationClientScript());
+ const c=createSheetReadContext({});vm.runInContext(fs.readFileSync('guide-evaluation-client.js','utf8'),c);new vm.Script(c.getGuideEvaluationClientScript());
 });
 
 test('guide weight and criterion maxima come from sheets and changes reject stale edits',()=>{

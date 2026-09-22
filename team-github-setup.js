@@ -1,6 +1,55 @@
+/** Bulk dashboard reads retain live verification without serial network calls per student. */
+function getTeamsGithubSetup_(rows, columns, repoUrlMap, usernameRows) {
+  const responses = new Map();
+  const token = PropertiesService.getScriptProperties().getProperty('GITHUB_ADMIN_TOKEN');
+  function prefetch(paths) {
+    const unique = [...new Set(paths)].filter(path => !responses.has(path));
+    for (let offset = 0; offset < unique.length; offset += 50) {
+      const batch = unique.slice(offset, offset + 50);
+      batch.forEach(path => responses.set(path, {status:503}));
+      if (!token) continue;
+      try {
+        const results = UrlFetchApp.fetchAll(batch.map(path => ({url:'https://api.github.com' + path,
+          method:'get', headers:{Authorization:'token ' + token, Accept:'application/vnd.github.v3+json'}, muteHttpExceptions:true})));
+        results.forEach((response, index) => {
+          let body = null;
+          try { body = JSON.parse(response.getContentText()); } catch (err) { /* Unavailable response. */ }
+          responses.set(batch[index], {status:response.getResponseCode(), body});
+        });
+      } catch (err) { /* Keep failed checks unavailable; never retry the whole batch serially. */ }
+    }
+  }
+  const latest = new Map();
+  usernameRows.forEach(row => latest.set(normalizeText_(row[2]) + ':' + normalizeEmail(row[1]), row));
+  const names = [];
+  rows.forEach(row => [1,2,3,4].forEach(n => {
+    const saved = latest.get(normalizeText_(row[columns.TEAM_ID]) + ':' + normalizeEmail(row[columns['S' + n + '_EMAIL']]));
+    const name = String(saved && saved[3] || '').trim();
+    if (/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(name)) names.push('/users/' + encodeURIComponent(name));
+  }));
+  prefetch(names);
+  const request = (method, path) => {
+    if (!responses.has(path)) prefetch([path]); // Additional invitation pages only.
+    return responses.get(path);
+  };
+  const validationCache = new Map();
+  const options = row => ({row, columns, repoUrl:repoUrlMap[normalizeText_(row[columns.TEAM_ID])] || '', usernameRows, validationCache, request});
+  const paths = [];
+  rows.forEach(row => {
+    const setup = getTeamGithubSetup_(row[columns.TEAM_ID], {...options(row), inspectAccess:false});
+    const slug = getGithubRepoSlug_(setup.repoUrl);
+    if (!setup.usernamesComplete || !slug) return;
+    paths.push('/repos/' + slug, '/repos/' + slug + '/invitations?per_page=100&page=1');
+    setup.members.forEach(member => paths.push('/repos/' + slug + '/collaborators/' + encodeURIComponent(member.username) + '/permission'));
+  });
+  prefetch(paths);
+  return Object.fromEntries(rows.map(row => [normalizeText_(row[columns.TEAM_ID]), getTeamGithubSetup_(row[columns.TEAM_ID], options(row))]));
+}
+
 /** Shared, live team readiness. Read paths never create repositories or invitations. */
 function getTeamGithubSetup_(teamId, options) {
   options = options || {};
+  const request = options.request || makeGithubRequest;
   const columns = options.columns || getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const row = options.row || getSheetRows(SHEET_NAMES.TEAM_STATUS).find(row => textEquals_(row[columns.TEAM_ID], teamId));
   if (!row) throw new Error('Team not found: ' + teamId);
@@ -18,7 +67,7 @@ function getTeamGithubSetup_(teamId, options) {
       status: 'missing', submittedAt: null, access: 'unchecked' };
     if (!username) return member;
     try {
-      if (!validationCache.has(username.toLowerCase())) validationCache.set(username.toLowerCase(), validateStudentGithubUsername_(username));
+      if (!validationCache.has(username.toLowerCase())) validationCache.set(username.toLowerCase(), validateStudentGithubUsername_(username, request));
       const check = validationCache.get(username.toLowerCase());
       member.status = check.valid ? 'valid' : 'invalid';
       if (check.valid) {
@@ -40,12 +89,14 @@ function getTeamGithubSetup_(teamId, options) {
     try {
       const slug = getGithubRepoSlug_(result.repoUrl);
       if (!slug) throw new Error('The saved repository URL is invalid. Contact your coordinator.');
-      const repo = makeGithubRequest('GET', '/repos/' + slug);
+      const repo = request('GET', '/repos/' + slug);
       if (repo.status !== 200) throw new Error('Repository could not be verified. Retry GitHub setup.');
       result.repositoryAvailable = true;
-      const invitations = getGithubInvitations_(slug);
+      const invitations = getGithubInvitations_(slug, request);
       members.forEach(member => {
-        const permission = getCollaboratorPermission_(slug, member.username);
+        const permission = options.request
+          ? request('GET', '/repos/' + slug + '/collaborators/' + encodeURIComponent(member.username) + '/permission')
+          : getCollaboratorPermission_(slug, member.username);
         if (permission.status === 200 && githubPermissionSufficient_(permission.body)) member.access = 'active';
         else if (permission.status === 200 || permission.status === 404) {
           const invitation = invitations.find(invite => !invite.expired && textEquals_(invite.invitee && invite.invitee.login, member.username));
@@ -81,10 +132,10 @@ function ensureGithubPermission_(slug, username, required, invitations) {
   if (!(invitation ? response.status === 200 : [201, 204].includes(response.status))) throw new Error('Could not grant access to ' + username + '. Retry GitHub setup.');
 }
 
-function getGithubInvitations_(slug) {
+function getGithubInvitations_(slug, request) {
   const invitations = [];
   for (let page = 1; ; page++) {
-    const response = makeGithubRequest('GET', '/repos/' + slug + '/invitations?per_page=100&page=' + page);
+    const response = (request || makeGithubRequest)('GET', '/repos/' + slug + '/invitations?per_page=100&page=' + page);
     if (response.status !== 200 || !Array.isArray(response.body)) throw new Error('Repository invitations could not be verified. Retry GitHub setup.');
     invitations.push(...response.body);
     if (response.body.length < 100) return invitations;

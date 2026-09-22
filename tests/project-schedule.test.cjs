@@ -1,3 +1,4 @@
+const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,12 +12,12 @@ function fixture(overrides = {}, runtime = {}) {
   const milestoneRows=runtime.milestoneRows || [['Milestone ID','Milestone Name','Due Date','Graded By','Weight (%)'],...Object.keys(labels).map(key=>[key,labels[key],settings[key],'Not Applicable','']),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'Review '+(i+1),settings['review'+(i+1)],'Review Committee',10])];
   const milestones={getDataRange:()=>({getValues:()=>{reads++;return milestoneRows;}})};
   let reads = 0;
-  const sheet = {getLastRow:()=>entries.length+1, getRange:(row,col,count,width)=>({
+  const sheet = {getLastRow:()=>entries.length+1, getLastColumn:()=>2, getRange:(row,col,count,width)=>({
     getValues:()=>{ reads++; return entries.slice(row-2,row-2+count).map(r=>r.slice(col-1,col-1+width)); },
     setValue:value=>{entries[row-2][col-1]=value;}
   })};
   const properties = runtime.properties || new Map([['SHEET_ID','test-id'],['GITHUB_TOKEN','test-token']]);
-  const c = vm.createContext({Date, console,
+  const c = createSheetReadContext({Date, console,
     CacheService:runtime.cache ? {getScriptCache:()=>runtime.cache} : undefined,
     PropertiesService:{getScriptProperties:()=>({getProperty:key=>properties.get(key)||null,setProperty:(key,value)=>properties.set(key,value)})},
     SpreadsheetApp:{openById:()=>({getSheetByName:name=>name==='Milestones'?milestones:sheet,getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),flush:()=>{}},
@@ -31,6 +32,7 @@ function fixture(overrides = {}, runtime = {}) {
   }
   const schedule = c.getProjectSchedule_();
   c.getTeamGithubSetup_=(id, options)=>({ready:!!options.repoUrl,usernamesComplete:!!options.repoUrl,message:'GitHub setup pending',verificationUnavailable:false});
+  c.getTeamsGithubSetup_=(rows, columns, repos)=>Object.fromEntries(rows.map(row=>[c.normalizeText_(row[columns.TEAM_ID]),c.getTeamGithubSetup_(row[columns.TEAM_ID],{repoUrl:repos[c.normalizeText_(row[columns.TEAM_ID])]} )]));
   c.githubSubmissionTiming_=(setup, schedule, clock)=>({state:setup && !setup.usernamesComplete && clock.today>schedule.formation?'overdue':'on-time',text:'Submission timing'});
   const clock = day => c.getProjectClock_(schedule,new Date(day+'T12:00:00+05:30'));
   return {c,schedule,clock,entries,milestoneRows,properties,sheet,reads:()=>reads};
@@ -268,12 +270,21 @@ test('coordinator statistics, attention list and tracker share one health result
   assert.equal(data.needsAttentionTeams[0].daysOverdue,1);
   assert(data.needsAttentionTeams[0].issue.includes('1 student weekly log(s) overdue'));
   const originalGithub=c.getTeamGithubSetup_;
-  c.getTeamGithubSetup_=()=>({ready:false,usernamesComplete:false,verificationUnavailable:false,message:'Waiting for R2'});
+  c.getTeamGithubSetup_=()=>{throw Error('Coordinator must not inspect GitHub details');};
+  c.getTeamsGithubSetup_=()=>{throw Error('Coordinator must not batch GitHub checks');};
   const incomplete=c.getCoordinatorDashboardData_();
   assert.equal(incomplete.stats.reposReady,1,'repository availability is counted separately');
-  assert.equal(incomplete.stages.setup.completed,0);
-  assert.equal(incomplete.teamTrackerData[0].repoStatus,'pending');
-  assert(incomplete.needsAttentionTeams[0].issue.includes('GitHub username submissions overdue'));
+  assert.equal(incomplete.stages.setup.completed,1);
+  assert.equal(incomplete.teamTrackerData[0].repoStatus,'ready');
+  assert.equal(incomplete.teamTrackerData[0].githubTiming,'');
+  assert(!incomplete.needsAttentionTeams[0].issue.includes('GitHub username'));
+  const originalRepoMap=c.getRepoUrlMap;
+  c.getRepoUrlMap=()=>({});
+  const missingRepo=c.getCoordinatorDashboardData_();
+  assert.equal(missingRepo.stages.setup.completed,0);
+  assert.equal(missingRepo.teamTrackerData[0].repoStatus,'pending');
+  assert(missingRepo.needsAttentionTeams[0].issue.includes('Repository URL missing'));
+  c.getRepoUrlMap=originalRepoMap;
   c.getTeamGithubSetup_=originalGithub;
   const readActivity=c.readActivityRows_, readReviews=c.getAllReviewCompletionStatus_;
   c.readActivityRows_=()=>{throw Error('Overview must not read historical logs');};
@@ -353,7 +364,7 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   const elements=Object.fromEntries(['teamDrawer','teamDrawerBackdrop','teamDrawerContent','teamDrawerTitle','drawerSection-basic','drawerSection-progress','drawerSection-activity'].map(id=>[id,element()]));
   const document={readyState:'loading',addEventListener(){},getElementById:id=>elements[id],createElement:element,body:element()};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorDrawerSection(teamId,section){requests.push({...handlers,teamId,section});}};return chain;}};
-  const browser=vm.createContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
+  const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
   vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext("focusCoordinatorTeam('A'); focusCoordinatorTeam('B');",browser);
   assert.deepEqual(requests.map(r=>r.section),['basic','progress','activity','basic','progress','activity']);
@@ -405,14 +416,14 @@ test('read-only dashboard snapshots reuse rows and are released after success or
 
 test('matched student records use one read and exclude nonmatching rows',()=>{
   const {c}=fixture(); let reads=0;
-  const sheet={getRange:(row,column,count,width)=>{
+  const sheet={getLastColumn:()=>3,getRange:(row,column,count,width)=>{
     reads++; assert.deepEqual([row,column,count,width],[3,1,6,3]);
     return {getValues:()=>Array.from({length:6},(_,i)=>[i+3,'email','team'])};
   }};
   const cells=[3,8,5].map(row=>({getRow:()=>row}));
-  assert.equal(JSON.stringify(c.readMatchedRows_(sheet,cells,1,3)),JSON.stringify([[3,'email','team'],[8,'email','team'],[5,'email','team']]));
+  assert.equal(JSON.stringify(c.readMatchedRows_(sheet,cells)),JSON.stringify([[3,'email','team'],[8,'email','team'],[5,'email','team']]));
   assert.equal(reads,1);
-  assert.equal(c.readMatchedRows_(sheet,[],1,3).length,0);
+  assert.equal(c.readMatchedRows_(sheet,[]).length,0);
   assert.equal(reads,1);
 });
 
@@ -458,7 +469,7 @@ function timelineBrowser() {
       loadDashboardRoleContent(role){requests.push({type:'role',role,...handlers});}};
     return chain;
   }};
-  const browser=vm.createContext({window:{matchMedia:()=>({matches:false})},ResizeObserver:class {constructor(callback){this.callback=callback;} observe(){} disconnect(){}},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
+  const browser=createSheetReadContext({window:{matchMedia:()=>({matches:false})},ResizeObserver:class {constructor(callback){this.callback=callback;} observe(){} disconnect(){}},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
   vm.runInContext(c.getDashboardClientScript(),browser);
   return {c,browser,requests,timeline,guide,reviewer,initialize:()=>initialize()};
 }
@@ -535,7 +546,7 @@ test('normalization handles whitespace, case, numeric IDs and literal search met
   }
   const grouped=c.groupBy([{id:' T1 '},{id:'t1'}],r=>r.id);
   assert.equal(grouped.t1.length,2);
-  const sheet={getLastRow:()=>3,getRange:()=>({getValues:()=>[[' T1 '],[2]]})};
+  const sheet={getLastRow:()=>3,getLastColumn:()=>1,getRange:()=>({getValues:()=>[[' T1 '],[2]]})};
   assert.equal(c.findTeamStatusRow(sheet,'t1',{TEAM_ID:0}),2);
   assert.equal(c.findTeamStatusRow(sheet,' 2 ',{TEAM_ID:0}),3);
 });
@@ -598,7 +609,7 @@ function coordinatorAsyncBrowser(fonts) {
   const elements=Object.fromEntries(ids.map(id=>[id,element()]));
   const document={fonts,readyState:'loading',addEventListener(){},getElementById:id=>elements[id]||null,querySelector:()=>null,querySelectorAll:()=>[],createElement:element};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorSection(section){requests.push({...handlers,section});},loadAllTeamsWeeklyActivity(){requests.push({...handlers,section:'activity'});}};return chain;}};
-  const browser=vm.createContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console:{log(){}}});
+  const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console:{log(){}}});
   vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext('DashboardUI.initializeCoordinatorAsync()',browser);
   return {browser,requests,elements,element};
@@ -679,11 +690,9 @@ test('non-tracker cards wait for their data and fonts before being revealed',asy
   assert.equal(f.elements.coordinatorTracker.innerHTML,'teams');
   resolveFonts();await Promise.resolve();
   assert.equal(f.elements.coordinatorGithub.hidden,true); // System cards are no longer revealed by dashboard state.
-  assert.equal(f.elements.coordinatorStats.hidden,true);
+  assert.equal(f.elements.coordinatorStats.hidden,false);
   f.requests[1].success({panels:{coordinatorStats:'complete stats',coordinatorCompletion:'completion'},partial:false});
-  assert.equal(f.elements.coordinatorStats.hidden,true);
-  assert.equal(f.elements.coordinatorStats.hidden,true);
-  assert.equal(f.elements.coordinatorStats.hidden,true);
+  assert.equal(f.elements.coordinatorStats.hidden,false);
   f.requests[2].success({state:'active',teams:{},activeTeams:0,totalTeams:0,checkedAt:'2026-09-22T12:00:00Z'});
   assert.equal(f.elements.coordinatorStats.hidden,false);
 });

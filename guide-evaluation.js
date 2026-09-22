@@ -193,7 +193,7 @@ function setupGuideEvaluation() {
     if (!storage) storage=ss.insertSheet('GuideEvaluations');
     if (!storage.getLastRow()) storage.getRange(1,1,1,GUIDE_EVAL_HEADERS_.length).setValues([GUIDE_EVAL_HEADERS_]);
     else {
-      const storageHeaders = storage.getRange(1,1,1,9).getValues()[0];
+      const storageHeaders = (readSheetRows_(storage, 1, 1)[0] || []);
       if (GUIDE_EVAL_HEADERS_.some((h,i)=>storageHeaders[i]!==h)) throw new Error('Existing GuideEvaluations headers differ; no records overwritten.');
     }
     SpreadsheetApp.flush();

@@ -45,7 +45,7 @@ test('tracker uses Lucide for repository, title, health and completion states wi
   vm.runInContext(fs.readFileSync('coordinator-dashboard.js', 'utf8'), c);
   const base = {teamId:'T1',guide:'Guide',registerNumbers:[],pendingDeadlines:[],emailRecipients:[],titleStatus:'APPROVED',reviews:{r1:'Completed'},guideEvaluation:'Pending',health:'ontrack'};
   const ready = c.buildTeamTrackerTable([{...base,repoStatus:'ready'}]);
-  assert.match(ready, /title="GitHub setup complete"><svg[^>]*lucide-check/);
+  assert.match(ready, /title="Repository URL recorded"><svg[^>]*lucide-check/);
   assert.match(ready, /aria-label="Completed"/);
   assert.match(ready, /lucide-clock/);
   assert(ready.indexOf('<th>Repo</th>') < ready.indexOf('<th>Title</th>'));

@@ -177,8 +177,8 @@ ${getLucideStyles_()}
 .role-tab-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding: 10px 20px; border-radius: 999px; font-size: 14px; font-weight: 600; border: 1px solid #dcdfe4; background: #fff; color: #6b7280; cursor: pointer; }
 .role-tab-btn.active { background: #1f2430; color: #fff; border-color: #1f2430; }
 @media(min-width:761px) {
-  .dashboard-navigation { background:#fff; border:1px solid #e4e7ec; border-radius:12px; padding:0 4px; }
-  .dashboard-navigation .role-tabs { gap:0; flex-wrap:nowrap; overflow-x:auto; }
+  .dashboard-navigation { background:#fff; border:1px solid #e4e7ec; border-radius:12px; padding:0; }
+  .dashboard-navigation .role-tabs { gap:0; flex-wrap:nowrap; overflow-x:auto; border-radius:11px; }
   .dashboard-navigation .role-tab-btn { flex:1 0 auto; min-height:48px; padding:12px 14px; border:0; border-radius:0; background:transparent; color:#667085; white-space:nowrap; }
   .dashboard-navigation .role-tab-btn:hover { background:#f8fafc; color:#344054; }
   .dashboard-navigation .role-tab-btn.active { background:#f5f3ff; color:#6941c6; box-shadow:inset 0 -3px #6941c6; }
@@ -187,6 +187,26 @@ ${getLucideStyles_()}
 .role-panel { display: none; }
 .role-panel.active { display: block; }
 .role-load-error { margin:20px 0; padding:14px 16px; border:1px solid #fecaca; background:#fef2f2; color:#991b1b; border-radius:10px; }
+.shared-rubrics { margin:0 0 20px; padding:20px 24px; border:1px solid #30324d; border-radius:16px; background:radial-gradient(ellipse at top right,rgba(139,92,246,.16),transparent 60%),#101523; color:#c5cee0; color-scheme:dark; box-shadow:0 8px 24px rgba(11,15,23,.14),inset 0 1px 0 rgba(255,255,255,.04); }
+.shared-rubrics h2 { margin:0 0 12px; font-family:'Space Grotesk','Inter',sans-serif; font-size:16px; color:#f5f7fa; }
+.rubric-assessments { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+.rubric-assessment { display:flex; flex-direction:column; gap:7px; padding:14px; border:1px solid #354057; border-radius:10px; background:#1b2335; color:#c5cee0; font:inherit; text-align:left; cursor:pointer; overflow-wrap:anywhere; transition:background .18s ease,border-color .18s ease; }
+.rubric-assessment strong { color:#f5f7fa; }
+.rubric-assessment:hover:enabled { border-color:#9e77ed; background:#302747; }
+.rubric-assessment:disabled { cursor:default; color:#a8b3c7; background:#171e2c; opacity:1; }
+.rubric-assessment:disabled strong { color:#bdc7da; }
+.rubric-assessment span { font-size:12px; }
+.rubric-assessment .rubric-weight { color:#c4b5fd; font-weight:600; }
+.shared-rubrics > button { padding:8px 14px; border:1px solid #655192; border-radius:8px; background:#34274f; color:#e2d9ff; font:inherit; cursor:pointer; }
+.shared-rubrics > button:hover { background:#473568; }
+.shared-rubrics > button:focus-visible { outline:3px solid #c4b5fd; outline-offset:3px; }
+.shared-rubrics .app-skeleton { --skeleton-base:#242e42; --skeleton-highlight:#39425c; --skeleton-edge:#303b51; }
+.rubric-assessment:focus-visible, #rubricDrawer button:focus-visible { outline:3px solid #9e77ed; outline-offset:3px; }
+.rubric-levels { margin:12px 0 0; }
+.rubric-levels dt { margin-top:10px; font-size:12px; font-weight:600; color:#344054; }
+.rubric-levels dd { margin:4px 0 0; color:#667085; font-size:13px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
+#rubricDrawer .drawer-project-title { white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(max-width:600px) { .shared-rubrics { padding:16px; } .rubric-assessments { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -197,9 +217,16 @@ ${multiRole ? '<h1>Dashboard</h1>' : ''}
 <div class="role-tabs" id="roleMenuItems">${roleButtons}${announcementsButton}${systemButton}</div>
 </nav>
 <section id="sharedProjectTimeline" class="shared-timeline" aria-label="Project timeline" aria-busy="true"><div class="timeline-heading"><h2>Project timeline</h2></div>${getSkeletonMarkup_('timeline', 'Loading project timeline')}</section>
+<section id="sharedRubrics" class="shared-rubrics" aria-labelledby="sharedRubricsHeading" aria-busy="true"><h2 id="sharedRubricsHeading">Assessment rubrics</h2>${getSkeletonMarkup_('panel', 'Loading assessment rubrics')}</section>
 ${rolePanels}
 ${announcementsPanel}
 ${systemPanel}
+<div id="rubricDrawerBackdrop" class="team-drawer-backdrop" onclick="DashboardUI.closeRubricDrawer()" aria-hidden="true"></div>
+<aside id="rubricDrawer" class="team-drawer" role="dialog" aria-modal="true" aria-labelledby="rubricDrawerTitle" aria-hidden="true" inert>
+  <div class="team-drawer-header"><div><div class="team-drawer-eyebrow">ASSESSMENT RUBRIC</div><h2 id="rubricDrawerTitle" class="team-drawer-title"></h2></div>
+  <button type="button" id="rubricDrawerClose" class="team-drawer-close" aria-label="Close rubric details" onclick="DashboardUI.closeRubricDrawer()">${renderLucideIcon_('x')}</button></div>
+  <div id="rubricDrawerContent" class="team-drawer-content"></div>
+</aside>
 <script>
 ${getDashboardClientScript()}
 ${getGuideEvaluationClientScript()}

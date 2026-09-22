@@ -1,3 +1,4 @@
+const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
@@ -7,7 +8,7 @@ function setup(tabs={}) {
   const counts={opens:0,reads:0};
   const TS={TEAM_ID:0,COMMITTEE_NUMBER:1,S1_REGNO:2,S1_EMAIL:3,S2_REGNO:4,S2_EMAIL:5};
   const roster=[['T1','1','A','a@example.com','B','b@example.com'],['T2','1','C','c@example.com'],['T3','2','D','d@example.com']];
-  const c=vm.createContext({getNamedSheet_:(ss,name)=>ss.getSheetByName(name),getRubricStructure_:()=>Object.fromEntries(['review1','review2'].map(key=>[key,Array.from({length:7},(_,i)=>({pi:'PI'+(i+1),name:'Criterion',co:'CO1',maxMarks:i===6?10:15,type:'Team'}))])),Logger:{log(){}},SHEET_NAMES:{TEAM_STATUS:'teams',REVIEW_COMMITTEE:'committees'},FIELD_DEFINITIONS:{TEAM_STATUS:{},REVIEW_COMMITTEE:{}},
+  const c=createSheetReadContext({getNamedSheet_:(ss,name)=>ss.getSheetByName(name),getRubricStructure_:()=>Object.fromEntries(['review1','review2'].map(key=>[key,Array.from({length:7},(_,i)=>({pi:'PI'+(i+1),name:'Criterion',co:'CO1',maxMarks:i===6?10:15,type:'Team'}))])),Logger:{log(){}},SHEET_NAMES:{TEAM_STATUS:'teams',REVIEW_COMMITTEE:'committees'},FIELD_DEFINITIONS:{TEAM_STATUS:{},REVIEW_COMMITTEE:{}},
     getColumnMap:name=>name==='teams'?TS:{COMMITTEE_NUMBER:0,MARKS_SHEET_ID:1},
     getSheetRows:name=>name==='teams'?roster:[['1','shared'],['2','shared']],
     getStudentTeamId:()=> 'T1',emailsMatch:(a,b)=>a===b,
@@ -118,14 +119,14 @@ test('review timings preserve results and count opens and review reads',()=>{
  assert(timings.every(t=>t.durationMs>=0&&t.success));
 });
 
-test('bounded review reader preserves validation and excludes extra columns',()=>{
+test('full-width review reader preserves validation and retains extra columns',()=>{
  const {c}=setup();const review=c.getReviewDefinitions_()[0];
  let reads=0;
  const read=values=>c.readReviewRows_({getSheetByName:()=>({getName:()=> 'Review',
    getLastRow:()=>values.length,
    getLastColumn:()=>values[0].length,
    getDataRange:()=>{throw Error("Unexpected unbounded read");},
-   getRange:(r,col,n,width)=>({getValues:()=>{reads++;assert.equal(width,14);return values.slice(0,n).map(row=>row.slice(0,width));}})
+   getRange:(r,col,n,width)=>({getValues:()=>{reads++;assert.equal(width,values[0].length);return values.slice(0,n).map(row=>row.slice(0,width));}})
  })},'1',review);
  const header=[1,2,3,4,5,6,'Comments',...Array(7).fill('Criterion')];
  assert.equal(read([['']]).length,0);
@@ -134,7 +135,7 @@ test('bounded review reader preserves validation and excludes extra columns',()=
  const badHeader=header.slice();badHeader[6]='Wrong';
  assert.throws(()=>read([badHeader,row('T1','A',zero())]),/Expected Comments/);
  const result=read([[...header,'Extra'],[...row('T1','A',zero()),'Ignored']]);
- assert.equal(result[0].length,14);assert(c.isReviewRowComplete_(result[0],review.rubric));
+ assert.equal(result[0].length,15);assert.equal(result[0][14],'Ignored');assert(c.isReviewRowComplete_(result[0],review.rubric));
  assert.equal(reads,2);
 });
 

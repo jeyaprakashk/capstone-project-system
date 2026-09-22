@@ -1,3 +1,4 @@
+const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -10,7 +11,7 @@ function fixture() {
  const criteria=[{pi:'PI1',name:'Team design',co:'CO1',maxMarks:6,type:'Team',descriptors:[]},{pi:'PI2',name:'Presentation',co:'CO2',maxMarks:4,type:'Individual',descriptors:[]}];
  const reviews=[{key:'r1',label:'Review 1',rubric:criteria},{key:'r2',label:'Review 2',rubric:criteria}];
  const writes=[],sheets={};let actor='reviewer@example.com',opens=0,released=0;
- const c=vm.createContext({console,Date,Set,Map,Session:{getActiveUser:()=>({getEmail:()=>actor})},SHEET_NAMES:{TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},getColumnMap:()=>TS,getSheetRows:()=>[team],textEquals_:(a,b)=>String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase(),normalizeText_:v=>String(v||'').trim().toLowerCase(),getCommitteeNumbersForReviewer:email=>email==='reviewer@example.com'?['C1']:[],getCommitteeInfo:()=>({marksSheetId:'sheet1'}),committeeReviewTabName_:(committee,review)=>review.key,getNamedSheet_:(ss,key)=>sheets[key],SpreadsheetApp:{openById:()=>{opens++;return {};},flush(){}},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(algorithm,input)=>crypto.createHash('sha256').update(input).digest(),base64EncodeWebSafe:value=>Buffer.from(value).toString('base64url')},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){released++;}})}});
+ const c=createSheetReadContext({console,Date,Set,Map,Session:{getActiveUser:()=>({getEmail:()=>actor})},SHEET_NAMES:{TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},getColumnMap:()=>TS,getSheetRows:()=>[team],textEquals_:(a,b)=>String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase(),normalizeText_:v=>String(v||'').trim().toLowerCase(),getCommitteeNumbersForReviewer:email=>email==='reviewer@example.com'?['C1']:[],getCommitteeInfo:()=>({marksSheetId:'sheet1'}),committeeReviewTabName_:(committee,review)=>review.key,getNamedSheet_:(ss,key)=>sheets[key],SpreadsheetApp:{openById:()=>{opens++;return {};},flush(){}},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(algorithm,input)=>crypto.createHash('sha256').update(input).digest(),base64EncodeWebSafe:value=>Buffer.from(value).toString('base64url')},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){released++;}})}});
  for(const file of ['marks-tracker.js','reviewer-evaluation.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
  c.getReviewDefinitions_=()=>reviews;
  for(const review of reviews) {
@@ -66,7 +67,7 @@ test('Review 2 submission rechecks Review 1 even after its drawer was opened',()
 });
 
 test('marking drawer generates a standalone valid browser script',()=>{
- const c=vm.createContext({});for(const file of ['lucide-icons.js','icon-renderer.js','reviewer-evaluation-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ const c=createSheetReadContext({});for(const file of ['lucide-icons.js','icon-renderer.js','reviewer-evaluation-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
  new vm.Script(c.getReviewerMarkingScript_());
 });
 
@@ -78,8 +79,10 @@ function drawerFixture() {
  const dialog={open:false,innerHTML:'',setAttribute(){},addEventListener:(key,fn)=>events[key]=fn,showModal(){this.open=true;},close(){this.open=false;},querySelector(selector){if(selector==='[data-marks-status]')return status;if(selector==='[data-marks-close]')return close;if(selector==='[data-marks-retry]')return retry;if(selector==='form')return form;if(selector.startsWith('[data-comments'))return comments;return select;},querySelectorAll:()=>[close,save,retry,comments,select]};
  const content={innerHTML:''},search={value:'T1',focus(){}};
  function runner(success,failure){return new Proxy({},{get:(_,name)=>name==='withSuccessHandler'?fn=>runner(fn,failure):name==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({name,args,success,failure})});}
- const c=vm.createContext({window:{confirm:()=>true},document:{createElement:()=>dialog,body:{appendChild(){}},getElementById:id=>id==='reviewerContent'?content:search},DashboardUI:{guideRun:()=>runner(),filterReviewerAssignedTeams(){filters++;}}});
+ const c=createSheetReadContext({window:{confirm:()=>true},document:{createElement:()=>dialog,body:{appendChild(){}},getElementById:id=>id==='reviewerContent'?content:search},DashboardUI:{guideRun:()=>runner(),filterReviewerAssignedTeams(){filters++;}}});
  for(const file of ['lucide-icons.js','icon-renderer.js','reviewer-evaluation-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
+ c.DashboardUI.renderSkeleton=c.getSkeletonMarkup_;
  vm.runInContext(c.getReviewerMarkingScript_()+'\nwindow.marks=ReviewerMarks;',c);
  const data={team:'T1',title:'Title',review:{key:'r1',label:'Review 1'},criteria:[{pi:'PI1',name:'Design',co:'CO1',maxMarks:10,type:'Team',descriptors:[]}],students:[{register:'r1',name:'Alice',comments:'',levels:[null]}],revision:'token'};
  return {requests,dialog,status,save,retry,filters:()=>filters,open:()=>c.window.marks.open('T1','r1',close),click:target=>events.click({target}),close,data};

@@ -3,12 +3,12 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 function fixture(system=false) {
- const requests=[], timers=new Map(); let id=0;
+ const requests=[], timers=new Map(), listeners={}; let id=0;
  const panels=['guide','reviewer','coord'].map(key=>({innerHTML:'',getAttribute:()=>key,classList:{toggle(){}}}));
  const announcement={innerHTML:'',setAttribute(){},querySelector:()=>null,querySelectorAll:()=>[]};
  const systemContent={innerHTML:'',setAttribute(){},querySelectorAll:()=>[]};
  const systemMessage={textContent:''}, systemRefresh={disabled:false};
- const document={hidden:false,readyState:'loading',addEventListener(){},getElementById:id=>id==='announcementsContent'?announcement:system?({systemStatusContent:systemContent,systemStatusMessage:systemMessage,systemStatusRefresh:systemRefresh}[id]||null):null,
+ const document={hidden:false,readyState:'loading',addEventListener(name,fn){(listeners[name] ||= []).push(fn);},getElementById:id=>id==='announcementsContent'?announcement:system?({systemStatusContent:systemContent,systemStatusMessage:systemMessage,systemStatusRefresh:systemRefresh}[id]||null):null,
  querySelector:selector=>panels.find(p=>selector.includes('"'+p.getAttribute()+'"'))||null,
  querySelectorAll:selector=>selector==='[data-role-content]'?panels:[]};
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({key,args,success,failure})}); }
@@ -16,8 +16,74 @@ function fixture(system=false) {
  for(const file of ['lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
  vm.runInContext(c.getDashboardClientScript(),c);
- return {c,requests,systemContent,systemMessage,click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);}};
+ return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);}};
 }
+
+function rubricClientFixture() {
+ const f=fixture(), nodes={}, document=f.c.document;
+ for(const id of ['sharedRubrics','rubricDrawer','rubricDrawerBackdrop','rubricDrawerTitle','rubricDrawerContent','rubricDrawerClose','teamDrawer','teamDrawerBackdrop']) {
+  const classes=new Set();nodes[id]={innerHTML:'',attrs:{},isConnected:true,setAttribute(k,v){this.attrs[k]=v;},
+   classList:{add:k=>classes.add(k),remove:k=>classes.delete(k),contains:k=>classes.has(k)},
+   querySelectorAll:()=>[],focus(){document.activeElement=this;}};
+ }
+ const retry={addEventListener(name,fn){this.click=fn;}};
+ nodes.sharedRubrics.querySelector=()=>retry;
+ nodes.rubricDrawer.querySelectorAll=()=>[nodes.rubricDrawerClose];
+ nodes.rubricDrawer.contains=el=>el===nodes.rubricDrawerClose;
+ document.body={classList:{add(){},remove(){}}};
+ const lookup=document.getElementById;document.getElementById=id=>nodes[id]||lookup(id);
+ const ui=vm.runInContext('DashboardUI',f.c);
+ const data={assessments:[{key:'review1',label:'Review 1',weight:12.5,available:true,criterionCount:1,totalMarks:100,criteria:[{pi:'PI1',co:'CO1',type:'Team',maxMarks:100,name:'<unsafe>',descriptors:['<level>','','','','','Excellent']}]},
+  {key:'see',label:'SEE',weight:40,available:false,status:'Rubric not configured'}]};
+ return {...f,nodes,ui,data,retry};
+}
+
+test('rubrics start alongside pending role and timeline, deduplicate and survive role switches',async()=>{
+ const f=rubricClientFixture();const query=f.c.document.querySelector;
+ f.c.document.querySelector=selector=>selector==='[data-role-panel].active'?{getAttribute:()=> 'guide'}:query(selector);
+ f.c.initializeFirstRoleTab();
+ for(const key of ['loadDashboardRoleContent','loadSharedProjectTimeline','loadSharedRubrics']) assert(f.requests.some(r=>r.key===key),key);
+ const promise=f.ui.loadSharedRubrics();assert.equal(f.ui.loadSharedRubrics(),promise);
+ f.done('loadSharedRubrics',f.data);await promise;
+ f.click('reviewer');await f.ui.loadSharedRubrics();
+ assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
+ assert.match(f.nodes.sharedRubrics.innerHTML,/12.5% contribution/);
+ assert.match(f.nodes.sharedRubrics.innerHTML,/disabled/);
+});
+
+test('shared rubric shell follows timeline and reuses responsive drawer styles',()=>{
+ const router=fs.readFileSync('dashboard-router.js','utf8'), coordinator=fs.readFileSync('coordinator-dashboard.js','utf8');
+ assert(router.indexOf('id="sharedRubrics"')>router.indexOf('id="sharedProjectTimeline"'));
+ assert(router.indexOf('id="sharedRubrics"')<router.indexOf('${rolePanels}'));
+ assert.match(router,/id="rubricDrawer" class="team-drawer" role="dialog"/);
+ assert.match(router,/id="rubricDrawerBackdrop"[^>]+DashboardUI.closeRubricDrawer/);
+ assert.match(coordinator,/width: min\(520px, 92vw\)/);
+ assert.match(coordinator,/@media \(max-width: 600px\)\s*\{\s*\.team-drawer\s*\{\s*width: 100%/);
+ assert(!coordinator.includes('${buildRubricsStatusCard_()}'));
+});
+
+test('rubric request failures release loading state and retry successfully',async()=>{
+ const f=rubricClientFixture();const promise=f.ui.loadSharedRubrics();
+ f.requests[0].done=true;f.requests[0].failure(new Error('offline'));
+ await assert.rejects(promise,/offline/);assert.equal(f.nodes.sharedRubrics.attrs['aria-busy'],'false');
+ f.retry.click();const retried=f.ui.loadSharedRubrics();f.done('loadSharedRubrics',f.data);await retried;
+ assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,2);
+});
+
+test('rubric drawer escapes text, traps focus, closes on Escape and excludes team drawer',async()=>{
+ const f=rubricClientFixture();const promise=f.ui.loadSharedRubrics();f.done('loadSharedRubrics',f.data);await promise;
+ const trigger={isConnected:true,focus(){f.c.document.activeElement=this;}};
+ f.nodes.teamDrawer.classList.add('open');f.ui.openRubricDrawer('review1',trigger);
+ assert(!f.nodes.teamDrawer.classList.contains('open'));assert(f.nodes.rubricDrawer.classList.contains('open'));
+ assert.match(f.nodes.rubricDrawerContent.innerHTML,/&lt;unsafe&gt;/);assert.match(f.nodes.rubricDrawerContent.innerHTML,/Level 5/);
+ assert.equal(f.c.document.activeElement,f.nodes.rubricDrawerClose);
+ let prevented=0;for(const shiftKey of [true,false])f.fire('keydown',{key:'Tab',shiftKey,preventDefault(){prevented++;}});
+ assert.equal(prevented,2);
+ f.fire('keydown',{key:'Escape',preventDefault(){}});assert.equal(f.c.document.activeElement,trigger);assert.equal(f.nodes.rubricDrawer.inert,true);
+ f.ui.openRubricDrawer('see',trigger);assert(!f.nodes.rubricDrawer.classList.contains('open'));
+ f.ui.openRubricDrawer('review1',trigger);f.ui.focusCoordinatorTeam('1');assert(!f.nodes.rubricDrawer.classList.contains('open'));
+ assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
+});
 test('preload waits for announcements, loads one adjacent role, and is reused',()=>{
  const f=fixture();f.click('guide');f.done('loadDashboardRoleContent');f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);

@@ -11,7 +11,7 @@ independent requests after inserting that shell:
   and health filters stay disabled until progress arrives.
 - Progress: assessment counts, completion cards, deadline filters and team health.
   These share one marks evaluation so each committee review tab is read once per
-  progress request. Historical logs use only the first three columns, and each
+  progress request. Historical log calculations use the first three fields of full-width rows, and each
   team's weekly summary is calculated once for both health and deadline events.
 - Weekly activity: starts without waiting for the tracker. Its result is retained
   for this page and applied when either overview or progress renders the tracker.
@@ -186,8 +186,8 @@ its requested scope. Student access is limited to their own individual activity
 and their team's totals; assigned guides/reviewers and coordinators have scoped
 staff access. Only coordinators/PD can request every team.
 
-No scoped endpoint calls another. All-team loading reads the narrow log and commit
-ranges once and aggregates in one pass. Team/student requests use a matching-column
+No scoped endpoint calls another. All-team loading reads full-width log and commit
+rows once and aggregates in one pass. Team/student requests use a matching-column
 search and read matching records in a bounded range; Sheets still scans to find
 matches, and interleaved records may span a large range. These are not indexed
 database queries. No locks or persistent activity caches are used.
@@ -206,7 +206,7 @@ Authorization and rendering reuse sheet rows within that scope. The scope is
 released in `finally`, including on errors. Write workflows retain live row reads.
 Spreadsheet/sheet handles and column maps are reused within an execution.
 
-Student log and username lookups batch matching records into one narrow rectangular
+Student log and username lookups batch matching records into one full-width rectangular
 read instead of reading each matching row separately. Only matching rows are
 returned; intervening rows in the rectangle are discarded.
 
@@ -346,14 +346,15 @@ improves loading priority and organization; it does not eliminate marks-sheet co
 Tests cover tab visibility, server authorization, deferred loading, click deduping,
 retry, and preservation of loaded status content on refresh failure.
 
-### Bounded review reads restored
+### Full-width review reads
 
-The used-range experiment did not demonstrate a performance improvement and has
-been reverted. Review reads obtain row/column counts, validate required columns,
-and fetch only the rubric-width rectangle. Empty/header-only behavior, Comments
-header checks, and live marks evaluation remain unchanged. Extra populated
-columns are not transferred. Timings again include `review_read_row_count`,
-`review_read_column_count`, and `review_read_values`.
+Review reads validate required rubric columns and fetch populated rows from
+column A through the last used column with `readSheetRows_()`. Extra columns are
+retained in the record but do not change which rubric fields are scored.
+Empty/header-only behavior, header validation, and live marks evaluation remain
+unchanged. This prioritizes complete records; wider sheets transfer more data.
+Timings include `review_read_row_count`, `review_read_column_count`, and
+`review_read_values`.
 
 No cross-request data cache is used. Existing request-local reuse, page-session
 loaded tabs, selective preloading, and System Status behavior remain intact.

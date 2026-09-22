@@ -1,10 +1,10 @@
 /** Inline GitHub registration. Sheet columns: timestamp, email, team, username. */
-function validateStudentGithubUsername_(value) {
+function validateStudentGithubUsername_(value, request) {
   const username = String(value || '').trim();
   if (!/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(username)) {
     return { valid: false, message: 'Enter a GitHub username, not a profile URL. Use letters, numbers, and single hyphens.' };
   }
-  const response = makeGithubRequest('GET', '/users/' + encodeURIComponent(username));
+  const response = (request || makeGithubRequest)('GET', '/users/' + encodeURIComponent(username));
   if (response.status === 404) return { valid: false, message: 'That GitHub username was not found. Check it and try again.' };
   if (response.status !== 200 || !response.body || !response.body.login) {
     throw new Error('GitHub could not verify usernames right now. Please try again shortly.');
@@ -42,7 +42,7 @@ function submitStudentGithubUsername(username) {
   try {
     const sheet = getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW);
     if (!sheet) throw new Error('GitHub username storage is unavailable. Please contact your coordinator.');
-    const rows = sheet.getLastRow() > 1 ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues() : [];
+    const rows = readSheetRows_(sheet, 2);
     let matchingRow = -1;
     rows.forEach((row, index) => {
       if (emailsMatch(row[1], student.email) && textEquals_(row[2], student.teamId)) matchingRow = index + 2;

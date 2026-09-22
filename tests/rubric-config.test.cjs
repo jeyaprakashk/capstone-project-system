@@ -29,6 +29,44 @@ test('loader returns immutable review criteria from the sheet',()=>{
  assert(Object.isFrozen(rubric));
 });
 
+test('shared rubrics preserve weights and independently validate every graded assessment',()=>{
+ const f=fixture();f.populate();
+ f.c.definitions[0].weight=12.5;
+ f.c.definitions.push({key:'see',label:'SEE',weight:40,gradedBy:'SEE Committee'},
+  {key:'formation',label:'Formation',weight:0,gradedBy:'Not Applicable'});
+ f.rows[1][3]='<script>example</script>';
+ f.rows.find(row=>row[0]==='review2')[5]=-1;
+ const data=f.c.getSharedRubricsData_();
+ assert.equal(data.assessments.length,3);
+ assert.equal(data.assessments[0].weight,12.5);
+ assert.equal(data.assessments[0].totalMarks,100);
+ assert.equal(data.assessments[0].criteria[0].name,'<script>example</script>');
+ assert.equal(data.assessments[0].criteria[0].pi,'PI1');
+ assert.equal(data.assessments[1].available,false);
+ assert.equal(data.assessments[2].status,'Rubric not configured');
+ assert.equal(f.metrics().reads,1);
+});
+
+test('shared rubrics handle missing sheets, headers and guide descriptors',()=>{
+ const f=fixture();assert(f.c.getSharedRubricsData_().assessments.every(a=>!a.available));f.populate();
+ f.c.definitions.push({key:'guide_eval',label:'Guide Eval',weight:20,gradedBy:'Project Guide'});
+ f.rows.push(['guide_eval',1,'PI1','Guide criterion','CO1',100,'Individual']);
+ assert.equal(f.c.getSharedRubricsData_().assessments.at(-1).available,false);
+ f.rows[0].push(...Array.from({length:6},(_,i)=>'Level '+i));f.rows.at(-1).push(...Array(6).fill('Descriptor'));
+ assert.equal(f.c.getSharedRubricsData_().assessments.at(-1).criteria[0].descriptors.length,6);
+ f.rows[0][0]='Invalid';assert(f.c.getSharedRubricsData_().assessments.every(a=>!a.available));
+});
+
+test('shared endpoint authorizes every dashboard role before reading definitions',()=>{
+ const f=fixture();f.populate();let email='user@example.com', roles=[];
+ f.c.Session={getActiveUser:()=>({getEmail:()=>email})};f.c.withDashboardRead_=fn=>fn();
+ f.c.getDashboardRoleViews_=()=>roles;
+ for(const role of ['student','guide','reviewer','coord']) {roles=[{key:role}];assert.equal(f.c.loadSharedRubrics().assessments.length,2);}
+ roles=[];assert.throws(()=>f.c.loadSharedRubrics(),/Dashboard access/);
+ email='';roles=[{key:'student'}];assert.throws(()=>f.c.loadSharedRubrics(),/Dashboard access/);
+ assert.equal(f.metrics().reads,4);
+});
+
 test('milestone-defined review IDs control requirements',()=>{
  const f=fixture();f.populate();f.c.setReviews(3);
  assert.throws(()=>f.c.getRubricStructure_(),/review3/);

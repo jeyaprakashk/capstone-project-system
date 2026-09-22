@@ -44,7 +44,8 @@ function onTeamIntakeSubmit(e) {
     return;
   }
 
-  const rosterRow = statusSheet.getRange(statusRow, 1, 1, TS.REVIEWER_NOTES + 1).getValues()[0];
+  // Header-based columns can be reordered; decisions may follow Reviewer Notes.
+  const rosterRow = readSheetRows_(statusSheet, statusRow, 1)[0];
   const validEmails = [rosterRow[TS.S1_EMAIL], rosterRow[TS.S2_EMAIL], rosterRow[TS.S3_EMAIL], rosterRow[TS.S4_EMAIL]]
     .filter(Boolean).map(normalizeEmail);
   if (!validEmails.includes(normalizeEmail(submitterEmail))) {
@@ -108,7 +109,7 @@ function onTeamIntakeSubmit(e) {
     statusSheet.getRange(statusRow, TS.SIMILARITY_FLAG + 1).setValue(flagText);
   }
 
-  const guideEmail = statusSheet.getRange(statusRow, TS.GUIDE_EMAIL + 1).getValue();
+  const guideEmail = rosterRow[TS.GUIDE_EMAIL];
   MailApp.sendEmail(guideEmail, `New/Updated Title Submission — Team ${teamId}`,
     `Team ${teamId} submitted "${title}" for your review.\n\nReview it here:\n${getDashboardUrl()}`);
 }
@@ -123,29 +124,26 @@ function applyGuideDecision(teamId, decision, notes, submitterEmail, editedTitle
   const statusRow = findTeamStatusRow(statusSheet, teamId, TS);
   if (statusRow === -1) return { ok: false, message: `Team ${teamId} not found.` };
 
-  const recordedGuideEmail = statusSheet.getRange(statusRow, TS.GUIDE_EMAIL + 1).getValue();
+  const rowData = readSheetRows_(statusSheet, statusRow, 1)[0];
+  const recordedGuideEmail = rowData[TS.GUIDE_EMAIL];
   if (!emailsMatch(submitterEmail, recordedGuideEmail)) {
     MailApp.sendEmail(COORDINATOR_EMAIL, `Unauthorized Guide Decision Attempt — Team ${teamId}`,
       `${submitterEmail} submitted a Guide Decision for Team ${teamId}, but the recorded guide is ${recordedGuideEmail}.`);
     return { ok: false, message: `You are not the recorded guide for Team ${teamId}.` };
   }
 
-  let title = statusSheet.getRange(statusRow, TS.TITLE + 1).getValue();
+  let title = rowData[TS.TITLE];
   const studentEmails = [
-    statusSheet.getRange(statusRow, TS.S1_EMAIL + 1, 1, 1).getValue(),
-    statusSheet.getRange(statusRow, TS.S2_EMAIL + 1, 1, 1).getValue(),
-    statusSheet.getRange(statusRow, TS.S3_EMAIL + 1, 1, 1).getValue(),
-    statusSheet.getRange(statusRow, TS.S4_EMAIL + 1, 1, 1).getValue()
+    rowData[TS.S1_EMAIL],
+    rowData[TS.S2_EMAIL],
+    rowData[TS.S3_EMAIL],
+    rowData[TS.S4_EMAIL]
   ].filter(Boolean);
 
   let titleWasEdited = false;
   if (editedTitle && editedTitle.trim() && editedTitle.trim() !== String(title).trim()) {
     const originalTitle = title;
     title = editedTitle.trim().toUpperCase();
-    statusSheet.getRange(statusRow, TS.TITLE + 1).setValue(title);
-    titleWasEdited = true;
-    MailApp.sendEmail(studentEmails.join(','), `Your Guide Updated Your Project Title — Team ${teamId}`,
-      `Original: "${originalTitle}"\nUpdated: "${title}"`);
     
     // RECALCULATE SIMILARITY FLAG WITH NEW TITLE (check both master registry and current semester teams)
     let bestMatch = { score: 0, title: '', context: '' };
@@ -158,7 +156,13 @@ function applyGuideDecision(teamId, decision, notes, submitterEmail, editedTitle
         if (score > bestMatch.score) bestMatch = { score, title: r[4], context: `${r[0]} - ${r[1]}` };
       });
     } catch (err) {
-      Logger.log(`Warning: Could not check master registry: ${err.message}`);
+      return { ok: false, message: 'Could not check the master registry for title similarity. Please try again. Your title and decision were not saved.' };
+    }
+
+    if (bestMatch.score >= 0.75) {
+      return { ok: false, message:
+        `The edited title is ${Math.round(bestMatch.score * 100)}% similar to: "${bestMatch.title}" (${bestMatch.context}). ` +
+        'Please revise the title. Your title and decision were not saved.' };
     }
     
     // Check other team titles in current semester
@@ -169,6 +173,11 @@ function applyGuideDecision(teamId, decision, notes, submitterEmail, editedTitle
       if (score > bestMatch.score) bestMatch = { score, title: r[TS.TITLE], context: `Team ${r[TS.TEAM_ID]}, this semester` };
     });
     
+    statusSheet.getRange(statusRow, TS.TITLE + 1).setValue(title);
+    titleWasEdited = true;
+    MailApp.sendEmail(studentEmails.join(','), `Your Guide Updated Your Project Title — Team ${teamId}`,
+      `Original: "${originalTitle}"\nUpdated: "${title}"`);
+
     // Clear and update similarity flag
     statusSheet.getRange(statusRow, TS.SIMILARITY_FLAG + 1).setValue('');
     if (bestMatch.score > 0) {
@@ -201,7 +210,7 @@ function applyReviewerDecision(teamId, decision, notes, submitterEmail) {
   const statusRow = findTeamStatusRow(statusSheet, teamId, TS);
   if (statusRow === -1) return { ok: false, message: `Team ${teamId} not found.` };
 
-  const rowData = statusSheet.getRange(statusRow, 1, 1, TS.TITLE_APPROVED_BY + 1).getValues()[0];
+  const rowData = readSheetRows_(statusSheet, statusRow, 1)[0];
   const committee = getCommitteeInfo(rowData[TS.COMMITTEE_NUMBER]);
   const validReviewerEmails = committee
     ? [committee.reviewer1Email, committee.reviewer2Email, committee.reviewer3Email, committee.reviewer4Email]
@@ -274,7 +283,7 @@ function syncTeamStatusFromRoster() {
 
     const existingRow = statusRowNumByTeamId[normalizeText_(teamId)];
     if (existingRow) {
-      const currentRow = statusSheet.getRange(existingRow, 1, 1, numCols).getValues()[0];
+      const currentRow = readSheetRows_(statusSheet, existingRow, 1)[0];
       Object.entries(rosterFields).forEach(([field, value]) => { currentRow[TS[field]] = value; });
       statusSheet.getRange(existingRow, 1, 1, numCols).setValues([currentRow]);
       updated.push(teamId);

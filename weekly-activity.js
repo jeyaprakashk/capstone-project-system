@@ -1,13 +1,13 @@
 /** Independent scoped readers; shared aggregation. No persistent activity cache or locks. */
-function readActivityRows_(sheetName, column, value, width) {
+function readActivityRows_(sheetName, column, value) {
   const sheet = getSheet(sheetName);
   const last = sheet.getLastRow();
   if (last < 2) return [];
-  if (column === null) return sheet.getRange(2, 1, last - 1, width).getValues();
+  if (column === null) return readSheetRows_(sheet, 2, last - 1);
   const matches = sheet.getRange(2, column, last - 1, 1)
     .createTextFinder(normalizedTextPattern_(String(value))).useRegularExpression(true)
     .matchEntireCell(true).matchCase(false).findAll();
-  return readMatchedRows_(sheet, matches, 1, width);
+  return readMatchedRows_(sheet, matches);
 }
 
 function weeklyActivityContext_() {
@@ -60,8 +60,8 @@ function loadAllTeamsWeeklyActivity() {
     const context = weeklyActivityContext_();
     const active = context.state === 'active';
     const teams = aggregateWeeklyActivity_(ids,
-      active ? readActivityRows_(SHEET_NAMES.RAW_LOG, null, null, 3) : [],
-      active ? readActivityRows_(SHEET_NAMES.COMMITS, null, null, 4) : [], context);
+      active ? readActivityRows_(SHEET_NAMES.RAW_LOG, null, null) : [],
+      active ? readActivityRows_(SHEET_NAMES.COMMITS, null, null) : [], context);
     return {...activityResponse_(context, teams), totalTeams:Object.keys(teams).length,
       activeTeams:active ? Object.values(teams).filter(value => value.logs > 0 || value.commits > 0).length : null};
   });
@@ -70,8 +70,7 @@ function loadAllTeamsWeeklyActivity() {
 function loadTeamWeeklyActivity(teamId) {
   return withDashboardRead_(() => {
     const columns = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    const sheet = getSheet(SHEET_NAMES.TEAM_STATUS);
-    const rows = readActivityRows_(SHEET_NAMES.TEAM_STATUS, columns.TEAM_ID + 1, teamId, sheet.getLastColumn());
+    const rows = readActivityRows_(SHEET_NAMES.TEAM_STATUS, columns.TEAM_ID + 1, teamId);
     if (rows.length !== 1) throw new Error('Team not found or duplicated.');
     authorizeActivityTeam_(Session.getActiveUser().getEmail(), rows[0], columns);
     const context = weeklyActivityContext_();
@@ -82,8 +81,8 @@ function loadTeamWeeklyActivity(teamId) {
 function getTeamWeeklyActivity_(teamId, context, logs) {
   const active = context.state === 'active';
   return aggregateWeeklyActivity_([teamId],
-    active ? (logs || readActivityRows_(SHEET_NAMES.RAW_LOG, 3, teamId, 3)) : [],
-    active ? readActivityRows_(SHEET_NAMES.COMMITS, 2, teamId, 4) : [], context);
+    active ? (logs || readActivityRows_(SHEET_NAMES.RAW_LOG, 3, teamId)) : [],
+    active ? readActivityRows_(SHEET_NAMES.COMMITS, 2, teamId) : [], context);
 }
 
 function loadStudentWeeklyActivity(studentEmail) {
@@ -101,11 +100,11 @@ function loadStudentWeeklyActivity(studentEmail) {
     if (context.state === 'active') {
       // Latest submission per email; a username claimed by multiple people is ambiguous.
       const mappings = new Map();
-      readActivityRows_(SHEET_NAMES.GITHUB_USERNAME_RAW, 3, teamId, 4).forEach(item => mappings.set(normalizeEmail(item[1]), normalizeText_(item[3])));
+      readActivityRows_(SHEET_NAMES.GITHUB_USERNAME_RAW, 3, teamId).forEach(item => mappings.set(normalizeEmail(item[1]), normalizeText_(item[3])));
       const candidate = mappings.get(studentEmail);
       if (candidate && /^[a-z\d](?:[a-z\d-]{0,38})$/.test(candidate) && [...mappings.values()].filter(value => value === candidate).length === 1) username = candidate;
-      logs = readActivityRows_(SHEET_NAMES.RAW_LOG, 2, studentEmail, 3);
-      if (username) commits = readActivityRows_(SHEET_NAMES.COMMITS, 2, teamId, 4);
+      logs = readActivityRows_(SHEET_NAMES.RAW_LOG, 2, studentEmail);
+      if (username) commits = readActivityRows_(SHEET_NAMES.COMMITS, 2, teamId);
     }
     return {...activityResponse_(context, aggregateWeeklyActivity_([teamId], logs, commits, context, {email:studentEmail, username})),
       studentEmail, commitAttribution:username ? 'mapped' : 'unavailable'};

@@ -1,6 +1,38 @@
 /** Spreadsheet-owned rubric definitions. No persistent caching of student marks. */
 let rubricExecutionStructure_ = null;
 
+/** Public dashboard definitions only; never reads marking sheets or student records. */
+function loadSharedRubrics() {
+  return withDashboardRead_(() => {
+    const email = Session.getActiveUser().getEmail();
+    if (!email || !getDashboardRoleViews_(email).length) throw new Error('Dashboard access is required.');
+    return getSharedRubricsData_();
+  });
+}
+
+function getSharedRubricsData_() {
+  const assessments = getMilestones_().filter(item => item.gradedBy !== 'Not Applicable');
+  const sheet = getSheet('Rubrics');
+  const rows = sheet ? sheet.getDataRange().getValues() : [];
+  const column = (rows[0] || []).map(normalizeText_).indexOf('milestone id');
+  return {assessments: assessments.map(item => {
+    const result = {key:item.key, label:item.label, weight:item.weight, available:false,
+      criterionCount:0, totalMarks:0, criteria:[], status:'Rubric unavailable'};
+    if (!sheet) return {...result, status:'Rubric not configured'};
+    if (column < 0) return {...result, status:'Rubric needs correction'};
+    const selected = rows.slice(1).filter(row => normalizeText_(row[column]) === item.key);
+    if (!selected.length) return {...result, status:'Rubric not configured'};
+    try {
+      const criteria = parseRubricRows_([rows[0], ...selected], [item])[item.key];
+      if (item.gradedBy === 'Project Guide' && criteria.some(c => c.type !== 'Individual' || c.descriptors.some(text => !text))) {
+        return {...result, status:'Guide rubric incomplete'};
+      }
+      return {...result, available:true, status:'Available', criteria,
+        criterionCount:criteria.length, totalMarks:Number(criteria.reduce((sum,c) => sum + c.maxMarks, 0).toFixed(2))};
+    } catch (err) { return {...result, status:'Rubric needs correction'}; }
+  })};
+}
+
 /** Read-only readiness check for every graded assessment, including guide and SEE. */
 function getRubricsStatus_() {
   let summaries = [];

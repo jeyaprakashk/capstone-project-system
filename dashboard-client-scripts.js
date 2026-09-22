@@ -15,6 +15,7 @@ const DashboardUI = (function() {
   initializeDashboardTooltips_();
 
   function byId(id) { return document.getElementById(id); }
+  function setLoading(id, label) { const el = byId(id); if (el) el.innerHTML = renderSkeleton('inline', label); }
   function setText(id, text) { const el = byId(id); if (el) el.textContent = text; }
   function setButtonsDisabled(container, disabled) {
     if (!container) return;
@@ -160,6 +161,86 @@ const DashboardUI = (function() {
   }
 
   const loadedRoleTabs = Object.create(null);
+  let sharedRubrics = null;
+  let rubricsRequest = null;
+  let rubricTrigger = null;
+  function loadSharedRubrics() {
+    if (rubricsRequest) return rubricsRequest;
+    const target = byId('sharedRubrics');
+    if (!target) return Promise.resolve(null);
+    target.setAttribute('aria-busy', 'true');
+    target.innerHTML = '<h2 id="sharedRubricsHeading">Assessment rubrics</h2>' + renderSkeleton('panel', 'Loading assessment rubrics');
+    rubricsRequest = new Promise(function(resolve, reject) {
+      dashboardRun().withSuccessHandler(function(data) {
+        try {
+          target.innerHTML = '<h2 id="sharedRubricsHeading">Assessment rubrics</h2><div class="rubric-assessments">' + data.assessments.map(function(item) {
+            return '<button type="button" class="rubric-assessment" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-weight">' + escapeClientHtml(item.weight) + '% contribution</span><span>' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></button>';
+          }).join('') + '</div>' + (data.assessments.length ? '' : '<p>No graded assessments configured.</p>');
+          sharedRubrics = data;
+          target.querySelectorAll('[data-rubric-key]').forEach(function(button) {
+            button.addEventListener('click', function() { openRubricDrawer(button.getAttribute('data-rubric-key'), button); });
+          });
+          target.setAttribute('aria-busy', 'false');
+          resolve(data);
+        } catch (err) { reject(err); }
+      }).withFailureHandler(reject).loadSharedRubrics();
+    }).catch(function(err) {
+      rubricsRequest = null;
+      target.setAttribute('aria-busy', 'false');
+      target.innerHTML = '<h2 id="sharedRubricsHeading">Assessment rubrics</h2><p role="status">Unable to load rubrics.</p><button type="button">Retry</button>';
+      target.querySelector('button').addEventListener('click', function() { loadSharedRubrics().catch(function() {}); });
+      throw err;
+    });
+    return rubricsRequest;
+  }
+
+  function openRubricDrawer(key, trigger) {
+    const item = sharedRubrics && sharedRubrics.assessments.find(function(a) { return a.key === key; });
+    const drawer = byId('rubricDrawer');
+    if (!item || !item.available || !drawer) return;
+    closeCoordinatorTeamDrawer();
+    rubricTrigger = trigger || document.activeElement;
+    byId('rubricDrawerTitle').textContent = item.label;
+    byId('rubricDrawerContent').innerHTML = '<div class="drawer-section"><div class="drawer-section-title">Assessment contribution</div><div class="drawer-project-title">' + escapeClientHtml(item.weight) + '% of overall assessment</div><p class="drawer-person-meta">' + escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks</p></div>' + item.criteria.map(function(c) {
+      return '<section class="drawer-section"><div class="drawer-section-title">' + escapeClientHtml(c.pi) + ' · ' + escapeClientHtml(c.co) + ' · ' + escapeClientHtml(c.type) + ' · ' + escapeClientHtml(c.maxMarks) + ' marks</div><h3 class="drawer-project-title">' + escapeClientHtml(c.name) + '</h3><dl class="rubric-levels">' + c.descriptors.map(function(text, level) {
+        return text ? '<dt>Level ' + level + '</dt><dd>' + escapeClientHtml(text) + '</dd>' : '';
+      }).join('') + '</dl></section>';
+    }).join('');
+    drawer.inert = false;
+    drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+    byId('rubricDrawerBackdrop').classList.add('open');
+    document.body.classList.add('team-drawer-open');
+    byId('rubricDrawerContent').scrollTop = 0;
+    byId('rubricDrawerClose').focus();
+  }
+
+  function closeRubricDrawer(restoreFocus) {
+    const drawer = byId('rubricDrawer');
+    if (!drawer || !drawer.classList.contains('open')) return;
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+    drawer.inert = true;
+    byId('rubricDrawerBackdrop').classList.remove('open');
+    document.body.classList.remove('team-drawer-open');
+    if (restoreFocus !== false && rubricTrigger && rubricTrigger.isConnected) rubricTrigger.focus();
+    rubricTrigger = null;
+  }
+  document.addEventListener('keydown', function(event) {
+    const drawer = byId('rubricDrawer');
+    if (!drawer || !drawer.classList.contains('open')) return;
+    if (event.key === 'Escape') { event.preventDefault(); closeRubricDrawer(); }
+    if (event.key === 'Tab') {
+      const controls = Array.from(drawer.querySelectorAll('button:not([disabled]), a[href], [tabindex="0"]'));
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  });
+  document.addEventListener('focusin', function(event) {
+    const drawer = byId('rubricDrawer');
+    if (drawer && drawer.classList.contains('open') && !drawer.contains(event.target)) byId('rubricDrawerClose').focus();
+  });
   const loadingRoleTabs = Object.create(null);
 
   function updatedLabel() {
@@ -187,7 +268,7 @@ const DashboardUI = (function() {
 
     const hadContent = !!loadedRoleTabs[activeKey];
     const refreshButton = byId(activeKey + 'Refresh');
-    if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderLucideIcon_('refresh-cw', '', 'icon-leading icon-spin') + 'Refreshing…'; }
+    if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderSkeleton('inline', 'Refreshing'); }
     setText(activeKey + 'RefreshStatus', '');
     loadingRoleTabs[activeKey] = true;
     const requestStarted = Date.now();
@@ -308,8 +389,8 @@ const DashboardUI = (function() {
     if (!hadContent) renderAnnouncementsLoading();
     const refreshButton = target.querySelector('.announcement-refresh-btn');
     const status = target.querySelector('.announcement-status');
-    if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderLucideIcon_('refresh-cw', '', 'icon-leading icon-spin') + 'Refreshing…'; }
-    if (status) status.textContent = 'Checking for updates…';
+    if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderSkeleton('inline', 'Refreshing'); }
+    if (status) status.innerHTML = renderSkeleton('inline', 'Checking for updates');
     target.setAttribute('aria-busy', 'true');
 
     dashboardRun()
@@ -362,11 +443,11 @@ const DashboardUI = (function() {
     systemStatusState.loading = true;
     systemStatusState.attempted = true;
     const button = byId('systemStatusRefresh');
-    if (button) { button.disabled = true; button.innerHTML = renderLucideIcon_('refresh-cw', '', 'icon-leading icon-spin') + 'Refreshing…'; }
+    if (button) { button.disabled = true; button.innerHTML = renderSkeleton('inline', 'Refreshing'); }
     const buttons = Array.from(target.querySelectorAll('button')).map(function(el) { return {el:el, disabled:el.disabled}; });
     buttons.forEach(function(item) { item.el.disabled = true; });
     target.setAttribute('aria-busy', 'true');
-    setText('systemStatusMessage', 'Loading system status…');
+    setLoading('systemStatusMessage', 'Loading system status');
     dashboardRun().withSuccessHandler(function(html) {
       target.innerHTML = html;
       systemStatusState.loading = false;
@@ -908,6 +989,7 @@ const DashboardUI = (function() {
 
   let coordinatorDrawerRequest = 0;
   function focusCoordinatorTeam(teamId) {
+    closeRubricDrawer(false);
     const request = ++coordinatorDrawerRequest;
     const drawer = byId('teamDrawer');
     const backdrop = byId('teamDrawerBackdrop');
@@ -995,7 +1077,7 @@ const DashboardUI = (function() {
 
   function markCoordinatorProgressUnavailable() {
     getCoordinatorRows().forEach(function(row) {
-      row.querySelectorAll('.col-review, .col-health').forEach(function(cell) { cell.textContent = 'Unavailable'; });
+      row.querySelectorAll('.col-review, .col-guide-evaluation, .col-health').forEach(function(cell) { cell.innerHTML = renderLucideIcon_('triangle-alert', 'Unavailable'); });
     });
     document.querySelectorAll('#coordinatorStats .stat-card-teal .stat-num, #coordinatorStats .stat-card-red .stat-num').forEach(function(el) { el.textContent = 'Unavailable'; });
     document.querySelectorAll('.tracker-tabs button:disabled').forEach(function(el) { el.textContent = el.getAttribute('data-filter') === 'attention' ? 'Attention (Unavailable)' : 'On Track (Unavailable)'; });
@@ -1007,7 +1089,7 @@ const DashboardUI = (function() {
     const state = coordinatorSectionState;
     if (!state || !state.fontsReady || state.root !== byId('coordinatorAsyncRoot')) return;
     const ready = {
-      coordinatorStats:state.progressSettled && !!coordinatorActivityResult
+      coordinatorStats:state.overviewSettled || state.progressSettled
     };
     Object.keys(ready).forEach(function(id) {
       const card = byId(id);
@@ -1127,7 +1209,7 @@ const DashboardUI = (function() {
     if (!root) return;
     activityRequestPending = true;
     if (byId('weeklyActivityRetry')) byId('weeklyActivityRetry').hidden = true;
-    setText('weeklyActivityStatus', 'Loading weekly activity…');
+    setLoading('weeklyActivityStatus', 'Loading weekly activity');
     dashboardRun().withSuccessHandler(function(result) {
       activityRequestPending = false;
       if (root !== byId('coordinatorAsyncRoot')) return;
@@ -1157,7 +1239,7 @@ const DashboardUI = (function() {
     card.setAttribute('data-state', 'checking');
     byId('reviewConfigurationRecheck').disabled = true;
     byId('createReviewerSheetsButton').disabled = true;
-    setText('reviewConfigurationSummary', 'Checking…');
+    setLoading('reviewConfigurationSummary', 'Checking');
     function finish(report, error) {
       checkingReviewConfiguration = false;
       if (coordinatorSectionState) coordinatorSectionState.configurationSettled = true;
@@ -1376,12 +1458,16 @@ const DashboardUI = (function() {
     refreshGithubStatus,
     retryGithubSetup,
     submitGithubUsername,
+    renderSkeleton: renderSkeleton,
     guideRun: dashboardRun,
     refreshRoleDashboard,
     refreshSystemStatus: function() { ensureSystemStatusLoaded(true); },
     initializeCoordinatorAsync,
     loadCoordinatorSectionAsync,
     loadSharedTimeline,
+    loadSharedRubrics,
+    openRubricDrawer,
+    closeRubricDrawer,
     getSharedSchedule: function() { return sharedSchedule; },
     showRoleTab,
     toggleRoleMenu,
@@ -1441,6 +1527,7 @@ function initializeFirstRoleTab() {
     DashboardUI.showRoleTab(activePanel.getAttribute('data-role-panel'));
   }
   DashboardSchedule.ready().catch(function() {});
+  DashboardUI.loadSharedRubrics().catch(function() {});
 }
 
 if (document.readyState === 'loading') {
