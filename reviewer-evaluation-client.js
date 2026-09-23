@@ -32,6 +32,7 @@ const ReviewerMarks = (function() {
   function header(title) { return '<div class="reviewer-marks-header"><h2 id="reviewerMarksHeading">'+escape(title)+'</h2><button type="button" data-marks-close aria-label="Close marking drawer">'+icon('x')+'</button></div>'; }
   function open(team,review,button) {
     if (review==='review1') {Review1Evaluation.open(team,button);return;}
+    if (review==='review2') {Review2Evaluation.open(team,button);return;}
     ensureDialog(); trigger=button; model=null;dirty=false;saved=false;busy=false;
     const token=++request;
     dialog.innerHTML=header('Review marks')+'<p role="status" data-marks-status>' + DashboardUI.renderSkeleton('panel', 'Loading rubric and marks') + '</p>';

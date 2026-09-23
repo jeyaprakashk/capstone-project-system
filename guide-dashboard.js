@@ -183,17 +183,9 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
 }
 
 function buildProblemBlock(teamId, problemText, maxLen) {
-  maxLen = maxLen || 130;
   const full = String(problemText || '');
   if (!full) return '';
-  if (full.length <= maxLen) {
-    return `<p class="card-desc">${renderLucideIcon_('file-text', '', 'icon-leading')}${escapeHtml(full)}</p>`;
-  }
-  const short = full.slice(0, maxLen).trim();
-  return `<p class="card-desc clickable" onclick="toggleProblem('${teamId}')">
-    ${renderLucideIcon_('file-text', '', 'icon-leading')}<span id="problem-short-${teamId}">${escapeHtml(short)}&hellip; <em class="expand-hint">more</em></span>
-    <span id="problem-full-${teamId}" style="display:none;">${escapeHtml(full)} <em class="expand-hint">less</em></span>
-  </p>`;
+  return `<div class="card-desc">${renderLucideIcon_('file-text', '', 'icon-leading')}${renderExpandableText_(full, maxLen || 130)}</div>`;
 }
 
 function buildRepoLine(repoUrl) {

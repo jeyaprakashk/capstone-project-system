@@ -72,10 +72,10 @@ function buildReviewerReviewCells_(r, TS, progress) {
   return progress.reviews.map(review => {
     const state=(progress.teams[normalizeReviewKey_(r[TS.TEAM_ID])] || {})[review.key];
     const available=state && state.available;
-    const first=review.key==='review1';
+    const first=['review1','review2'].includes(review.key);
     const firstState=(progress.teams[normalizeReviewKey_(r[TS.TEAM_ID])] || {}).review1;
-    const ready=unlocked && (review.key!=='review2' || !!(firstState && firstState.completed));
-    const enabled=available && (first ? state.readable : ready);
+    const ready=review.key==='review2'?approved && !!(firstState && (firstState.recorded ?? firstState.completed)):unlocked;
+    const enabled=available && (first ? state.readable && (review.key==='review1' || ready) : ready);
     const hint=first ? (!available ? (state && state.error || 'Marks unavailable.') : state.reason || state.status) : !ready ? (approved ? 'Complete the previous review first.' : 'Approve the title first.') : !available ? (state && state.error || 'Marks unavailable.') : '';
     const label=first && state && ['Submitted','Published'].includes(state.status) ? 'View marks' : state && state.completed ? 'Edit marks' : 'Enter marks';
     const cell=`<td class="reviewer-review-cell"><button type="button" class="btn-outline" ${enabled ? '' : 'disabled'} data-team="${escapeHtml(r[TS.TEAM_ID])}" data-review="${escapeHtml(review.key)}" onclick="DashboardUI.openReviewerMarks(this.dataset.team, this.dataset.review, this)">${renderLucideIcon_(enabled ? 'clipboard-check' : 'lock-keyhole')} ${label}</button><small>${hint ? escapeHtml(hint) : state.completed ? 'Completed' : state.markedStudents + '/' + state.totalStudents + ' students marked'}</small></td>`;

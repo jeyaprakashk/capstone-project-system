@@ -35,8 +35,11 @@ function reviewerEvaluationContext_(teamId, reviewKey) {
   const spreadsheet = SpreadsheetApp.openById(info.marksSheetId);
   const registers = new Set(context.students.map(s => s.register));
   for (let i=0;i<index;i++) {
-    if (reviews[i].key === 'review1') {
-      if (reviewKey !== 'review2') review1RequireCompleted_(context.row,context.TS,reviews[index].label);
+    if (['review1','review2'].includes(reviews[i].key)) {
+      if (reviewKey !== 'review2') {
+        const prior=reviews[i].key;
+        if(!review1Progress_(context.row,context.TS,review1Records_(prior).records,review1Configuration_(prior)).completed) throw new Error('Complete '+reviews[i].label+' for every student before entering '+reviews[index].label+' marks.');
+      }
       continue;
     }
     const previous = reviewerReviewRows_(spreadsheet,context.committee,reviews[i]);
@@ -55,6 +58,7 @@ function reviewerEvaluationContext_(teamId, reviewKey) {
 
 function getReviewerEvaluation(teamId, reviewKey) {
   if (reviewKey === 'review1') return getReview1Evaluation(teamId);
+  if (reviewKey === 'review2') return getReview2Evaluation(teamId);
   const context = reviewerEvaluationContext_(teamId,reviewKey);
   return {team:context.team,title:context.title,review:{key:context.review.key,label:context.review.label},criteria:context.review.rubric,revision:context.revision,
     students:context.matched.map(student => ({register:student.register,name:student.name,comments:String(student.row[6] || ''),levels:context.review.rubric.map((pi,i) => isReviewMarkEntered_(student.row[7+i]) ? Number(student.row[7+i]) : null)}))};
@@ -62,6 +66,7 @@ function getReviewerEvaluation(teamId, reviewKey) {
 
 function saveReviewerEvaluation(teamId, reviewKey, payload) {
   if (reviewKey === 'review1') throw new Error('Use the Review 1 draft and submission workflow.');
+  if (reviewKey === 'review2') throw new Error('Use the Review 2 draft and submission workflow.');
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) throw new Error('Another save is in progress. Try again.');
   try {
@@ -96,23 +101,24 @@ function getReviewerReviewProgress_(rows) {
   const result = {reviews:[],teams:Object.create(null),error:''};
   try { result.reviews = getReviewDefinitions_(); }
   catch (err) { result.error = err.message; return result; }
-  let review1Records = [], review1Config, review1Error = '';
-  if (result.reviews.some(r=>r.key==='review1')) {
-    try {review1Config=review1Configuration_(); const history=review1Records_(); review1Records=history.records; if (!history.sheet) throw new Error('Review1Evaluations is missing from the main spreadsheet. Create the tab manually with the required headers.');}
-    catch(err) {review1Error=err.message;}
-  }
+  const histories={};
+  result.reviews.filter(r=>['review1','review2'].includes(r.key)).forEach(review=>{
+    try {const config=review1Configuration_(review.key),history=review1Records_(review.key);if(!history.sheet)throw new Error(reviewHistoryName_(review.key)+' is missing. Create the tab manually with the required headers.');histories[review.key]={config,records:history.records};}
+    catch(err) {histories[review.key]={error:err.message};}
+  });
   const grouped = new Map();
   rows.forEach(row => { const key=String(row[TS.COMMITTEE_NUMBER] || ''); if (!grouped.has(key)) grouped.set(key,[]); grouped.get(key).push(row); });
   grouped.forEach((teams,committee) => {
     let spreadsheet, issue='';
-    try { const info=getCommitteeInfo(committee); if (!info || !info.marksSheetId) throw new Error('Marking spreadsheet not created.'); spreadsheet=SpreadsheetApp.openById(info.marksSheetId); }
+    try { if(result.reviews.some(r=>!['review1','review2'].includes(r.key))) {const info=getCommitteeInfo(committee); if (!info || !info.marksSheetId) throw new Error('Marking spreadsheet not created.'); spreadsheet=SpreadsheetApp.openById(info.marksSheetId);} }
     catch(err) { issue=err.message; }
     result.reviews.forEach(review => {
-      if (review.key === 'review1') {
+      if (['review1','review2'].includes(review.key)) {
         teams.forEach(row=>{
           const team=normalizeReviewKey_(row[TS.TEAM_ID]);
           if (!result.teams[team]) result.teams[team]={};
-          result.teams[team][review.key]=review1Error?{available:false,completed:false,error:review1Error}:review1Progress_(row,TS,review1Records,review1Config);
+          const history=histories[review.key];
+          result.teams[team][review.key]=history.error?{available:false,completed:false,error:history.error}:review1Progress_(row,TS,history.records,history.config);
         });
         return;
       }

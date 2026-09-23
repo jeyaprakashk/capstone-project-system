@@ -4,11 +4,23 @@
  * Single source of truth for browser-side behaviour used by both
  * single-role and multi-role dashboards.
  */
+/** Shared server/browser text preview, matching the 130-character card limit. */
+function renderExpandableText_(value, maxLen = 130) {
+  const full = String(value || '');
+  const escape = text => text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if (full.length <= maxLen) return escape(full);
+  return '<details class="expandable-text"><summary><span class="expandable-text-preview">' +
+    escape(full.slice(0, maxLen).trim()) + '&hellip; <em class="expand-hint">more</em></span>' +
+    '<span class="expandable-text-full">' + escape(full) +
+    ' <em class="expand-hint">less</em></span></summary></details>';
+}
+
 function getDashboardClientScript() {
   return `
 const DashboardUI = (function() {
   'use strict';
   const renderSkeleton = ${getSkeletonMarkup_.toString()};
+  const renderExpandableText = ${renderExpandableText_.toString()};
   ${getLucideIconNodes_.toString()}
   ${renderLucideIcon_.toString()}
   ${initializeDashboardTooltips_.toString()}
@@ -117,7 +129,7 @@ const DashboardUI = (function() {
     activatedRoles[key] = true;
     if (key === 'coord') initializeCoordinatorAsync();
     if (key === 'reviewer') filterReviewerAssignedTeams();
-    if (key === 'student') { loadStudentMarksAsync(); GuideEvaluation.student(); if (typeof Review1Evaluation !== 'undefined') Review1Evaluation.student(); }
+    if (key === 'student') { loadStudentMarksAsync(); GuideEvaluation.student(); if (typeof Review1Evaluation !== 'undefined') Review1Evaluation.student(); if (typeof Review2Evaluation !== 'undefined') Review2Evaluation.student(); }
   }
 
   let sharedSchedule = null;
@@ -547,7 +559,7 @@ const DashboardUI = (function() {
       reviewConfigurationValid = false;
       recheckReviewConfiguration();
       GuideEvaluation.admin();
-      if (typeof Review1Evaluation !== 'undefined') Review1Evaluation.admin();
+      if (typeof Review1Evaluation !== 'undefined') Review1Evaluation.admin(); if (typeof Review2Evaluation !== 'undefined') Review2Evaluation.admin();
     }).withFailureHandler(function(err) {
       finishCards.forEach(function(finish) { finish(); });
       systemStatusState.loading = false;
@@ -959,7 +971,7 @@ const DashboardUI = (function() {
         (
           data.problem
             ? '<div class="drawer-problem">' +
-                escapeDrawerHtml(data.problem) +
+                renderExpandableText(data.problem) +
               '</div>'
             : ''
         ) +
@@ -1574,6 +1586,7 @@ const DashboardUI = (function() {
     initializeRoleMenu,
     refreshAnnouncements,
     toggleProblem,
+    renderExpandableText,
     decide,
     openReviewerMarks: function(team, review, button) { ReviewerMarks.open(team, review, button); },
     filterReviewerAssignedTeams,

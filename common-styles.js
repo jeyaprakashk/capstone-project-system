@@ -9,6 +9,13 @@
 function getBaseStyles() {
   return `
   * { box-sizing: border-box; }
+  .expandable-text { display: inline; overflow-wrap: anywhere; }
+  .expandable-text > summary { display: inline; cursor: pointer; list-style: none; white-space: pre-wrap; }
+  .expandable-text > summary::-webkit-details-marker { display: none; }
+  .expandable-text .expandable-text-full { display: none; }
+  .expandable-text[open] .expandable-text-preview { display: none; }
+  .expandable-text[open] .expandable-text-full { display: inline; }
+  .expand-hint { font-size: 12px; color: #3b5bdb; font-style: normal; }
   body {
     font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
     color: #1f2430;
@@ -293,11 +300,6 @@ function getCardStyles() {
     margin: 0 0 10px 0;
   }
   .card-desc.clickable { cursor: pointer; }
-  .expand-hint {
-    font-size: 12px;
-    color: #3b5bdb;
-    font-style: normal;
-  }
   .flag {
     font-size: 12.5px;
     color: #9a5b0c;
