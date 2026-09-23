@@ -52,34 +52,33 @@ test('rubric validation accepts real zeroes but rejects blanks, errors and inval
 });
 
 test('bulk and single-team results agree; each spreadsheet opens once and tab reads once',()=>{
-  const tabs={'Committee 1 - review1':[row('T1','A',zero()),row('T1','B',zero()),row('T2','C',Array(7).fill(''))],
-    'Committee 1 - review2':[row('T1','A',zero()),row('T1','B',[0,0,0,0,0,0,''])],
-    'Committee 2 - review1':[row('T3','D',zero())]};
+  const tabs={'Review1Evaluations':[row('T1','A',zero()),row('T1','B',zero()),row('T2','C',Array(7).fill('')),row('T3','D',zero())],
+    'Review2Evaluations':[row('T1','A',zero()),row('T1','B',[0,0,0,0,0,0,''])]};
   const bulk=setup(tabs);const all=bulk.c.getAllReviewCompletionStatus_();
-  assert.equal(all.t1.review1.completed,true);assert.equal(all.t1.review2.completed,false);
-  assert.equal(all.t2.review1.completed,false);assert.equal(all.t3.review1.completed,true);
-  assert.equal(bulk.counts.opens,1);assert.equal(bulk.counts.reads,3);
+  assert.equal(all.t1.review1.completed,false);assert.equal(all.t1.review2.completed,false);
+  assert.equal(all.t2.review1.completed,false);assert.equal(all.t3.review1.completed,false);
+  assert.equal(bulk.counts.opens,1);assert.equal(bulk.counts.reads,1);
   const single=setup(tabs);const team=single.c.getTeamReviewCompletionStatus_(' T1 ');
   assert.equal(JSON.stringify(team),JSON.stringify(all.t1));
-  assert.equal(single.counts.reads,2);assert.equal(single.counts.opens,1);
+  assert.equal(single.counts.reads,1);assert.equal(single.counts.opens,1);
   assert.equal(single.c.getTeamReviewCompletionStatus_('unknown'),null);
 });
 
 test('duplicate and foreign student rows cannot falsely complete a team',()=>{
-  const {c}=setup({'Committee 1 - review1':[row('T1','A',zero()),row('T1','A',zero()),row('T1','B',zero()),row('T1','stranger',zero())]});
-  const result=c.getTeamReviewCompletionStatus_('T1').review1;
+  const {c}=setup({'Review2Evaluations':[row('T1','A',zero()),row('T1','A',zero()),row('T1','B',zero()),row('T1','stranger',zero())]});
+  const result=c.getTeamReviewCompletionStatus_('T1').review2;
   assert.equal(result.markedStudents,1);assert.equal(result.completed,false);
 });
 
 test('a failed review does not prevent the next review from loading',()=>{
-  const {c}=setup({'Committee 1 - review1':Error('unavailable'),'Committee 1 - review2':[row('T1','A',zero()),row('T1','B',zero())]});
+  const {c}=setup({'Review1Evaluations':Error('unavailable'),'Review2Evaluations':[row('T1','A',zero()),row('T1','B',zero())]});
   const result=c.getTeamReviewCompletionStatus_('T1');
   assert.equal(result.review1.completed,false);assert.equal(result.review2.completed,true);
   assert.equal(result.review1.available,false);assert.equal(result.review2.available,true);
 });
 
 test('missing tabs are unavailable while a readable empty tab is incomplete',()=>{
-  const {c}=setup({'Committee 1 - review2':[]});
+  const {c}=setup({'Review2Evaluations':[]});
   const result=c.getTeamReviewCompletionStatus_('T1');
   assert.equal(result.review1.available,false);
   assert.equal(result.review2.available,true);
@@ -87,33 +86,35 @@ test('missing tabs are unavailable while a readable empty tab is incomplete',()=
 });
 
 test('student totals above 5 and all-zero completed assessments are preserved',()=>{
-  const {c}=setup({'Committee 1 - review1':[row('T1','A',Array(7).fill(4),80)],'Committee 1 - review2':[row('T1','A',zero(),0)]});
+  const {c}=setup({'Review1Evaluations':[row('T1','A',Array(7).fill(4),80)],'Review2Evaluations':[row('T1','A',zero(),0)]});
   const result=c.getStudentAllReviewMarks('a@example.com');
-  assert.equal(result.review1.totalMarks,80);assert.equal(result.review1.completed,true);
+  assert.equal(result.review1,null); // Legacy Review 1 marks are never student results.
+  const high=setup({'Review2Evaluations':[row('T1','A',Array(7).fill(4),80)]}).c.getStudentAllReviewMarks('a@example.com');
+  assert.equal(high.review2.totalMarks,80);assert.equal(high.review2.completed,true);
   assert.equal(result.review2.totalMarks,0);assert.equal(result.review2.completed,true);
 });
 
 test('student formula zero with blank criteria remains incomplete',()=>{
-  const {c}=setup({'Committee 1 - review1':[row('T1','A',Array(7).fill(''),0)]});
+  const {c}=setup({'Review2Evaluations':[row('T1','A',Array(7).fill(''),0)]});
   const result=c.getStudentAllReviewMarks('a@example.com');
-  assert.equal(result.review1.totalMarks,0);assert.equal(result.review1.completed,false);
+  assert.equal(result.review2.totalMarks,0);assert.equal(result.review2.completed,false);
 });
 
 test('marks joins normalize team and register identifiers across sheets',()=>{
-  const {c}=setup({'Committee 1 - review1':[row(' t1 ',' a ',zero()),row('T1',' b ',zero())]});
+  const {c}=setup({'Review2Evaluations':[row(' t1 ',' a ',zero()),row('T1',' b ',zero())]});
   const result=c.getTeamReviewCompletionStatus_(' t1 ');
-  assert.equal(result.teamId,'T1');assert.equal(result.review1.completed,true);
+  assert.equal(result.teamId,'T1');assert.equal(result.review2.completed,true);
 });
 
 test('review timings preserve results and count opens and review reads',()=>{
- const f=setup({'Committee 1 - review1':[row('T1','A',zero()),row('T1','B',zero())]});
+ const f=setup({'Review2Evaluations':[row('T1','A',zero()),row('T1','B',zero())]});
  const expected=f.c.getAllReviewCompletionStatus_();
  const timings=[];
  const actual=f.c.getAllReviewCompletionStatus_(timings);
  assert.equal(JSON.stringify(actual),JSON.stringify(expected));
  assert.equal(timings.find(t=>t.phase==='review_detail_open').calls,1);
- assert.equal(timings.find(t=>t.phase==='review_detail_read').calls,4);
- assert.equal(timings.find(t=>t.phase==='review_read_lookup').calls,4);
+ assert.equal(timings.find(t=>t.phase==='review_detail_read').calls,1);
+ assert.equal(timings.find(t=>t.phase==='review_read_lookup').calls,1);
  assert.equal(timings.find(t=>t.phase==='review_read_values').calls,1);
  for(const phase of ['review_read_row_count','review_read_column_count']) assert.equal(timings.find(t=>t.phase===phase).calls,1);
  assert(timings.every(t=>t.durationMs>=0&&t.success));

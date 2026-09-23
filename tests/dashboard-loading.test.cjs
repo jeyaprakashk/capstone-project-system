@@ -3,12 +3,13 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 function fixture(system=false) {
+ const loadingNode=()=>({attrs:{},children:[],inert:false,setAttribute(k,v){this.attrs[k]=v;},classList:{add(){},remove(){},toggle(){}},appendChild(node){this.children.push(node);node.remove=()=>{this.children=this.children.filter(child=>child!==node);};}});
  const requests=[], timers=new Map(), listeners={}; let id=0;
- const panels=['guide','reviewer','coord'].map(key=>({innerHTML:'',getAttribute:()=>key,classList:{toggle(){}}}));
- const announcement={innerHTML:'',setAttribute(){},querySelector:()=>null,querySelectorAll:()=>[]};
- const systemContent={innerHTML:'',setAttribute(){},querySelectorAll:()=>[]};
+ const panels=['guide','reviewer','coord'].map(key=>({...loadingNode(),innerHTML:'',getAttribute:()=>key}));
+ const announcement={...loadingNode(),innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[]};
+ const systemContent={...loadingNode(),innerHTML:'',querySelectorAll:()=>[]};
  const systemMessage={textContent:''}, systemRefresh={disabled:false};
- const document={hidden:false,readyState:'loading',addEventListener(name,fn){(listeners[name] ||= []).push(fn);},getElementById:id=>id==='announcementsContent'?announcement:system?({systemStatusContent:systemContent,systemStatusMessage:systemMessage,systemStatusRefresh:systemRefresh}[id]||null):null,
+ const document={createElement:loadingNode,hidden:false,readyState:'loading',addEventListener(name,fn){(listeners[name] ||= []).push(fn);},getElementById:id=>id==='announcementsContent'?announcement:system?({systemStatusContent:systemContent,systemStatusMessage:systemMessage,systemStatusRefresh:systemRefresh}[id]||null):null,
  querySelector:selector=>panels.find(p=>selector.includes('"'+p.getAttribute()+'"'))||null,
  querySelectorAll:selector=>selector==='[data-role-content]'?panels:[]};
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({key,args,success,failure})}); }
@@ -124,6 +125,20 @@ test('Coordinator shell preload does not start expensive sections',()=>{
 test('failed role can be retried by selecting it again',()=>{
  const f=fixture();f.click('guide');f.requests[0].failure(new Error('offline'));f.click('guide');
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+});
+
+test('shared loading preserves live children and restores interaction on repeated cleanup',()=>{
+ const f=fixture(true), host=f.systemContent;
+ const active={inert:false}, locked={inert:true};host.children.push(active,locked);
+ host.innerHTML='existing results';
+ const finish=vm.runInContext('DashboardUI',f.c).beginContentLoading(host,'Refreshing results');
+ assert.equal(host.innerHTML,'existing results');
+ assert.equal(host.children[0],active);
+ assert.equal(active.inert,true);assert.equal(locked.inert,true);
+ assert.equal(host.attrs['aria-busy'],'true');assert.equal(host.children.length,3);
+ finish();finish();
+ assert.equal(active.inert,false);assert.equal(locked.inert,true);
+ assert.equal(host.attrs['aria-busy'],'false');assert.equal(host.children.length,2);
 });
 
 test('System Status waits for foreground requests, loads once and precedes adjacent preload',()=>{

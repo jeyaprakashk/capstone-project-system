@@ -8,10 +8,10 @@
 2. Maintain the guide criteria directly in the existing `Rubrics` sheet.
    Use `Milestone ID` = `guide_eval`, Individual type, and all six Level 0–5
    descriptors. No rubric creation/reset action or built-in criteria are provided.
-3. Deploy the updated script including `milestone-config.js`. As coordinator,
-   open **System Status → Guide Evaluation → Set up guide evaluation**.
-   This validates the definitions and creates only `GuideEvaluations` storage.
-   It does not seed or overwrite Rubrics, Milestones, Config, or existing records.
+3. Use the manually created `GuideEvaluations` tab in the main spreadsheet.
+   Its header row must be: `Assessment`, `Team`, `Student`, `Revision`, `Action`,
+   `Actor`, `At`, `Request ID`, `Payload`. The application validates these headers
+   and never creates or replaces the tab. Deploy the updated script, then refresh evaluations.
 4. Verify the entered criteria and band convention against the approved framework
    before production grading, then refresh evaluations.
 
@@ -31,7 +31,7 @@ The button remains available on and after the assessment date.
 Open **My Teams → Guide Evaluation** on the assigned team. Select a student,
 expand criterion descriptors, select each level and enter marks within the
 shown range. Marks accept two decimals. Select **Save Draft** for incomplete
-work or **Submit Evaluation** when complete. Each criterion below Level 3 needs
+work or **Submit Evaluation** when complete. Each criterion below Level 2 needs
 a remark on submission. Zero is valid; blank is incomplete. The repository link
 opens existing project evidence; the app does not treat commit counts as marks.
 Student selection/reload/closing warns about unsaved edits. Tab switching keeps

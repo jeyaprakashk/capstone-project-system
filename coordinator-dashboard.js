@@ -391,45 +391,32 @@ function refreshCoordinatorContent() {
 function buildCoordinatorHeaderStats(stats) {
   let reviews = [];
   try { reviews = getInternalReviews_(); } catch (err) { /* System Status reports configuration problems. */ }
-  const smallCard = (label, value, color, note, icon) => `<div class="stat-card stat-card-${color}"><div class="stat-header">${icon || ''}<div class="stat-num">${value}</div></div><div class="stat-label">${label}</div><div class="stat-pct">${note}</div></div>`;
-  const pct = (n) => stats.total > 0 ? Math.round((n / stats.total) * 100) : 0;
-
-  return `
-  <div class="coord-stats">
-    <div class="stat-card stat-card-blue">
-      <div class="stat-header">
-        ${renderLucideIcon_('users', '', 'stat-icon')}
-        <div class="stat-num">${stats.total}</div>
-      </div>
-      <div class="stat-label">Total Teams</div>
-    </div>
-
-    ${smallCard('Repositories Available', stats.reposReady || 0, 'purple', '(' + pct(stats.reposReady || 0) + '%)', renderLucideIcon_('git-branch', '', 'stat-icon'))}
-    ${smallCard('Title Approved', stats.titleApproved || 0, 'green', '(' + pct(stats.titleApproved || 0) + '%)', renderLucideIcon_('check', '', 'stat-icon'))}
-    <div class="stat-card stat-card-orange">
-      <div class="stat-header">
-        ${renderLucideIcon_('trending-up', '', 'stat-icon')}
-        <div class="stat-num" id="coordinatorActiveTeams">${getSkeletonMarkup_('inline', 'Loading activity')}</div>
-      </div>
-      <div class="stat-label">Active This Week</div>
-      <div class="stat-pct" id="coordinatorActiveTeamsPct">${getSkeletonMarkup_('inline', 'Loading activity')}</div>
-    </div>
-
-    ${reviews.map(review => {
+  const pct = n => stats.total > 0 ? Math.round(n / stats.total * 100) : 0;
+  const skeleton = label => getSkeletonMarkup_('inline', label);
+  const completionTone = (value, color, note) => {
+    if (!stats.total || typeof value !== 'number' || /unavailable/i.test(note)) return 'neutral';
+    const remaining = color === 'red' ? value : stats.total - value;
+    return remaining <= 0 ? 'complete' : remaining / stats.total >= .6 ? 'danger' : remaining / stats.total >= .3 ? 'warning' : 'neutral';
+  };
+  const card = (label, value, color, note, icon, detail, ids) => `<div class="stat-card stat-card-${color}" data-completion-tone="${completionTone(value, color, note)}">
+    <div class="stat-label">${label}</div>${renderLucideIcon_(icon, '', 'stat-icon')}
+    <div class="stat-header"><div class="stat-num"${ids ? ' id="coordinatorActiveTeams"' : ''}>${value}</div><div class="stat-pct"${ids ? ' id="coordinatorActiveTeamsPct"' : ''}>${note}</div></div>
+    <div class="stat-detail">${detail}</div></div>`;
+  const progress = (value, color, left, right) => `<div class="stat-track" aria-hidden="true"><span style="width:${pct(value)}%;background:${color}"></span></div><div class="stat-detail-row"><span>${left}</span><span${value < stats.total ? ' class="stat-outstanding"' : ''}>${right}</span></div>`;
+  const repos = stats.reposReady || 0, approved = stats.titleApproved || 0;
+  return `<div class="coord-stats coordinator-stats-grid">
+    ${card('Total Teams', stats.total, 'blue', 'Teams Roster', 'users', '<span class="stat-registered">●</span> Teams registered')}
+    ${card('Repositories Available', repos, 'purple', pct(repos) + '% linked', 'git-branch', progress(repos, '#4338ca', repos + ' / ' + stats.total + ' recorded', Math.max(0, stats.total - repos) + ' missing'))}
+    ${card('Title Approved', approved, 'green', pct(approved) + '% validated', 'tag', progress(approved, '#059669', approved + ' approved', Math.max(0, stats.total - approved) + ' pending approval'))}
+    ${card('Active This Week', skeleton('Loading activity'), 'orange', skeleton('Loading activity'), 'trending-up', 'Weekly repository activity', true)}
+    ${reviews.map((review, index) => {
       const result = stats.reviews && stats.reviews[review.key];
-      const value = stats.loading ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : result ? result.completed : '—';
-      const note = stats.loading ? '' : !result ? 'Unavailable' : result.unavailable ? result.unavailable + ' unavailable' : '(' + pct(result.completed) + '%)';
-      return smallCard(escapeHtml(review.label) + ' Completed', value, 'teal', note);
+      const value = stats.loading ? skeleton('Loading ' + review.label) : result ? result.completed : '—';
+      const note = stats.loading ? '' : !result ? 'Unavailable' : result.unavailable ? result.unavailable + ' unavailable' : pct(result.completed) + '% (' + result.completed + '/' + stats.total + ')';
+      return card(escapeHtml(review.label) + ' Completed', value, 'teal', note, ['clipboard-check', 'file-text', 'book-open'][index % 3], 'Team review completion');
     }).join('')}
-    ${smallCard('Guide Evaluation Completed', stats.loading ? getSkeletonMarkup_('inline', 'Loading guide evaluation') : stats.guideEvaluation && stats.guideEvaluation.available ? stats.guideEvaluation.completed : '—', 'teal', stats.loading ? '' : stats.guideEvaluation && stats.guideEvaluation.available ? '(' + pct(stats.guideEvaluation.completed) + '%)' : 'Unavailable')}
-    <div class="stat-card stat-card-red">
-      <div class="stat-header">
-        ${renderLucideIcon_('triangle-alert', '', 'stat-icon')}
-        <div class="stat-num">${stats.loading ? getSkeletonMarkup_('inline', 'Loading attention count') : stats.needsAttention}</div>
-      </div>
-      <div class="stat-label">Need Attention</div>
-      <div class="stat-pct">${stats.loading ? "" : "(" + pct(stats.needsAttention) + "%)"}</div>
-    </div>
+    ${card('Guide Evaluation Completed', stats.loading ? skeleton('Loading guide evaluation') : stats.guideEvaluation && stats.guideEvaluation.available ? stats.guideEvaluation.completed : '—', 'teal', stats.loading ? '' : stats.guideEvaluation && stats.guideEvaluation.available ? pct(stats.guideEvaluation.completed) + '% evaluated' : 'Unavailable', 'graduation-cap', 'Guide assessment completion')}
+    ${card('Need Attention', stats.loading ? skeleton('Loading attention count') : stats.needsAttention, 'red', stats.loading ? '' : pct(stats.needsAttention) + '% of cohort', 'triangle-alert', 'Teams with overdue requirements')}
   </div>`;
 }
 
@@ -564,7 +551,7 @@ function buildTeamTrackerTable(teamData, deadlinePills) {
     const healthBadge = t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading health') : `<span class="tracker-health ${health.color}" tabindex="0" role="img" aria-label="${health.label}" title="${health.label}">${renderLucideIcon_(health.icon)}</span>`;
     const registers = t.registerNumbers || [];
 
-    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td class="col-team"><strong>${escapeHtml(t.teamId)}</strong></td><td class="col-guide">${escapeHtml(t.guide)}</td><td class="col-registers"><div class="tracker-registers">${registers.length ? registers.map(value => `<span>${escapeHtml(value)}</span>`).join('') : '—'}</div></td><td class="col-repo">${repoBadge}</td><td class="col-status">${titleBadge}</td><td class="col-activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation">${buildCompletionIndicator_(t.guideEvaluation)}</td><td class="col-health">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
+    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td class="col-team"><strong>${escapeHtml(t.teamId)}</strong><div class="tracker-registers">${registers.length ? registers.map(value => escapeHtml(value)).join(', ') : '—'}</div></td><td class="col-guide">${escapeHtml(t.guide)}</td><td class="col-repo">${repoBadge}</td><td class="col-status">${titleBadge}</td><td class="col-activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation">${buildCompletionIndicator_(t.guideEvaluation)}</td><td class="col-health">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
   }).join('');
 
   return `<div class="team-tracker-section"><div class="tracker-header"><h3 class="assessment-title tracker-title">Team Tracker (${teamData.length} teams)</h3></div>
@@ -576,7 +563,7 @@ function buildTeamTrackerTable(teamData, deadlinePills) {
     </div>
     <button type="button" id="weeklyActivityRetry" onclick="loadCoordinatorWeeklyActivity()" hidden>Retry activity</button>
     <div class="tracker-search"><input type="text" id="trackerSearch" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" oninput="filterTrackerSearch()"><button class="reset-btn" onclick="resetTrackerFilters()">Reset</button></div>
-    <div class="tracker-table-scroll" role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="team-tracker-table"><thead><tr><th>Team</th><th>Guide</th><th>Register Numbers</th><th>Repo</th><th>Title</th><th>Weekly Activity</th>${configuredReviews.map(review => `<th class="col-review">${escapeHtml(review.label)}</th>`).join('')}<th>Guide Eval</th><th>Health</th><th>Actions</th></tr></thead><tbody id="trackerBody">${rows}</tbody></table></div>
+    <div class="tracker-table-scroll" role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="team-tracker-table"><thead><tr><th>Team</th><th>Guide</th><th>Repo</th><th>Title</th><th>Weekly Activity</th>${configuredReviews.map(review => `<th class="col-review" title="${escapeHtml(review.label)}">${escapeHtml(review.label.replace(/^Review\s+(\d+)$/i, 'R$1'))}</th>`).join('')}<th>Guide Eval</th><th>Health</th><th>Actions</th></tr></thead><tbody id="trackerBody">${rows}</tbody></table></div>
     ${buildTeamPagination_('tracker', 'coord', teamData.length)}
   </div>`;
 }
@@ -664,7 +651,7 @@ function buildCoordinatorAsyncShell_() {
     if (id === 'coordinatorStats') {
       let reviews = [];
       try { reviews = getInternalReviews_(); } catch (err) { /* See System Status. */ }
-      return `<div id="${id}Placeholder" class="coord-stats" aria-label="Loading summary cards">${Array.from({length:6 + reviews.length}, () => `<div class="stat-card coordinator-stat-placeholder">${getSkeletonMarkup_('panel', label)}</div>`).join('')}</div>`;
+      return `<div id="${id}Placeholder" class="coord-stats coordinator-stats-grid" aria-label="Loading summary cards">${Array.from({length:6 + reviews.length}, () => `<div class="stat-card coordinator-stat-placeholder">${getSkeletonMarkup_('panel', label)}</div>`).join('')}</div>`;
     }
     return `<div id="${id}Placeholder" class="coordinator-card-placeholder">${getSkeletonMarkup_('panel', label)}</div>`;
   };
@@ -798,12 +785,43 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .review-config-card li { margin:8px 0; }
 .review-config-card p { margin:8px 0; font-size:13px; line-height:1.5; }
 #createReviewerSheetsButton:disabled { opacity:.55; cursor:not-allowed; }
-.coord-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
-.stat-card { display: flex; flex-direction: column; background: #fff; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); overflow: hidden;  min-width:160px;}
-.stat-header { display: flex; align-items: center; justify-content: left; gap: 8px; padding: 14px 12px 6px 12px; }
-.stat-num { font-size: 32px; font-weight: 800; color: #1f2430; line-height: 1; }
-.stat-label { padding: 0 12px; font-size: 11px; color: #6b7280;  letter-spacing: 0.5px; font-weight: 500;  line-height: 1.3; }
-.stat-pct { padding: 6px 12px 8px 12px; font-size: 12px; color: #8b8f99;  font-weight: 500; }
+.coord-stats.coordinator-stats-grid { display:grid; width:100%; grid-template-columns:repeat(4,minmax(0,1fr)); grid-auto-rows:1fr; gap:12px; margin-bottom:24px; }
+.coordinator-stats-grid .stat-card { position:relative; display:flex; flex-direction:column; gap:8px; min-width:0; min-height:114px; box-sizing:border-box; padding:13px; background:#fff; border:1px solid #f0edf8; border-radius:7px; box-shadow:0 1px 1px rgba(15,23,42,.02); }
+.coordinator-stats-grid .stat-label { min-height:22px; padding-right:29px; font-size:9px; color:#64748b; font-weight:500; letter-spacing:.45px; text-transform:uppercase; line-height:1.4; }
+.coordinator-stats-grid .lucide-icon.stat-icon { position:absolute; top:12px; right:12px; width:18px; height:18px; padding:6px; box-sizing:content-box; border-radius:4px; background:#e0e7ff; }
+.coordinator-stats-grid .stat-header { display:flex; align-items:baseline; flex-wrap:wrap; gap:6px; min-height:26px; }
+.coordinator-stats-grid .stat-card .stat-num { font-size:25px; font-weight:750; color:#0f172a; line-height:1; font-variant-numeric:tabular-nums; }
+.coordinator-stats-grid .stat-pct { padding:2px 4px; background:#eef2ff; font-size:9px; color:#64748b; font-weight:400; line-height:1.3; }
+.coordinator-stats-grid .stat-pct:empty { display:none; }
+.coordinator-stats-grid .stat-detail { margin-top:auto; color:#475569; font-size:10px; line-height:1.4; }
+.coordinator-stats-grid .stat-detail-row { display:flex; justify-content:space-between; gap:8px; font-size:9px; }
+.coordinator-stats-grid .stat-detail-row > span { flex:1; }
+.coordinator-stats-grid .stat-detail-row .stat-outstanding { color:#dc2626; font-weight:700; font-size:10px; }
+.coordinator-stats-grid .stat-track { height:4px; border-radius:4px; background:#e9eaff; overflow:hidden; margin-bottom:4px; }
+.coordinator-stats-grid .stat-track > span { display:block; height:100%; border-radius:inherit; }
+.coordinator-stats-grid .stat-registered { color:#059669; }
+.coordinator-stats-grid .stat-card-blue .stat-pct { background:transparent; padding:0; }
+.coordinator-stats-grid .stat-card-purple .stat-pct,.coordinator-stats-grid .stat-card-green .stat-pct { background:#d1fae5; color:#047857; }
+.coordinator-stats-grid .stat-card-green .stat-icon { background:#a7f3d0; }
+.coordinator-stats-grid .stat-card-orange .stat-icon { background:#ffedd5; }
+.coordinator-stats-grid .stat-card-red { background:#fff5f7; }
+.coordinator-stats-grid .stat-card-red .stat-label,.coordinator-stats-grid .stat-card-red .stat-num { color:#dc2626; }
+.coordinator-stats-grid .stat-card-red .stat-pct { background:#ffe4e6; color:#be123c; }
+.coordinator-stats-grid .stat-card-red .stat-icon { background:#dc2626; color:#fff; }
+/* Completion tones override the decorative card palette, including unknown data. */
+.coordinator-stats-grid .stat-card[data-completion-tone] { --stat-tone:#4f46e5; --stat-tint:#eef2ff; background:#fff; }
+.coordinator-stats-grid .stat-card[data-completion-tone="complete"] { --stat-tone:#047857; --stat-tint:#d1fae5; }
+.coordinator-stats-grid .stat-card[data-completion-tone="warning"] { --stat-tone:#b45309; --stat-tint:#fef3c7; }
+.coordinator-stats-grid .stat-card[data-completion-tone="danger"] { --stat-tone:#dc2626; --stat-tint:#fee2e2; }
+.coordinator-stats-grid .stat-card[data-completion-tone] .stat-icon,
+.coordinator-stats-grid .stat-card[data-completion-tone] .stat-pct { color:var(--stat-tone); background:var(--stat-tint); }
+.coordinator-stats-grid .stat-card[data-completion-tone] .stat-num { color:var(--stat-tone); }
+.coordinator-stats-grid .stat-card[data-completion-tone] .stat-label { color:#64748b; }
+.coordinator-stats-grid .stat-card[data-completion-tone] .stat-track > span { background:var(--stat-tone) !important; }
+.coordinator-stats-grid .coordinator-stat-placeholder { display:block; }
+.coordinator-stats-grid .coordinator-stat-placeholder .app-skeleton { min-height:86px; box-sizing:border-box; }
+@media (max-width:760px) { .coord-stats.coordinator-stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } }
+@media (max-width:340px) { .coord-stats.coordinator-stats-grid { grid-template-columns:minmax(0,1fr); } }
 .stat-card-blue .stat-icon { color: #3b82f6; }
 .stat-card-blue .stat-num { color: #3b82f6; }
 .stat-card-green .stat-icon { color: #16a34a; }
@@ -1177,10 +1195,9 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 #weeklyActivityRetry[hidden] { display:none !important; }
 .tracker-table-scroll { width:100%; max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; }
 .tracker-table-scroll:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
-.team-tracker-table .col-registers { min-width:140px; max-width:220px; white-space:normal; }
-.tracker-registers { display:flex; flex-wrap:wrap; gap:4px 10px; }
-.tracker-registers span { overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
-.team-tracker-table .col-guide { min-width:120px; max-width:180px; overflow-wrap:anywhere; }
+.team-tracker-table .col-team { width:100px; min-width:100px; max-width:160px; white-space:normal; }
+.team-tracker-table .tracker-registers { margin-top:5px; max-width:220px; white-space:normal; overflow-wrap:anywhere; font-size:11px; font-weight:400; line-height:1.5; color:#64748b; font-variant-numeric:tabular-nums; }
+.team-tracker-table .col-guide { min-width:170px; max-width:220px; overflow-wrap:anywhere; }
 .team-tracker-table .col-health { width:36px; text-align:center; }
 .tracker-health { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; }
 .tracker-health.green { background:#dcfce7; color:#166534; }
@@ -1212,7 +1229,11 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .reset-btn { padding: 10px 16px; border-radius: 8px; background: #f3f4f6; border: 1px solid #dcdfe4; font-weight: 600; font-size: 13px; cursor: pointer; }
 .team-tracker-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .team-tracker-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; color: #8b8f99; padding: 10px 12px; border-bottom: 1px solid #eef0f3; }
-.team-tracker-table td { padding: 10px 12px; border-bottom: 1px solid #f2f3f5; }
+.team-tracker-table td { padding: 7px 12px; border-bottom: 1px solid #f2f3f5; }
+.team-tracker-table th:first-child,.team-tracker-table td.col-team { padding-right:6px; }
+.team-tracker-table th:nth-child(2),.team-tracker-table td.col-guide { padding-left:6px; }
+.team-tracker-table th:nth-child(5),.team-tracker-table td.col-activity { width:76px; padding-right:6px; }
+.team-tracker-table th:nth-child(6),.team-tracker-table td.col-activity + td { padding-left:6px; }
 .col-title { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .health-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; }
 .health-badge.green { background: #dcfce7; color: #15803d; }
@@ -1511,6 +1532,7 @@ function loadCoordinatorSystemStatus() {
     return `<div class="coordinator-container">
       <div class="system-status-primary">${buildGithubAccessSection(access)}</div>
       ${buildGuideEvaluationAdmin_()}
+      <section class="assessment-section"><h3>Review 1</h3><button type="button" onclick="Review1Evaluation.admin()">Refresh Review 1 evaluations</button><div id="review1Admin" aria-live="polite">Refresh to view submissions and publish or reopen evaluations.</div></section>
       <section class="assessment-section reviewer-setup" aria-label="Review committees and marking sheets">
         ${buildCommitteeDirectory_(committees)}
         <div class="reviewer-setup-panels">${buildReviewConfigurationCard_()}

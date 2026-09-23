@@ -958,6 +958,10 @@ function getSkeletonMarkup_(variant, label) {
 
 function getLoadingStyles_() {
   return `
+  .app-content-loading { position:relative !important; overflow:hidden; }
+  .app-content-loading > :not(.app-loading-overlay) { visibility:hidden !important; }
+  .app-loading-overlay { position:absolute; inset:0; z-index:1; display:grid; overflow:hidden; border-radius:inherit; background:var(--loading-surface,#fff); color:inherit; }
+  .app-loading-overlay > .app-skeleton--inline { place-self:center; }
   .app-skeleton { display:block; width:100%; padding:20px; box-sizing:border-box; }
   .app-skeleton-bar { display:block; height:14px; border-radius:6px; background:linear-gradient(90deg,var(--skeleton-base,#e4e8ef) 25%,var(--skeleton-highlight,#f2f4f7) 50%,var(--skeleton-base,#e4e8ef) 75%); box-shadow:inset 0 0 0 1px var(--skeleton-edge,#dde3eb); background-size:200% 100%; animation:appSkeletonShimmer 1.6s ease-in-out infinite; }
   .app-skeleton-title { display:block; width:38%; margin-bottom:22px; }

@@ -27,7 +27,7 @@ function fixture(overrides = {}, runtime = {}) {
       return new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'short',year:'numeric'}).format(date);
     }}
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','reviewer-evaluation.js','reviewer-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-evaluation.js','dashboard-router.js']) {
+  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','reviewer-evaluation.js','reviewer-evaluation-client.js','review1-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-evaluation.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
   const schedule = c.getProjectSchedule_();
@@ -95,7 +95,9 @@ test('one and three configured reviews drive timeline, student marks and coordin
     f.c.Session={getActiveUser:()=>({getEmail:()=> 'student@example.com'})};
     f.c.getStudentAllReviewMarks=()=>({});
     const marks=f.c.loadStudentMarksSection();
-    assert(marks.includes('Review '+count));assert(!marks.includes('Review '+(count+1)));
+    if(count>1) assert(marks.includes('Review '+count));
+    assert(!marks.includes('Review 1')); // Published Review 1 has a separate authenticated result section.
+    assert(!marks.includes('Review '+(count+1)));
     const stats=Object.fromEntries(reviews.map(r=>[r.key,{completed:1,total:2,pending:1}]));
     const html=f.c.buildCoordinatorHeaderStats({total:2,reviews:stats})+f.c.buildTeamCompletionProgress({...stats,setup:{completed:1,total:2},titleApproval:{completed:1,total:2}});
     assert(html.includes('Review '+count));assert(!html.includes('Review '+(count+1)));
@@ -446,7 +448,7 @@ test('role request shares authorization rows with rendering but rechecks the nex
 function timelineBrowser() {
   const {c}=fixture();
   const requests=[];
-  const target=()=>({innerHTML:'',attributes:{},nodes:{},listeners:{},scrollLeft:0,scrollWidth:1000,clientWidth:400,
+  const target=()=>({innerHTML:'',children:[],appendChild(){},remove(){},classList:{add(){},remove(){}},attributes:{},nodes:{},listeners:{},scrollLeft:0,scrollWidth:1000,clientWidth:400,
     getBoundingClientRect(){return {left:0,width:132};},
     setPointerCapture(id){this.capturedPointer=id;},
     hasPointerCapture(id){return this.capturedPointer===id;},
@@ -458,7 +460,7 @@ function timelineBrowser() {
     scrollBy(options){this.lastScroll=options;},focus(){this.focused=true;}});
   const timeline=target(), guide=target(), reviewer=target();
   let initialize;
-  const document={readyState:'loading',addEventListener:(event,callback)=>{initialize=callback;},
+  const document={createElement:target,readyState:'loading',addEventListener:(event,callback)=>{initialize=callback;},
     getElementById:id=>id==='sharedProjectTimeline'?timeline:null,
     querySelectorAll:()=>[],querySelector:selector=>{
       if(selector==='[data-role-panel].active')return {getAttribute:()=> 'guide'};

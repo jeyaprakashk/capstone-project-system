@@ -29,11 +29,16 @@ function reviewerEvaluationContext_(teamId, reviewKey) {
   const reviews = getReviewDefinitions_();
   const index = reviews.findIndex(review => review.key === reviewKey);
   if (index < 0) throw new Error('Unknown review.');
+  if (reviewKey === 'review2') review1RequireCompleted_(context.row,context.TS,reviews[index].label);
   const info = getCommitteeInfo(context.committee);
   if (!info || !info.marksSheetId) throw new Error('The coordinator has not created the committee marking spreadsheet.');
   const spreadsheet = SpreadsheetApp.openById(info.marksSheetId);
   const registers = new Set(context.students.map(s => s.register));
   for (let i=0;i<index;i++) {
+    if (reviews[i].key === 'review1') {
+      if (reviewKey !== 'review2') review1RequireCompleted_(context.row,context.TS,reviews[index].label);
+      continue;
+    }
     const previous = reviewerReviewRows_(spreadsheet,context.committee,reviews[i]);
     const indexed = indexReviewRows_(previous.rows).get(normalizeReviewKey_(context.team));
     if (!summarizeReviewCompletion_(registers,indexed,reviews[i].rubric).completed) throw new Error('Complete ' + reviews[i].label + ' for every student before entering ' + reviews[index].label + ' marks.');
@@ -49,12 +54,14 @@ function reviewerEvaluationContext_(teamId, reviewKey) {
 }
 
 function getReviewerEvaluation(teamId, reviewKey) {
+  if (reviewKey === 'review1') return getReview1Evaluation(teamId);
   const context = reviewerEvaluationContext_(teamId,reviewKey);
   return {team:context.team,title:context.title,review:{key:context.review.key,label:context.review.label},criteria:context.review.rubric,revision:context.revision,
     students:context.matched.map(student => ({register:student.register,name:student.name,comments:String(student.row[6] || ''),levels:context.review.rubric.map((pi,i) => isReviewMarkEntered_(student.row[7+i]) ? Number(student.row[7+i]) : null)}))};
 }
 
 function saveReviewerEvaluation(teamId, reviewKey, payload) {
+  if (reviewKey === 'review1') throw new Error('Use the Review 1 draft and submission workflow.');
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) throw new Error('Another save is in progress. Try again.');
   try {
@@ -89,6 +96,11 @@ function getReviewerReviewProgress_(rows) {
   const result = {reviews:[],teams:Object.create(null),error:''};
   try { result.reviews = getReviewDefinitions_(); }
   catch (err) { result.error = err.message; return result; }
+  let review1Records = [], review1Config, review1Error = '';
+  if (result.reviews.some(r=>r.key==='review1')) {
+    try {review1Config=review1Configuration_(); const history=review1Records_(); review1Records=history.records; if (!history.sheet) throw new Error('Review1Evaluations is missing from the main spreadsheet. Create the tab manually with the required headers.');}
+    catch(err) {review1Error=err.message;}
+  }
   const grouped = new Map();
   rows.forEach(row => { const key=String(row[TS.COMMITTEE_NUMBER] || ''); if (!grouped.has(key)) grouped.set(key,[]); grouped.get(key).push(row); });
   grouped.forEach((teams,committee) => {
@@ -96,6 +108,14 @@ function getReviewerReviewProgress_(rows) {
     try { const info=getCommitteeInfo(committee); if (!info || !info.marksSheetId) throw new Error('Marking spreadsheet not created.'); spreadsheet=SpreadsheetApp.openById(info.marksSheetId); }
     catch(err) { issue=err.message; }
     result.reviews.forEach(review => {
+      if (review.key === 'review1') {
+        teams.forEach(row=>{
+          const team=normalizeReviewKey_(row[TS.TEAM_ID]);
+          if (!result.teams[team]) result.teams[team]={};
+          result.teams[team][review.key]=review1Error?{available:false,completed:false,error:review1Error}:review1Progress_(row,TS,review1Records,review1Config);
+        });
+        return;
+      }
       let indexed, error=issue;
       if (!error) { try { indexed=indexReviewRows_(reviewerReviewRows_(spreadsheet,committee,review).rows); } catch(err) {error=err.message;} }
       teams.forEach(row => {

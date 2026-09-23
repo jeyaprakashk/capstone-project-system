@@ -33,6 +33,14 @@ test('all band boundaries, precision, blank and zero are enforced',()=>{
  const bounds=[0,40,60,75,85,95,100];for(let i=0;i<6;i++){assert.equal(score(i,bounds[i]).total,bounds[i]);if(i<5)assert.throws(()=>score(i,bounds[i+1]),/outside/);if(i>0)assert.throws(()=>score(i,bounds[i]-.01),/outside/);}
  assert.equal(score(5,100).total,100);assert.throws(()=>score(5,100.001),/decimals/);assert.throws(()=>score(0,0,''),/remark/);assert.throws(()=>score(null,''),/required/);assert.equal(score(null,'','',false).scores.PI1.marks,null);assert.throws(()=>score(true,50),/level/);
 });
+test('Level 2 is the target: feedback is mandatory only below Level 2',()=>{
+ const f=fixture(),criteria=[{pi:'PI1',maxMarks:100}];
+ for(const [level,marks] of [[0,0],[1,40],[2,60],[3,75],[4,85],[5,95]]) {
+  const run=()=>f.c.guideScore_(criteria,{PI1:{level,marks,remark:''}},true,.2);
+  if(level<2)assert.throws(run,/below Level 2/);else assert.equal(run().total,marks);
+ }
+});
+
 test('draft submit publish reopen preserve history and privacy',()=>{
  const f=fixture();let d=f.load();const draft=f.input(d);assert.equal(f.c.saveGuideEvaluationDraft(draft).status,'Draft');d=f.load();const submit=f.input(d);const result=f.c.submitGuideEvaluation(submit);assert.equal(result.total,80);assert.equal(result.weighted,16);assert(f.load().evaluation.late);
  assert.throws(()=>f.c.saveGuideEvaluationDraft(f.input()),/locked/);f.actor('s1@x');assert.equal(f.c.loadPublishedGuideEvaluation(),null);
@@ -48,10 +56,10 @@ test('assignment, rubric and roster changes reject stale saves',()=>{
  const f=fixture(),input=f.input();f.assign('other@x');assert.throws(()=>f.c.saveGuideEvaluationDraft(input),/assigned guide/);f.assign('guide@x');f.students.push({regNo:'S3',email:'s3@x'});assert.throws(()=>f.c.saveGuideEvaluationDraft(input),/Roster or rubric/);f.students.pop();f.tables.Rubrics[1][7]='Changed descriptor';assert.throws(()=>f.c.saveGuideEvaluationDraft(input),/Roster or rubric/);assert.equal(f.tables.GuideEvaluations.length,1);
 });
 test('coordinator-only actions cannot be called by guides or students',()=>{
- const f=fixture();for(const method of ['publishGuideEvaluation','reopenGuideEvaluation','setupGuideEvaluation','loadCoordinatorGuideEvaluations'])assert.throws(()=>f.c[method](f.input()),/Coordinator/);f.actor('s1@x');assert.throws(()=>f.load(),/assigned guide/);
+ const f=fixture();for(const method of ['publishGuideEvaluation','reopenGuideEvaluation','loadCoordinatorGuideEvaluations'])assert.throws(()=>f.c[method](f.input()),/Coordinator/);f.actor('s1@x');assert.throws(()=>f.load(),/assigned guide/);
 });
-test('setup is repeatable, preserves existing rubric and records, and requires valid configuration',()=>{
- const f=fixture();f.actor('coord@x');const original=JSON.stringify(f.tables.Rubrics);f.c.setupGuideEvaluation();f.c.setupGuideEvaluation();assert.equal(JSON.stringify(f.tables.Rubrics),original);assert.equal(f.tables.GuideEvaluations.length,1);
+test('manual storage preserves existing rubric and records, and requires valid configuration',()=>{
+ const f=fixture();f.actor('coord@x');const original=JSON.stringify(f.tables.Rubrics);assert.equal(f.c.setupGuideEvaluation,undefined);f.c.guideRecords_();f.c.guideRecords_();assert.equal(JSON.stringify(f.tables.Rubrics),original);assert.equal(f.tables.GuideEvaluations.length,1);
  f.tables.Milestones[1][2]='';assert.equal(f.c.loadCoordinatorGuideEvaluations().ready,false);f.tables.Milestones[1][2]='2020-01-01';f.tables.Rubrics[1][7]='';assert.equal(f.c.loadCoordinatorGuideEvaluations().ready,false);
 });
 test('guide completion requires every current student to submit',()=>{
@@ -74,10 +82,10 @@ test('publication rejects changed assignments and reopening uses fresh rubric wi
  f.c.reopenGuideEvaluation({team:'T1',student:'S1',revision:1,requestId:'reopen_changed_123',reason:'Guide reassigned'});
  f.actor('new@x');const d=f.load();assert.equal(d.evaluation.config.criteria[0].descriptors[0],'New level zero descriptor');assert.equal(Object.keys(d.evaluation.scores).length,0);
 });
-test('setup never seeds missing rubric rows',()=>{
+test('validation never seeds missing rubric rows',()=>{
  const f=fixture();const review=['review1',1,'PI1','Existing','CO1',100,'Team'];
  f.tables.Rubrics.splice(1,f.tables.Rubrics.length-1,review);f.actor('coord@x');
- assert.throws(()=>f.c.setupGuideEvaluation(),/no criteria/);assert.equal(f.tables.Rubrics.length,2);
+ assert.throws(()=>f.c.guideConfiguration_(),/no criteria/);assert.equal(f.tables.Rubrics.length,2);
  assert.equal(f.c.guideSeedCriteria_,undefined);
 });
 

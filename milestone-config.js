@@ -1,6 +1,12 @@
 /** Semester definitions, read once per execution; never cached across requests. */
 let milestonesExecution_ = null;
 const MILESTONE_HEADERS_ = ['Milestone ID','Milestone Name','Due Date','Graded By','Weight (%)'];
+// Stable storage names are keyed by milestone ID, never label or due-date order.
+const EVALUATION_SHEET_NAMES_ = Object.freeze({
+  review1: 'Review1Evaluations',
+  review2: 'Review2Evaluations',
+  guide_eval: 'GuideEvaluations'
+});
 function parseMilestoneRows_(rows, timezone) {
   const headers = (rows[0] || []).map(normalizeText_);
   const columns = MILESTONE_HEADERS_.map(name => {
@@ -54,6 +60,9 @@ function reviewsFromMilestones_(milestones) {
   return Object.freeze(milestones.filter(item=>item.gradedBy==='Review Committee').map(item=>Object.freeze({...item})));
 }
 function committeeReviewTabName_(committee, review) {
+  if (Object.prototype.hasOwnProperty.call(EVALUATION_SHEET_NAMES_, review.key)) {
+    return EVALUATION_SHEET_NAMES_[review.key];
+  }
   const name = 'Committee ' + committee + ' - ' + review.key;
   if (name.length > 100 || /[\[\]:*?\/\\]/.test(name)) throw new Error('Committee identifier cannot be used in a marking-sheet tab name.');
   return name;

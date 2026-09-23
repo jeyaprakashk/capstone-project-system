@@ -38,7 +38,7 @@ function guideEvaluationBrowser_() {
       (!same && old && !locked?'<p>Rubric changed. Previous revisions are retained; enter scores against the current rubric.</p>':'')+
       config.criteria.map(c=>{
         const score=scores[c.pi]||{};
-        return '<fieldset class="guide-eval-criterion" data-pi="'+escape(c.pi)+'"><legend>'+escape(c.pi+' · '+c.name+' · '+c.co+' · '+c.maxMarks+' marks')+'</legend><details><summary>Performance descriptors</summary>'+c.descriptors.map((text,i)=>'<p><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><label>Level <select data-level '+(locked?'disabled data-locked="true"':'')+'><option value="">Select</option>'+[0,1,2,3,4,5].map(i=>'<option '+(score.level===i?'selected':'')+'>'+i+'</option>').join('')+'</select></label> <label>Marks <input data-marks type="number" min="0" max="'+c.maxMarks+'" step="0.01" value="'+escape(score.marks??'')+'" '+(locked?'disabled data-locked="true"':'')+'></label><p data-range></p><label>Criterion feedback (required below Level 3)<textarea maxlength="2000" data-remark '+(locked?'disabled data-locked="true"':'')+'>'+escape(score.remark||'')+'</textarea></label></fieldset>';
+        return '<fieldset class="guide-eval-criterion" data-pi="'+escape(c.pi)+'"><legend>'+escape(c.pi+' · '+c.name+' · '+c.co+' · '+c.maxMarks+' marks')+'</legend><details><summary>Performance descriptors</summary>'+c.descriptors.map((text,i)=>'<p><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><label>Level <select data-level '+(locked?'disabled data-locked="true"':'')+'><option value="">Select</option>'+[0,1,2,3,4,5].map(i=>'<option '+(score.level===i?'selected':'')+'>'+i+'</option>').join('')+'</select></label> <label>Marks <input data-marks type="number" min="0" max="'+c.maxMarks+'" step="0.01" value="'+escape(score.marks??'')+'" '+(locked?'disabled data-locked="true"':'')+'></label><p data-range></p><label>Criterion feedback (required below Level 2)<textarea maxlength="2000" data-remark '+(locked?'disabled data-locked="true"':'')+'>'+escape(score.remark||'')+'</textarea></label></fieldset>';
       }).join('')+'<p id="guideEvalTotal"></p><p id="guideEvalMessage" role="status"></p><button type="button" id="guideEvalDraft" '+(locked?'disabled data-locked="true"':'')+'>Save Draft</button> <button type="button" id="guideEvalSubmit" '+(locked?'disabled data-locked="true"':'')+'>Submit Evaluation</button> <button type="button" id="guideEvalReload">Reload</button> <button type="button" id="guideEvalClose">Close</button>';
     el('guideEvalStudent').onchange=e=>{const selected=e.target.value;e.target.value=d.student.register;open(d.roster.team,selected);};
     el('guideEvalReload').onclick=()=>open(d.roster.team,d.student.register);
@@ -75,23 +75,19 @@ function guideEvaluationBrowser_() {
   let adminBusy=false;
   function admin() {
     const host=el('guideEvaluationAdmin');if(!host || adminBusy)return;
-    adminBusy=true;host.innerHTML=DashboardUI.renderSkeleton('panel', 'Loading evaluations');
+    adminBusy=true;const finishLoading=DashboardUI.beginContentLoading(host, 'Loading evaluations');
     rpc('loadCoordinatorGuideEvaluations',[],report=>{
-      adminBusy=false;
+      finishLoading();adminBusy=false;
       if(!report.ready){host.textContent=report.error;return;}
       const students=report.students || [];
       const submitted=students.filter(s=>s.status==='Submitted').length;
       const published=students.filter(s=>s.status==='Published').length;
       host.textContent=students.length+' students · '+submitted+' submitted · '+published+' published';
-    },err=>{adminBusy=false;host.textContent=err.message;});
-  }
-  function setup() {
-    if(adminBusy || !confirm('Create guide evaluation storage? Milestones and Rubrics must already be configured.'))return;
-    adminBusy=true;
-    rpc('setupGuideEvaluation',[],result=>{adminBusy=false;alert(result.message);admin();},err=>{adminBusy=false;alert(err.message);});
+    },err=>{finishLoading();adminBusy=false;const notice=document.createElement('p');notice.setAttribute('role','status');notice.textContent='Unable to refresh: '+err.message;host.appendChild(notice);});
   }
   function student() {
     const host=el('studentGuideEvaluation');if(!host)return;
+    host.innerHTML=DashboardUI.renderSkeleton('panel', 'Loading guide evaluation results');
     rpc('loadPublishedGuideEvaluation',[],result=>{
       if(!result){host.textContent='Guide Evaluation: not published.';return;}
       host.innerHTML='<h3>Guide Evaluation</h3><p>'+result.total.toFixed(2)+' / '+result.config.maximum+' · Course contribution '+result.weighted.toFixed(2)+' / '+(result.config.weight*100)+'</p>'+result.config.criteria.map(c=>{
@@ -100,6 +96,6 @@ function guideEvaluationBrowser_() {
     },err=>{host.textContent='Guide evaluation unavailable. ';const button=document.createElement('button');button.textContent='Retry';button.onclick=student;host.appendChild(button);});
   }
   window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
-  return {open,admin,setup,student};
+  return {open,admin,student};
 }
 function getGuideEvaluationClientScript() { return 'const GuideEvaluation = ('+guideEvaluationBrowser_.toString()+')();'; }

@@ -1,5 +1,10 @@
 # capstone-project-system
 
+## UI conventions
+
+Follow [Loading and refresh behavior](LOADING-UI.md) for all asynchronous UI reads.
+Use the shared skeleton renderer and `DashboardUI.beginContentLoading` helper.
+
 ## Sheet read boundaries
 
 Use `readSheetRows_(sheet, firstRow, rowCount)` for selected rows. It reads
@@ -84,3 +89,15 @@ Coordinator indicators distinguish repository availability from setup completion
   provisioning and activity reporting still use it.
 
 Run `npm test` for dashboard, registration, authorization, and workflow checks.
+
+## Evaluation sheet tabs
+
+Evaluation storage is mapped by stable Milestone ID: `review1` →
+`Review1Evaluations`, `review2` → `Review2Evaluations`, and `guide_eval` →
+`GuideEvaluations`. Review tabs live in the committee marking spreadsheet;
+guide storage lives in the main spreadsheet. Labels and due-date order do not
+change this mapping. Custom committee milestones retain `Committee <id> - <milestone ID>` names.
+
+Before using this version with existing marks, rename the existing `review1`
+and `review2` tabs to the names above in each committee spreadsheet. Preserve
+their contents; the application does not automatically migrate or merge old tabs.

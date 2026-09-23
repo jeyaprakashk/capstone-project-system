@@ -1,5 +1,5 @@
 /* Guide evaluation: live reads, immutable per-student revisions, no cross-request cache. */
-const GUIDE_EVAL_POLICY_ = 'guide-bands-v2';
+const GUIDE_EVAL_POLICY_ = 'guide-bands-v3-target-level-2';
 const GUIDE_EVAL_HEADERS_ = ['Assessment','Team','Student','Revision','Action','Actor','At','Request ID','Payload'];
 const GUIDE_EVAL_BANDS_ = [0,40,60,75,85,95,100];
 function guideActor_(coordinator) {
@@ -32,7 +32,7 @@ function guideConfiguration_() {
   if (group < 0) throw new Error('Rubrics requires Milestone ID column.');
   const selected = [rows[0],...rows.slice(1).filter(row=>normalizeText_(row[group])===milestone.key)];
   const criteria = parseRubricRows_(selected,[milestone])[milestone.key];
-  if (criteria.some(c=>c.type!=='Individual' || c.descriptors.some(text=>!text))) throw new Error('Guide rubric requires individual criteria with all Level 0–5 descriptors.');
+  if (criteria.some(c=>c.type!=='Individual' || c.descriptors.some(text=>!text))) throw new Error('Guide rubric requires individual criteria with all Level 0â€“5 descriptors.');
   const maximum = criteria.reduce((sum,c)=>sum+c.maxMarks,0);
   return {criteria,maximum,due:milestone.day,timezone:getSpreadsheet().getSpreadsheetTimeZone(),policy:GUIDE_EVAL_POLICY_,weight:milestone.weight/100};
 }
@@ -42,8 +42,8 @@ function guideEnsureRows_(sheet, lastRow) {
   if (lastRow > capacity) sheet.insertRowsAfter(capacity, Math.max(100, lastRow - capacity));
 }
 function guideRecords_() {
-  const sheet = getSheet('GuideEvaluations');
-  if (!sheet) throw new Error('Run guide evaluation setup in System Status.');
+  const sheet = getSheet(EVALUATION_SHEET_NAMES_.guide_eval);
+  if (!sheet) throw new Error('GuideEvaluations is missing from the main spreadsheet. Create the tab manually with the required headers.');
   const values = sheet.getDataRange().getValues();
   if (GUIDE_EVAL_HEADERS_.some((h,i) => values[0][i] !== h)) throw new Error('GuideEvaluations headers do not match.');
   return {sheet, records:values.slice(1).filter(r => r[0]).map(r => {
@@ -71,12 +71,12 @@ function guideScore_(criteria, scores, complete, weight) {
       if (!blankMarks) throw new Error(c.pi + ': select a level before marks.');
       clean[c.pi] = {level:blankLevel ? null : value.level, marks:null, remark}; return;
     }
-    if (!Number.isInteger(value.level) || value.level < 0 || value.level > 5 || typeof value.marks === 'boolean' || !/^\d+(\.\d{1,2})?$/.test(String(value.marks))) throw new Error(c.pi + ': use level 0–5 and marks with at most two decimals.');
+    if (!Number.isInteger(value.level) || value.level < 0 || value.level > 5 || typeof value.marks === 'boolean' || !/^\d+(\.\d{1,2})?$/.test(String(value.marks))) throw new Error(c.pi + ': use level 0â€“5 and marks with at most two decimals.');
     const marks = Number(value.marks), scaled = Math.round(marks * 100);
     const lower = GUIDE_EVAL_BANDS_[value.level] * c.maxMarks;
     const upper = GUIDE_EVAL_BANDS_[value.level+1] * c.maxMarks;
     if (scaled < lower || (value.level === 5 ? scaled > upper : scaled >= upper)) throw new Error(c.pi + ': marks are outside the selected level band.');
-    if (complete && value.level < 3 && !remark) throw new Error(c.pi + ': a remark is required below Level 3.');
+    if (complete && value.level < 2 && !remark) throw new Error(c.pi + ': a remark is required below Level 2.');
     clean[c.pi] = {level:value.level, marks, remark}; cents += scaled;
   });
   return {scores:clean, total:cents/100, weighted:Math.round(cents / criteria.reduce((sum,c)=>sum+c.maxMarks,0) * weight * 100)/100};
@@ -168,7 +168,7 @@ function loadPublishedGuideEvaluation() {
   const cols = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const matches = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(r=>r[cols.TEAM_ID]).flatMap(row => getStudentsFromTeamStatusRow_(row,cols).filter(s=>emailsMatch(s.email,actor)).map(s=>({team:normalizeText_(row[cols.TEAM_ID]),student:normalizeText_(s.regNo)})));
   if (matches.length !== 1) throw new Error('Student assignment is missing or ambiguous.');
-  if (!getSheet('GuideEvaluations')) return null;
+  if (!getSheet(EVALUATION_SHEET_NAMES_.guide_eval)) return null;
   const m = matches[0], latest = guideLatest_(guideRecords_().records,m.team,m.student);
   if (!latest || latest.status !== 'Published') return null;
   return {config:latest.config,scores:latest.scores,total:latest.total,weighted:latest.weighted};
@@ -182,24 +182,6 @@ function guideCompletion_() {
     return {available:true,completed:Object.values(teams).filter(Boolean).length,teams};
   } catch(err) { return {available:false,completed:0,teams:{}}; }
 }
-function setupGuideEvaluation() {
-  guideActor_(true);
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) throw new Error('Setup is busy. Retry.');
-  try {
-    const ss = getSpreadsheet();
-    guideConfiguration_(); // Validate manually maintained definitions before creating storage.
-    let storage = getNamedSheet_(ss,'GuideEvaluations');
-    if (!storage) storage=ss.insertSheet('GuideEvaluations');
-    if (!storage.getLastRow()) storage.getRange(1,1,1,GUIDE_EVAL_HEADERS_.length).setValues([GUIDE_EVAL_HEADERS_]);
-    else {
-      const storageHeaders = (readSheetRows_(storage, 1, 1)[0] || []);
-      if (GUIDE_EVAL_HEADERS_.some((h,i)=>storageHeaders[i]!==h)) throw new Error('Existing GuideEvaluations headers differ; no records overwritten.');
-    }
-    SpreadsheetApp.flush();
-    return {message:'Guide evaluation storage is ready. Milestones and Rubrics were not changed.'};
-  } finally { lock.releaseLock(); }
-}
 function buildGuideEvaluationAdmin_() {
-  return '<section class="assessment-section"><h3>Guide Evaluation</h3><p>Individual assessment · Defined in Milestones and Rubrics</p><button type="button" onclick="GuideEvaluation.admin()">Refresh evaluations</button> <button type="button" onclick="GuideEvaluation.setup()">Set up guide evaluation</button><div id="guideEvaluationAdmin" aria-live="polite">Open Refresh evaluations to check configuration and submissions.</div></section>';
+  return '<section class="assessment-section"><h3>Guide Evaluation</h3><p>Individual assessment Â· Defined in Milestones and Rubrics</p><button type="button" onclick="GuideEvaluation.admin()">Refresh evaluations</button><div id="guideEvaluationAdmin" aria-live="polite">Open Refresh evaluations to check configuration and submissions.</div></section>';
 }

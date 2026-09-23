@@ -16,6 +16,27 @@ const DashboardUI = (function() {
 
   function byId(id) { return document.getElementById(id); }
   function setLoading(id, label) { const el = byId(id); if (el) el.innerHTML = renderSkeleton('inline', label); }
+  // Preserve live DOM, layout and event handlers until a read finishes.
+  function beginContentLoading(target, label) {
+    if (!target) return function() {};
+    const overlay = document.createElement('div');
+    overlay.className = 'app-loading-overlay';
+    overlay.innerHTML = renderSkeleton(target.clientHeight < 120 ? 'inline' : 'panel', label);
+    const children = Array.from(target.children).map(function(child) { return {node:child, inert:child.inert}; });
+    children.forEach(function(child) { child.node.inert = true; });
+    target.setAttribute('aria-busy', 'true');
+    target.classList.add('app-content-loading');
+    target.appendChild(overlay);
+    let finished = false;
+    return function() {
+      if (finished) return;
+      finished = true;
+      overlay.remove();
+      children.forEach(function(child) { child.node.inert = child.inert; });
+      target.setAttribute('aria-busy', 'false');
+      target.classList.remove('app-content-loading');
+    };
+  }
   function setText(id, text) { const el = byId(id); if (el) el.textContent = text; }
   function setButtonsDisabled(container, disabled) {
     if (!container) return;
@@ -96,7 +117,7 @@ const DashboardUI = (function() {
     activatedRoles[key] = true;
     if (key === 'coord') initializeCoordinatorAsync();
     if (key === 'reviewer') filterReviewerAssignedTeams();
-    if (key === 'student') { loadStudentMarksAsync(); GuideEvaluation.student(); }
+    if (key === 'student') { loadStudentMarksAsync(); GuideEvaluation.student(); if (typeof Review1Evaluation !== 'undefined') Review1Evaluation.student(); }
   }
 
   let sharedSchedule = null;
@@ -324,6 +345,7 @@ const DashboardUI = (function() {
     }
 
     const hadContent = !!loadedRoleTabs[activeKey];
+    const finishLoading = beginContentLoading(target, 'Loading dashboard');
     const refreshButton = byId(activeKey + 'Refresh');
     if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderSkeleton('inline', 'Refreshing'); }
     setText(activeKey + 'RefreshStatus', '');
@@ -332,6 +354,7 @@ const DashboardUI = (function() {
 
     dashboardRun()
       .withSuccessHandler(function(html) {
+        finishLoading();
         target.innerHTML = html;
         if (onLoaded) onLoaded();
         if (refresh) activatedRoles[activeKey] = false;
@@ -350,6 +373,7 @@ const DashboardUI = (function() {
         ensureAnnouncementsLoaded();
       })
       .withFailureHandler(function(err) {
+        finishLoading();
         loadingRoleTabs[activeKey] = false;
         if (onError) { onError(err); return; }
         if (refreshButton) { refreshButton.disabled = false; refreshButton.innerHTML = renderLucideIcon_('refresh-cw', '', 'icon-leading') + 'Refresh'; }
@@ -444,6 +468,7 @@ const DashboardUI = (function() {
     announcementsState.loading = true;
     const hadContent = announcementsState.loaded;
     if (!hadContent) renderAnnouncementsLoading();
+    const finishLoading = beginContentLoading(target, 'Loading announcements');
     const refreshButton = target.querySelector('.announcement-refresh-btn');
     const status = target.querySelector('.announcement-status');
     if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderSkeleton('inline', 'Refreshing'); }
@@ -452,6 +477,7 @@ const DashboardUI = (function() {
 
     dashboardRun()
       .withSuccessHandler(function(html) {
+        finishLoading();
         announcementsState.loading = false;
         announcementsState.loaded = true;
         target.innerHTML = html;
@@ -463,6 +489,7 @@ const DashboardUI = (function() {
         }
       })
       .withFailureHandler(function(err) {
+        finishLoading();
         announcementsState.loading = false;
         announcementsState.loaded = hadContent;
         target.setAttribute('aria-busy', 'false');
@@ -501,11 +528,15 @@ const DashboardUI = (function() {
     systemStatusState.attempted = true;
     const button = byId('systemStatusRefresh');
     if (button) { button.disabled = true; button.innerHTML = renderSkeleton('inline', 'Refreshing'); }
+    if (!systemStatusState.loaded) target.innerHTML = renderSkeleton('panel', 'Loading system status');
     const buttons = Array.from(target.querySelectorAll('button')).map(function(el) { return {el:el, disabled:el.disabled}; });
     buttons.forEach(function(item) { item.el.disabled = true; });
+    const cards = Array.from(target.querySelectorAll('.system-status-primary > *, .coordinator-container > .assessment-section'));
+    const finishCards = (cards.length ? cards : [target]).map(function(card) { return beginContentLoading(card, 'Loading system status'); });
     target.setAttribute('aria-busy', 'true');
-    setLoading('systemStatusMessage', 'Loading system status');
+    setText('systemStatusMessage', '');
     dashboardRun().withSuccessHandler(function(html) {
+      finishCards.forEach(function(finish) { finish(); });
       target.innerHTML = html;
       systemStatusState.loading = false;
       systemStatusState.loaded = true;
@@ -516,7 +547,9 @@ const DashboardUI = (function() {
       reviewConfigurationValid = false;
       recheckReviewConfiguration();
       GuideEvaluation.admin();
+      if (typeof Review1Evaluation !== 'undefined') Review1Evaluation.admin();
     }).withFailureHandler(function(err) {
+      finishCards.forEach(function(finish) { finish(); });
       systemStatusState.loading = false;
       target.setAttribute('aria-busy', 'false');
       if (button) { button.disabled = false; button.innerHTML = renderLucideIcon_('refresh-cw', '', 'icon-leading') + 'Refresh'; }
@@ -1253,6 +1286,13 @@ const DashboardUI = (function() {
         if (cell) { cell.textContent = item && result.state === 'active' ? item.logs + '/' + item.commits : '—'; cell.title = label; }
       });
       setText('coordinatorActiveTeams', result.activeTeams === null ? '—' : result.activeTeams);
+      const activeValue = byId('coordinatorActiveTeams');
+      const activeCard = activeValue && activeValue.closest ? activeValue.closest('.stat-card') : null;
+      if (activeCard) {
+        const remaining = result.totalTeams - result.activeTeams;
+        const tone = result.activeTeams === null || !result.totalTeams || result.state !== 'active' ? 'neutral' : remaining <= 0 ? 'complete' : remaining / result.totalTeams >= .6 ? 'danger' : remaining / result.totalTeams >= .3 ? 'warning' : 'neutral';
+        activeCard.setAttribute('data-completion-tone', tone);
+      }
       setText('coordinatorActiveTeamsPct', result.activeTeams === null ? label : '(' + (result.totalTeams ? Math.round(result.activeTeams / result.totalTeams * 100) : 0) + '%)');
       setText('weeklyActivityStatus', label + ' · Updated ' + new Date(result.checkedAt).toLocaleString());
       if (byId('weeklyActivityRetry')) byId('weeklyActivityRetry').hidden = result.state !== 'unavailable';
@@ -1291,6 +1331,7 @@ const DashboardUI = (function() {
     const card = byId('reviewConfigurationCard');
     if (!card || checkingReviewConfiguration || creatingReviewerSheets) return;
     checkingReviewConfiguration = true;
+    const finishLoading = beginContentLoading(card, 'Checking assessment readiness');
     reviewConfigurationValid = false;
     card.setAttribute('aria-busy', 'true');
     card.setAttribute('data-state', 'checking');
@@ -1298,6 +1339,7 @@ const DashboardUI = (function() {
     byId('createReviewerSheetsButton').disabled = true;
     setLoading('reviewConfigurationSummary', 'Checking');
     function finish(report, error) {
+      finishLoading();
       checkingReviewConfiguration = false;
       if (coordinatorSectionState) coordinatorSectionState.configurationSettled = true;
       reviewConfigurationValid = !error && report.valid;
@@ -1439,7 +1481,7 @@ const DashboardUI = (function() {
   function refreshGithubStatus(button, message) {
     const statusButton = byId('githubStatusRefresh');
     if (statusButton) { statusButton.hidden = false; statusButton.disabled = true; }
-    setText('githubSubmitStatus', message || 'Refreshing GitHub status…');
+    setLoading('githubSubmitStatus', message || 'Refreshing GitHub status');
     loadRoleContent('student', false, true, function() {
       setText('githubSubmitStatus', message || '');
     }, function(err) {
@@ -1456,7 +1498,7 @@ const DashboardUI = (function() {
     const badge = card.querySelector('.step-badge');
     if (body) {
       const text = body.querySelector('p');
-      if (text) text.textContent = 'Your valid GitHub username is saved. Checking the latest team status…';
+      if (text) text.innerHTML = 'Your valid GitHub username is saved. ' + renderSkeleton('inline', 'Checking the latest team status');
       body.querySelectorAll('.step-detail').forEach(function(detail) { detail.hidden = true; });
     }
     if (badge) { badge.textContent = 'Waiting'; badge.classList.remove('active', 'done'); badge.classList.add('waiting'); }
@@ -1469,7 +1511,7 @@ const DashboardUI = (function() {
   function retryGithubSetup(button) {
     if (button.disabled) return;
     button.disabled = true;
-    setText('githubSubmitStatus', 'Checking team usernames and repository access…');
+    setLoading('githubSubmitStatus', 'Checking team usernames and repository access');
     function finish(message) {
       button.disabled = false;
       refreshGithubStatus(null, message);
@@ -1484,7 +1526,7 @@ const DashboardUI = (function() {
     if (input.disabled || !form.reportValidity()) return;
     input.disabled = true;
     setButtonsDisabled(form, true);
-    setText('githubSubmitStatus', 'Checking your GitHub username…');
+    setLoading('githubSubmitStatus', 'Checking your GitHub username');
     function retry(message) {
       input.disabled = false;
       setButtonsDisabled(form, false);
@@ -1502,7 +1544,7 @@ const DashboardUI = (function() {
       }
       if (!result.ok) { retry(result.message); return; }
       markGithubUsernameSaved(form);
-      setText('githubSubmitStatus', result.message + ' Checking repository setup…');
+      setLoading('githubSubmitStatus', result.message + ' Checking repository setup');
       dashboardRun().withSuccessHandler(function(setup) {
         refresh(setup.message || '');
       }).withFailureHandler(function(err) {
@@ -1516,6 +1558,7 @@ const DashboardUI = (function() {
     retryGithubSetup,
     submitGithubUsername,
     renderSkeleton: renderSkeleton,
+    beginContentLoading: beginContentLoading,
     guideRun: dashboardRun,
     refreshRoleDashboard,
     refreshSystemStatus: function() { ensureSystemStatusLoaded(true); },

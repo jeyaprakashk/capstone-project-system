@@ -1,5 +1,17 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const header=['Milestone ID','Milestone Name','Due Date','Graded By','Weight (%)'];
+test('evaluation storage names are immutable and independent of committee, label and order',()=>{
+ const {c}=fixture([header,
+  ['review2','Earlier renamed review','2026-10-01','Review Committee',25],
+  ['review1','Later renamed review','2026-10-12','Review Committee',25]]);
+ for (const committee of ['1','C2']) {
+  const reviews=c.getInternalReviews_();
+  assert.equal(c.committeeReviewTabName_(committee,reviews[0]),'Review2Evaluations');
+  assert.equal(c.committeeReviewTabName_(committee,reviews[1]),'Review1Evaluations');
+ }
+ assert.equal(vm.runInContext('EVALUATION_SHEET_NAMES_.guide_eval',c),'GuideEvaluations');
+ assert.equal(vm.runInContext('Object.isFrozen(EVALUATION_SHEET_NAMES_)',c),true);
+});
 function fixture(rows) {
  let reads=0;
  const c=vm.createContext({Date,

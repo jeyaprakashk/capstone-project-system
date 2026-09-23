@@ -287,6 +287,10 @@ function collectReviewCompletion_(requestedTeamId, timings) {
   const RC = getColumnMap(SHEET_NAMES.REVIEW_COMMITTEE, FIELD_DEFINITIONS.REVIEW_COMMITTEE);
   const reviews = measure('review_detail_rubrics', () => getReviewDefinitions_());
   const result = Object.create(null);
+  let firstRecords=[], firstConfig, firstError='';
+  if (reviews.some(r=>r.key==='review1')) {
+    try {firstConfig=review1Configuration_(); firstRecords=review1Records_().records;} catch(err) {firstError=err.message;}
+  }
   const teamsByCommittee = new Map();
   getSheetRows(SHEET_NAMES.TEAM_STATUS).forEach(row => {
     const teamId = normalizeReviewKey_(row[TS.TEAM_ID]);
@@ -295,6 +299,7 @@ function collectReviewCompletion_(requestedTeamId, timings) {
     const registers = new Set(getStudentsFromTeamStatusRow_(row, TS).map(s => normalizeReviewKey_(s.regNo)));
     const team = { teamId:String(row[TS.TEAM_ID]).trim(), committeeNumber:committee, totalStudents:registers.size };
     reviews.forEach(review => { team[review.key] = {...summarizeReviewCompletion_(registers, null, review.rubric), available:false}; });
+    if (reviews.some(r=>r.key==='review1') && !firstError) team.review1=review1Progress_(row,TS,firstRecords,firstConfig);
     result[teamId] = team;
     if (committee && registers.size) {
       if (!teamsByCommittee.has(committee)) teamsByCommittee.set(committee, new Map());
@@ -307,6 +312,7 @@ function collectReviewCompletion_(requestedTeamId, timings) {
     sheetIds.set(normalizeReviewKey_(row[RC.COMMITTEE_NUMBER]), String(row[RC.MARKS_SHEET_ID] || '').trim());
   });
   const spreadsheets = new Map();
+  const reviewIndexes = new Map();
   teamsByCommittee.forEach((teams, committee) => {
     const id = sheetIds.get(committee);
     if (!id) return;
@@ -317,11 +323,16 @@ function collectReviewCompletion_(requestedTeamId, timings) {
     const spreadsheet = spreadsheets.get(id);
     if (!spreadsheet) return;
     reviews.forEach(review => {
+      if (review.key==='review1') return;
       try {
-        const rows = measure('review_detail_read', () => readReviewRows_(spreadsheet, committee, review, measure));
-        if (rows === null) return;
+        const cacheKey = JSON.stringify([id, committeeReviewTabName_(committee, review)]);
+        if (!reviewIndexes.has(cacheKey)) {
+          const rows = measure('review_detail_read', () => readReviewRows_(spreadsheet, committee, review, measure));
+          reviewIndexes.set(cacheKey, rows === null ? null : indexReviewRows_(rows));
+        }
+        const index = reviewIndexes.get(cacheKey);
+        if (index === null) return;
         measure('review_detail_evaluate', () => {
-        const index = indexReviewRows_(rows);
         teams.forEach((registers, teamId) => {
           result[teamId][review.key] = {...summarizeReviewCompletion_(registers, index.get(teamId), review.rubric), available:true};
         });
@@ -446,7 +457,7 @@ function getStudentAllReviewMarks(email) {
     const marksSpreadsheet = SpreadsheetApp.openById(marksSheetId);
 
     function readReview_(review) {
-      if (!review) return null;
+      if (!review || review.key==='review1') return null; // Published Review 1 results use the authenticated history endpoint.
       const rows = readReviewRows_(marksSpreadsheet, normalizeReviewKey_(committeeNumber), review);
       if (!rows) return null;
       const teamRows = indexReviewRows_(rows).get(normalizeReviewKey_(teamId));

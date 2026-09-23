@@ -229,7 +229,7 @@ test('coordinator access sync reads and deduplicates TeamStatus repository URLs'
 function browserFixture() {
   const requests=[];
   const status={textContent:''};
-  const panel={innerHTML:''};
+  const panel={innerHTML:'',children:[],appendChild(){},setAttribute(){},classList:{add(){},remove(){}}};
   const button={disabled:false};
   const input={value:'octocat',disabled:false,focus(){this.focused=true;}};
   const summary={textContent:'Enter your GitHub username.'};
@@ -243,7 +243,7 @@ function browserFixture() {
   }
   const c=createSheetReadContext({
     console,window:{},performance:{now:()=>0},setTimeout:()=>1,clearTimeout(){},
-    document:{hidden:false,readyState:'loading',addEventListener(){},getElementById:id=>id==='githubSubmitStatus'?status:id==='githubStatusRefresh'?refreshButton:null,
+    document:{createElement:()=>({remove(){}}),hidden:false,readyState:'loading',addEventListener(){},getElementById:id=>id==='githubSubmitStatus'?status:id==='githubStatusRefresh'?refreshButton:null,
       querySelector:()=>panel,querySelectorAll:()=>[]},
     google:{script:{run:runner()}},getSkeletonMarkup_:()=>''
   });
@@ -299,7 +299,7 @@ test('browser hides textbox only after saving and refreshes after provisioning w
 test('setup and refresh failures preserve saved state, show actual errors and offer a read-only retry',()=>{
   const f=browserFixture();f.submit();
   f.requests[0].success({ok:true,message:'Saved'});
-  assert.match(f.summary.textContent,/valid GitHub username is saved/);
+  assert.match(f.summary.innerHTML,/valid GitHub username is saved/);
   assert.equal(f.badge.textContent,'Waiting');assert.equal(f.detail.hidden,true);
   f.requests[1].failure(new Error('Missing header Guide GitHub Username'));
   f.requests[2].failure(new Error('Dashboard unavailable'));
@@ -307,7 +307,7 @@ test('setup and refresh failures preserve saved state, show actual errors and of
   assert.equal(f.refreshButton.hidden,false);assert.equal(f.refreshButton.disabled,false);
   assert.match(f.status.textContent,/Missing header Guide GitHub Username/);
   assert.match(f.status.textContent,/Dashboard refresh failed: Dashboard unavailable/);
-  assert.doesNotMatch(f.summary.textContent,/Enter your/);
+  assert.doesNotMatch(f.summary.innerHTML,/Enter your/);
   f.refresh();assert.equal(f.requests[3].key,'loadDashboardRoleContent');
   f.requests[3].success('Current team status');
   assert.equal(f.panel.innerHTML,'Current team status');

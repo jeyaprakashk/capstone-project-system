@@ -47,6 +47,10 @@ function getDashboardRoleViews_(email) {
     views.push({ key: 'student', label: 'My Team', contentId: 'studentContent' });
   }
 
+  if (statusRows.some(r => emailsMatch(r[TS.GUIDE_EMAIL], email))) {
+    views.push({ key: 'guide', label: 'My Teams (Guide)', contentId: 'guideContent' });
+  }
+
   // Reviewer role: inspect committee membership only; do not build reviewer data.
   const reviewerCommittees = getCommitteeNumbersForReviewer(email);
   if (reviewerCommittees.length > 0) {
@@ -54,10 +58,6 @@ function getDashboardRoleViews_(email) {
     if (statusRows.some(r => committeeSet.has(normalizeText_(r[TS.COMMITTEE_NUMBER])))) {
       views.push({ key: 'reviewer', label: 'Reviewer', contentId: 'reviewerContent' });
     }
-  }
-
-  if (statusRows.some(r => emailsMatch(r[TS.GUIDE_EMAIL], email))) {
-    views.push({ key: 'guide', label: 'My Teams (Guide)', contentId: 'guideContent' });
   }
 
   const coordinatorEmail = getCoordinatorEmail();
@@ -157,6 +157,7 @@ ${getGuideStyles()}
 ${getCoordinatorStyles()}
 ${getStudentPageStyles()}
 ${getReviewerStyles()}
+${getReview1EvaluationStyles_()}
 ${getSharedTimelineStyles_()}
 ${getLoadingStyles_()}
 ${getDashboardSurfaceStyles_()}
@@ -255,6 +256,7 @@ ${systemPanel}
 ${getDashboardClientScript()}
 ${getGuideEvaluationClientScript()}
 ${getReviewerMarkingScript_()}
+${getReview1EvaluationClientScript_()}
 </script>
 </body>
 </html>`;

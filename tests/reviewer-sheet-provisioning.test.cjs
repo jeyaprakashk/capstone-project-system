@@ -30,7 +30,7 @@ function setup(options={}) {
   getSheet:()=>({getLastColumn:()=>3,getRange:(r,col,n,w)=>({getValues:()=>rows.slice(r-2,r-2+n).map(row=>row.slice(col-1,col-1+w)),getValue:()=>rows[r-2][col-1],setValue:value=>{rows[r-2][col-1]=value;calls.push(['write-id',value]);}})}),
   getStudentsFromTeamStatusRow_:()=>[{regNo:'A',name:'Student'}],getReviewDefinitions_:()=>Array.from({length:options.reviewCount || 2},(_,i)=>({key:'review'+(i+1),number:i+1,rubric})),
   getNamedSheet_:(ss,name)=>sheets.get(name)||null,
-  seedCommitteeReviewTab:(ss,committee,key)=>{const name=`Committee ${committee} - ${key}`;sheets.set(name,sheet(name));calls.push(['seed',key]);},
+  seedCommitteeReviewTab:(ss,committee,key)=>{const name=c.committeeReviewTabName_(committee,{key});sheets.set(name,sheet(name));calls.push(['seed',key]);},
   LockService:{getScriptLock:()=>({tryLock:()=>!options.busy,releaseLock:()=>calls.push(['unlock'])})},
   PropertiesService:{getScriptProperties:()=>({getProperty:key=>properties.get(key)||null,setProperty:(key,v)=>properties.set(key,v),deleteProperty:key=>properties.delete(key)})},
   SpreadsheetApp:{create:()=>{created++;calls.push(['create']);sheets.set('Sheet1',sheet('Sheet1'));return spreadsheet;},openById:()=>spreadsheet,flush(){}},
@@ -60,6 +60,7 @@ test('creates only missing committee files, protects before sharing and writes e
  assert.equal(result.ok,true);assert.equal(result.key,'c1');assert.equal(f.created(),1);
  assert.equal(f.rows[0][1],'NewCaseSensitiveID');assert.equal(f.rows[1][1],'existing');
  assert.equal(f.properties.size,0);assert.equal(f.sheets.size,2);
+ assert(f.sheets.has('Review1Evaluations'));assert(f.sheets.has('Review2Evaluations'));
  const share=f.calls.findIndex(x=>x[0]==='share');const protect=f.calls.findIndex(x=>x[0]==='unprotected');assert(protect<share);
  assert.deepEqual(f.calls[share],['share','reviewer@example.com']);
  assert(f.calls.some(x=>x[0]==='reshare'&&x[1]===false));

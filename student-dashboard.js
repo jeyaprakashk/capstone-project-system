@@ -335,6 +335,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
     </div>
 
     ${marksSection}
+    <section id="studentReview1Evaluation" class="assessment-section" aria-live="polite"></section>
     <section id="studentGuideEvaluation" class="assessment-section" aria-live="polite">${getSkeletonMarkup_('panel', 'Loading guide evaluation')}</section>
 
 
@@ -359,7 +360,7 @@ function loadStudentMarksSection() {
   }
 
   return `<h3>Your Marks</h3>
-    ${getInternalReviews_().map(review => row_(review.label, allReviewMarks && allReviewMarks[review.key])).join('')}`;
+    ${getInternalReviews_().filter(review=>review.key!=='review1').map(review => row_(review.label, allReviewMarks && allReviewMarks[review.key])).join('')}`;
 }
 
 function buildStudentPage(email, teamId) {
