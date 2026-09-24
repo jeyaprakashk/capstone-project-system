@@ -49,8 +49,11 @@ function initializeDashboardTooltips_() {
       tooltip = document.createElement('div');
       tooltip.id = 'dashboardTooltip'; tooltip.className = 'dashboard-tooltip';
       tooltip.setAttribute('role', 'tooltip');
-      document.body.appendChild(tooltip);
     }
+    // Modal dialogs occupy the top layer, above any body-level z-index.
+    // Reattach on every show: refreshing a drawer can remove its old children.
+    const host = owner.closest('dialog[open]') || document.body;
+    if (tooltip.parentNode !== host) host.appendChild(tooltip);
     active = owner;
     oldDescription = owner.getAttribute('aria-describedby');
     nativeTitle = owner.getAttribute('title');
@@ -74,5 +77,6 @@ function initializeDashboardTooltips_() {
   document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
   document.addEventListener('scroll', hide, true);
   document.addEventListener('click', hide);
+  document.addEventListener('close', hide, true);
   if (window.addEventListener) window.addEventListener('resize', hide);
 }

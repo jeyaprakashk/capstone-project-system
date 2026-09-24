@@ -65,7 +65,7 @@ test('student step icons and expandable sections use the shared library', () => 
   assert(!/[▸▾]/.test(c.getCollapsibleStyles()));
 });
 const events={}, appended=[];
-function node(attrs={}) {return {attrs,style:{},hidden:false,setAttribute(k,v){this.attrs[k]=v;},getAttribute(k){return this.attrs[k]??null;},removeAttribute(k){delete this.attrs[k];},closest(){return this;},contains(n){return n===this;},getBoundingClientRect(){return {left:50,top:50,bottom:70,width:40,height:20};}};}
+function node(attrs={}) {return {attrs,style:{},hidden:false,setAttribute(k,v){this.attrs[k]=v;},getAttribute(k){return this.attrs[k]??null;},removeAttribute(k){delete this.attrs[k];},closest(selector){return selector==='dialog[open]'?null:this;},contains(n){return n===this;},getBoundingClientRect(){return {left:50,top:50,bottom:70,width:40,height:20};}};}
 test('tooltips support hover, focus, Escape, scrolling and dynamically added icons',()=>{
  const c=icons();
  c.document={addEventListener:(name,fn)=>{events[name]=fn;},createElement:()=>node(),body:{appendChild:n=>appended.push(n)}};
@@ -79,4 +79,19 @@ test('tooltips support hover, focus, Escape, scrolling and dynamically added ico
  const refreshed=node({'aria-label':'Repository ready'});
  events.focusin({target:refreshed});assert.equal(tip.textContent,'Repository ready');assert.equal(tip.hidden,false);
  events.scroll();assert.equal(tip.hidden,true);assert.equal(refreshed.getAttribute('aria-describedby'),null);
+});
+
+test('drawer tooltips follow their dialog across refreshes and return to the page',()=>{
+ const c=icons(),handlers={},body={appendChild(n){n.parentNode=this;}},dialog={appendChild(n){n.parentNode=this;}},tip=node();
+ c.document={addEventListener:(name,fn)=>{handlers[name]=fn;},createElement:()=>tip,body};
+ c.window={innerWidth:320,innerHeight:240,addEventListener(){}};
+ c.initializeDashboardTooltips_();
+ const owner=node({title:'Drawer action'});
+ owner.closest=selector=>selector==='dialog[open]'?dialog:owner;
+ handlers.focusin({target:owner});assert.equal(tip.parentNode,dialog);assert.equal(tip.hidden,false);
+ handlers.close();assert.equal(tip.hidden,true);assert.equal(owner.getAttribute('title'),'Drawer action');
+ tip.parentNode=null;
+ handlers.pointerover({target:owner});assert.equal(tip.parentNode,dialog);assert.equal(tip.hidden,false);
+ handlers.pointerover({target:node({title:'Page action'})});assert.equal(tip.parentNode,body);assert.equal(tip.textContent,'Page action');
+ assert.equal(owner.getAttribute('aria-describedby'),null);
 });

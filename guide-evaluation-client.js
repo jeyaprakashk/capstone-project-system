@@ -13,9 +13,9 @@ function guideEvaluationBrowser_() {
     const host=el('guideEvaluationEditor');
     if(host) host.querySelectorAll('input,select,textarea,button').forEach(node=>node.disabled=value || node.dataset.locked==='true');
   }
-  function open(team,register) {
+  async function open(team,register) {
     if(busy) return;
-    if(dirty && !confirm('Discard unsaved evaluation changes?')) return;
+    if(dirty && !await DashboardUI.ask('Discard unsaved evaluation changes?')) return;
     let host=el('guideEvaluationEditor');
     if(!host) return;
     const version=++generation;
@@ -42,7 +42,7 @@ function guideEvaluationBrowser_() {
       }).join('')+'<p id="guideEvalTotal"></p><p id="guideEvalMessage" role="status"></p><button type="button" id="guideEvalDraft" '+(locked?'disabled data-locked="true"':'')+'>Save Draft</button> <button type="button" id="guideEvalSubmit" '+(locked?'disabled data-locked="true"':'')+'>Submit Evaluation</button> <button type="button" id="guideEvalReload">Reload</button> <button type="button" id="guideEvalClose">Close</button>';
     el('guideEvalStudent').onchange=e=>{const selected=e.target.value;e.target.value=d.student.register;open(d.roster.team,selected);};
     el('guideEvalReload').onclick=()=>open(d.roster.team,d.student.register);
-    el('guideEvalClose').onclick=()=>{if(!dirty || confirm('Discard unsaved changes?')){host.hidden=true;dirty=false;}};
+    el('guideEvalClose').onclick=async ()=>{if(!dirty || await DashboardUI.ask('Discard unsaved changes?')){host.hidden=true;dirty=false;}};
     el('guideEvalDraft').onclick=()=>save(false);el('guideEvalSubmit').onclick=()=>save(true);
     host.querySelectorAll('fieldset').forEach((field,index)=>{
       const update=()=>{
@@ -56,9 +56,9 @@ function guideEvaluationBrowser_() {
     });
     if(locked) message('Submitted scores are locked. Contact the coordinator for corrections.');
   }
-  function save(submit) {
+  async function save(submit) {
     if(busy)return;
-    if(submit && !confirm('Submit this student’s evaluation? Scores will lock until the coordinator reopens it.'))return;
+    if(submit && !await DashboardUI.ask('Submit this student’s evaluation? Scores will lock until the coordinator reopens it.'))return;
     const method=submit?'submitGuideEvaluation':'saveGuideEvaluationDraft';
     const scores={};el('guideEvaluationEditor').querySelectorAll('fieldset').forEach(field=>{
       const level=field.querySelector('[data-level]').value;

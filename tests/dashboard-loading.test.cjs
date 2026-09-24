@@ -2,6 +2,51 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
+function dialogFixture() {
+ const nodes=[],scripts=[],calls=[];let focused=0;
+ const node=()=>({style:{},children:[],setAttribute(){},addEventListener(){},appendChild(child){this.children.push(child);},showModal(){this.open=true;},close(){this.open=false;},remove(){this.removed=true;},focus(){focused++;}});
+ const previous={isConnected:true,focus(){focused++;}};
+ const document={activeElement:previous,createElement(){const el=node();nodes.push(el);return el;},body:node(),head:{appendChild(script){scripts.push(script);}}};
+ const window={matchMedia:()=>({matches:true})};
+ const c=vm.createContext({document,window,setTimeout,clearTimeout});
+ vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
+ const api=c.dashboardDialogsBrowser_(()=>'<div>Skeleton</div>');
+ const resolveLibrary=()=>{window.Swal={fire(options){calls.push(options);return new Promise(resolve=>{options.resolve=resolve;});}};scripts.at(-1).onload();};
+ return {api,nodes,scripts,calls,resolveLibrary,focused:()=>focused};
+}
+test('dialogs load once, block duplicate approvals, preserve literal text and restore focus',async()=>{
+ const f=dialogFixture();const result=f.api.ask('<b>Discard?</b>');
+ assert.equal(f.scripts.length,1);assert(f.nodes[0].open);
+ assert.equal(await f.api.ask('Duplicate'),false);
+ f.resolveLibrary();await Promise.resolve();await Promise.resolve();
+ assert.equal(f.calls[0].text,'<b>Discard?</b>');assert.equal(f.calls[0].html,undefined);
+ assert.equal(f.calls[0].target,f.nodes[0]);assert.equal(f.calls[0].focusCancel,true);
+ assert.equal(f.calls[0].animation,false);
+ f.calls[0].resolve({isConfirmed:false});assert.equal(await result,false);
+ assert(f.nodes[0].removed);assert.equal(f.focused(),1);
+ const next=f.api.ask('Submit?');await Promise.resolve();
+ assert.equal(f.scripts.length,1);f.calls[1].resolve({isConfirmed:true});assert.equal(await next,true);
+});
+test('prompt validates blank remarks and returns trimmed input only on approval',async()=>{
+ const f=dialogFixture();const result=f.api.requestText('Reason');f.resolveLibrary();await Promise.resolve();await Promise.resolve();
+ assert(f.calls[0].inputValidator('   '));assert.equal(f.calls[0].inputValidator('Evidence'),undefined);
+ f.calls[0].resolve({isConfirmed:true,value:' Evidence '});assert.equal(await result,'Evidence');
+ const cancelled=f.api.requestText('Reason');await Promise.resolve();f.calls[1].resolve({isConfirmed:false});assert.equal(await cancelled,null);
+});
+test('failed library load fails closed and the next action retries the download',async()=>{
+ const f=dialogFixture();const result=f.api.ask('Publish?');f.scripts[0].onerror();
+ await Promise.resolve();await Promise.resolve();await Promise.resolve();
+ const panel=f.nodes[0].children.at(-1);assert.match(panel.children[0].textContent,/not performed/);
+ panel.children[1].onclick();assert.equal(await result,false);
+ const retry=f.api.ask('Publish?');assert.equal(f.scripts.length,2);f.resolveLibrary();await Promise.resolve();await Promise.resolve();
+ f.calls[0].resolve({isConfirmed:true});assert.equal(await retry,true);
+});
+test('notifications wait for an existing confirmation instead of replacing it',async()=>{
+ const f=dialogFixture();const decision=f.api.ask('Discard?');const notice=f.api.notify('Sync completed','success');
+ f.resolveLibrary();await Promise.resolve();await Promise.resolve();assert.equal(f.calls.length,1);
+ f.calls[0].resolve({isConfirmed:false});await decision;await Promise.resolve();await Promise.resolve();
+ assert.equal(f.calls[1].text,'Sync completed');f.calls[1].resolve({isConfirmed:true});await notice;
+});
 function fixture(system=false) {
  const loadingNode=()=>({attrs:{},children:[],inert:false,setAttribute(k,v){this.attrs[k]=v;},classList:{add(){},remove(){},toggle(){}},appendChild(node){this.children.push(node);node.remove=()=>{this.children=this.children.filter(child=>child!==node);};}});
  const requests=[], timers=new Map(), listeners={}; let id=0;

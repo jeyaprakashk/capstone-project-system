@@ -15,11 +15,85 @@ function renderExpandableText_(value, maxLen = 130) {
     ' <em class="expand-hint">less</em></span></summary></details>';
 }
 
+/** Lazy-load one pinned bundle; a separate top-layer host also covers marking dialogs. */
+function dashboardDialogsBrowser_(renderSkeleton) {
+  let library, active=false, settled=Promise.resolve();
+  function load() {
+    if (window.Swal) return Promise.resolve(window.Swal);
+    if (!library) library=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      const timer=setTimeout(()=>finish(new Error('Dialog download timed out.')),15000);
+      function finish(error) {
+        clearTimeout(timer);script.onload=null;script.onerror=null;
+        if(error){script.remove();reject(error);}else resolve(window.Swal);
+      }
+      script.src='https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/dist/sweetalert2.all.min.js';
+      script.onload=()=>finish(window.Swal?null:new Error('Dialog library unavailable.'));
+      script.onerror=()=>finish(new Error('Dialog download failed.'));
+      document.head.appendChild(script);
+    }).catch(error=>{library=null;throw error;});
+    return library;
+  }
+  async function show(kind,text,icon) {
+    // A second action must never inherit approval from an already open confirmation.
+    if(active)return {isConfirmed:false};
+    active=true;
+    let settle;
+    settled=new Promise(resolve=>{settle=resolve;});
+    const previous=document.activeElement;
+    const host=document.createElement('dialog');
+    host.setAttribute('aria-label','Dashboard message');
+    host.style.cssText='position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;color:inherit;';
+    host.addEventListener('cancel',event=>event.preventDefault());
+    host.addEventListener('keydown',event=>event.stopPropagation());
+    host.addEventListener('focusin',event=>event.stopPropagation());
+    document.body.appendChild(host);
+    try {
+      host.showModal();
+      host.innerHTML=renderSkeleton('panel','Preparing message');
+      const swal=await load();
+      host.innerHTML='';
+      return await swal.fire({
+        target:host,titleText:kind==='confirm'?'Please confirm':kind==='prompt'?'Add a remark':icon==='error'?'Unable to complete action':'Message',
+        text:String(text),icon:icon || (kind==='confirm'?'question':'info'),
+        showCancelButton:kind!=='alert',confirmButtonText:kind==='alert'?'OK':'Continue',
+        cancelButtonText:'Cancel',focusCancel:kind==='confirm',allowOutsideClick:false,
+        heightAuto:false,returnFocus:false,keydownListenerCapture:true,
+        animation:!window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        ...(kind==='prompt'?{input:'textarea',inputLabel:String(text),inputAttributes:{maxlength:'5000'},
+          inputValidator:value=>!value.trim()?'Please enter a remark.':undefined}:{}),
+        didOpen:()=>{const content=swal.getHtmlContainer();if(content)content.style.whiteSpace='pre-line';}
+      });
+    } catch(error) {
+      // Fail closed when the CDN is unavailable; retain form data and permit retry.
+      host.innerHTML='';
+      const panel=document.createElement('div');
+      panel.style.cssText='margin:15vh auto;padding:24px;max-width:480px;background:white;color:#172033;border-radius:12px;';
+      const message=document.createElement('p');
+      message.style.whiteSpace='pre-line';
+      message.textContent=kind==='alert'?String(text):'Unable to open the confirmation. Your action was not performed. Please close this message and try again.';
+      const button=document.createElement('button');button.textContent='Close';
+      panel.appendChild(message);panel.appendChild(button);host.appendChild(panel);
+      await new Promise(resolve=>{button.onclick=resolve;button.focus();});
+      return {isConfirmed:false};
+    } finally {
+      host.close();host.remove();active=false;settle();
+      if(previous && previous.isConnected)previous.focus();
+    }
+  }
+  return {
+    notify:async (text,icon)=>{while(active)await settled;return show('alert',text,icon);},
+    ask:async text=>(await show('confirm',text)).isConfirmed,
+    requestText:async text=>{const result=await show('prompt',text);return result.isConfirmed?result.value.trim():null;}
+  };
+}
+
 function getDashboardClientScript() {
   return `
 const DashboardUI = (function() {
   'use strict';
   const renderSkeleton = ${getSkeletonMarkup_.toString()};
+  const dialogs = (${dashboardDialogsBrowser_.toString()})(renderSkeleton);
   const renderExpandableText = ${renderExpandableText_.toString()};
   ${getLucideIconNodes_.toString()}
   ${renderLucideIcon_.toString()}
@@ -1466,7 +1540,7 @@ const DashboardUI = (function() {
           'Repaired: ' + result.repaired + '\\n' +
           'Failed: ' + result.failedCount;
 
-        alert(message);
+        dialogs.notify(message, result.failedCount ? 'warning' : 'success');
 
         if (btn) {
           btn.disabled = false;
@@ -1475,7 +1549,7 @@ const DashboardUI = (function() {
       })
       .withFailureHandler(function(error) {
 
-        alert(
+        dialogs.notify(
           'GitHub access sync failed.\\n\\n' +
           (error && error.message
             ? error.message
@@ -1566,6 +1640,7 @@ const DashboardUI = (function() {
   }
 
   return {
+    notify: dialogs.notify, ask: dialogs.ask, requestText: dialogs.requestText,
     refreshGithubStatus,
     retryGithubSetup,
     submitGithubUsername,

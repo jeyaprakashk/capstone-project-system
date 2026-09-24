@@ -22,9 +22,9 @@ const ReviewerMarks = (function() {
     dialog.addEventListener('submit',function(event) { event.preventDefault(); save(); });
     document.body.appendChild(dialog);
   }
-  function close() {
+  async function close() {
     if (busy) return;
-    if (dirty && !window.confirm('Discard unsaved review marks?')) return;
+    if (dirty && !await DashboardUI.ask('Discard unsaved review marks?')) return;
     request++; dialog.close(); model=null; dirty=false;
     if (trigger && trigger.isConnected) trigger.focus();
     else { const search=document.getElementById('reviewerAssignedSearch'); if (search) search.focus(); }

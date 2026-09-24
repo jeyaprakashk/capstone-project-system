@@ -66,11 +66,34 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       return '<button type="button" role="tab" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-selected="'+(activeCriteria===component)+'" tabindex="'+(activeCriteria===component?'0':'-1')+'"><span class="review1-tab-label">'+DashboardUI.renderIcon(component==='team'?'users':'user')+label+'</span><span class="review1-tab-caption">'+max+' pts '+(component==='team'?'pool':'weight')+'</span></button>';
     }).join('')+'</div>';
   }
-  let gradingProgress={team:{graded:0,total:0},individual:{graded:0,total:0}},activeTeamPI=null;
+  let gradingProgress={team:{graded:0,total:0},individual:{graded:0,total:0}},activeTeamPI=null,activeStudentPIs={};
+  function piPillLabel(c) {
+    return '<span data-pi-icon>'+DashboardUI.renderIcon('clock')+'</span><span class="review1-pi-label"><strong>'+escape(c.pi+'–'+c.co)+'</strong><small>0–'+escape(c.maxMarks)+'</small></span>';
+  }
+  function individualPills(owner) {
+    return '<div class="review1-pi-pills" data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators">'+model.config.criteria.map((c,index)=>{
+      if(c.type!=='Individual' && !(targeted && targeted.index===owner && targeted.components.includes('team')))return '';
+      return '<button type="button" data-select-individual-pi="'+index+'" data-student="'+owner+'" aria-pressed="false" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>';
+    }).join('')+'</div>';
+  }
+  function syncIndividualCards() {
+    const fields=Array.from(drawer.querySelectorAll('[data-index]')).filter(field=>field.dataset.owner!=='team');
+    model.roster.students.forEach((student,index)=>{
+      const available=fields.filter(field=>Number(field.dataset.owner)===index && showRubric(field));
+      if(!available.some(field=>Number(field.dataset.index)===activeStudentPIs[index]))activeStudentPIs[index]=available.length?Number(available[0].dataset.index):null;
+      const pills=drawer.querySelector('[data-individual-pills="'+index+'"]');if(pills)pills.hidden=!available.length;
+      fields.filter(field=>Number(field.dataset.owner)===index).forEach(field=>{
+        const applicable=available.includes(field),selected=Number(field.dataset.index)===activeStudentPIs[index];
+        field.hidden=!applicable || !selected;
+        const button=drawer.querySelector('[data-select-individual-pi="'+field.dataset.index+'"][data-student="'+index+'"]');
+        if(button){button.hidden=!applicable;button.disabled=busy || reading;button.setAttribute('aria-pressed',String(selected));}
+      });
+    });
+  }
   function teamPills() {
     const criteria=model.config.criteria.map((c,index)=>({c,index})).filter(({c})=>c.type==='Team');
     if(!criteria.some(({index})=>index===activeTeamPI))activeTeamPI=criteria.length?criteria[0].index:null;
-    return '<div class="review1-pi-pills" data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'" title="'+escape(c.name)+'"><span data-pi-icon>'+DashboardUI.renderIcon('clock')+'</span><span class="review1-pi-label"><strong>'+escape(c.pi)+'</strong><small>'+escape(c.co)+'</small></span></button>').join('')+'</div>';
+    return '<div class="review1-pi-pills" data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
   }
   function updateTabProgress() {
     const row=drawer.querySelector('[data-tab-progress]');if(!row)return;
@@ -84,10 +107,12 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       if(panel){panel.hidden=!selected;panel.open=selected;}
     }
     const students=drawer.querySelector('.review1-header-students');if(students)students.hidden=activeCriteria!=='individual';
+    const assessmentSummary=drawer.querySelector('[data-assessment-summary]');if(assessmentSummary)assessmentSummary.hidden=activeCriteria!=='individual';
     updateTabProgress();
     const pills=drawer.querySelector('[data-team-pills]');if(pills)pills.hidden=activeCriteria!=='team';
     model.config.criteria.forEach((c,index)=>{const button=drawer.querySelector('[data-select-pi="'+index+'"]');if(button){button.disabled=busy || reading;button.setAttribute('aria-pressed',String(index===activeTeamPI));}});
     syncTeamCards();
+    syncIndividualCards();
   }
   function syncTeamCards() {
     drawer.querySelectorAll('[data-index]').forEach(field=>{if(field.dataset.owner==='team')field.hidden=!showRubric(field) || Number(field.dataset.index)!==activeTeamPI;});
@@ -104,6 +129,8 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       const selected=index===activeStudent,group=drawer.querySelector('[data-student-group="'+index+'"]'),chip=drawer.querySelector('[data-select-student="'+index+'"]');
       if(group){group.hidden=hiddenStudent(index) || !selected;group.open=selected;}
       if(chip){chip.setAttribute('aria-pressed',String(selected));chip.disabled=busy || reading;}
+      const summary=drawer.querySelector('[data-summary-student="'+index+'"]');
+      if(summary)summary.hidden=hiddenStudent(index) || !selected;
     });
   }
   function selectStudent(index) {
@@ -119,18 +146,44 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" title="'+escape(s.name+' ('+s.register+')')+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'"><span class="review1-avatar" aria-hidden="true">'+escape(initials)+'</span><span class="review1-student-details">'+escape(short)+'</span><small class="review1-student-register">'+escape(s.register)+'</small><span class="review1-student-score" data-student-score="'+index+'">— / '+model.config.maximum+'</span></button></li>';
     }).join('')+'</ul>';
   }
+  function assessmentSummaryCard(students) {
+    return '<section class="review1-assessment-summary" data-assessment-summary aria-live="polite" aria-label="Assessment Summary"><h3>Assessment Summary <small data-summary-unsaved hidden>Unsaved preview</small></h3>'+students.map((student,index)=>assessmentSummary(index)).join('')+'</section>';
+  }
+  function assessmentSummary(index) {
+    const student=savedStudent(index).assessment?savedStudent(index):(model.assessmentResults||[]).find(s=>s.register===model.roster.students[index].register)||{};
+    const actions=!model.availability.editable && !targeted && correctionIndex===null && student.assessment?academicControls(index,student):'';
+    return '<div data-summary-student="'+index+'"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+'><dl data-summary-values="'+index+'">'+assessmentSummaryValues(student)+'</dl>'+actions+'</div>';
+  }
+  function assessmentSummaryValues(student) {
+    const a=student.assessment||{},maximum=type=>model.config.criteria.filter(c=>c.type===type).reduce((sum,c)=>sum+c.maxMarks,0);
+    const component=(value,state)=>value!=null?mark(value):state==='PENDING'?'Pending':'Unassessed';
+    const unresolved=a.teamState==='PENDING' || a.individualState==='PENDING'?'Pending':'Incomplete';
+    const labels={COMPLETED:'Completed',MAKEUP_PENDING:'Makeup Pending',COMPLETED_AFTER_MAKEUP:'Completed after Makeup',ABSENT_UNAPPROVED:'Absent – Unapproved',ACADEMIC_DECISION_PENDING:'Academic Decision Required',NON_PARTICIPATION:'Non-Participation',INCOMPLETE:'Assessment Incomplete'};
+    const cells=[['Team Mark',component(a.teamMark,a.teamState)+' / '+maximum('Team')],['Individual Mark',component(a.individualMark,a.individualState)+' / '+maximum('Individual')],['Review Total',(student.total==null?unresolved:mark(student.total))+' / '+model.config.maximum]];
+    const tone=['COMPLETED','COMPLETED_AFTER_MAKEUP'].includes(a.status)?'complete':['MAKEUP_PENDING','ACADEMIC_DECISION_PENDING'].includes(a.status)?'pending':['ABSENT_UNAPPROVED','NON_PARTICIPATION'].includes(a.status)?'exception':'incomplete';
+    return cells.map(([label,value],index)=>'<div'+(index===2?' class="review1-summary-total" data-resolved="'+(student.total!=null)+'"':'')+'><dt>'+label+'</dt><dd>'+escape(value)+'</dd></div>').join('')+'<div class="review1-summary-status" data-tone="'+tone+'"><dt>Assessment Status</dt><dd>'+escape(labels[a.status]||'Assessment Incomplete')+'</dd></div>';
+  }
   function canEditAbsence(index) {return !busy && !reading && !targeted && (model.availability.editable || correctionIndex===index);}
-  function editAbsence(index) {
+  const attendanceChoices=[['','Select attendance'],['NORMAL','Present / Normal'],['REVIEW_DAY_ABSENCE','Review-Day Absence'],['PROLONGED','Prolonged Absence']];
+  function attendancePicker(index,value) {
+    const current=attendanceChoices.find(([key])=>key===value)||attendanceChoices[0];
+    return '<div class="review1-attendance"><span id="'+reviewKey+'AttendanceLabel-'+index+'">Absence / exception</span><select data-fact="type" hidden aria-hidden="true" tabindex="-1">'+attendanceChoices.map(([key,label])=>'<option value="'+key+'"'+(key===current[0]?' selected':'')+'>'+label+'</option>').join('')+'</select><details class="review1-attendance-picker" data-attendance-picker><summary aria-labelledby="'+reviewKey+'AttendanceLabel-'+index+' '+reviewKey+'AttendanceValue-'+index+'"><span data-attendance-label id="'+reviewKey+'AttendanceValue-'+index+'">'+current[1]+'</span>'+DashboardUI.renderIcon('chevron-down')+'</summary><div class="review1-attendance-options" role="radiogroup" aria-labelledby="'+reviewKey+'AttendanceLabel-'+index+'">'+attendanceChoices.map(([key,label])=>'<label><input type="radio" name="'+reviewKey+'Attendance-'+index+'" data-attendance-option value="'+key+'"'+(key===current[0]?' checked':'')+'><span>'+label+'</span></label>').join('')+'</div></details></div>';
+  }
+  function focusAttendance(host) {
+    const summary=host.querySelector('[data-attendance-picker] > summary');
+    (summary||host.querySelector('[data-fact="type"]')).focus();
+  }
+  async function editAbsence(index) {
     if(busy || reading || targeted || model.availability.editable)return;
-    if(dirty && !confirm('Discard unsaved changes before editing this absence correction?'))return;
+    if(dirty && !await DashboardUI.ask('Discard unsaved changes before editing this absence correction?'))return;
     correctionIndex=index;dirty=false;pending=null;render();
     revealCriterion(drawer.querySelector('[data-absence="'+index+'"]'));
     const group=drawer.querySelector('[data-student-group="'+index+'"]');if(group)group.open=true;
-    drawer.querySelector('[data-absence="'+index+'"]').querySelector('[data-fact="type"]').focus();
+    focusAttendance(drawer.querySelector('[data-absence="'+index+'"]'));
   }
-  function cancelAbsence(index) {
+  async function cancelAbsence(index) {
     if(busy || reading || correctionIndex!==index)return;
-    if(dirty && !confirm('Discard unsaved absence correction?'))return;
+    if(dirty && !await DashboardUI.ask('Discard unsaved absence correction?'))return;
     correctionIndex=null;dirty=false;pending=null;render();
     revealCriterion(drawer.querySelector('[data-absence="'+index+'"]'));
     const group=drawer.querySelector('[data-student-group="'+index+'"]');if(group)group.open=true;
@@ -141,6 +194,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
     if(!host)return (savedStudent(index).assessment||{}).facts||{type:'NORMAL',attended:true};
     const read=name=>host.querySelector('[data-fact="'+name+'"]').value;
     const type=read('type');
+    if(!type)return {type:'UNSELECTED',attended:null};
     if(type==='REVIEW_DAY_ABSENCE' && read('approved')==='no')return {type,approved:false,attended:false,absenceReason:null,supportingEvidence:[],otherReasonText:null,otherEvidenceText:null};
     const structured=type!=='NORMAL' && host.querySelector('[data-review-day-fields]');
     const extra=structured?{absenceReason:(host.querySelector('[data-primary-reason]:checked')||{}).value||null,supportingEvidence:Array.from(host.querySelectorAll('[data-supporting-evidence]:checked'),e=>e.value),otherReasonText:host.querySelector('[data-other-reason]').value,otherEvidenceText:host.querySelector('[data-other-evidence]').value}:{};
@@ -163,6 +217,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
     if(targeted)return field.dataset.owner===String(targeted.index) && targeted.components.includes(component);
     if(component==='team')return !focusedAssessment();
     const index=Number(field.dataset.owner),f=facts(index);
+    if(f.type==='UNSELECTED')return false;
     if(hiddenStudent(index))return false;
     if(f.type==='NORMAL' || f.type==='PROLONGED' && f.attended===true)return true;
     // Retain access to legitimate saved evidence even when a later absence is recorded.
@@ -195,23 +250,23 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       const decisions=[...(eligible.length?[['MAKEUP_ALTERNATIVE_ASSESSMENT','Authorize Makeup / Alternative Assessment']]:[]),
         ...(a.teamMark===null || a.individualMark===null?[['DEFERRED_ASSESSMENT','Deferred Assessment']]:[]),
         ...(teamPending?[['TEAM_MARK_APPLICABLE','Team Mark Applicable'],['TEAM_MARK_NOT_APPLICABLE','Team Mark Not Applicable']]:[]),['OTHER','Other permitted academic decision']];
-      html+='<label>Academic decision<select data-decision="'+index+'">'+decisions.map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('')+'</select></label>';
+      html+='<details class="review1-summary-decision"><summary>Record Academic Decision</summary><label>Academic decision<select data-decision="'+index+'">'+decisions.map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('')+'</select></label>';
       if(eligible.length>1)html+='<label data-component-choice="'+index+'">Components for assessment<select data-components="'+index+'"><option value="team">Team</option><option value="individual">Individual</option><option value="team,individual">Team and Individual</option></select></label>';
-      html+='<label>Decision reason<textarea data-decision-reason="'+index+'" maxlength="2000"></textarea></label><button type="button" data-record-decision="'+index+'">Record decision</button>';
+      html+='<label>Decision reason<textarea data-decision-reason="'+index+'" maxlength="2000"></textarea></label><button type="button" data-record-decision="'+index+'">Record decision</button></details>';
     }
     if(authorized.length)html+='<button type="button" data-target="'+index+'">'+(a.status==='MAKEUP_PENDING' && authorized.length===1 && authorized[0]==='individual'?'Conduct Makeup Assessment':'Conduct Authorized Assessment')+'</button>';
     return html;
   }
   function absenceControl(index,student) {
-    const a=student.assessment||{},f=a.facts||{type:'NORMAL'};
+    const a=student.assessment||{},f=a.facts||{type:'UNSELECTED'};
     const readOnly=!model.availability.editable && correctionIndex!==index;
-    const labels={NORMAL:'Normal',REVIEW_DAY_ABSENCE:'Review-Day Absence',PROLONGED:'Prolonged Absence'};
+    const labels={UNSELECTED:'Not selected',NORMAL:'Present / Normal',REVIEW_DAY_ABSENCE:'Review-Day Absence',PROLONGED:'Prolonged Absence'};
     const recorded=readOnly?'<dl class="review1-exception-summary"><div><dt>Absence type</dt><dd>'+escape(labels[f.type])+'</dd></div>'+(f.type!=='NORMAL'?'<div><dt>Approval status</dt><dd>'+(f.approved?'Approved':'Unapproved')+'</dd></div>'+(f.reason?'<div><dt>Recorded reason / evidence</dt><dd class="review1-recorded-reason">'+escape(f.reason)+'</dd></div>':'')+structuredReasonSummary(f)+(f.type==='PROLONGED'?'<div><dt>Verified contribution</dt><dd>'+(f.verifiedContribution?'Yes':'No')+'</dd></div><div><dt>Attended scheduled review</dt><dd>'+(f.attended?'Yes':'No')+'</dd></div>':''):'')+'</dl>':'';
     const choice=(name,value)=>'<select data-fact="'+name+'"><option value="">Select</option><option value="yes"'+(value===true?' selected':'')+'>Yes</option><option value="no"'+(value===false?' selected':'')+'>No</option></select>';
-    return '<div class="review1-criterion" data-absence="'+index+'"'+(targeted?' hidden':'')+'>'+(!model.availability.editable && f.type==='REVIEW_DAY_ABSENCE' && f.approved?'<h4>Approved Review-Day Absence</h4>':'')+recorded+'<div data-absence-editor'+(readOnly?' hidden':'')+'><label>Absence / exception<select data-fact="type">'+[['NORMAL','Normal'],['REVIEW_DAY_ABSENCE','Review-Day Absence'],['PROLONGED','Prolonged Absence']].map(([v,label])=>'<option value="'+v+'"'+(f.type===v?' selected':'')+'>'+label+'</option>').join('')+'</select></label><div data-exception-fields'+(f.type==='NORMAL'?' hidden':'')+'><label>Absence approved?'+choice('approved',f.approved)+'</label>'+reviewDayFields(index,f)+'<div data-prolonged-fields'+(f.type!=='PROLONGED'?' hidden':'')+'><label>Attended scheduled review?'+choice('attended',f.attended)+'</label><label>Verified contribution during assessment period?'+choice('contribution',f.verifiedContribution)+'</label>'+contributionFields(f)+'</div><div data-legacy-evidence hidden><textarea data-fact="reason" hidden>'+escape(f.reason||'')+'</textarea></div></div></div><div data-effective="'+index+'"></div>'+(!model.availability.editable && !targeted && (f.type!=='NORMAL' || ['MAKEUP_PENDING','ACADEMIC_DECISION_PENDING'].includes(a.status))?(correctionIndex===index?'<button type="button" data-record-absence="'+index+'">Save absence details</button><button type="button" data-cancel-absence="'+index+'">Cancel editing</button>':academicControls(index,student)+'<button type="button" data-edit-absence="'+index+'">Edit absence details</button>'):'')+(a.decisions||[]).map(d=>'<p>'+escape(d.decision)+' · '+escape(d.reviewer)+' · '+escape(d.at)+' · '+escape(d.reason)+' · '+escape(d.previousStatus)+' → '+escape(d.resultingStatus)+'</p>').join('')+'</div>';
+    return '<div class="review1-criterion" data-absence="'+index+'"'+(targeted?' hidden':'')+'>'+(!model.availability.editable && f.type==='REVIEW_DAY_ABSENCE' && f.approved?'<h4>Approved Review-Day Absence</h4>':'')+recorded+'<div data-absence-editor'+(readOnly?' hidden':'')+'>'+attendancePicker(index,f.type)+'<div data-exception-fields'+(f.type==='NORMAL'?' hidden':'')+'><label>Absence approved?'+choice('approved',f.approved)+'</label>'+reviewDayFields(index,f)+'<div data-prolonged-fields'+(f.type!=='PROLONGED'?' hidden':'')+'><label>Attended scheduled review?'+choice('attended',f.attended)+'</label><label>Verified contribution during assessment period?'+choice('contribution',f.verifiedContribution)+'</label>'+contributionFields(f)+'</div><div data-legacy-evidence hidden><textarea data-fact="reason" hidden>'+escape(f.reason||'')+'</textarea></div></div></div><div data-effective="'+index+'"></div>'+(!model.availability.editable && !targeted && (f.type!=='NORMAL' || ['MAKEUP_PENDING','ACADEMIC_DECISION_PENDING'].includes(a.status))?(correctionIndex===index?'<button type="button" data-record-absence="'+index+'">Save absence details</button><button type="button" data-cancel-absence="'+index+'">Cancel editing</button>':'<button type="button" data-edit-absence="'+index+'">Edit absence details</button>'):'')+(a.decisions||[]).map(d=>'<p>'+escape(d.decision)+' · '+escape(d.reviewer)+' · '+escape(d.at)+' · '+escape(d.reason)+' · '+escape(d.previousStatus)+' → '+escape(d.resultingStatus)+'</p>').join('')+'</div>';
   }
-  function close() {
-    if (busy || (dirty && !confirm('Discard unsaved '+reviewLabel+' marks?'))) return;
+  async function close() {
+    if (busy || (dirty && !await DashboardUI.ask('Discard unsaved '+reviewLabel+' marks?'))) return;
     if(finishRead)finishRead();finishRead=null;reading=false;
     sequence++;drawer.close();dirty=false;model=null;pending=null;correctionIndex=null;
     document.body.classList.remove('team-drawer-open');
@@ -229,14 +284,20 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       }
     },true);
     drawer.addEventListener('keydown',event=>{
+      const attendance=event.target.closest && event.target.closest('[data-attendance-picker]');
+      if(attendance && attendance.open && event.key==='Escape'){event.preventDefault();event.stopPropagation();attendance.open=false;attendance.querySelector('summary').focus();return;}
       if(!event.target.hasAttribute('data-criteria-tab') || !['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
       event.preventDefault();
       const next=event.key==='Home'?'team':event.key==='End'?'individual':activeCriteria==='team'?'individual':'team';
       selectCriteria(next,true);
     });
     drawer.addEventListener('invalid',event=>revealCriterion(event.target),true);
-    drawer.addEventListener('cancel',event=>{event.preventDefault();close();});
-    drawer.addEventListener('click',event=>{
+    drawer.addEventListener('cancel',event=>{event.preventDefault();return close();});
+    drawer.addEventListener('click',async event=>{
+      const candidate=event.target.closest && event.target.closest('[data-attendance-picker]');
+      const picker=candidate && candidate.hasAttribute && candidate.hasAttribute('data-attendance-picker')?candidate:null;
+      drawer.querySelectorAll('[data-attendance-picker]').forEach(other=>{if(other!==picker)other.open=false;});
+      if(picker){const host=picker.closest('[data-absence]');if(!canEditAbsence(Number(host.dataset.absence))){event.preventDefault();return;}}
       if (event.target===drawer && event.clientX<drawer.getBoundingClientRect().left) {close();return;}
       const summary=event.target.closest('summary');
       if(summary && summary.parentElement && (summary.parentElement.hasAttribute('data-criteria-group') || summary.parentElement.hasAttribute('data-student-group'))) {
@@ -257,27 +318,37 @@ function review1EvaluationBrowser_(reviewKey='review1') {
         const current=drawer.querySelector('[data-index="'+activeTeamPI+'"][data-owner="team"]');
         if(current && !validateClosingGroup({querySelectorAll:()=>[current]}))return;
         const field=drawer.querySelector('[data-index="'+Number(button.dataset.selectPi)+'"][data-owner="team"]');
-        if(field){activeTeamPI=Number(button.dataset.selectPi);syncCriteriaTabs();field.scrollIntoView({block:'start'});const level=field.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});}
+        if(field){activeTeamPI=Number(button.dataset.selectPi);syncCriteriaTabs();const content=drawer.querySelector('.team-drawer-content');if(content)content.scrollTop=0;const level=field.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});}
+        return;
+      }
+      if(button.hasAttribute('data-select-individual-pi')) {
+        if(busy || reading)return;
+        const owner=Number(button.dataset.student),index=Number(button.dataset.selectIndividualPi),group=drawer.querySelector('[data-student-group="'+owner+'"]');
+        if(group && !validateClosingGroup(group))return;
+        const field=drawer.querySelector('[data-index="'+index+'"][data-owner="'+owner+'"]');
+        if(!field || !showRubric(field))return;
+        activeStudentPIs[owner]=index;syncIndividualCards();
+        const level=field.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});
         return;
       }
       if(button.hasAttribute('data-criteria-tab')){selectCriteria(button.dataset.criteriaTab);return;}
       if(button.hasAttribute('data-select-student')){selectStudent(Number(button.dataset.selectStudent));return;}
-      if(button.hasAttribute('data-close'))close();
-      if(button.hasAttribute('data-draft'))save(false);
-      if(button.hasAttribute('data-submit'))save(true);
-      if(button.hasAttribute('data-edit-absence'))editAbsence(Number(button.dataset.editAbsence));
-      if(button.hasAttribute('data-cancel-absence'))cancelAbsence(Number(button.dataset.cancelAbsence));
+      if(button.hasAttribute('data-close'))return close();
+      if(button.hasAttribute('data-draft'))return save(false);
+      if(button.hasAttribute('data-submit'))return save(true);
+      if(button.hasAttribute('data-edit-absence'))return editAbsence(Number(button.dataset.editAbsence));
+      if(button.hasAttribute('data-cancel-absence'))return cancelAbsence(Number(button.dataset.cancelAbsence));
       if(button.hasAttribute('data-record-absence'))academic('exception',Number(button.dataset.recordAbsence));
       if(button.hasAttribute('data-record-decision'))academic('decision',Number(button.dataset.recordDecision));
       if(button.hasAttribute('data-target')) {
         if(busy || reading)return;
-        if(dirty && !confirm('Discard unsaved changes and open the authorized assessment?'))return;
+        if(dirty && !await DashboardUI.ask('Discard unsaved changes and open the authorized assessment?'))return;
         const index=Number(button.dataset.target),a=savedStudent(index).assessment||{};
         targeted={index,components:assessmentComponents(a)};correctionIndex=null;dirty=false;render();
       }
-      if(button.hasAttribute('data-target-draft'))saveTarget(false);
-      if(button.hasAttribute('data-target-submit'))saveTarget(true);
-      if(button.hasAttribute('data-reload') && (!dirty || confirm('Discard unsaved marks and reload?')))open(model?model.roster.team:drawer.dataset.team,trigger);
+      if(button.hasAttribute('data-target-draft'))return saveTarget(false);
+      if(button.hasAttribute('data-target-submit'))return saveTarget(true);
+      if(button.hasAttribute('data-reload') && (!dirty || await DashboardUI.ask('Discard unsaved marks and reload?')))open(model?model.roster.team:drawer.dataset.team,trigger);
       if(button.hasAttribute('data-other-feedback')) {
         const field=button.closest('[data-index]');if(busy || reading || !canEdit(field))return;
         const remark=field.querySelector('[data-remark]'),custom=field.querySelector('[data-custom-feedback]');
@@ -325,6 +396,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       }
     });
     drawer.addEventListener('input',event=>{
+      if(event && event.target && event.target.hasAttribute('data-attendance-option'))return;
       if(event && event.target && event.target.hasAttribute('data-custom-feedback')) {
         const field=event.target.closest('[data-index]'),c=model.config.criteria[Number(field.dataset.index)],remark=field.querySelector('[data-remark]');
         const suggestions=feedbackOptions(c,Number(field.querySelector('[data-level]').value)),selected=selectedFeedback(remark.value);
@@ -336,6 +408,13 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       dirty=true;pending=null;updateRanges();
     });
     drawer.addEventListener('change',event=>{
+      if(event.target.hasAttribute('data-attendance-option')) {
+        const host=event.target.closest('[data-absence]'),index=Number(host.dataset.absence);
+        if(!canEditAbsence(index))return;
+        host.querySelector('[data-fact="type"]').value=event.target.value;
+        host.querySelector('[data-attendance-picker]').open=false;
+        dirty=true;pending=null;updateRanges();focusAttendance(host);return;
+      }
       if(event.target.hasAttribute('data-decision')){
         const choice=drawer.querySelector('[data-component-choice="'+event.target.dataset.decision+'"]');
         if(choice)choice.hidden=event.target.value!=='MAKEUP_ALTERNATIVE_ASSESSMENT';
@@ -352,6 +431,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
     const titleRow=assessment?'<details class="review1-project-title-row"><summary title="'+escape(projectTitle)+'">'+DashboardUI.renderIcon('file-text')+'<span>'+escape(projectTitle)+'</span>'+DashboardUI.renderIcon('chevron-down','','review1-title-chevron')+'</summary><p>'+escape(projectTitle)+'</p></details>':'';
     const headerDetails=assessment?'<div class="review1-project-meta-row"><p class="review1-project-meta">Guide: '+escape(assessment.details.guideName)+'</p><p class="review1-project-meta">Committee: '+escape(assessment.details.committee)+'</p></div>':'';
     const navigation=assessment?'<div class="review1-assessment-navigation">'+criteriaTabs()+'<div class="review1-tab-progress" data-tab-progress aria-live="polite"></div>'+teamPills()+(students.length?studentChips(students):'')+'</div>':'';
+    if(assessment && students.length)body=assessmentSummaryCard(students)+body;
     return '<div class="team-drawer-header"><div class="review1-heading-details"><div class="review1-header-line"><h2 class="team-drawer-title" id="'+reviewKey+'Heading">'+escape(title)+'</h2><span class="review1-header-review">'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review1-progress" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="team-drawer-close" data-close aria-label="Close '+escape(reviewLabel)+' drawer">×</button></div>'+navigation+'<div class="team-drawer-content">'+body+'<p data-message role="status" aria-live="polite"></p></div>'+footer;
   }
 
@@ -362,7 +442,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
     const previous=drawer.open && drawer.dataset.team===team?model:null,previousDirty=dirty,previousTarget=targeted,previousCorrection=correctionIndex;
     trigger=button;reading=true;
     if(previous && DashboardUI.beginContentLoading){finishRead=DashboardUI.beginContentLoading(drawer.querySelector('.team-drawer-content'),'Refreshing '+reviewLabel+' evaluation');const reload=drawer.querySelector('[data-reload]');if(reload)reload.disabled=true;}
-    else {activeCriteria='team';activeStudent=0;model=null;dirty=false;pending=null;targeted=null;correctionIndex=null;drawer.dataset.team=team;drawer.innerHTML=shell(team,DashboardUI.renderSkeleton('drawer','Loading '+reviewLabel+' evaluation'));}
+    else {activeCriteria='team';activeStudent=0;activeStudentPIs={};model=null;dirty=false;pending=null;targeted=null;correctionIndex=null;drawer.dataset.team=team;drawer.innerHTML=shell(team,DashboardUI.renderSkeleton('drawer','Loading '+reviewLabel+' evaluation'));}
     const token=++sequence;
     if(!drawer.open)drawer.showModal();
     document.body.classList.add('team-drawer-open');
@@ -406,7 +486,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
   }
   function revealCriterion(element) {
     const criterion=element.closest && element.closest('[data-index]');
-    if(criterion && criterion.dataset && criterion.dataset.owner==='team')activeTeamPI=Number(criterion.dataset.index);
+    if(criterion && criterion.dataset){if(criterion.dataset.owner==='team')activeTeamPI=Number(criterion.dataset.index);else activeStudentPIs[criterion.dataset.owner]=Number(criterion.dataset.index);syncIndividualCards();}
     const group=element.closest && element.closest('[data-criteria-group]');
     if(group) {
       if(group.dataset && group.dataset.criteriaGroup){activeCriteria=group.dataset.criteriaGroup;syncCriteriaTabs();}
@@ -427,7 +507,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
     const teamFields=criteria.map((c,i)=>c.type==='Team'?control(c,i,'team',team[c.pi]):'').join('');
     const individual=d.roster.students.map((s,index)=>{
       const student=savedStudents.find(v=>v.register===s.register)||{},a=student.assessment||{},draft=a.targetDraft||{},scores=targeted && targeted.index===index?(draft.individual||student.scores||{}):(student.scores||{});
-      return '<details class="review1-student-accordion" data-student-group="'+index+'" name="review1-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary><span class="review1-student-heading"><strong>'+escape(s.name)+'</strong><span class="review1-header-mark" data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span class="review1-student-subheading"><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div class="review1-accordion-content">'+absenceControl(index,student)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
+      return '<details class="review1-student-accordion" data-student-group="'+index+'" name="review1-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary><span class="review1-student-heading"><strong>'+escape(s.name)+'</strong><span class="review1-header-mark" data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span class="review1-student-subheading"><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div class="review1-accordion-content">'+absenceControl(index,student)+individualPills(index)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
     }).join('');
     drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their authorized assessment.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div class="review1-footer"><div class="review1-actions">'+(d.availability.editable?'<button type="button" data-draft>Save Draft</button><button type="button" data-submit>Submit Evaluation</button>':'')+'<button type="button" data-reload>Reload</button><button type="button" data-close>Close</button></div></div>');
     if(targeted)drawer.querySelector('.review1-actions').innerHTML='<button type="button" data-target-draft>Save assessment draft</button><button type="button" data-target-submit>Complete assessment</button><button type="button" data-reload>Cancel / Reload</button><button type="button" data-close>Close</button>';
@@ -437,6 +517,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
   }
   function updateRanges() {
     if(!model)return;
+    const unsaved=drawer.querySelector('[data-summary-unsaved]');if(unsaved)unsaved.hidden=!dirty;
     const totals=model.roster.students.map(()=>0),entered=model.roster.students.map(()=>0);let completed=0,count=0;
     let teamGraded=0;const individualGraded=model.roster.students.map(()=>0);
     drawer.querySelectorAll('[data-index]').forEach(field=>{
@@ -488,6 +569,10 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       const graded=applicable && level!=='' && marks!=='' && valid && (n>=2 || !!remark.value.trim()) && remark.value.length<=2000;
       if(field.dataset.owner==='team') {
         const pill=drawer.querySelector('[data-select-pi="'+field.dataset.index+'"]');
+        if(pill){pill.dataset.complete=String(graded);pill.setAttribute('aria-label',c.pi+' · '+c.co+' · '+c.name+': '+(graded?'Completed':'Incomplete'));const icon=pill.querySelector('[data-pi-icon]');if(icon)icon.innerHTML=DashboardUI.renderIcon(graded?'check':'clock');}
+      }
+      else {
+        const pill=drawer.querySelector('[data-select-individual-pi="'+field.dataset.index+'"][data-student="'+field.dataset.owner+'"]');
         if(pill){pill.dataset.complete=String(graded);pill.setAttribute('aria-label',c.pi+' · '+c.co+' · '+c.name+': '+(graded?'Completed':'Incomplete'));const icon=pill.querySelector('[data-pi-icon]');if(icon)icon.innerHTML=DashboardUI.renderIcon(graded?'check':'clock');}
       }
       if(graded) {
@@ -547,6 +632,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
     const progress=drawer.querySelector('[data-evaluation-progress]');
     if(progress)progress.hidden=focusedAssessment() && !targeted;
     if(progress)progress.innerHTML='<span class="review1-progress-students">'+model.roster.students.length+' '+(model.roster.students.length===1?'student':'students')+'</span><div class="review1-progress-completion"><span><strong>'+completed+' of '+count+'</strong> criteria evaluated</span><progress max="'+Math.max(1,count)+'" value="'+completed+'" aria-label="Evaluated criteria"></progress></div>';
+    syncIndividualCards();
     updateAbsenceDisplay();
   }
   const mark=value=>value===null || value===undefined || !Number.isFinite(Number(value))?'Pending':String(value);
@@ -555,7 +641,15 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       const host=drawer.querySelector('[data-absence="'+index+'"]');if(!host)return;
       const f=facts(index),old=savedStudent(index),a=old.assessment;
       ['type','approved','contribution','attended','reason'].forEach(name=>host.querySelector('[data-fact="'+name+'"]').disabled=!canEditAbsence(index));
-      host.querySelector('[data-exception-fields]').hidden=f.type==='NORMAL';
+      const picker=host.querySelector('[data-attendance-picker]');
+      if(picker){
+        const value=host.querySelector('[data-fact="type"]').value;
+        picker.querySelector('[data-attendance-label]').textContent=(attendanceChoices.find(([key])=>key===value)||attendanceChoices[0])[1];
+        picker.querySelector('summary').setAttribute('aria-disabled',String(!canEditAbsence(index)));
+        if(!canEditAbsence(index))picker.open=false;
+        picker.querySelectorAll('[data-attendance-option]').forEach(option=>{option.disabled=!canEditAbsence(index);option.checked=option.value===value;});
+      }
+      host.querySelector('[data-exception-fields]').hidden=f.type==='NORMAL' || f.type==='UNSELECTED';
       host.querySelector('[data-prolonged-fields]').hidden=f.type!=='PROLONGED';
       const dayFields=host.querySelector('[data-review-day-fields]'),legacy=host.querySelector('[data-legacy-evidence]');
       if(dayFields) {
@@ -587,10 +681,10 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       const otherOption=host.querySelector('[data-other-evidence-option]'),otherTitle=host.querySelector('[data-other-evidence-title]');
       if(otherOption)otherOption.textContent=f.type==='PROLONGED'?'Other supporting absence evidence':'Other supporting evidence';
       if(otherTitle)otherTitle.textContent=f.type==='PROLONGED'?'Describe other supporting absence evidence *':'Describe other supporting evidence';
-      const value=type=>{
+      const value=(type,owner)=>{
         const criteria=model.config.criteria.filter(c=>c.type===type);
         const values=criteria.map(c=>{
-          const i=model.config.criteria.indexOf(c),field=drawer.querySelector('[data-index="'+i+'"][data-owner="'+(type==='Team'?'team':index)+'"]');
+          const i=model.config.criteria.indexOf(c),field=drawer.querySelector('[data-index="'+i+'"][data-owner="'+(owner??(type==='Team'?'team':index))+'"]');
           const v=field && field.querySelector('[data-marks]').value;
           const stored=type==='Team' && !field && ((model.evaluation||{}).teamScores||{})[c.pi];
           return stored?stored.marks:v===undefined || v===''?null:Number(v);
@@ -619,6 +713,48 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       if(individualBadge)individualBadge.textContent=(i===null && individualState==='UNASSESSED'?'Unassessed':mark(i))+' / '+maximum('Individual');
       const assessmentStatus=drawer.querySelector('[data-assessment-status="'+index+'"]');
       if(assessmentStatus)assessmentStatus.textContent='Assessment status: '+statusLabel;
+      const values=drawer.querySelector('[data-summary-values="'+index+'"]');
+      if(values && dirty && (model.availability.editable || correctionIndex===index || targeted && targeted.index===index)) {
+        const checkedValue=(type,owner)=>{
+          const criteria=model.config.criteria.filter(c=>c.type===type);
+          const valid=criteria.every(c=>{
+            const field=drawer.querySelector('[data-index="'+model.config.criteria.indexOf(c)+'"][data-owner="'+owner+'"]');
+            if(!field)return false;
+            const level=field.querySelector('[data-level]').value,marks=field.querySelector('[data-marks]').value,remark=field.querySelector('[data-remark]').value;
+            const n=Number(level),m=Number(marks),range=Number.isInteger(n) && n>=0 && n<=5?bounds(c.maxMarks,n):null;
+            return level!=='' && marks!=='' && range && Number.isFinite(m) && Number.isInteger(m*2) && m>=range.min && m<=range.max && (n>=2 || !!remark.trim()) && remark.length<=2000;
+          });
+          return valid?value(type,owner):null;
+        };
+        let previewTeam=model.availability.editable || correctionIndex===index?checkedValue('Team','team'):a?.teamMark??null;
+        let previewIndividual=model.availability.editable || correctionIndex===index?checkedValue('Individual',index):a?.individualMark??null;
+        let previewTeamState=previewTeam===null?'UNASSESSED':'RESOLVED',previewIndividualState=previewIndividual===null?'UNASSESSED':'RESOLVED',previewStatus='COMPLETED';
+        if(!model.availability.editable && a){previewTeamState=a.teamState;previewIndividualState=a.individualState;previewStatus=a.status;}
+        if(model.availability.editable || correctionIndex===index) {
+          previewStatus=a?.makeupCompleted?'COMPLETED_AFTER_MAKEUP':'COMPLETED';
+          if(f.type==='UNSELECTED'){previewIndividual=null;previewIndividualState='UNASSESSED';}
+          else if(f.type!=='NORMAL' && (f.approved===null || f.type==='PROLONGED' && (f.attended===null || f.verifiedContribution===null))) {
+            previewTeam=null;previewIndividual=null;previewTeamState='UNASSESSED';previewIndividualState='UNASSESSED';
+          } else {
+            if(f.type==='PROLONGED' && f.verifiedContribution===false){previewTeam=f.approved?null:0;previewTeamState=f.approved?'PENDING':'RESOLVED';}
+            const preserved=savedStudent(index).assessment?.makeupCompleted || f.type==='PROLONGED' && previewIndividual!==null;
+            if(f.attended===false && !preserved){previewIndividual=f.approved?null:0;previewIndividualState=f.approved?'PENDING':'RESOLVED';}
+            if(f.attended===false && f.approved===false && !preserved)previewStatus='ABSENT_UNAPPROVED';
+            if(f.type==='PROLONGED' && f.approved===false && f.verifiedContribution===false)previewStatus='NON_PARTICIPATION';
+          }
+          if(correctionIndex===index && (a?.teamDecision || a?.alternativeTeamScores)){previewTeam=a.teamMark;previewTeamState=a.teamState;}
+        }
+        if(targeted && targeted.index===index) {
+          if(targeted.components.includes('team')){previewTeam=checkedValue('Team',index);previewTeamState=previewTeam===null?'PENDING':'RESOLVED';}
+          if(targeted.components.includes('individual')){previewIndividual=checkedValue('Individual',index);previewIndividualState=previewIndividual===null?'PENDING':'RESOLVED';}
+          if(previewTeam!==null && previewIndividual!==null)previewStatus='COMPLETED_AFTER_MAKEUP';
+        }
+        const previewTotal=previewTeam===null || previewIndividual===null?null:Math.round((previewTeam+previewIndividual)*100)/100;
+        if(previewTeamState==='PENDING')previewStatus='ACADEMIC_DECISION_PENDING';
+        else if(previewIndividualState==='PENDING')previewStatus='MAKEUP_PENDING';
+        else if(previewTotal===null)previewStatus='INCOMPLETE';
+        values.innerHTML=assessmentSummaryValues({total:previewTotal,assessment:{teamMark:previewTeam,individualMark:previewIndividual,teamState:previewTeamState,individualState:previewIndividualState,status:previewStatus}});
+      }
       const summary=drawer.querySelector('[data-student-score="'+index+'"]');
       if(summary)summary.textContent=mark(total)+' / '+model.config.maximum;
     });
@@ -648,10 +784,10 @@ function review1EvaluationBrowser_(reviewKey='review1') {
     }
     return true;
   }
-  function saveTarget(submit) {
+  async function saveTarget(submit) {
     if(busy || reading || !targeted)return;
     updateRanges();if(!validateFeedback(submit))return;
-    const reason=prompt('Makeup / alternative assessment remark');if(!reason || !reason.trim())return;
+    const reason=await DashboardUI.requestText('Makeup / alternative assessment remark');if(!reason || !reason.trim())return;
     const input={review:reviewKey,team:model.roster.team,student:model.roster.students[targeted.index].register,revision:model.revision,token:model.token,submit,reason};
     targeted.components.forEach(component=>{input[component==='team'?'teamScores':'scores']={};});
     drawer.querySelectorAll('[data-index]').forEach(field=>{
@@ -674,11 +810,13 @@ function review1EvaluationBrowser_(reviewKey='review1') {
     syncCriteriaTabs();
     updateRanges();
   }
-  function save(submit) {
+  async function save(submit) {
     if(busy || reading || !model || !model.availability.editable)return;
     updateRanges();
     if(!validateFeedback(submit))return;
     if(submit) {
+      const unselected=model.roster.students.findIndex((s,index)=>facts(index).type==='UNSELECTED');
+      if(unselected!==-1){const host=drawer.querySelector('[data-absence="'+unselected+'"]');revealCriterion(host);message('Select attendance for every student before submitting.');focusAttendance(host);return;}
       const missing=Array.from(drawer.querySelectorAll('[data-index]')).find(field=>canEdit(field) && field.querySelector('[data-level]').value==='');
       if(missing){revealCriterion(missing);message('Select a proficiency level for every criterion before submitting.');const button=missing.querySelector('[data-pick-level]');if(button)button.focus();return;}
     }
@@ -695,7 +833,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
     const invalid=form.querySelector && form.querySelector('input:invalid,select:invalid,textarea:invalid');
     if(invalid){revealCriterion(invalid);invalid.reportValidity();return;}
     if(!form.reportValidity())return;
-    if(submit && !confirm('Submit '+reviewLabel+' for the entire team? Normal scores will lock; documented pending cases can be assessed separately.'))return;
+    if(submit && !await DashboardUI.ask('Submit '+reviewLabel+' for the entire team? Normal scores will lock; documented pending cases can be assessed separately.'))return;
     const method=submit?'submitReview1Evaluation':'saveReview1EvaluationDraft', signature=JSON.stringify({method,payload});
     if(!pending || pending.signature!==signature)pending={signature,id:requestId()};
     payload.requestId=pending.id;setBusy(true);message('Saving Review 1…');
@@ -725,17 +863,17 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       finishLoading();adminBusy=false;
       if(!report.ready){host.textContent='Review'+reviewNumber+'Evaluations is missing from the main spreadsheet. Create the tab manually with the required headers.';return;}
       host.innerHTML=report.teams.map((team,index)=>'<section class="drawer-section"><strong>'+escape(team.team)+'</strong> &middot; '+escape(team.status)+(team.late?' &middot; Late':'')+(team.students||[]).map((s,j)=>'<p>'+escape(s.register)+': '+mark(s.total)+' marks &middot; Course contribution '+mark(s.weighted)+' &middot; '+escape(s.assessment && s.assessment.status || '')+'</p>'+(s.assessment && s.assessment.decisions || []).map(d=>'<p>'+escape(d.decision)+' &middot; '+escape(d.reviewer)+' &middot; '+escape(d.at)+' &middot; '+escape(d.reason)+' &middot; '+escape(d.previousStatus)+' &middot; '+escape(d.resultingStatus)+'</p>').join('')+(s.needsPublication && team.status==='Submitted'?'<button type="button" data-publish="'+index+'" data-publish-student="'+j+'">Publish '+escape(s.register)+'</button>':'')).join('')+(team.status==='Submitted'?'<button type="button" data-publish="'+index+'">Publish pending results</button> ':'')+(['Submitted','Published'].includes(team.status)?'<button type="button" data-reopen="'+index+'">Reopen full review</button>':'')+'</section>').join('')||'No teams.';
-      host.querySelectorAll('[data-publish],[data-reopen]').forEach(button=>button.addEventListener('click',()=>{
+      host.querySelectorAll('[data-publish],[data-reopen]').forEach(button=>button.addEventListener('click',async ()=>{
         if(adminBusy)return;
         const publish=button.hasAttribute('data-publish'),team=report.teams[Number(publish?button.dataset.publish:button.dataset.reopen)];
         const input={team:team.team,revision:team.revision};
         if(button.hasAttribute('data-publish-student'))input.student=team.students[Number(button.dataset.publishStudent)].register;
-        if(publish){if(!confirm('Publish '+reviewLabel+' results for '+team.team+' to its students?'))return;}
-        else {const reason=prompt('Reason for reopening (scores will be cleared):');if(!reason || !reason.trim())return;input.reason=reason.trim();}
+        if(publish){if(!await DashboardUI.ask('Publish '+reviewLabel+' results for '+team.team+' to its students?'))return;}
+        else {const reason=await DashboardUI.requestText('Reason for reopening (scores will be cleared):');if(!reason || !reason.trim())return;input.reason=reason.trim();}
         const method=publish?'publishReview1Evaluation':'reopenReview1Evaluation',signature=JSON.stringify({method,input});
         if(!adminPending || adminPending.signature!==signature)adminPending={signature,id:requestId()};
         input.requestId=adminPending.id;adminBusy=true;host.querySelectorAll('button').forEach(b=>b.disabled=true);
-        rpc(method,[input],()=>{adminBusy=false;adminPending=null;admin();},error=>{adminBusy=false;host.querySelectorAll('button').forEach(b=>b.disabled=false);alert(error.message);});
+        rpc(method,[input],()=>{adminBusy=false;adminPending=null;admin();},error=>{adminBusy=false;host.querySelectorAll('button').forEach(b=>b.disabled=false);DashboardUI.notify(error.message, 'error');});
       }));
     },error=>{finishLoading();adminBusy=false;const notice=document.createElement('p');notice.setAttribute('role','status');notice.textContent='Unable to refresh: '+error.message;host.appendChild(notice);});
   }
@@ -770,8 +908,7 @@ function getReview1EvaluationStyles_() {
   .review1-project-meta-row { display:flex; align-items:baseline; justify-content:space-between; gap:4px 16px; flex-wrap:wrap; margin:8px 0 0; color:#667085; }
   .review1-project-meta-row .review1-project-meta { margin:0; min-width:0; overflow-wrap:anywhere; }
   .review1-project-meta-row .review1-project-meta:last-child { flex-shrink:0; text-align:right; }
-  .review1-exception-summary, .review1-assessment-summary { display:grid; gap:16px; margin:16px 0; }
-  .review1-assessment-summary { grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); }
+  .review1-exception-summary { display:grid; gap:16px; margin:16px 0; }
   .review1-exception-summary dt, .review1-assessment-summary dt { font-size:12px; color:var(--muted-text, #64748b); margin-bottom:4px; }
   .review1-exception-summary dd, .review1-assessment-summary dd { margin:0; overflow-wrap:anywhere; }
   .review1-criterion .review1-absence-choice { display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:400; }
@@ -780,6 +917,7 @@ function getReview1EvaluationStyles_() {
   .review1-assessment-summary dd { font-size:12px; font-weight:600; }
   .review1-recorded-reason { white-space:pre-wrap; }
   .review1-drawer:not([open]) { display:none; }
+  .review1-drawer.open { transform:none; transition:none; }
   .review1-drawer [hidden] { display:none !important; }
   .review1-drawer::backdrop { background:rgba(15,23,42,.28); }
   .review1-drawer .team-drawer-header { position:relative; display:block; flex-shrink:0; }
@@ -806,38 +944,44 @@ function getReview1EvaluationStyles_() {
   .review1-project-title-row[open] .review1-title-chevron { transform:rotate(180deg); }
   .review1-project-title-row > summary:focus-visible { outline:2px solid #6941c6; outline-offset:2px; border-radius:4px; }
   .review1-project-title-row > p { margin:0 0 8px; max-height:15dvh; overflow:auto; overflow-wrap:anywhere; font-size:12px; color:#344054; }
-  .review1-assessment-navigation { flex:0 0 auto; padding:6px 20px; background:#f8fafc; border-bottom:1px solid #e4e7ec; }
+  .review1-assessment-navigation { flex:0 0 auto; padding:6px 20px 4px; background:#f8fafc; border-bottom:1px solid #e4e7ec; }
   .review1-criteria-tabs { display:flex; gap:4px; padding:3px; margin:0; border:1px solid #e4e7ec; border-radius:11px; background:#fff; }
   .review1-drawer .review1-criteria-tabs [role="tab"] { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; min-width:0; min-height:44px; box-sizing:border-box; padding:4px 5px; border:1px solid transparent; border-radius:8px; background:transparent; color:#344054; font-size:12px; font-weight:600; line-height:1.4; }
   .review1-tab-label { display:flex; align-items:center; justify-content:center; gap:5px; }
   .review1-tab-label .lucide-icon { width:14px; height:14px; color:#98a2b3; }
   .review1-tab-caption { color:#8492a6; font-size:11px; font-weight:400; }
-  .review1-pi-pills { display:grid; grid-template-columns:repeat(auto-fit,minmax(72px,1fr)); gap:6px; padding:3px 0; margin-top:6px; }
-  .review1-drawer .review1-pi-pills button { display:flex; align-items:center; justify-content:center; gap:6px; min-width:0; min-height:44px; padding:5px 7px; border:1px solid #d0d5dd; border-radius:8px; background:#fff; color:#475467; font-size:12px; }
+  .review1-pi-pills { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:6px; padding:0; margin-top:6px; }
+  .review1-pi-pills[data-individual-pills] { margin:0 0 6px; }
+  .review1-drawer .review1-pi-pills button { display:flex; flex:0 0 auto; align-items:center; justify-content:flex-start; gap:5px; width:auto; min-width:0; max-width:100%; min-height:34px; box-sizing:border-box; padding:4px 8px; margin:0; border:1px solid #d0d5dd; border-radius:6px; background:#fff; color:#475467; font-size:11px; text-align:left; }
   .review1-pi-label { display:flex; flex-direction:column; align-items:flex-start; line-height:1.3; overflow-wrap:anywhere; }
-  .review1-pi-label strong { font-size:12px; font-weight:600; }
-  .review1-pi-label small { font-size:10px; font-weight:400; }
+  .review1-pi-label strong { font-size:11px; font-weight:600; }
+  .review1-pi-label small { font-size:9px; font-weight:400; }
   .review1-pi-pills [data-pi-icon] { display:flex; }
-  .review1-pi-pills .lucide-icon { width:15px; height:15px; }
+  .review1-pi-pills .lucide-icon { width:12px; height:12px; }
   .review1-drawer .review1-pi-pills button[aria-pressed="false"]:not(:disabled):hover { border-color:#9e77ed; background:#f4f3ff; color:#475467; }
   .review1-drawer .review1-pi-pills [data-complete="true"] { color:#067647; background:#ecfdf3; border-color:#abefc6; }
   .review1-drawer .review1-pi-pills button[aria-pressed="true"],.review1-drawer .review1-pi-pills button[aria-pressed="true"]:hover { border-color:#6941c6; background:#6941c6; color:#fff; box-shadow:0 1px 3px rgba(16,24,40,.12); }
+  .review1-drawer .review1-pi-pills[data-individual-pills] button[aria-pressed="false"]:not(:disabled):hover { border-color:#99f6e4; background:#f0fdfa; color:#115e59; }
+  .review1-drawer .review1-pi-pills[data-individual-pills] button[aria-pressed="true"], .review1-drawer .review1-pi-pills[data-individual-pills] button[aria-pressed="true"]:hover { border-color:#99f6e4; background:#f0fdfa; color:#115e59; box-shadow:inset 0 0 0 1px #14b8a6; }
   .review1-card-title { display:none; }
-  .review1-team-rubric[data-owner="team"] { position:relative; margin:8px 0 16px; padding:16px; border:1px solid #e4e7ec; border-top:5px solid #7f56d9; border-radius:16px; background:linear-gradient(110deg,#fff 65%,#faf5ff); }
-  .review1-team-rubric[data-owner="team"] > legend { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-  .review1-team-rubric[data-owner="team"] .review1-card-title { display:block; margin:8px 0 14px; color:#182230; font-size:14px; line-height:1.4; font-weight:700; }
-  .review1-team-rubric[data-owner="team"] .review1-criterion-meta { margin-bottom:0; gap:6px; }
-  .review1-team-rubric[data-owner="team"] .review1-criterion-meta span { padding:3px 6px; font-size:10px; }
-  .review1-team-rubric[data-owner="team"] .review1-control-title { margin-top:10px; color:#8492a6; font-size:10px; text-transform:uppercase; letter-spacing:.04em; }
-  .review1-team-rubric[data-owner="team"] .review1-levels button[aria-pressed="true"] { background:#6941c6; color:#fff; border-color:#b692f6; }
-  .review1-team-rubric[data-owner="team"] .review1-feedback-heading { margin-top:14px; padding-top:12px; border-top:1px solid #eaecf0; }
-  .review1-team-rubric[data-owner="team"] .review1-feedback-options button { border-radius:6px; padding:5px 8px; min-height:28px; }
+  .review1-criterion[data-index] { position:relative; margin:0 0 16px; padding:16px; border:1px solid #e4e7ec; border-top:5px solid #7f56d9; border-radius:16px; background:linear-gradient(110deg,#fff 65%,#faf5ff); }
+  .review1-individual-rubric[data-index] { border-top-color:#0f766e; background:linear-gradient(110deg,#fff 65%,#f0fdfa); }
+  .review1-individual-rubric[data-index] .review1-criterion-meta span:first-child { background:#f0fdfa; color:#115e59; }
+  .review1-criterion[data-index] > legend { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  .review1-criterion[data-index] .review1-card-title { display:block; margin:8px 0 14px; color:#182230; font-size:14px; line-height:1.4; font-weight:700; }
+  .review1-criterion[data-index] .review1-criterion-meta { margin-bottom:0; gap:6px; }
+  .review1-criterion[data-index] .review1-criterion-meta span { padding:3px 6px; font-size:10px; }
+  .review1-criterion[data-index] .review1-control-title { margin-top:10px; color:#8492a6; font-size:10px; text-transform:uppercase; letter-spacing:.04em; }
+  .review1-criterion[data-index] .review1-levels button[aria-pressed="true"] { background:#6941c6; color:#fff; border-color:#b692f6; }
+  .review1-criterion[data-index] .review1-feedback-heading { margin-top:14px; padding-top:12px; border-top:1px solid #eaecf0; }
+  .review1-criterion[data-index] .review1-feedback-options button { border-radius:6px; padding:5px 8px; min-height:28px; }
   .review1-tab-progress { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; color:#667085; font-size:11px; }
   .review1-graded-pill { padding:2px 7px; border:1px solid #e4e7ec; border-radius:5px; background:#f2f4f7; color:#667085; white-space:nowrap; }
   .review1-graded-pill[data-completion="partial"] { color:#6941c6; border-color:#e9d5ff; background:#faf5ff; }
   .review1-graded-pill[data-completion="complete"] { color:#067647; border-color:#abefc6; background:#ecfdf3; }
   .review1-drawer .review1-criteria-tabs [aria-selected="false"]:not(:disabled):hover { background:#f8fafc; }
   .review1-drawer .review1-criteria-tabs [aria-selected="true"] { background:#faf5ff; color:#6927da; border-color:#e9d5ff; }
+  .review1-drawer .review1-criteria-tabs [data-criteria-tab="individual"][aria-selected="true"] { background:#f0fdfa; color:#115e59; border-color:#99f6e4; }
   .review1-criteria-tabs [aria-selected="true"] .review1-tab-label::after { content:""; width:5px; height:5px; border-radius:50%; background:currentColor; }
   .review1-criteria-tabs [aria-selected="true"] .lucide-icon,.review1-criteria-tabs [aria-selected="true"] .review1-tab-caption { color:inherit; }
   .review1-criteria-tabs [role="tab"]:focus-visible { outline:2px solid currentColor; outline-offset:1px; }
@@ -845,21 +989,39 @@ function getReview1EvaluationStyles_() {
   .review1-header-students { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:6px; max-width:100%; list-style:none; padding:2px 0; margin:6px 0 0; color:#667085; font-size:11px; font-weight:400; line-height:1.4; }
   .review1-header-students li { min-width:0; }
   .review1-drawer .review1-header-students button { display:grid; grid-template-columns:20px minmax(0,1fr); align-content:start; align-items:center; gap:4px; width:100%; height:100%; min-height:44px; box-sizing:border-box; border:1px solid #d0d5dd; border-radius:9px; padding:8px 6px; background:#fff; color:#344054; font-size:11px; text-align:left; cursor:pointer; }
-  .review1-header-students button[aria-pressed="false"]:not(:disabled):hover { border-color:#b692f6; background:#faf5ff; }
-  .review1-drawer .review1-header-students button[aria-pressed="true"] { background:#f4f3ff; border-color:#6941c6; color:#5925dc; box-shadow:inset 0 0 0 1px #6941c6; }
-  .review1-header-students button:focus-visible { outline:2px solid #6941c6; outline-offset:2px; }
+  .review1-drawer .review1-header-students button { border-color:#99f6e4; background:#f0fdfa; color:#115e59; }
+  .review1-drawer .review1-header-students button[aria-pressed="false"]:not(:disabled):hover { border-color:#5eead4; background:#ccfbf1; }
+  .review1-drawer .review1-header-students button[aria-pressed="true"] { background:#f0fdfa; border-color:#14b8a6; color:#115e59; box-shadow:inset 0 0 0 1px #14b8a6; }
+  .review1-drawer .review1-header-students button:focus-visible, .review1-drawer .review1-pi-pills[data-individual-pills] button:focus-visible { outline:2px solid #0f766e; outline-offset:2px; }
   .review1-avatar { display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:#f2f4f7; color:#475467; font-size:9px; font-weight:600; }
-  .review1-header-students [aria-pressed="true"] .review1-avatar { background:#6941c6; color:#fff; }
+  .review1-header-students .review1-avatar { background:#ccfbf1; color:#115e59; }
+  .review1-header-students [aria-pressed="true"] .review1-avatar { background:#0f766e; color:#fff; }
   .review1-header-students .review1-student-details { font-weight:600; }
   .review1-student-register { grid-column:1 / -1; color:#667085; font-size:10px; overflow-wrap:anywhere; }
   .review1-header-students .review1-student-score { grid-column:1 / -1; padding-top:3px; border-top:1px solid #eaecf0; font-size:11px; text-align:left; white-space:normal; overflow-wrap:anywhere; }
 
   .review1-student-details { min-width:0; overflow-wrap:anywhere; }
   .review1-student-score { flex-shrink:0; color:#6941c6; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
+  .review1-header-students .review1-student-score { color:#115e59; border-top-color:#99f6e4; }
   .review1-drawer .team-drawer-close { position:absolute; top:18px; right:20px; }
   .review1-drawer form .drawer-section > h3 { margin:20px 0 12px; padding:10px 12px; border-left:4px solid #6941c6; border-radius:6px; background:#f4f3ff; color:#42307d; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
-  .review1-drawer .team-drawer-content { background:#f8fafc; flex:1 1 auto; min-height:0; overflow-y:auto; }
-  .review1-criterion { min-width:0; margin:26px 0; border:1px solid #e4e7ec; border-radius:16px; padding:18px; background:#fff; box-shadow:0 2px 4px rgba(16,24,40,.04); }
+  .review1-drawer .team-drawer-content { background:#f8fafc; flex:1 1 auto; min-height:0; overflow-y:auto; padding-top:6px; }
+  .review1-criterion { min-width:0; margin:14px 0; border:1px solid #e4e7ec; border-radius:8px; padding:14px; background:#fff; }
+  .review1-drawer .review1-criterion[data-absence] { margin:0 0 14px; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+  .review1-criterion [data-absence-editor] > label:first-child { margin-top:0; }
+  .review1-attendance > span { display:block; margin-bottom:4px; color:#344054; font-weight:600; }
+  .review1-criterion .review1-attendance-picker { font-size:12px; color:#344054; }
+  .review1-attendance-picker > summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; box-sizing:border-box; padding:6px 8px; border:1px solid #d0d5dd; border-radius:6px; background:#fff; list-style:none; cursor:pointer; }
+  .review1-attendance-picker > summary::-webkit-details-marker { display:none; }
+  .review1-attendance-picker > summary[aria-disabled="true"] { opacity:.6; cursor:default; }
+  .review1-attendance-picker[open] > summary { border-color:#14b8a6; }
+  .review1-attendance-picker[open] > summary .lucide-icon { transform:rotate(180deg); }
+  .review1-attendance-options { margin-top:4px; padding:4px; border:1px solid #99f6e4; border-radius:6px; background:#fff; }
+  .review1-criterion .review1-attendance-options label { display:flex; align-items:center; gap:8px; margin:0; padding:7px 8px; border-radius:4px; color:#344054; font-weight:400; cursor:pointer; }
+  .review1-criterion .review1-attendance-options input { width:14px; height:14px; flex:0 0 14px; margin:0; padding:0; accent-color:#0f766e; }
+  .review1-attendance-options label:hover, .review1-attendance-options label:focus-within { background:#f0fdfa; }
+  .review1-attendance-options input:checked + span { color:#115e59; font-weight:600; }
+  .review1-drawer .review1-attendance-picker > summary:focus-visible { outline:2px solid #0f766e; outline-offset:2px; }
   .review1-criterion > legend { max-width:100%; box-sizing:border-box; padding:4px 8px; color:#182230; font-size:13px; font-weight:700; line-height:1.5; overflow-wrap:anywhere; }
   .review1-criterion label { display:block; margin-top:12px; color:#344054; font-weight:600; }
   .review1-criterion :is(input,select,textarea) { display:block; width:100%; box-sizing:border-box; font:inherit; margin-top:4px; padding:5px 6px; border:1px solid #d0d5dd; border-radius:6px; }
@@ -883,7 +1045,7 @@ function getReview1EvaluationStyles_() {
   .review1-descriptor { margin:14px 0 10px; padding:12px; border:1px solid #e9d7fe; border-radius:10px; background:#faf5ff; color:#53389e; font-size:12px; line-height:1.5; white-space:pre-wrap; }
   .review1-criterion details { font-size:11px; color:#6941c6; }
   .review1-criterion summary { cursor:pointer; }
-  .review1-accordion { margin:14px 0; border:1px solid #e4e7ec; border-radius:8px; background:#fff; }
+  .review1-accordion { margin:0; border:0; padding:0; background:transparent; }
   .review1-accordion > summary { cursor:pointer; padding:12px; border-left:4px solid #6941c6; border-radius:7px; background:#f4f3ff; color:#42307d; font-size:13px; }
   .review1-accordion > summary strong { font-weight:700; }
   .review1-accordion > summary span { display:block; margin:4px 0 0 16px; color:#475467; font-size:12px; line-height:1.5; }
@@ -892,9 +1054,26 @@ function getReview1EvaluationStyles_() {
   .review1-accordion[data-criteria-group="individual"] > summary { border-left-color:#0f766e; background:#f0fdfa; color:#115e59; }
   .review1-accordion[data-criteria-group="individual"] > summary:focus-visible { outline-color:#14b8a6; }
   .review1-accordion[data-criteria-group="individual"] .drawer-section > h3 { border-left-color:#0f766e; background:#f0fdfa; color:#115e59; }
-  .review1-accordion-content { padding:0 12px 12px; }
-  .review1-student-accordion { margin-top:12px; border:1px solid #99f6e4; border-radius:8px; background:#fff; }
-  .review1-student-accordion > summary { padding:12px; cursor:pointer; background:#f0fdfa; color:#115e59; border-radius:7px; font-size:12px; overflow-wrap:anywhere; }
+  .review1-accordion-content { padding:0; }
+  .review1-student-accordion { margin:0; border:0; padding:0; background:transparent; }
+  .review1-student-accordion > summary { display:none; }
+  .review1-assessment-summary { display:block; margin:0 0 12px; padding:8px 10px; border:1px solid #dbe3e9; border-radius:8px; background:#fff; color:#475569; font-size:12px; }
+  .review1-assessment-summary h3 { margin:0 0 6px; font-size:12px; color:#0f172a; }
+  .review1-assessment-summary dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px 12px; margin:0; }
+  .review1-assessment-summary dl > div { display:flex; align-items:baseline; flex-wrap:wrap; gap:3px 6px; }
+  .review1-assessment-summary dt { margin:0; font-size:11px; color:#64748b; }
+  .review1-assessment-summary .review1-summary-status { grid-column:1 / -1; }
+  .review1-assessment-summary dd { color:#1e293b; font-variant-numeric:tabular-nums; }
+  .review1-assessment-summary .review1-summary-total { border-left:2px solid #99f6e4; padding-left:8px; }
+  .review1-assessment-summary .review1-summary-total[data-resolved="true"] dd { color:#0f766e; font-weight:700; }
+  .review1-assessment-summary .review1-summary-status dd { padding:2px 7px; border-radius:5px; background:#f1f5f9; color:#475569; font-size:11px; }
+  .review1-assessment-summary .review1-summary-status[data-tone="complete"] dd { background:#ecfdf5; color:#047857; }
+  .review1-assessment-summary .review1-summary-status[data-tone="pending"] dd { background:#fffbeb; color:#92400e; }
+  .review1-assessment-summary .review1-summary-status[data-tone="exception"] dd { background:#fff1f2; color:#9f1239; }
+  .review1-assessment-summary button, .review1-summary-decision { margin-top:8px; }
+  .review1-summary-decision > summary { cursor:pointer; color:#6941c6; font-weight:600; }
+  .review1-summary-decision label { display:block; margin-top:8px; }
+  .review1-assessment-summary [data-summary-unsaved] { display:inline-block; margin-left:6px; padding:1px 5px; border-radius:4px; background:#fffbeb; color:#92400e; font-size:10px; font-weight:400; }
   .review1-student-accordion > summary span { display:block; margin:3px 0 0 16px; color:#475467; font-size:11px; }
   .review1-accordion > summary .review1-header-mark, .review1-student-accordion > summary .review1-header-mark { display:inline-flex; flex-shrink:0; margin:0 0 0 8px; padding:3px 9px; border:1px solid #d6bbfb; border-radius:999px; background:#f4f3ff; color:#5925dc; font-size:12px; font-weight:600; line-height:1.5; }
   .review1-accordion > summary > .review1-header-mark { float:right; }
@@ -904,8 +1083,7 @@ function getReview1EvaluationStyles_() {
   .review1-student-accordion > summary .review1-student-subheading > span { display:inline; margin:0; }
   .review1-student-accordion > summary [data-assessment-status] { margin-left:auto !important; text-align:right; }
   .review1-team-rubric { border-color:#d6bbfb; border-left:4px solid #6941c6; }
-  .review1-individual-rubric { border-color:#99f6e4; border-left:4px solid #0f766e; }
-  .review1-individual-rubric .review1-criterion-meta span:first-child { background:#f0fdfa; color:#115e59; }
+
   .review1-student-accordion > summary .review1-header-mark { border-color:#99f6e4; background:#f0fdfa; color:#115e59; }
   .review1-student-accordion > summary:focus-visible { outline:3px solid #14b8a6; outline-offset:2px; }
   .review1-award { display:grid; grid-template-columns:minmax(0,1fr) 100px; align-items:center; gap:6px 8px; margin:10px 0; padding:8px; border:1px solid #eaecf0; border-radius:8px; background:#f9fafb; }
@@ -954,7 +1132,7 @@ function getReview1EvaluationStyles_() {
   .review1-progress progress::-webkit-progress-value { background:#6941c6; border-radius:999px; }
   .review1-progress progress::-moz-progress-bar { background:#6941c6; border-radius:999px; }
   .review1-progress progress { width:80px; max-width:100%; height:5px; accent-color:#6941c6; border:0; border-radius:999px; overflow:hidden; background:#e2e8f0; }
-  @media(max-width:400px) { .review1-criterion { padding:12px; } .review1-drawer .team-drawer-content { padding:14px; } }
+  @media(max-width:400px) { .review1-criterion { padding:12px; } .review1-drawer .team-drawer-content { padding:6px 14px 14px; } }
   .review1-drawer :is(button,input,select,textarea):focus-visible { outline:3px solid #9e77ed; outline-offset:2px; }
   .review1-drawer .review1-stepper :is(button,input):focus-visible { outline:2px solid #6941c6; outline-offset:-2px; }
   .review1-drawer [hidden] { display:none !important; }

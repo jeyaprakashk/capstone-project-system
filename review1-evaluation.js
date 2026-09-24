@@ -112,7 +112,8 @@ function getReviewEvaluation_(teamId,key) {
   return {details:context.details,roster:latest && latest.status!=='Draft'?latest.roster:context.roster,
     config:latest && latest.status!=='Draft'?latest.config:config,availability,
     token:guideFingerprint_({roster:context.roster,config:latest && latest.status!=='Draft'?latest.config:config}),revision:latest?latest.revision:0,
-    status:latest?latest.status:'Not started',evaluation:latest?{...latest,students:latest.students.map(s=>reviewStudentView_(latest.config,latest.teamScores,s))}:null};
+    status:latest?latest.status:'Not started',evaluation:latest?{...latest,students:latest.students.map(s=>reviewStudentView_(latest.config,latest.teamScores,s))}:null,
+    assessmentResults:latest?null:context.roster.students.map(s=>reviewEffectiveStudent_(config,{}, {register:s.register,scores:{}}))};
 }
 
 function review1Score_(config, roster, input, complete, previous) {
@@ -125,6 +126,7 @@ function review1Score_(config, roster, input, complete, previous) {
     const entry=input.students.find(s=>s.register===student.register);
     const prior=previous && previous.students.find(s=>s.register===student.register);
     const facts=reviewAbsenceFacts_(entry.absence || (prior && prior.assessment && prior.assessment.facts),true);
+    if(complete && facts.type==='UNSELECTED')throw new Error('Select attendance for every student before submitting.');
     if((facts.absenceReason || facts.type==='PROLONGED') && prior && prior.assessment && prior.assessment.facts.reason)facts.reason=prior.assessment.facts.reason;
     const preserve=facts.type!=='NORMAL' && prior && reviewScoresComplete_(individual,prior.scores);
     const allowed=facts.type==='NORMAL' || (facts.type==='PROLONGED' && facts.attended);
@@ -218,6 +220,7 @@ function saveReviewTargetedAssessment(input) {return review1Write_(input.submit=
 /** Source facts only. Neither blank marks nor client-computed outcomes establish absence. */
 function reviewAbsenceFacts_(value, writing=false) {
   const f=value || {type:'NORMAL'};
+  if(f.type==='UNSELECTED')return {type:'UNSELECTED',attended:null};
   if(!['NORMAL','REVIEW_DAY_ABSENCE','PROLONGED'].includes(f.type)) throw new Error('Invalid absence type.');
   if(f.type==='NORMAL') return {type:'NORMAL',attended:true};
   if(typeof f.approved!=='boolean') throw new Error('Select whether the absence is approved.');
@@ -279,14 +282,15 @@ function reviewEffectiveStudent_(config,teamScores,student) {
   if(a.teamDecision==='TEAM_MARK_NOT_APPLICABLE') {teamMark=0;teamSource='policy';}
   if(a.alternativeTeamScores) {teamMark=sum(team,a.alternativeTeamScores);teamSource='assessment';}
   const preserve=individualMark!==null && facts.type==='PROLONGED';
-  if(!facts.attended && !a.makeupCompleted && !preserve) {
+  if(facts.type!=='UNSELECTED' && !facts.attended && !a.makeupCompleted && !preserve) {
     individualMark=facts.approved?null:0;individualSource=facts.approved?'pending':'policy';
   }
   if(facts.type==='PROLONGED' && facts.approved && !facts.verifiedContribution && !facts.attended && !preserve && !a.makeupCompleted) {individualMark=null;individualSource='pending';}
   if(a.individualPending && !a.makeupCompleted) {individualMark=null;individualSource='pending';}
+  if(facts.type==='UNSELECTED'){individualMark=null;individualSource='assessment';}
   const total=teamMark===null || individualMark===null?null:Math.round((teamMark+individualMark)*100)/100;
   let status=total===null?S.INCOMPLETE:S.COMPLETED;
-  if(!facts.attended && !facts.approved && !a.makeupCompleted) status=S.ABSENT_UNAPPROVED;
+  if(facts.type!=='UNSELECTED' && !facts.attended && !facts.approved && !a.makeupCompleted) status=S.ABSENT_UNAPPROVED;
   if(facts.type==='PROLONGED' && !facts.approved && !facts.verifiedContribution) status=S.NON_PARTICIPATION;
   if(individualMark===null && individualSource==='pending') status=S.MAKEUP_PENDING;
   if(teamMark===null && teamSource==='pending') status=S.ACADEMIC_DECISION_PENDING;
@@ -317,6 +321,7 @@ function reviewTargeted_(latest,action,input,actor) {
   if(action==='exception') {
     // A correction changes source facts, not prior decisions, authorizations or rubric evidence.
     const facts=reviewAbsenceFacts_(input.absence,true);
+    if(facts.type==='UNSELECTED')throw new Error('Select attendance before saving absence details.');
     if((facts.absenceReason || facts.type==='PROLONGED') && a.facts.reason)facts.reason=a.facts.reason;
     const changed=['type','approved','verifiedContribution','attended'].some(key=>facts[key]!==a.facts[key]);
     if(changed && (a.teamDecision || a.alternativeTeamScores)) {
