@@ -2,6 +2,7 @@
 const REVIEW1_HISTORY_ = 'Review1Evaluations';
 const REVIEW1_HEADERS_ = ['Assessment','Team','Student','Revision','Action','Actor','At','Request ID','Payload'];
 const REVIEW_ASSESSMENT_STATUS_ = Object.freeze({
+  INCOMPLETE:'INCOMPLETE',
   COMPLETED:'COMPLETED',MAKEUP_PENDING:'MAKEUP_PENDING',COMPLETED_AFTER_MAKEUP:'COMPLETED_AFTER_MAKEUP',
   ABSENT_UNAPPROVED:'ABSENT_UNAPPROVED',ACADEMIC_DECISION_PENDING:'ACADEMIC_DECISION_PENDING',NON_PARTICIPATION:'NON_PARTICIPATION'
 });
@@ -98,6 +99,7 @@ function review1Availability_(context, config, latest) {
 function getReview1Evaluation(teamId) {return getReviewEvaluation_(teamId,'review1');}
 function getReview2Evaluation(teamId) {return getReviewEvaluation_(teamId,'review2');}
 function reviewStudentView_(config,teamScores,student) {
+  if(student.assessment && student.assessment.facts.type==='PROLONGED')return reviewEffectiveStudent_(config,teamScores,student);
   const assessment=student.assessment || reviewEffectiveStudent_(config,teamScores,student).assessment;
   // Preserve recorded, completed totals; normalize unresolved legacy display values only, without writing history.
   return {...student,total:assessment.completed?student.total:null,weighted:assessment.completed?student.weighted:null,assessment};
@@ -122,7 +124,8 @@ function review1Score_(config, roster, input, complete, previous) {
   const students=roster.students.map(student=>{
     const entry=input.students.find(s=>s.register===student.register);
     const prior=previous && previous.students.find(s=>s.register===student.register);
-    const facts=reviewAbsenceFacts_(entry.absence || (prior && prior.assessment && prior.assessment.facts));
+    const facts=reviewAbsenceFacts_(entry.absence || (prior && prior.assessment && prior.assessment.facts),true);
+    if((facts.absenceReason || facts.type==='PROLONGED') && prior && prior.assessment && prior.assessment.facts.reason)facts.reason=prior.assessment.facts.reason;
     const preserve=facts.type!=='NORMAL' && prior && reviewScoresComplete_(individual,prior.scores);
     const allowed=facts.type==='NORMAL' || (facts.type==='PROLONGED' && facts.attended);
     if (!allowed && !preserve && Object.values(entry.scores||{}).some(s=>s && s.marks!==null && s.marks!==undefined && s.marks!=='')) throw new Error('Absent students require an authorized targeted assessment; do not enter documentary-only marks.');
@@ -213,12 +216,50 @@ function recordReviewAbsence(input) {return review1Write_('exception',input,inpu
 function saveReviewTargetedAssessment(input) {return review1Write_(input.submit===true?'targetSubmit':'targetDraft',input,input.review);}
 
 /** Source facts only. Neither blank marks nor client-computed outcomes establish absence. */
-function reviewAbsenceFacts_(value) {
+function reviewAbsenceFacts_(value, writing=false) {
   const f=value || {type:'NORMAL'};
   if(!['NORMAL','REVIEW_DAY_ABSENCE','PROLONGED'].includes(f.type)) throw new Error('Invalid absence type.');
   if(f.type==='NORMAL') return {type:'NORMAL',attended:true};
   if(typeof f.approved!=='boolean') throw new Error('Select whether the absence is approved.');
+  if(f.type==='PROLONGED') {
+    if(typeof f.verifiedContribution!=='boolean' || typeof f.attended!=='boolean')throw new Error('Record verified contribution and scheduled review attendance.');
+    const structured=writing || Object.prototype.hasOwnProperty.call(f,'contributionEvidence') || Object.prototype.hasOwnProperty.call(f,'absenceReason');
+    if(structured) {
+      const evidence=f.contributionEvidence ?? [];
+      const choices=['GUIDE_CONFIRMATION','PROJECT_LOG','GITHUB_ACTIVITY','ASSIGNED_TASK','TECHNICAL_DESIGN','OTHER'];
+      if(!Array.isArray(evidence) || new Set(evidence).size!==evidence.length || evidence.some(e=>!choices.includes(e)))throw new Error('Invalid contribution evidence selection.');
+      if(f.verifiedContribution && !evidence.length)throw new Error('At least one contribution evidence item is required.');
+      if(!f.verifiedContribution && (evidence.length || f.otherContributionEvidenceText))throw new Error('Contribution evidence requires verified contribution.');
+      if(f.supportingEvidence!=null && !Array.isArray(f.supportingEvidence))throw new Error('Invalid supporting absence evidence selection.');
+      if(!f.approved && (f.absenceReason || (f.supportingEvidence||[]).length || f.otherReasonText || f.otherEvidenceText))throw new Error('Approved absence evidence requires absence approval.');
+      if(f.otherReasonText && f.absenceReason!=='OTHER_APPROVED' || f.otherEvidenceText && !(f.supportingEvidence||[]).includes('OTHER'))throw new Error('Other absence details require the corresponding Other selection.');
+      const other=String(f.otherContributionEvidenceText||'').trim();
+      if(evidence.includes('OTHER') && !other || other.length>2000)throw new Error('Describe other contribution evidence (maximum 2000 characters).');
+      if(other && !evidence.includes('OTHER'))throw new Error('Other contribution text requires Other contribution evidence.');
+      const approval=f.approved?reviewAbsenceFacts_({...f,type:'REVIEW_DAY_ABSENCE',absenceReason:f.absenceReason??null}):{absenceReason:null,supportingEvidence:[],otherReasonText:null,otherEvidenceText:null};
+      return {...approval,type:'PROLONGED',approved:f.approved,verifiedContribution:f.verifiedContribution,attended:f.attended,
+        contributionEvidence:[...evidence],otherContributionEvidenceText:evidence.includes('OTHER')?other:null,...(f.reason?{reason:f.reason}:{})};
+    }
+  }
+  // Unapproved review-day absence needs no justification. Prior revisions retain saved evidence.
+  if(f.type==='REVIEW_DAY_ABSENCE' && !f.approved) return {type:f.type,approved:false,attended:false,absenceReason:null,supportingEvidence:[],otherReasonText:null,otherEvidenceText:null};
   const reason=String(f.reason || '').trim();
+  if(f.type==='REVIEW_DAY_ABSENCE' && Object.prototype.hasOwnProperty.call(f,'absenceReason')) {
+    if(!['MEDICAL','PERSONAL_FAMILY','OFFICIAL_ACADEMIC','OTHER_APPROVED'].includes(f.absenceReason)) throw new Error('Select one primary reason for absence.');
+    const evidence=f.supportingEvidence ?? [];
+    if(!Array.isArray(evidence) || new Set(evidence).size!==evidence.length || evidence.some(e=>!['MEDICAL_DOCUMENT','APPROVAL_DOCUMENT','OTHER'].includes(e))) throw new Error('Invalid supporting evidence selection.');
+    const detail=(value,required,label)=>{
+      const text=String(value || '').trim();
+      if(required && !text || text.length>2000) throw new Error(label+' is required when Other is selected (maximum 2000 characters).');
+      return required?text:null;
+    };
+    if(reason.length>2000) throw new Error('Historical reason exceeds 2000 characters.');
+    return {type:f.type,approved:f.approved,attended:false,absenceReason:f.absenceReason,supportingEvidence:[...evidence],
+      otherReasonText:detail(f.otherReasonText,f.absenceReason==='OTHER_APPROVED','Other approved reason'),
+      otherEvidenceText:detail(f.otherEvidenceText,evidence.includes('OTHER'),'Other supporting evidence'),
+      ...(f.reason?{reason:f.reason}:{})};
+  }
+  // Keep legacy free-text records readable; new Review-Day forms always send absenceReason.
   if(!reason || reason.length>2000) throw new Error('Exception evidence/reason is required (maximum 2000 characters).');
   if(f.type==='PROLONGED' && (typeof f.verifiedContribution!=='boolean' || typeof f.attended!=='boolean')) throw new Error('Record verified contribution and scheduled review attendance.');
   return {type:f.type,approved:f.approved,reason,attended:f.type==='PROLONGED'?f.attended:false,
@@ -241,23 +282,27 @@ function reviewEffectiveStudent_(config,teamScores,student) {
   if(!facts.attended && !a.makeupCompleted && !preserve) {
     individualMark=facts.approved?null:0;individualSource=facts.approved?'pending':'policy';
   }
-  if(facts.type==='PROLONGED' && facts.approved && !facts.verifiedContribution && !preserve && !a.makeupCompleted) {individualMark=null;individualSource='pending';}
+  if(facts.type==='PROLONGED' && facts.approved && !facts.verifiedContribution && !facts.attended && !preserve && !a.makeupCompleted) {individualMark=null;individualSource='pending';}
   if(a.individualPending && !a.makeupCompleted) {individualMark=null;individualSource='pending';}
   const total=teamMark===null || individualMark===null?null:Math.round((teamMark+individualMark)*100)/100;
-  let status=total===null?null:S.COMPLETED;
+  let status=total===null?S.INCOMPLETE:S.COMPLETED;
   if(!facts.attended && !facts.approved && !a.makeupCompleted) status=S.ABSENT_UNAPPROVED;
   if(facts.type==='PROLONGED' && !facts.approved && !facts.verifiedContribution) status=S.NON_PARTICIPATION;
-  if(individualMark===null && (facts.approved || a.individualPending)) status=S.MAKEUP_PENDING;
-  if(teamMark===null && facts.type==='PROLONGED' && !facts.verifiedContribution) status=S.ACADEMIC_DECISION_PENDING;
+  if(individualMark===null && individualSource==='pending') status=S.MAKEUP_PENDING;
+  if(teamMark===null && teamSource==='pending') status=S.ACADEMIC_DECISION_PENDING;
   if(total!==null && (a.makeupCompleted || a.alternativeTeamScores) && status!==S.NON_PARTICIPATION) status=S.COMPLETED_AFTER_MAKEUP;
+  const state=(mark,source)=>mark!==null?'RESOLVED':source==='pending'?'PENDING':'UNASSESSED';
+  const teamState=state(teamMark,teamSource),individualState=state(individualMark,individualSource);
+  const assessmentComponents=a.authorized && a.authorized.length?a.authorized:(facts.approved && !facts.attended && status===S.MAKEUP_PENDING?['individual']:[]);
+  const nextActions={assessmentComponents,academicDecision:teamState==='PENDING' || !assessmentComponents.length && individualSource==='policy' && !reviewScoresComplete_(individual,student.scores)};
   const effectiveScores={};
   config.criteria.forEach(c=>{
     const isTeam=c.type==='Team', mark=isTeam?teamMark:individualMark, source=isTeam?teamSource:individualSource;
     const evidence=(isTeam?(a.alternativeTeamScores || teamScores):student.scores)[c.pi];
-    effectiveScores[c.pi]={marks:mark===null?null:source==='policy'?0:evidence?evidence.marks:null,maximum:c.maxMarks,co:c.co,state:mark===null?'PENDING':'RESOLVED',source};
+    effectiveScores[c.pi]={marks:mark===null?null:source==='policy'?0:evidence?evidence.marks:null,maximum:c.maxMarks,co:c.co,state:state(mark,source),source};
   });
   return {...student,total,weighted:total===null?null:Math.round(total/config.criteria.reduce((n,c)=>n+c.maxMarks,0)*config.weight*10000)/100,
-    assessment:{...a,facts,classification,status,teamMark,individualMark,teamState:teamMark===null?'PENDING':'RESOLVED',individualState:individualMark===null?'PENDING':'RESOLVED',effectiveScores,completed:total!==null}};
+    assessment:{...a,facts,classification,status,teamMark,individualMark,teamState,individualState,nextActions,effectiveScores,completed:total!==null}};
 }
 function reviewTargeted_(latest,action,input,actor) {
   const original=latest.students.find(s=>s.register===input.student);
@@ -266,12 +311,13 @@ function reviewTargeted_(latest,action,input,actor) {
   student=reviewEffectiveStudent_(latest.config,latest.teamScores,student);
   const previousStatus=student.assessment.status;
   let a=student.assessment;
-  const reason=String(input.reason || input.absence && input.absence.reason || '').trim();
+  const reason=String(input.reason || input.absence && (input.absence.type==='PROLONGED'?'Prolonged absence source facts updated.':input.absence.type==='REVIEW_DAY_ABSENCE' && input.absence.approved===false?'Review-day absence recorded as unapproved.':input.absence.reason || input.absence.absenceReason && 'Absence details recorded: '+input.absence.absenceReason) || '').trim();
   if(!reason || reason.length>2000) throw new Error('A reviewer reason is required (maximum 2000 characters).');
   const team=latest.config.criteria.filter(c=>c.type==='Team'), individual=latest.config.criteria.filter(c=>c.type==='Individual');
   if(action==='exception') {
     // A correction changes source facts, not prior decisions, authorizations or rubric evidence.
-    const facts=reviewAbsenceFacts_(input.absence);
+    const facts=reviewAbsenceFacts_(input.absence,true);
+    if((facts.absenceReason || facts.type==='PROLONGED') && a.facts.reason)facts.reason=a.facts.reason;
     const changed=['type','approved','verifiedContribution','attended'].some(key=>facts[key]!==a.facts[key]);
     if(changed && (a.teamDecision || a.alternativeTeamScores)) {
       const policy=reviewEffectiveStudent_(latest.config,latest.teamScores,{...student,assessment:{facts}}).assessment;
@@ -282,24 +328,26 @@ function reviewTargeted_(latest,action,input,actor) {
   } else if(action==='decision') {
     if(!['MAKEUP_ALTERNATIVE_ASSESSMENT','DEFERRED_ASSESSMENT','TEAM_MARK_APPLICABLE','TEAM_MARK_NOT_APPLICABLE','OTHER'].includes(input.decision)) throw new Error('Invalid academic decision.');
     if(['TEAM_MARK_APPLICABLE','TEAM_MARK_NOT_APPLICABLE'].includes(input.decision)) {
-      if(a.teamMark!==null) throw new Error('Only a pending team component can be resolved by this decision.');
+      if(a.teamState!=='PENDING') throw new Error('Only a pending team component can be resolved by this decision.');
       a.teamDecision=input.decision;
     } else if(input.decision==='MAKEUP_ALTERNATIVE_ASSESSMENT') {
       const components=input.components || ['individual'];
       if(!Array.isArray(components) || !components.length || new Set(components).size!==components.length || components.some(c=>!['team','individual'].includes(c))) throw new Error('Select the assessment components.');
       components.forEach(c=>{
-        if(c==='team' && a.teamMark!==null) throw new Error('The team component is already resolved.');
+        if(c==='team' && a.teamState!=='PENDING') throw new Error('The team component is already resolved.');
         if(c==='individual' && reviewScoresComplete_(individual,student.scores)) throw new Error('Valid individual evidence must be preserved.');
+        if(c==='individual' && a.individualState==='UNASSESSED')throw new Error('Complete the normal individual rubric for the attended review.');
       });
       a.authorized=components;
       if(components.includes('individual')) {a.individualPending=true;a.makeupCompleted=false;}
     } else if(input.decision==='DEFERRED_ASSESSMENT') {
       a.authorized=[];
       // Defer only unresolved components; never erase assessed evidence or turn a final zero into pending.
-      if(a.individualMark===null) a.individualPending=true;
+      if(a.individualState==='PENDING') a.individualPending=true;
     }
   } else {
-    const authorized=a.authorized || (a.facts.approved && a.status===REVIEW_ASSESSMENT_STATUS_.MAKEUP_PENDING && a.individualMark===null?['individual']:[]);
+    // An empty explicit list does not remove the makeup already permitted by absence policy.
+    const authorized=a.nextActions.assessmentComponents;
     if(!authorized.length) throw new Error('No pending components are authorized for assessment.');
     if(input.teamScores && !authorized.includes('team') || input.scores && !authorized.includes('individual')) throw new Error('Only authorized components may be assessed.');
     const draft={};
@@ -332,7 +380,7 @@ function review1Progress_(row, columns, records, config) {
   const submitted=!!latest && ['Submitted','Published'].includes(latest.status) && latest.rosterHash===guideFingerprint_(currentRoster);
   const isComplete=s=>s.assessment?s.assessment.completed:reviewScoresComplete_(latest.config.criteria,{...latest.teamScores,...s.scores});
   const markedStudents=submitted?latest.students.filter(isComplete).length:0;
-  const recorded=submitted && latest.students.every(s=>isComplete(s) || s.assessment && s.assessment.facts.type!=='NORMAL' && !!s.assessment.facts.reason);
+  const recorded=submitted && latest.students.every(s=>isComplete(s) || s.assessment && s.assessment.facts.type!=='NORMAL' && !!(s.assessment.facts.reason || s.assessment.facts.absenceReason));
   const completed=submitted && markedStudents===totalStudents;
   const availability=review1Availability_({eligibility:review1Eligibility_(row,columns)},config,latest);
   return {...summarizeReviewCompletion_(new Set(roster.map(s=>normalizeReviewKey_(s.regNo))),null,config.criteria),

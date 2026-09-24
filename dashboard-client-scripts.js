@@ -1587,6 +1587,8 @@ const DashboardUI = (function() {
     refreshAnnouncements,
     toggleProblem,
     renderExpandableText,
+    renderIcon: renderLucideIcon_,
+    renderIcon: renderLucideIcon_,
     decide,
     openReviewerMarks: function(team, review, button) { ReviewerMarks.open(team, review, button); },
     filterReviewerAssignedTeams,

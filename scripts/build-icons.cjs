@@ -3,7 +3,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const source = path.join(root, 'node_modules/lucide-static');
 const version = JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8')).version;
-const names = ['users','link','tag','mail','file-text','check','x','clock','triangle-alert','eye','chevron-down','chevron-right','chevron-left','arrow-left','arrow-right','arrow-left-right','external-link','refresh-cw','plus','sparkles','lock-keyhole','trending-up','git-branch','graduation-cap','book-open','clipboard-check','network','megaphone','activity','menu'];
+const names = ['users','user','link','tag','mail','file-text','check','x','clock','triangle-alert','eye','chevron-down','chevron-right','chevron-left','arrow-left','arrow-right','arrow-left-right','external-link','refresh-cw','plus','sparkles','lock-keyhole','trending-up','git-branch','graduation-cap','book-open','clipboard-check','network','megaphone','activity','menu'];
 const nodes = Object.fromEntries(names.map(name => {
   const svg = fs.readFileSync(path.join(source, 'icons', name + '.svg'), 'utf8');
   const body = svg.match(/<svg\b[^>]*>([\s\S]*?)<\/svg>/)[1].trim().replace(/\s*\n\s*/g, '');
