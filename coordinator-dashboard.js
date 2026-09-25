@@ -402,7 +402,7 @@ function buildCoordinatorHeaderStats(stats) {
     <div class="stat-label">${label}</div>${renderLucideIcon_(icon, '', 'stat-icon')}
     <div class="stat-header"><div class="stat-num"${ids ? ' id="coordinatorActiveTeams"' : ''}>${value}</div><div class="stat-pct"${ids ? ' id="coordinatorActiveTeamsPct"' : ''}>${note}</div></div>
     <div class="stat-detail">${detail}</div></div>`;
-  const progress = (value, color, left, right) => `<div class="stat-track" aria-hidden="true"><span style="width:${pct(value)}%;background:${color}"></span></div><div class="stat-detail-row"><span>${left}</span><span${value < stats.total ? ' class="stat-outstanding"' : ''}>${right}</span></div>`;
+  const progress = (value, color, left, right) => `<div class="stat-track" aria-hidden="true"><span style="width:${pct(value)}%;background:var(--color-success,${color})"></span></div><div class="stat-detail-row"><span>${left}</span><span${value < stats.total ? ' class="stat-outstanding"' : ''}>${right}</span></div>`;
   const repos = stats.reposReady || 0, approved = stats.titleApproved || 0;
   return `<div class="coord-stats coordinator-stats-grid">
     ${card('Total Teams', stats.total, 'blue', 'Teams Roster', 'users', '<span class="stat-registered">●</span> Teams registered')}
@@ -454,7 +454,7 @@ function buildNeedsAttentionTable(teams) {
     return `<tr><td class="col-index">${idx + 1}</td><td class="col-severity"><span class="severity-badge ${sev}">${sev.toUpperCase()}</span></td><td class="col-team">${escapeHtml(t.row[ts.TEAM_ID])}</td><td class="col-issue">${escapeHtml(t.issue)}</td><td class="col-since">${t.daysOverdue} days</td><td class="col-guide">${escapeHtml(t.row[ts.GUIDE_NAME])}</td><td class="col-action"><button type="button" class="link-button action-link" onclick="focusCoordinatorTeam('${escapeHtml(String(t.row[ts.TEAM_ID]))}')">View</button></td></tr>`;
   }).join('');
 
-  return `<div class="needs-attention"><div class="table-title">Needs Attention (${teams.length} teams) <button type="button" class="link-button view-all" onclick="showAllCoordinatorTeams()">View all ${renderLucideIcon_('arrow-right')}</button></div><table class="attention-table"><thead><tr><th>#</th><th>Severity</th><th>Team</th><th>Issue</th><th>Overdue</th><th>Guide</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="needs-attention"><div class="table-title">Needs Attention (${teams.length} teams) <button type="button" class="link-button view-all" onclick="showAllCoordinatorTeams()">View all ${renderLucideIcon_('arrow-right')}</button></div><div class="tracker-table-scroll" role="region" aria-label="Teams needing attention, scroll horizontally for more columns" tabindex="0"><table class="attention-table"><thead><tr><th>#</th><th>Severity</th><th>Team</th><th>Issue</th><th>Overdue</th><th>Guide</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 
 function buildAssessmentProgress(assessmentProgress) {
@@ -1305,9 +1305,12 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 
 .team-drawer-title {
   margin-top: 3px;
-  font-size: 20px;
-  line-height: 1.2;
-  font-weight: 750;
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
   color: #1f2430;
 }
 

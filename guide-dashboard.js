@@ -207,19 +207,22 @@ function buildDocumentLinks(r) {
 
 function buildDashboardContent(email, data) {
   const { teams, counts } = data;
+  const stats = [
+    [counts.NOT_SUBMITTED, 'gray', 'Not Submitted'],
+    [counts.NEEDS_REVIEW, 'orange', 'Needs Review'],
+    [counts.REVISE_AWAITING_STUDENT, 'gray', 'Awaiting Student'],
+    [counts.AWAITING_REVIEWER, 'blue', 'Awaiting Reviewer'],
+    [counts.APPROVED, 'green', 'Approved'],
+    [counts.REJECTED_BY_GUIDE, 'red', 'Rejected'],
+  ].filter(([value]) => value > 0).map(([value, color, label]) =>
+    `<span class="stat ${color}"><span class="stat-num">${value}</span><span class="stat-label">${label}</span></span>`
+  ).join('');
   const teamCards = teams.map(t => buildTeamCard(t.row, t.status, t.repoUrl, t.logWeeks, data)).join('')
     || '<p class="empty">You have no teams assigned.</p>';
 
   return `
   ${buildDashboardContainerHeader_('Guide Dashboard', 'guide')}
-  <div class="stats">
-    <span class="stat gray"><span class="stat-num">${counts.NOT_SUBMITTED}</span><span class="stat-label">Not Submitted</span></span>
-    <span class="stat orange"><span class="stat-num">${counts.NEEDS_REVIEW}</span><span class="stat-label">Needs Review</span></span>
-    <span class="stat gray"><span class="stat-num">${counts.REVISE_AWAITING_STUDENT}</span><span class="stat-label">Awaiting Student</span></span>
-    <span class="stat blue"><span class="stat-num">${counts.AWAITING_REVIEWER}</span><span class="stat-label">Awaiting Reviewer</span></span>
-    <span class="stat green"><span class="stat-num">${counts.APPROVED}</span><span class="stat-label">Approved</span></span>
-    <span class="stat red"><span class="stat-num">${counts.REJECTED_BY_GUIDE}</span><span class="stat-label">Rejected</span></span>
-  </div>
+  ${stats ? `<div class="stats">${stats}</div>` : ''}
   ${teamCards}
   <section id="guideEvaluationEditor" class="assessment-section" hidden aria-label="Guide evaluation editor"></section>
   `;

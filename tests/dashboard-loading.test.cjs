@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
-function dialogFixture() {
+function dialogFixture(deferDestroy=false) {
  const nodes=[],scripts=[],calls=[];let focused=0;
  const node=()=>({style:{},children:[],setAttribute(){},addEventListener(){},appendChild(child){this.children.push(child);},showModal(){this.open=true;},close(){this.open=false;},remove(){this.removed=true;},focus(){focused++;}});
  const previous={isConnected:true,focus(){focused++;}};
@@ -11,7 +11,7 @@ function dialogFixture() {
  const c=vm.createContext({document,window,setTimeout,clearTimeout});
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
  const api=c.dashboardDialogsBrowser_(()=>'<div>Skeleton</div>');
- const resolveLibrary=()=>{window.Swal={fire(options){calls.push(options);return new Promise(resolve=>{options.resolve=resolve;});}};scripts.at(-1).onload();};
+ const resolveLibrary=()=>{window.Swal={fire(options){calls.push(options);return new Promise(resolve=>{options.resolve=result=>{resolve(result);if(!deferDestroy)options.didDestroy();};});}};scripts.at(-1).onload();};
  return {api,nodes,scripts,calls,resolveLibrary,focused:()=>focused};
 }
 test('dialogs load once, block duplicate approvals, preserve literal text and restore focus',async()=>{
@@ -27,6 +27,18 @@ test('dialogs load once, block duplicate approvals, preserve literal text and re
  const next=f.api.ask('Submit?');await Promise.resolve();
  assert.equal(f.scripts.length,1);f.calls[1].resolve({isConfirmed:true});assert.equal(await next,true);
 });
+test('dialog host stays mounted until animated cleanup finishes',async()=>{
+ const f=dialogFixture(true);let settled=false;
+ const result=f.api.ask('Close drawer?').then(value=>{settled=true;return value;});
+ f.resolveLibrary();await Promise.resolve();await Promise.resolve();
+ f.calls[0].resolve({isConfirmed:true});
+ await Promise.resolve();await Promise.resolve();
+ assert.equal(settled,false);assert(f.nodes[0].open);assert(!f.nodes[0].removed);
+ assert.equal(f.focused(),0);assert.equal(await f.api.ask('Duplicate'),false);
+ f.calls[0].didDestroy();
+ assert.equal(await result,true);assert(f.nodes[0].removed);assert.equal(f.focused(),1);
+});
+
 test('prompt validates blank remarks and returns trimmed input only on approval',async()=>{
  const f=dialogFixture();const result=f.api.requestText('Reason');f.resolveLibrary();await Promise.resolve();await Promise.resolve();
  assert(f.calls[0].inputValidator('   '));assert.equal(f.calls[0].inputValidator('Evidence'),undefined);
@@ -54,7 +66,7 @@ function fixture(system=false) {
  const announcement={...loadingNode(),innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[]};
  const systemContent={...loadingNode(),innerHTML:'',querySelectorAll:()=>[]};
  const systemMessage={textContent:''}, systemRefresh={disabled:false};
- const document={createElement:loadingNode,hidden:false,readyState:'loading',addEventListener(name,fn){(listeners[name] ||= []).push(fn);},getElementById:id=>id==='announcementsContent'?announcement:system?({systemStatusContent:systemContent,systemStatusMessage:systemMessage,systemStatusRefresh:systemRefresh}[id]||null):null,
+ const document={body:loadingNode(),createElement:loadingNode,hidden:false,readyState:'loading',addEventListener(name,fn){(listeners[name] ||= []).push(fn);},getElementById:id=>id==='announcementsContent'?announcement:system?({systemStatusContent:systemContent,systemStatusMessage:systemMessage,systemStatusRefresh:systemRefresh}[id]||null):null,
  querySelector:selector=>panels.find(p=>selector.includes('"'+p.getAttribute()+'"'))||null,
  querySelectorAll:selector=>selector==='[data-role-content]'?panels:[]};
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({key,args,success,failure})}); }
@@ -65,18 +77,73 @@ function fixture(system=false) {
  return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);}};
 }
 
+test('theme follows active tabs immediately, cached content and late responses cannot change it',()=>{
+ const f=fixture(true), doc=f.c.document;
+ const student={...doc.body,innerHTML:'',getAttribute:()=> 'student'};
+ const query=doc.querySelector;
+ doc.querySelector=selector=>selector.includes('data-role-content="student"')?student:query(selector);
+ const theme=()=>doc.body.attrs['data-dashboard-theme'];
+ f.click('student');assert.equal(theme(),'student');
+ f.click('guide');assert.equal(theme(),'editorial');
+ f.done('loadDashboardRoleContent','student content');assert.equal(theme(),'editorial');
+ f.done('loadDashboardRoleContent','guide content');
+ const roleReads=()=>f.requests.filter(r=>r.key==='loadDashboardRoleContent').length;
+ const count=roleReads();
+ f.click('student');assert.equal(theme(),'student');
+ f.click('guide');assert.equal(theme(),'editorial');assert.equal(roleReads(),count);
+ f.click('student');f.click('announcements');assert.equal(theme(),'editorial');
+ f.click('student');f.click('system-status');assert.equal(theme(),'editorial');
+ f.click('student');assert.equal(theme(),'student');
+});
+
+test('shell selects the first role theme before scripts or fonts load',()=>{
+ const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})}});
+ for(const file of ['common-styles.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review1-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ for(const name of ['getDashboardClientScript','getGuideEvaluationClientScript','getReviewerMarkingScript_','getReview1EvaluationClientScript_']) c[name]=()=>'';
+ for(const key of ['student','guide','reviewer','coord']) {
+  const html=c.buildDashboardShell('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
+  assert.match(html,new RegExp('<body data-dashboard-theme="'+(key==='student'?'student':'editorial')+'">'));
+  assert(html.indexOf(c.getEditorialStyles_())<html.indexOf('</style>'));
+  assert.match(html,/Source\+Serif\+4/);assert.match(html,/Source\+Sans\+3/);
+ }
+ const html=c.buildDashboardShell('preview@example.test',[{key:'student',label:'My Team',contentId:'studentContent'},{key:'guide',label:'Guide',contentId:'guideContent'}]);
+ assert.match(html,/<body data-dashboard-theme="student">/);
+});
+
+test('editorial rules stay opt-in and text palette pairs meet normal-text contrast',()=>{
+ const c=vm.createContext({});vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
+ const css=c.getEditorialStyles_().replace(/\/\*[\s\S]*?\*\//g,'');
+ for(const match of css.matchAll(/([^{}]+)\{/g)) {
+  const selector=match[1].trim();
+  assert(selector.startsWith('@media') || selector.startsWith('body[data-dashboard-theme="editorial"]'),selector);
+  if(!selector.startsWith('@media')) {
+   for(const line of selector.split('\n')) assert(line.trim().startsWith('body[data-dashboard-theme="editorial"]'),line);
+  }
+ }
+ assert(!css.includes('!important'));
+ const token=name=>{const match=css.match(new RegExp('--color-'+name+':(#[0-9a-f]{6})','i'));assert(match,name);return match[1];};
+ const luminance=hex=>{
+  const rgb=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
+  return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;
+ };
+ for(const [foreground,background] of [['ink','canvas'],['ink-muted','paper'],['accent-primary','accent-tint'],['accent-primary','paper'],['success','success-tint'],['warning','warning-tint'],['danger','danger-tint'],['info','info-tint']]) {
+  const values=[luminance(token(foreground)),luminance(token(background))].sort((a,b)=>a-b);
+  assert((values[1]+.05)/(values[0]+.05)>=4.5,foreground+' on '+background);
+ }
+});
+
 function rubricClientFixture() {
  const f=fixture(), nodes={}, document=f.c.document;
- for(const id of ['sharedRubrics','rubricDrawer','rubricDrawerBackdrop','rubricDrawerTitle','rubricDrawerContent','rubricDrawerClose','teamDrawer','teamDrawerBackdrop']) {
+ for(const id of ['sharedRubrics','sharedRubricsContent','sharedRubricsToggle','rubricDrawer','rubricDrawerBackdrop','rubricDrawerTitle','rubricDrawerContent','rubricDrawerClose','teamDrawer','teamDrawerBackdrop']) {
   const classes=new Set();nodes[id]={innerHTML:'',attrs:{},isConnected:true,setAttribute(k,v){this.attrs[k]=v;},
    classList:{add:k=>classes.add(k),remove:k=>classes.delete(k),contains:k=>classes.has(k)},
    querySelectorAll:()=>[],focus(){document.activeElement=this;}};
  }
  const retry={addEventListener(name,fn){this.click=fn;}};
- nodes.sharedRubrics.querySelector=()=>retry;
+ nodes.sharedRubricsContent.querySelector=()=>retry;
  nodes.rubricDrawer.querySelectorAll=()=>[nodes.rubricDrawerClose];
  nodes.rubricDrawer.contains=el=>el===nodes.rubricDrawerClose;
- document.body={classList:{add(){},remove(){}}};
+ document.body.classList={add(){},remove(){}};
  const lookup=document.getElementById;document.getElementById=id=>nodes[id]||lookup(id);
  const ui=vm.runInContext('DashboardUI',f.c);
  const data={assessments:[{key:'review1',label:'Review 1',weight:12.5,available:true,criterionCount:1,totalMarks:100,criteria:[{pi:'PI1',co:'CO1',type:'Team',maxMarks:100,name:'<unsafe>',descriptors:['<level>','','','','','Excellent']}]},
@@ -93,16 +160,47 @@ test('rubrics start alongside pending role and timeline, deduplicate and survive
  f.done('loadSharedRubrics',f.data);await promise;
  f.click('reviewer');await f.ui.loadSharedRubrics();
  assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
- assert.match(f.nodes.sharedRubrics.innerHTML,/12.5%<span class="rubric-mobile-hidden"> weight<\/span>/);
- assert.match(f.nodes.sharedRubrics.innerHTML,/<span class="rubric-mobile-hidden">View rubric<\/span>/);
- const mobileRows=[...f.nodes.sharedRubrics.innerHTML.matchAll(/<div class="rubric-mobile-row">([\s\S]*?)<\/button><\/div>/g)];
+ assert.match(f.nodes.sharedRubricsContent.innerHTML,/12.5%<span class="rubric-mobile-hidden"> weight<\/span>/);
+ assert.match(f.nodes.sharedRubricsContent.innerHTML,/<span class="rubric-mobile-hidden">View rubric<\/span>/);
+ const mobileRows=[...f.nodes.sharedRubricsContent.innerHTML.matchAll(/<div class="rubric-mobile-row">([\s\S]*?)<\/button><\/div>/g)];
  assert.equal(mobileRows.length,2);
  assert.match(mobileRows[0][1],/<strong>Review 1<\/strong><span class="rubric-mobile-weight"/);
  assert.match(mobileRows[0][1],/<button type="button" class="rubric-view-button" data-rubric-key="review1"/);
  assert.equal((mobileRows[0][1].match(/data-rubric-key=/g)||[]).length,1,'only the action button opens the mobile rubric');
  assert.match(mobileRows[1][1],/Rubric not configured/);
  assert.match(mobileRows[1][1],/ disabled>View rubric/);
- assert.match(f.nodes.sharedRubrics.innerHTML,/disabled/);
+ assert.match(f.nodes.sharedRubricsContent.innerHTML,/disabled/);
+});
+
+test('rubrics collapse on staff tabs, survive async loading and always expand for students',async()=>{
+ const f=rubricClientFixture(),button=f.nodes.sharedRubricsToggle,content=f.nodes.sharedRubricsContent;
+ f.click('guide');assert.equal(button.hidden,false);assert.equal(content.hidden,true);
+ assert.equal(button.attrs['aria-expanded'],'false');
+ assert.equal(button.attrs['aria-label'],'Expand assessment rubrics');
+ const pending=f.ui.loadSharedRubrics();
+ f.done('loadSharedRubrics',f.data);await pending;
+ assert.equal(content.hidden,true);assert.match(content.innerHTML,/rubric-assessments/);
+ for(const role of ['reviewer','coord']) {f.click(role);assert.equal(button.hidden,false);assert.equal(content.hidden,true);}
+ f.click('student');assert.equal(button.hidden,true);assert.equal(content.hidden,false);assert.equal(button.attrs['aria-expanded'],'true');
+ f.ui.toggleSharedRubrics();assert.equal(content.hidden,false);
+ f.click('guide');assert.equal(content.hidden,true);
+ f.ui.toggleSharedRubrics();assert.equal(content.hidden,false);
+ assert.equal(button.attrs['aria-expanded'],'true');assert.equal(button.attrs['aria-label'],'Collapse assessment rubrics');
+ assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
+});
+
+test('collapsed rubrics retain the disclosure control through failure and retry',async()=>{
+ const f=rubricClientFixture();f.click('reviewer');
+ const pending=f.ui.loadSharedRubrics();
+ const request=f.requests.find(r=>r.key==='loadSharedRubrics');request.done=true;request.failure(new Error('offline'));
+ await assert.rejects(pending,/offline/);
+ assert.equal(f.nodes.sharedRubricsContent.hidden,true);
+ assert.equal(f.nodes.sharedRubricsToggle.hidden,false);
+ f.ui.toggleSharedRubrics();assert.match(f.nodes.sharedRubricsContent.innerHTML,/Retry/);
+ f.retry.click();const retried=f.ui.loadSharedRubrics();f.ui.toggleSharedRubrics();
+ f.done('loadSharedRubrics',f.data);await retried;
+ assert.equal(f.nodes.sharedRubricsContent.hidden,true);
+ assert.equal(f.nodes.sharedRubrics.attrs['aria-busy'],'false');
 });
 
 test('shared rubric shell follows timeline and reuses responsive drawer styles',()=>{

@@ -128,6 +128,7 @@ function buildSingleRoleDashboardPage(email, key, label, contentId, html) {
 
 function buildDashboardShell(email, views) {
   const multiRole = views.length > 1;
+  const rubricsCollapsible = ['guide','reviewer','coord'].includes(views[0].key);
 
   // Role tabs are followed by one common utility tab. Announcements is not a role.
   const roleIcons = { student:'graduation-cap', guide:'book-open', reviewer:'clipboard-check', coord:'network' };
@@ -151,7 +152,7 @@ function buildDashboardShell(email, views) {
 <meta charset="UTF-8">
 <base target="_top">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 ${getGuideStyles()}
 ${getCoordinatorStyles()}
@@ -222,9 +223,10 @@ ${getLucideStyles_()}
 }
 @container rubrics (min-width:480px) { .rubric-assessments { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @container rubrics (min-width:960px) { .rubric-assessments { grid-template-columns:repeat(4,minmax(0,1fr)); } }
-.shared-rubrics > button { padding:8px 14px; border:1px solid #655192; border-radius:8px; background:#34274f; color:#e2d9ff; font:inherit; cursor:pointer; }
-.shared-rubrics > button:hover { background:#473568; }
-.shared-rubrics > button:focus-visible { outline:3px solid #c4b5fd; outline-offset:3px; }
+.shared-rubrics-heading > button, #sharedRubricsContent > button { padding:8px 14px; border:1px solid #655192; border-radius:8px; background:#34274f; color:#e2d9ff; font:inherit; cursor:pointer; }
+.shared-rubrics-heading > button:hover, #sharedRubricsContent > button:hover { background:#473568; }
+.shared-rubrics-heading > button:focus-visible, #sharedRubricsContent > button:focus-visible { outline:3px solid #c4b5fd; outline-offset:3px; }
+#sharedRubricsToggle[hidden], #sharedRubricsContent[hidden] { display:none; }
 .shared-rubrics .app-skeleton { --skeleton-base:#242e42; --skeleton-highlight:#39425c; --skeleton-edge:#303b51; }
 .rubric-assessment:focus-visible, #rubricDrawer button:focus-visible { outline:3px solid #9e77ed; outline-offset:3px; }
 .rubric-levels { margin:12px 0 0; }
@@ -232,9 +234,10 @@ ${getLucideStyles_()}
 .rubric-levels dd { margin:4px 0 0; color:#667085; font-size:13px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
 #rubricDrawer .drawer-project-title { white-space:pre-wrap; overflow-wrap:anywhere; }
 @media(max-width:600px) { .shared-rubrics { padding:16px; } }
+${getEditorialStyles_()}
 </style>
 </head>
-<body>
+<body data-dashboard-theme="${views[0].key === 'student' ? 'student' : 'editorial'}">
 ${multiRole ? '<h1>Dashboard</h1>' : ''}
 <p class="signed-in-as">Signed in as ${escapeHtml(email)}</p>
 <nav class="dashboard-navigation" id="dashboardNavigation" aria-label="Dashboard sections">
@@ -242,7 +245,7 @@ ${multiRole ? '<h1>Dashboard</h1>' : ''}
 <div class="role-tabs" id="roleMenuItems">${roleButtons}${announcementsButton}${systemButton}</div>
 </nav>
 <section id="sharedProjectTimeline" class="shared-timeline" aria-label="Project timeline" aria-busy="true"><div class="timeline-heading"><h2>Project timeline</h2></div>${getSkeletonMarkup_('timeline', 'Loading project timeline')}</section>
-<section id="sharedRubrics" class="shared-rubrics" aria-labelledby="sharedRubricsHeading" aria-busy="true"><h2 id="sharedRubricsHeading">Assessment rubrics</h2>${getSkeletonMarkup_('panel', 'Loading assessment rubrics')}</section>
+<section id="sharedRubrics" class="shared-rubrics" aria-labelledby="sharedRubricsHeading" aria-busy="true"><div class="shared-rubrics-heading"><h2 id="sharedRubricsHeading">Assessment rubrics</h2><button type="button" id="sharedRubricsToggle" aria-expanded="${!rubricsCollapsible}" aria-label="${rubricsCollapsible ? 'Expand' : 'Collapse'} assessment rubrics" aria-controls="sharedRubricsContent" onclick="DashboardUI.toggleSharedRubrics()"${rubricsCollapsible ? '' : ' hidden'}>${renderLucideIcon_('chevron-down')}</button></div><div id="sharedRubricsContent"${rubricsCollapsible ? ' hidden' : ''}>${getSkeletonMarkup_('panel', 'Loading assessment rubrics')}</div></section>
 ${rolePanels}
 ${announcementsPanel}
 ${systemPanel}

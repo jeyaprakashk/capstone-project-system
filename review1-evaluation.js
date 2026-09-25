@@ -297,7 +297,8 @@ function reviewEffectiveStudent_(config,teamScores,student) {
   if(total!==null && (a.makeupCompleted || a.alternativeTeamScores) && status!==S.NON_PARTICIPATION) status=S.COMPLETED_AFTER_MAKEUP;
   const state=(mark,source)=>mark!==null?'RESOLVED':source==='pending'?'PENDING':'UNASSESSED';
   const teamState=state(teamMark,teamSource),individualState=state(individualMark,individualSource);
-  const assessmentComponents=a.authorized && a.authorized.length?a.authorized:(facts.approved && !facts.attended && status===S.MAKEUP_PENDING?['individual']:[]);
+  const attendedIncomplete=facts.type==='PROLONGED' && facts.attended && individualState==='UNASSESSED';
+  const assessmentComponents=a.authorized && a.authorized.length?a.authorized:(attendedIncomplete || facts.approved && !facts.attended && status===S.MAKEUP_PENDING?['individual']:[]);
   const nextActions={assessmentComponents,academicDecision:teamState==='PENDING' || !assessmentComponents.length && individualSource==='policy' && !reviewScoresComplete_(individual,student.scores)};
   const effectiveScores={};
   config.criteria.forEach(c=>{
@@ -364,7 +365,7 @@ function reviewTargeted_(latest,action,input,actor) {
     });
     if(action==='targetDraft') a.targetDraft=draft;
     else {
-      if(draft.individual) {student.scores=draft.individual;a.makeupCompleted=true;a.individualPending=false;}
+      if(draft.individual) {student.scores=draft.individual;a.makeupCompleted=a.makeupCompleted || a.individualState!=='UNASSESSED';a.individualPending=false;}
       if(draft.team) a.alternativeTeamScores=draft.team;
       delete a.targetDraft;a.authorized=[];
     }

@@ -53,7 +53,11 @@ function dashboardDialogsBrowser_(renderSkeleton) {
       host.innerHTML=renderSkeleton('panel','Preparing message');
       const swal=await load();
       host.innerHTML='';
-      return await swal.fire({
+      // The result resolves before the close animation finishes. Keep the host
+      // mounted until SweetAlert has removed its body classes and scroll lock.
+      let finishDialog;
+      const dialogDestroyed=new Promise(resolve=>{finishDialog=resolve;});
+      const result=await swal.fire({
         target:host,titleText:kind==='confirm'?'Please confirm':kind==='prompt'?'Add a remark':icon==='error'?'Unable to complete action':'Message',
         text:String(text),icon:icon || (kind==='confirm'?'question':'info'),
         showCancelButton:kind!=='alert',confirmButtonText:kind==='alert'?'OK':'Continue',
@@ -62,13 +66,16 @@ function dashboardDialogsBrowser_(renderSkeleton) {
         animation:!window.matchMedia('(prefers-reduced-motion: reduce)').matches,
         ...(kind==='prompt'?{input:'textarea',inputLabel:String(text),inputAttributes:{maxlength:'5000'},
           inputValidator:value=>!value.trim()?'Please enter a remark.':undefined}:{}),
-        didOpen:()=>{const content=swal.getHtmlContainer();if(content)content.style.whiteSpace='pre-line';}
+        didOpen:()=>{const content=swal.getHtmlContainer();if(content)content.style.whiteSpace='pre-line';},
+        didDestroy:()=>finishDialog()
       });
+      await dialogDestroyed;
+      return result;
     } catch(error) {
       // Fail closed when the CDN is unavailable; retain form data and permit retry.
       host.innerHTML='';
       const panel=document.createElement('div');
-      panel.style.cssText='margin:15vh auto;padding:24px;max-width:480px;background:white;color:#172033;border-radius:12px;';
+      panel.style.cssText='margin:15vh auto;padding:24px;max-width:480px;background:var(--color-paper,white);color:var(--color-ink,#172033);border-radius:var(--editorial-radius,12px);';
       const message=document.createElement('p');
       message.style.whiteSpace='pre-line';
       message.textContent=kind==='alert'?String(text):'Unable to open the confirmation. Your action was not performed. Please close this message and try again.';
@@ -326,16 +333,32 @@ const DashboardUI = (function() {
   let sharedRubrics = null;
   let rubricsRequest = null;
   let rubricTrigger = null;
+  let rubricsCollapsed = true;
+  function syncRubricsDisclosure() {
+    const button = byId('sharedRubricsToggle'), content = byId('sharedRubricsContent');
+    if (!button || !content) return;
+    const collapsible = ['guide','reviewer','coord'].includes(activeRole);
+    const collapsed = collapsible && rubricsCollapsed;
+    button.hidden = !collapsible;
+    button.setAttribute('aria-expanded', String(!collapsed));
+    button.setAttribute('aria-label', collapsed ? 'Expand assessment rubrics' : 'Collapse assessment rubrics');
+    content.hidden = collapsed;
+  }
+  function toggleSharedRubrics() {
+    if (!['guide','reviewer','coord'].includes(activeRole)) return;
+    rubricsCollapsed = !rubricsCollapsed;
+    syncRubricsDisclosure();
+  }
   function loadSharedRubrics() {
     if (rubricsRequest) return rubricsRequest;
-    const target = byId('sharedRubrics');
-    if (!target) return Promise.resolve(null);
-    target.setAttribute('aria-busy', 'true');
-    target.innerHTML = '<h2 id="sharedRubricsHeading">Assessment rubrics</h2>' + renderSkeleton('panel', 'Loading assessment rubrics');
+    const target = byId('sharedRubricsContent'), section = byId('sharedRubrics');
+    if (!target || !section) return Promise.resolve(null);
+    section.setAttribute('aria-busy', 'true');
+    target.innerHTML = renderSkeleton('panel', 'Loading assessment rubrics');
     rubricsRequest = new Promise(function(resolve, reject) {
       dashboardRun().withSuccessHandler(function(data) {
         try {
-          target.innerHTML = '<h2 id="sharedRubricsHeading">Assessment rubrics</h2><div class="rubric-assessments">' + data.assessments.map(function(item) {
+          target.innerHTML = '<div class="rubric-assessments">' + data.assessments.map(function(item) {
             const desktopCard = '<button type="button" class="rubric-assessment" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span class="rubric-header"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-weight">' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span class="rubric-footer"><span class="rubric-metadata">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span class="rubric-action"><span class="rubric-mobile-hidden">View rubric</span> <span aria-hidden="true">→</span></span>' : '') + '</span></button>';
             const mobileRow = '<div class="rubric-mobile-row"><div class="rubric-mobile-details"><div class="rubric-mobile-title"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-mobile-weight" aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span class="rubric-mobile-meta">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="rubric-view-button" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
             return desktopCard + mobileRow;
@@ -344,14 +367,14 @@ const DashboardUI = (function() {
           target.querySelectorAll('[data-rubric-key]').forEach(function(button) {
             button.addEventListener('click', function() { openRubricDrawer(button.getAttribute('data-rubric-key'), button); });
           });
-          target.setAttribute('aria-busy', 'false');
+          section.setAttribute('aria-busy', 'false');
           resolve(data);
         } catch (err) { reject(err); }
       }).withFailureHandler(reject).loadSharedRubrics();
     }).catch(function(err) {
       rubricsRequest = null;
-      target.setAttribute('aria-busy', 'false');
-      target.innerHTML = '<h2 id="sharedRubricsHeading">Assessment rubrics</h2><p role="status">Unable to load rubrics.</p><button type="button">Retry</button>';
+      section.setAttribute('aria-busy', 'false');
+      target.innerHTML = '<p role="status">Unable to load rubrics.</p><button type="button">Retry</button>';
       target.querySelector('button').addEventListener('click', function() { loadSharedRubrics().catch(function() {}); });
       throw err;
     });
@@ -688,7 +711,9 @@ const DashboardUI = (function() {
   }
 
   function showRoleTab(activeKey) {
+    document.body.setAttribute('data-dashboard-theme', activeKey === 'student' ? 'student' : 'editorial');
     activeRole = activeKey;
+    syncRubricsDisclosure();
     tabSelectedAt = performance.now();
     recordPerformance({event:'tab_selected', role:activeKey, cached:!!loadedRoleTabs[activeKey], prefetched:!!preloadedRoles[activeKey]});
     const keys = Array.from(document.querySelectorAll('[data-role-content]')).map(function(el) { return el.getAttribute('data-role-content'); });
@@ -1653,6 +1678,7 @@ const DashboardUI = (function() {
     loadCoordinatorSectionAsync,
     loadSharedTimeline,
     loadSharedRubrics,
+    toggleSharedRubrics,
     openRubricDrawer,
     closeRubricDrawer,
     getSharedSchedule: function() { return sharedSchedule; },

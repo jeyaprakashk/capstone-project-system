@@ -460,7 +460,7 @@ function timelineBrowser() {
     scrollBy(options){this.lastScroll=options;},focus(){this.focused=true;}});
   const timeline=target(), guide=target(), reviewer=target();
   let initialize;
-  const document={createElement:target,readyState:'loading',addEventListener:(event,callback)=>{initialize=callback;},
+  const document={body:target(),createElement:target,readyState:'loading',addEventListener:(event,callback)=>{initialize=callback;},
     getElementById:id=>id==='sharedProjectTimeline'?timeline:null,
     querySelectorAll:()=>[],querySelector:selector=>{
       if(selector==='[data-role-panel].active')return {getAttribute:()=> 'guide'};

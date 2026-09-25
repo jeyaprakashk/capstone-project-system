@@ -109,15 +109,18 @@ function buildReviewerAssignedTeams_(data) {
 
 function buildReviewerContent(email, data) {
   const { pending, approved, notYetGuideApproved, total } = data;
+  const stats = [
+    [pending.length, 'orange', 'Pending Your Decision'],
+    [approved.length, 'green', 'Approved'],
+    [notYetGuideApproved.length, 'gray', 'Not Yet Guide-Approved'],
+    [total, 'blue', 'Total Assigned to You'],
+  ].filter(([value]) => value > 0).map(([value, color, label]) =>
+    `<span class="coord-stat ${color}"><span class="coord-stat-num">${value}</span><span class="coord-stat-label">${label}</span></span>`
+  ).join('');
   data.reviewProgress = getReviewerReviewProgress_(data.assigned);
   return `
   ${buildDashboardContainerHeader_('Reviewer Dashboard', 'reviewer')}
-  <div class="coord-stats">
-    <span class="coord-stat orange"><span class="coord-stat-num">${pending.length}</span><span class="coord-stat-label">Pending Your Decision</span></span>
-    <span class="coord-stat green"><span class="coord-stat-num">${approved.length}</span><span class="coord-stat-label">Approved</span></span>
-    <span class="coord-stat gray"><span class="coord-stat-num">${notYetGuideApproved.length}</span><span class="coord-stat-label">Not Yet Guide-Approved</span></span>
-    <span class="coord-stat blue"><span class="coord-stat-num">${total}</span><span class="coord-stat-label">Total Assigned to You</span></span>
-  </div>
+  ${stats ? `<div class="coord-stats">${stats}</div>` : ''}
   ${data.reviewProgress.error ? `<p role="status">Review marks are unavailable: ${escapeHtml(data.reviewProgress.error)}</p>` : ''}
   ${buildReviewerAssignedTeams_(data)}`;
 }

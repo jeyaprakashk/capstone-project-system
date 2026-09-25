@@ -589,6 +589,27 @@ for(const key of ['review1','review2']) {
     host.controls.type.value='NORMAL';f.events.input();assert.equal(field.hidden,false);
     assert.equal(f.fields()[0].hidden,false);
   });
+  test(key+': corrected attended exception permits completing the missing individual rubric',async ()=>{
+    const server=absenceFixture(key),input=server.input();
+    input.students[0].absence=absence('REVIEW_DAY_ABSENCE',true,false,false);input.students[0].scores={};server.submit(input);
+    server.c.recordReviewAbsence(server.target({absence:absence('REVIEW_DAY_ABSENCE',false,false,false)}));
+    server.c.recordReviewAbsence(server.target({absence:absence('PROLONGED',true,true,true)}));
+    assert.equal(server.student().assessment.status,'INCOMPLETE');
+    const before=JSON.parse(JSON.stringify(server.load().evaluation));
+    const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(JSON.parse(JSON.stringify(server.load())));
+    assert.match(f.drawer.innerHTML,/Complete Individual Assessment/);
+    await f.click('data-target');
+    assert.equal(f.fields()[1].controls['[data-marks]'].disabled,false);
+    assert.equal(f.fields()[0].hidden,true);assert.equal(f.fields()[2].hidden,true);
+    assert.throws(()=>server.c.saveReviewTargetedAssessment(server.target({submit:true,teamScores:{T:{level:3,marks:48,remark:''}},scores:{I:{level:3,marks:32,remark:''}}})),/Only authorized components/);
+    server.c.saveReviewTargetedAssessment(server.target({submit:false,scores:{I:{level:3,marks:32,remark:''}}}));
+    assert.equal(server.student().assessment.status,'INCOMPLETE');
+    server.c.saveReviewTargetedAssessment(server.target({submit:true,scores:{I:{level:3,marks:32,remark:''}}}));
+    assert.equal(server.student().assessment.status,'COMPLETED');assert.equal(server.student().total,80);
+    assert.equal(server.student().assessment.nextActions.assessmentComponents.length,0);
+    const after=JSON.parse(JSON.stringify(server.load().evaluation));
+    assert.deepEqual(after.teamScores,before.teamScores);assert.deepEqual(after.students[1],before.students[1]);
+  });
   test(key+': pending absence hides individual controls until makeup is opened',async ()=>{
     const server=absenceFixture(key),input=server.input();input.students[0].absence=absence('PROLONGED',true,true,false);input.students[0].scores={};server.submit(input);
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(JSON.parse(JSON.stringify(server.load())));
@@ -660,7 +681,7 @@ for(const key of ['review1','review2']) {
     for(const approved of [true,false]){
       const incomplete=evaluate(absence('PROLONGED',approved,true,true),common,{});
       assert.equal(incomplete.assessment.individualMark,null);assert.equal(incomplete.assessment.individualState,'UNASSESSED');assert.equal(incomplete.assessment.status,'INCOMPLETE');assert.equal(incomplete.assessment.completed,false);
-      assert.equal(incomplete.assessment.nextActions.assessmentComponents.length,0);assert.equal(incomplete.assessment.nextActions.academicDecision,false);
+      assert.deepEqual(Array.from(incomplete.assessment.nextActions.assessmentComponents),['individual']);assert.equal(incomplete.assessment.nextActions.academicDecision,false);
     }
     const pending=evaluate(absence('PROLONGED',true,false,true),common,{});
     assert.equal(pending.assessment.teamState,'PENDING');assert.equal(pending.assessment.individualState,'UNASSESSED');assert.equal(pending.assessment.status,'ACADEMIC_DECISION_PENDING');
