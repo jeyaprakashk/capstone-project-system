@@ -247,7 +247,7 @@ function browserFixture() {
       querySelector:()=>panel,querySelectorAll:()=>[]},
     google:{script:{run:runner()}},getSkeletonMarkup_:()=>''
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','dashboard-client-scripts.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js','dashboard-client-scripts.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):fs.readFileSync(file,'utf8'),c);
   vm.runInContext(c.getDashboardClientScript(),c);
   c.form=form;
   return {requests,status,panel,button,input,form,summary,badge,detail,refreshButton,

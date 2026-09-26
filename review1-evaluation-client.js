@@ -258,18 +258,9 @@ function review1EvaluationBrowser_(reviewKey='review1') {
     return html;
   }
   function assessmentHistory(decisions) {
-    if(!decisions || !decisions.length)return '';
-    const actions={exception:'Absence details updated',targetSubmit:'Assessment completed',targetDraft:'Assessment draft saved',MAKEUP_ALTERNATIVE_ASSESSMENT:'Assessment authorized',DEFERRED_ASSESSMENT:'Assessment deferred',TEAM_MARK_APPLICABLE:'Team mark approved',TEAM_MARK_NOT_APPLICABLE:'Team mark not applicable',OTHER:'Academic decision recorded'};
-    const statuses={COMPLETED:'Completed',MAKEUP_PENDING:'Awaiting makeup',COMPLETED_AFTER_MAKEUP:'Completed after makeup',ABSENT_UNAPPROVED:'Unapproved absence',ACADEMIC_DECISION_PENDING:'Awaiting academic decision',NON_PARTICIPATION:'Non-participation',INCOMPLETE:'Incomplete'};
-    const automaticReasons=['Prolonged absence source facts updated.','Review-day absence recorded as unapproved.'];
-    return '<details class="review1-history"><summary>Assessment history <span>'+decisions.length+'</span></summary><ol>'+decisions.slice().reverse().map(d=>{
-      const date=new Date(d.at),valid=Number.isFinite(date.getTime());
-      const when=valid?date.toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-      const reason=String(d.reason||'');
-      const note=reason && !automaticReasons.includes(reason) && !reason.startsWith('Absence details recorded: ')?'<p>'+escape(reason)+'</p>':'';
-      return '<li><div class="review1-history-heading"><strong>'+escape(actions[d.decision]||'Assessment updated')+'</strong>'+(when?'<time datetime="'+escape(date.toISOString())+'">'+escape(when)+'</time>':'')+'</div><div class="review1-history-status">'+escape(statuses[d.previousStatus]||'Not assessed')+' <span aria-label="changed to">→</span> '+escape(statuses[d.resultingStatus]||'Updated')+'</div>'+note+(d.reviewer?'<small>'+escape(d.reviewer)+'</small>':'')+'</li>';
-    }).join('')+'</ol></details>';
+    return DashboardUI.renderAssessmentHistory(decisions);
   }
+
   function absenceControl(index,student) {
     const a=student.assessment||{},f=a.facts||{type:'UNSELECTED'};
     const readOnly=!model.availability.editable && correctionIndex!==index;
@@ -869,28 +860,7 @@ function review1EvaluationBrowser_(reviewKey='review1') {
       DashboardUI.filterReviewerAssignedTeams(false);
     },()=>{finish();if(drawer.open)message('Evaluation saved. The assigned-team table could not refresh; reload to retry.');});
   }
-  let adminBusy=false,adminPending=null;
-  function admin() {
-    const host=document.getElementById(reviewKey+'Admin');if(!host || adminBusy)return;
-    adminBusy=true;const finishLoading=DashboardUI.beginContentLoading(host, 'Loading '+reviewLabel+' evaluations');
-    rpc('loadCoordinatorReview1Evaluations',[],report=>{
-      finishLoading();adminBusy=false;
-      if(!report.ready){host.textContent='Review'+reviewNumber+'Evaluations is missing from the main spreadsheet. Create the tab manually with the required headers.';return;}
-      host.innerHTML=report.teams.map((team,index)=>'<section class="drawer-section"><strong>'+escape(team.team)+'</strong> &middot; '+escape(team.status)+(team.late?' &middot; Late':'')+(team.students||[]).map((s,j)=>'<p>'+escape(s.register)+': '+mark(s.total)+' marks &middot; Course contribution '+mark(s.weighted)+' &middot; '+escape(s.assessment && s.assessment.status || '')+'</p>'+(s.assessment && s.assessment.decisions || []).map(d=>'<p>'+escape(d.decision)+' &middot; '+escape(d.reviewer)+' &middot; '+escape(d.at)+' &middot; '+escape(d.reason)+' &middot; '+escape(d.previousStatus)+' &middot; '+escape(d.resultingStatus)+'</p>').join('')+(s.needsPublication && team.status==='Submitted'?'<button type="button" data-publish="'+index+'" data-publish-student="'+j+'">Publish '+escape(s.register)+'</button>':'')).join('')+(team.status==='Submitted'?'<button type="button" data-publish="'+index+'">Publish pending results</button> ':'')+(['Submitted','Published'].includes(team.status)?'<button type="button" data-reopen="'+index+'">Reopen full review</button>':'')+'</section>').join('')||'No teams.';
-      host.querySelectorAll('[data-publish],[data-reopen]').forEach(button=>button.addEventListener('click',async ()=>{
-        if(adminBusy)return;
-        const publish=button.hasAttribute('data-publish'),team=report.teams[Number(publish?button.dataset.publish:button.dataset.reopen)];
-        const input={team:team.team,revision:team.revision};
-        if(button.hasAttribute('data-publish-student'))input.student=team.students[Number(button.dataset.publishStudent)].register;
-        if(publish){if(!await DashboardUI.ask('Publish '+reviewLabel+' results for '+team.team+' to its students?'))return;}
-        else {const reason=await DashboardUI.requestText('Reason for reopening (scores will be cleared):');if(!reason || !reason.trim())return;input.reason=reason.trim();}
-        const method=publish?'publishReview1Evaluation':'reopenReview1Evaluation',signature=JSON.stringify({method,input});
-        if(!adminPending || adminPending.signature!==signature)adminPending={signature,id:requestId()};
-        input.requestId=adminPending.id;adminBusy=true;host.querySelectorAll('button').forEach(b=>b.disabled=true);
-        rpc(method,[input],()=>{adminBusy=false;adminPending=null;admin();},error=>{adminBusy=false;host.querySelectorAll('button').forEach(b=>b.disabled=false);DashboardUI.notify(error.message, 'error');});
-      }));
-    },error=>{finishLoading();adminBusy=false;const notice=document.createElement('p');notice.setAttribute('role','status');notice.textContent='Unable to refresh: '+error.message;host.appendChild(notice);});
-  }
+  function admin() { return InternalAssessmentPublishing.refresh(reviewKey); }
   let studentBusy=false;
   function student() {
     const host=document.getElementById('studentReview'+reviewNumber+'Evaluation');if(!host || studentBusy)return;
@@ -922,16 +892,7 @@ function getReview1EvaluationStyles_() {
   .review1-project-meta-row { display:flex; align-items:baseline; justify-content:space-between; gap:4px 16px; flex-wrap:wrap; margin:8px 0 0; color:var(--color-ink-muted,#667085); }
   .review1-project-meta-row .review1-project-meta { margin:0; min-width:0; overflow-wrap:anywhere; }
   .review1-project-meta-row .review1-project-meta:last-child { flex-shrink:0; text-align:right; }
-  .review1-history { margin-top:16px; border-top:1px solid var(--color-border,#e2e8f0); padding-top:12px; font-size:12px; }
-  .review1-history summary { cursor:pointer; font-weight:600; color:var(--color-ink-muted,#475569); }
-  .review1-history summary span { margin-left:6px; padding:2px 7px; border-radius:var(--editorial-radius,12px); background:var(--color-border,#e2e8f0); font-size:11px; }
-  .review1-history ol { list-style:none; padding:0; margin:8px 0 0; }
-  .review1-history li { padding:10px 0; border-bottom:1px solid var(--color-border,#e2e8f0); overflow-wrap:anywhere; }
-  .review1-history li:last-child { border-bottom:0; }
-  .review1-history-heading { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; }
-  .review1-history time, .review1-history small { color:var(--color-ink-muted,#64748b); font-size:11px; }
-  .review1-history-status { margin-top:4px; color:var(--color-ink-muted,#475569); }
-  .review1-history li p { margin:4px 0; white-space:pre-line; }
+
   .review1-exception-summary { display:grid; gap:16px; margin:16px 0; }
   .review1-exception-summary dt, .review1-assessment-summary dt { font-size:12px; color:var(--muted-text, var(--color-ink-muted,#64748b)); margin-bottom:4px; }
   .review1-exception-summary dd, .review1-assessment-summary dd { margin:0; overflow-wrap:anywhere; }

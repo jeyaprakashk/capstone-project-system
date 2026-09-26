@@ -300,7 +300,8 @@ function browserFixture(extended=false,key='review1') {
   function runner(success,failure){return new Proxy({},{get:(_,name)=>name==='withSuccessHandler'?fn=>runner(fn,failure):name==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({name,args,success,failure})});}
   const c=vm.createContext({console,confirm:()=>discard,prompt:()=>extended?'Reviewed assessment':null,window:{crypto,addEventListener(){}},document:{createElement:()=>drawer,body:{appendChild(){},classList:{add(){},remove(){}}},getElementById:()=>null},DashboardUI:{ask:async ()=>discard,requestText:async ()=>extended?'Reviewed assessment':null,notify:async ()=>{},guideRun:()=>runner(),renderSkeleton:()=>'<p>Loading</p>',...(extended?{beginContentLoading(){loading.begun++;let settled=false;return()=>{if(!settled)loading.settled++;settled=true;};}}:{})}});
   vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
-  for(const file of ['lucide-icons.js','icon-renderer.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
+  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js'])vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):fs.readFileSync(file,'utf8'),c);
+  c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;
   c.DashboardUI.renderIcon=c.renderLucideIcon_;
   c.DashboardUI.renderExpandableText=c.renderExpandableText_;
   vm.runInContext(fs.readFileSync('review1-evaluation-client.js','utf8'),c);const api=c.review1EvaluationBrowser_(key);

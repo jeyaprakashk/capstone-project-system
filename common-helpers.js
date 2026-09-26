@@ -749,3 +749,19 @@ function buildDashboardContainerHeader_(title, key) {
 function buildTeamPagination_(prefix, tableKey, total) {
   return `<div class="pagination"><span id="${prefix}PaginationInfo">Showing 0 - 0 of ${total} teams</span><label class="team-page-size" for="${prefix}PageSize">Rows per page <select id="${prefix}PageSize" onchange="DashboardUI.changeTeamPageSize('${tableKey}', this.value)"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="all">All</option></select></label><div id="${prefix}PaginationButtons" class="pagination-buttons" aria-label="Team table pages"></div></div>`;
 }
+
+/** Presentation only: preserves the Review drawer history labels and note filtering. */
+function renderAssessmentHistory_(decisions) {
+    const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    if(!decisions || !decisions.length)return '';
+    const actions={exception:'Absence details updated',targetSubmit:'Assessment completed',targetDraft:'Assessment draft saved',MAKEUP_ALTERNATIVE_ASSESSMENT:'Assessment authorized',DEFERRED_ASSESSMENT:'Assessment deferred',TEAM_MARK_APPLICABLE:'Team mark approved',TEAM_MARK_NOT_APPLICABLE:'Team mark not applicable',OTHER:'Academic decision recorded'};
+    const statuses={COMPLETED:'Completed',MAKEUP_PENDING:'Awaiting makeup',COMPLETED_AFTER_MAKEUP:'Completed after makeup',ABSENT_UNAPPROVED:'Unapproved absence',ACADEMIC_DECISION_PENDING:'Awaiting academic decision',NON_PARTICIPATION:'Non-participation',INCOMPLETE:'Incomplete'};
+    const automaticReasons=['Prolonged absence source facts updated.','Review-day absence recorded as unapproved.'];
+    return '<details class="review1-history"><summary>Assessment history <span>'+decisions.length+'</span></summary><ol>'+decisions.slice().reverse().map(d=>{
+      const date=new Date(d.at),valid=Number.isFinite(date.getTime());
+      const when=valid?date.toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+      const reason=String(d.reason||'');
+      const note=reason && !automaticReasons.includes(reason) && !reason.startsWith('Absence details recorded: ')?'<p>'+escape(reason)+'</p>':'';
+      return '<li><div class="review1-history-heading"><strong>'+escape(actions[d.decision]||'Assessment updated')+'</strong>'+(when?'<time datetime="'+escape(date.toISOString())+'">'+escape(when)+'</time>':'')+'</div><div class="review1-history-status">'+escape(statuses[d.previousStatus]||'Not assessed')+' <span aria-label="changed to">→</span> '+escape(statuses[d.resultingStatus]||'Updated')+'</div>'+note+(d.reviewer?'<small>'+escape(d.reviewer)+'</small>':'')+'</li>';
+    }).join('')+'</ol></details>';
+  }

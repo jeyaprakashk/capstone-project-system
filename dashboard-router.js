@@ -257,6 +257,7 @@ ${systemPanel}
 </aside>
 <script>
 ${getDashboardClientScript()}
+${getInternalAssessmentPublishingClientScript_()}
 ${getGuideEvaluationClientScript()}
 ${getReviewerMarkingScript_()}
 ${getReview1EvaluationClientScript_()}

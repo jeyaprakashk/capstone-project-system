@@ -102,6 +102,7 @@ const DashboardUI = (function() {
   const renderSkeleton = ${getSkeletonMarkup_.toString()};
   const dialogs = (${dashboardDialogsBrowser_.toString()})(renderSkeleton);
   const renderExpandableText = ${renderExpandableText_.toString()};
+  const renderAssessmentHistory = ${renderAssessmentHistory_.toString()};
   ${getLucideIconNodes_.toString()}
   ${renderLucideIcon_.toString()}
   ${initializeDashboardTooltips_.toString()}
@@ -1669,6 +1670,7 @@ const DashboardUI = (function() {
     refreshGithubStatus,
     retryGithubSetup,
     submitGithubUsername,
+    renderAssessmentHistory: renderAssessmentHistory,
     renderSkeleton: renderSkeleton,
     beginContentLoading: beginContentLoading,
     guideRun: dashboardRun,

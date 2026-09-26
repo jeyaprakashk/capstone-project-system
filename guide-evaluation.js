@@ -92,6 +92,11 @@ function loadGuideEvaluation(teamId, register) {
   return {roster, student, config, overdue, repository, token:guideFingerprint_({roster,config}), revision:latest ? latest.revision : 0,
     evaluation:latest, statuses:roster.students.map(s => ({register:s.register,status:(guideLatest_(records,roster.team,s.register)||{}).status || 'Not started'}))};
 }
+function guidePublicationBlock_(latest, rosterHash) {
+  if (!latest || latest.status !== 'Submitted') return 'This action is not available for the current status.';
+  if (rosterHash !== latest.rosterHash) return 'Roster changed; reopen and ask the guide to review.';
+  return '';
+}
 function guideWrite_(action, input) {
   const staff = action === 'publish' || action === 'reopen';
   const actor = guideActor_(staff);
@@ -115,7 +120,10 @@ function guideWrite_(action, input) {
     if (staff) {
       if (!latest || (action === 'publish' ? latest.status !== 'Submitted' : !['Submitted','Published'].includes(latest.status))) throw new Error('This action is not available for the current status.');
       if (action === 'reopen' && (!String(input.reason || '').trim() || String(input.reason).length > 2000)) throw new Error('A reopening reason is required (maximum 2000 characters).');
-      if (action === 'publish' && guideFingerprint_(roster) !== latest.rosterHash) throw new Error('Roster changed; reopen and ask the guide to review.');
+      if (action === 'publish') {
+        const publicationBlock=guidePublicationBlock_(latest,guideFingerprint_(roster));
+        if(publicationBlock) throw new Error(publicationBlock);
+      }
       payload = {...latest, status:action === 'publish' ? 'Published' : 'Draft', reason:action === 'reopen' ? String(input.reason).trim() : '', fingerprint};
       if (action === 'reopen') {
         payload.config = guideConfiguration_(); payload.scores = {}; payload.total = 0; payload.weighted = 0;
@@ -183,5 +191,5 @@ function guideCompletion_() {
   } catch(err) { return {available:false,completed:0,teams:{}}; }
 }
 function buildGuideEvaluationAdmin_() {
-  return '<section class="assessment-section"><h3>Guide Evaluation</h3><p>Individual assessment Â· Defined in Milestones and Rubrics</p><button type="button" onclick="GuideEvaluation.admin()">Refresh evaluations</button><div id="guideEvaluationAdmin" aria-live="polite">Open Refresh evaluations to check configuration and submissions.</div></section>';
+  return buildInternalAssessmentPublishing_('guide_eval');
 }

@@ -140,6 +140,14 @@ function review1Score_(config, roster, input, complete, previous) {
   return {teamScores,students};
 }
 
+// Shared by the coordinator presentation adapter and the existing write path.
+// Academic completion is intentionally not a publication requirement.
+function reviewPublicationBlock_(latest, rosterHash, student) {
+  if (!latest || latest.status !== 'Submitted') return 'This action is not available for the current status.';
+  if (latest.rosterHash !== rosterHash) return 'Roster changed; reopen and ask the reviewer to review.';
+  if (student && !latest.students.some(s=>s.register===student)) return 'Unknown student.';
+  return '';
+}
 function review1Write_(action,input,key='review1') {
   const staff=action==='publish' || action==='reopen';
   const actor=guideActor_(staff);
@@ -162,8 +170,8 @@ function review1Write_(action,input,key='review1') {
     if (staff) {
       if (!latest || (action==='publish'?latest.status!=='Submitted':!['Submitted','Published'].includes(latest.status))) throw new Error('This action is not available for the current status.');
       if (action==='publish') {
-        if (latest.rosterHash!==rosterHash) throw new Error('Roster changed; reopen and ask the reviewer to review.');
-        if(input.student && !latest.students.some(s=>s.register===input.student)) throw new Error('Unknown student.');
+        const publicationBlock=reviewPublicationBlock_(latest,rosterHash,input.student);
+        if(publicationBlock) throw new Error(publicationBlock);
         const students=latest.students.map(s=>(!input.student || s.register===input.student)?{...s,needsPublication:false}:s);
         payload={...latest,students,status:students.some(s=>s.needsPublication)?'Submitted':'Published',publishedStudents:students.filter(s=>!input.student || s.register===input.student).map(s=>s.register),fingerprint};
       } else {

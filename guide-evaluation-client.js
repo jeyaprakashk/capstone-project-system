@@ -72,19 +72,7 @@ function guideEvaluationBrowser_() {
       open(team,student);
     },err=>{setBusy(false);message(err.message+' Retry uses the same request ID unless you change the form.');});
   }
-  let adminBusy=false;
-  function admin() {
-    const host=el('guideEvaluationAdmin');if(!host || adminBusy)return;
-    adminBusy=true;const finishLoading=DashboardUI.beginContentLoading(host, 'Loading evaluations');
-    rpc('loadCoordinatorGuideEvaluations',[],report=>{
-      finishLoading();adminBusy=false;
-      if(!report.ready){host.textContent=report.error;return;}
-      const students=report.students || [];
-      const submitted=students.filter(s=>s.status==='Submitted').length;
-      const published=students.filter(s=>s.status==='Published').length;
-      host.textContent=students.length+' students · '+submitted+' submitted · '+published+' published';
-    },err=>{finishLoading();adminBusy=false;const notice=document.createElement('p');notice.setAttribute('role','status');notice.textContent='Unable to refresh: '+err.message;host.appendChild(notice);});
-  }
+  function admin() { return InternalAssessmentPublishing.refresh('guide_eval'); }
   function student() {
     const host=el('studentGuideEvaluation');if(!host)return;
     host.innerHTML=DashboardUI.renderSkeleton('panel', 'Loading guide evaluation results');

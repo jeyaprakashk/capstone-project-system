@@ -71,7 +71,7 @@ function fixture(system=false) {
  querySelectorAll:selector=>selector==='[data-role-content]'?panels:[]};
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({key,args,success,failure})}); }
  const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
- for(const file of ['lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').split('function renderAssessmentHistory_')[1].replace(/^/, 'function renderAssessmentHistory_'):fs.readFileSync(file,'utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
  vm.runInContext(c.getDashboardClientScript(),c);
  return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);}};
@@ -99,7 +99,7 @@ test('theme follows active tabs immediately, cached content and late responses c
 test('shell selects the first role theme before scripts or fonts load',()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})}});
  for(const file of ['common-styles.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review1-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- for(const name of ['getDashboardClientScript','getGuideEvaluationClientScript','getReviewerMarkingScript_','getReview1EvaluationClientScript_']) c[name]=()=>'';
+ for(const name of ['getInternalAssessmentPublishingClientScript_','getDashboardClientScript','getGuideEvaluationClientScript','getReviewerMarkingScript_','getReview1EvaluationClientScript_']) c[name]=()=>'';
  for(const key of ['student','guide','reviewer','coord']) {
   const html=c.buildDashboardShell('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
   assert.match(html,new RegExp('<body data-dashboard-theme="'+(key==='student'?'student':'editorial')+'">'));

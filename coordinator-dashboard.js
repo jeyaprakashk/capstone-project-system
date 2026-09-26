@@ -1535,8 +1535,8 @@ function loadCoordinatorSystemStatus() {
     return `<div class="coordinator-container">
       <div class="system-status-primary">${buildGithubAccessSection(access)}</div>
       ${buildGuideEvaluationAdmin_()}
-      <section class="assessment-section"><h3>Review 1</h3><button type="button" onclick="Review1Evaluation.admin()">Refresh Review 1 evaluations</button><div id="review1Admin" aria-live="polite">Refresh to view submissions and publish or reopen evaluations.</div></section>
-      <section class="assessment-section"><h3>Review 2</h3><button type="button" onclick="Review2Evaluation.admin()">Refresh Review 2 evaluations</button><div id="review2Admin" aria-live="polite">Refresh to view submissions and publish or reopen evaluations.</div></section>
+      ${buildInternalAssessmentPublishing_('review1')}
+      ${buildInternalAssessmentPublishing_('review2')}
       <section class="assessment-section reviewer-setup" aria-label="Review committees and marking sheets">
         ${buildCommitteeDirectory_(committees)}
         <div class="reviewer-setup-panels">${buildReviewConfigurationCard_()}

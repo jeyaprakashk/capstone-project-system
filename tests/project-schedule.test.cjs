@@ -27,7 +27,7 @@ function fixture(overrides = {}, runtime = {}) {
       return new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'short',year:'numeric'}).format(date);
     }}
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','reviewer-evaluation.js','reviewer-evaluation-client.js','review1-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-evaluation.js','dashboard-router.js']) {
+  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','reviewer-evaluation.js','reviewer-evaluation-client.js','review1-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
   const schedule = c.getProjectSchedule_();
