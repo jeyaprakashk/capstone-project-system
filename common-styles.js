@@ -68,16 +68,16 @@ function getBaseStyles() {
   .publishing-students th,.publishing-students td { min-width:120px; overflow-wrap:anywhere; }
   .publishing-allowed { color:var(--color-ink,#172f35); }
   .publishing-secondary { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-top:10px; font-size:var(--font-size-small); color:var(--color-ink-muted,#52636c); }
-  .review1-history { margin-top:16px; border-top:1px solid var(--color-border,#e2e8f0); padding-top:12px; font-size:12px; }
-  .review1-history summary { cursor:pointer; font-weight:600; color:var(--color-ink-muted,#475569); }
-  .review1-history summary span { margin-left:6px; padding:2px 7px; border-radius:var(--editorial-radius,12px); background:var(--color-border,#e2e8f0); font-size:11px; }
-  .review1-history ol { list-style:none; padding:0; margin:8px 0 0; }
-  .review1-history li { padding:10px 0; border-bottom:1px solid var(--color-border,#e2e8f0); overflow-wrap:anywhere; }
-  .review1-history li:last-child { border-bottom:0; }
-  .review1-history-heading { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; }
-  .review1-history time, .review1-history small { color:var(--color-ink-muted,#64748b); font-size:11px; }
-  .review1-history-status { margin-top:4px; color:var(--color-ink-muted,#475569); }
-  .review1-history li p { margin:4px 0; white-space:pre-line; }
+  .review-history { margin-top:16px; border-top:1px solid var(--color-border,#e2e8f0); padding-top:12px; font-size:12px; }
+  .review-history summary { cursor:pointer; font-weight:600; color:var(--color-ink-muted,#475569); }
+  .review-history summary span { margin-left:6px; padding:2px 7px; border-radius:var(--editorial-radius,12px); background:var(--color-border,#e2e8f0); font-size:11px; }
+  .review-history ol { list-style:none; padding:0; margin:8px 0 0; }
+  .review-history li { padding:10px 0; border-bottom:1px solid var(--color-border,#e2e8f0); overflow-wrap:anywhere; }
+  .review-history li:last-child { border-bottom:0; }
+  .review-history-heading { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; }
+  .review-history time, .review-history small { color:var(--color-ink-muted,#64748b); font-size:11px; }
+  .review-history-status { margin-top:4px; color:var(--color-ink-muted,#475569); }
+  .review-history li p { margin:4px 0; white-space:pre-line; }
   .publishing-error { padding:12px; margin:0 0 12px; background:#fff4dc; color:#80520c; border-radius:6px; font-size:var(--font-size-body); overflow-wrap:anywhere; }
   .publishing-result { padding:10px 0; font-size:var(--font-size-body); }
   .internal-publishing [data-notice]:not(:empty) { margin-bottom:12px; font-size:var(--font-size-body); }
@@ -1092,10 +1092,10 @@ function getEditorialStyles_() {
     background:var(--color-canvas); color:var(--color-ink); color-scheme:light;
     font-family:var(--editorial-body); font-size:15px; line-height:1.55;
   }
-  ${rule('h1|h2|h3|h4|.card-title|.assessment-title|.pipeline-title|.tracker-title|.team-drawer-title|.drawer-project-title|.shared-timeline .timeline-heading h2|.shared-rubrics h2|.announcement-tab-surface .announcement-header h2|.dashboard-body-surface h1|.dashboard-body-surface :is(h2,h3)|.review1-drawer .team-drawer-title', 'font-family:var(--editorial-heading); color:var(--color-ink); font-weight:600; letter-spacing:-.025em; text-transform:none; overflow-wrap:anywhere;')}
+  ${rule('h1|h2|h3|h4|.card-title|.assessment-title|.pipeline-title|.tracker-title|.team-drawer-title|.drawer-project-title|.shared-timeline .timeline-heading h2|.shared-rubrics h2|.announcement-tab-surface .announcement-header h2|.dashboard-body-surface h1|.dashboard-body-surface :is(h2,h3)|.review-drawer .team-drawer-title', 'font-family:var(--editorial-heading); color:var(--color-ink); font-weight:600; letter-spacing:-.025em; text-transform:none; overflow-wrap:anywhere;')}
   ${rule('h1|.dashboard-body-surface h1|.announcement-tab-surface .announcement-header h2', 'font-size:32px; line-height:1.2;')}
   ${rule('h2|.shared-timeline .timeline-heading h2|.shared-rubrics h2|.assessment-title|.pipeline-title|.tracker-title', 'font-size:23px; line-height:1.3;')}
-  ${rule('h3|.card-title|.team-drawer-title|.review1-drawer .team-drawer-title', 'font-size:20px; line-height:1.35;')}
+  ${rule('h3|.card-title|.team-drawer-title|.review-drawer .team-drawer-title', 'font-size:20px; line-height:1.35;')}
   ${rule('a|.card-sub a|.doc-links a|.coord-table.read-only a|.expand-hint|.announcement-expand|.announcement-collapse|.drawer-repo-link|.view-link', 'color:var(--color-accent-primary); text-underline-offset:3px;')}
   ${rule('a:hover', 'color:var(--color-accent-hover);')}
   ${rule('.signed-in-as', 'font-size:13px; color:var(--color-ink-muted); margin:8px 0 24px; overflow-wrap:anywhere;')}
@@ -1111,7 +1111,7 @@ function getEditorialStyles_() {
   ${rule('.dashboard-navigation .role-tab-btn.active', 'background:var(--color-accent-tint); color:var(--color-accent-primary); box-shadow:inset 0 -3px var(--color-accent-primary); border-color:var(--color-accent-primary);')}
 
   /* Paper surfaces, with structure supplied by fine rules rather than elevation. */
-  ${rule('.shared-timeline|.shared-rubrics|.event-card|.pipeline-section|.assessment-section|.github-section|.team-tracker-section|.reviewer-assigned-teams|.system-status-primary > .system-status-card|.coordinator-card-placeholder|.committee-item|.review-config-card|.announcement-item|.announcement-empty-state|.drawer-info-card|.guide-eval-criterion|.review1-assessment-summary', 'background:var(--color-paper); color:var(--color-ink); border:1px solid var(--color-border); border-radius:8px; box-shadow:none; color-scheme:light;')}
+  ${rule('.shared-timeline|.shared-rubrics|.event-card|.pipeline-section|.assessment-section|.github-section|.team-tracker-section|.reviewer-assigned-teams|.system-status-primary > .system-status-card|.coordinator-card-placeholder|.committee-item|.review-config-card|.announcement-item|.announcement-empty-state|.drawer-info-card|.guide-eval-criterion|.review-assessment-summary', 'background:var(--color-paper); color:var(--color-ink); border:1px solid var(--color-border); border-radius:8px; box-shadow:none; color-scheme:light;')}
   ${rule('.shared-timeline|.shared-rubrics', 'padding:24px; margin-bottom:var(--dashboard-section-gap); border-top:2px solid var(--color-accent-secondary);')}
   ${rule('.shared-rubrics h2', 'margin-bottom:20px;')}
   ${rule('.shared-rubrics-heading', 'display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--dashboard-content-gap);')}
@@ -1131,7 +1131,7 @@ function getEditorialStyles_() {
   ${rule('.card-accent.orange', 'background:var(--color-accent-secondary);')}
   ${rule('.card-accent.blue', 'background:var(--color-info);')}
   ${rule('.card-accent.red', 'background:var(--color-danger);')}
-  ${rule('.card-divider|.timeline-body|.committee-body|.drawer-section|.drawer-person|.drawer-status-row|.review1-history|.review1-history li|.review1-project-title-row|.review1-criterion[data-index] .review1-feedback-heading', 'border-color:var(--color-border);')}
+  ${rule('.card-divider|.timeline-body|.committee-body|.drawer-section|.drawer-person|.drawer-status-row|.review-history|.review-history li|.review-project-title-row|.review-criterion[data-index] .review-feedback-heading', 'border-color:var(--color-border);')}
   ${rule('.card-divider', 'background:var(--color-border);')}
   ${rule('.coordinator-container', 'gap:var(--dashboard-section-gap);')}
   ${rule('.stats|.coord-stats|.coord-stats.coordinator-stats-grid', 'gap:var(--dashboard-content-gap); margin-bottom:var(--dashboard-section-gap);')}
@@ -1144,7 +1144,7 @@ function getEditorialStyles_() {
   ${rule('[data-role-content="guide"] .stat|[data-role-content="reviewer"] .coord-stat', 'min-width:0;')}
   ${rule('.stat|.coord-stat|.coordinator-stats-grid .stat-card', 'padding:var(--dashboard-content-gap) var(--dashboard-section-gap); border:1px solid var(--color-border); border-radius:6px; background:var(--color-paper); box-shadow:none; text-align:left;')}
   ${rule('.stat-num|.coord-stat-num|.coordinator-stats-grid .stat-card .stat-num', 'font-family:var(--editorial-heading); font-size:32px; font-weight:600; line-height:1.15; font-variant-numeric:tabular-nums; color:var(--color-ink);')}
-  ${rule('.stat-label|.coord-stat-label|.coordinator-stats-grid .stat-label|.drawer-section-title|.drawer-info-label|.team-drawer-eyebrow|.review1-control-title', 'font-family:var(--editorial-body); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--color-ink-muted);')}
+  ${rule('.stat-label|.coord-stat-label|.coordinator-stats-grid .stat-label|.drawer-section-title|.drawer-info-label|.team-drawer-eyebrow|.review-control-title', 'font-family:var(--editorial-body); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--color-ink-muted);')}
   ${rule('.coordinator-stats-grid .stat-detail|.coordinator-stats-grid .stat-detail-row', 'font-size:12px; color:var(--color-ink-muted);')}
   ${rule('.coordinator-stats-grid .stat-card[data-completion-tone]', '--stat-tone:var(--color-info); --stat-tint:var(--color-info-tint); background:var(--color-paper);')}
   ${rule('.coordinator-stats-grid .stat-card[data-completion-tone="complete"]', '--stat-tone:var(--color-success); --stat-tint:var(--color-success-tint);')}
@@ -1163,7 +1163,7 @@ function getEditorialStyles_() {
   ${rule('.btn-solid:hover:enabled|.run-sync-btn:hover:enabled|.announcement-add-btn:hover|.swal2-confirm:hover|.tracker-tabs .tab.active:hover', 'background:var(--color-accent-hover); color:#fff; border-color:var(--color-accent-hover);')}
   ${rule('input:not([type=checkbox]):not([type=radio]):not([type=range])|select|textarea|.dashboard-body-surface :is(input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea)|.announcement-tab-surface :is(input,select,textarea)', 'max-width:100%; box-sizing:border-box; background:var(--color-paper); color:var(--color-ink); border:1px solid var(--color-control-border); border-radius:6px; font-family:var(--editorial-body); font-size:14px; line-height:1.45;')}
   ${rule('input::placeholder|textarea::placeholder|.dashboard-body-surface :is(input,textarea)::placeholder', 'color:var(--color-ink-muted); opacity:1;')}
-  ${rule('input[aria-invalid="true"]|.review1-criterion input[aria-invalid="true"]', 'border-color:var(--color-danger); background:var(--color-danger-tint);')}
+  ${rule('input[aria-invalid="true"]|.review-criterion input[aria-invalid="true"]', 'border-color:var(--color-danger); background:var(--color-danger-tint);')}
   ${rule('button:disabled', 'cursor:not-allowed;')}
   ${rule(':is(a,button,summary,input,select,textarea,[tabindex]):focus-visible|.dashboard-navigation button:focus-visible|.dashboard-body-surface :is(a,button,summary,input,select,textarea):focus-visible|.announcement-tab-surface :is(a,button,summary,input,select,textarea):focus-visible|#rubricDrawer button:focus-visible', 'outline:3px solid var(--color-accent-primary); outline-offset:3px;')}
 
@@ -1179,14 +1179,14 @@ function getEditorialStyles_() {
   ${rule('.tracker-table-scroll|.reviewer-assigned-table-scroll', 'max-width:100%; overflow-x:auto; overscroll-behavior-x:contain;')}
   ${rule('.card-top-row|.footer-actions|.pagination', 'flex-wrap:wrap; gap:10px;')}
   ${rule('.card-title|.drawer-project-title|.announcement-message|.announcement-preview', 'overflow-wrap:anywhere;')}
-  ${rule('.card-sub|.card-desc|.status-label|.status-cell|.footer-count|.empty|.coord-empty|.doc-links|.team-progress-note|.team-progress-count|.drawer-person-meta|.drawer-problem|.drawer-status-label|.rubric-levels dd|.announcement-date|.announcement-results|.announcement-status|.announcement-empty|.announcement-audience-label|.reviewer-setup-intro|.rubrics-status-detail|.committee-email|.committee-teams|.review1-project-meta-row|.review1-tab-caption|.review1-slider-values|.review1-history time|.review1-history small|#systemStatusMessage', 'color:var(--color-ink-muted);')}
+  ${rule('.card-sub|.card-desc|.status-label|.status-cell|.footer-count|.empty|.coord-empty|.doc-links|.team-progress-note|.team-progress-count|.drawer-person-meta|.drawer-problem|.drawer-status-label|.rubric-levels dd|.announcement-date|.announcement-results|.announcement-status|.announcement-empty|.announcement-audience-label|.reviewer-setup-intro|.rubrics-status-detail|.committee-email|.committee-teams|.review-project-meta-row|.review-tab-caption|.review-slider-values|.review-history time|.review-history small|#systemStatusMessage', 'color:var(--color-ink-muted);')}
   ${rule('.announcement-message|.announcement-preview|.announcement-details p|.drawer-info-value|.drawer-person-name|.rubric-levels dt', 'color:var(--color-ink);')}
-  ${rule('.team-chip|.committee-team-chip|.announcement-audience-chip|.review-config-pill|.review1-graded-pill', 'background:var(--color-soft); color:var(--color-ink-muted); border-color:var(--color-border); border-radius:4px;')}
+  ${rule('.team-chip|.committee-team-chip|.announcement-audience-chip|.review-config-pill|.review-graded-pill', 'background:var(--color-soft); color:var(--color-ink-muted); border-color:var(--color-border); border-radius:4px;')}
   ${rule('.status-badge|.tag|.health-badge|.rubrics-status-pill', 'border-radius:4px; font-size:12px;')}
-  ${rule('.status-badge.green|.tag.green|.health-badge.green|.tracker-health.green|.committee-sheet-status.linked|.rubrics-status-pill[data-configured="true"]|.review-config-card[data-state="ready"] .review-config-pill|.review1-graded-pill[data-completion="complete"]|.review1-header-line .review1-header-due[data-timing="success"]', 'color:var(--color-success); background:var(--color-success-tint); border-color:var(--color-success);')}
-  ${rule('.status-badge.orange|.tag.orange|.health-badge.orange|.tracker-health.orange|.flag|.committee-sheet-status|.rubrics-status-pill[data-configured="false"]|.review-config-card[data-state="invalid"] .review-config-pill|.review1-header-line .review1-header-due[data-timing="warning"]', 'color:var(--color-warning); background:var(--color-warning-tint); border-color:var(--color-warning);')}
-  ${rule('.status-badge.red|.tag.red|.health-badge.red|.tracker-health.red|.role-load-error|.drawer-error|.review1-marks-error|.review1-header-line .review1-header-due[data-timing="danger"]', 'color:var(--color-danger); background:var(--color-danger-tint); border-color:var(--color-danger);')}
-  ${rule('.status-badge.blue|.tag.blue|.committee-avatar|.review1-header-line .review1-header-due[data-timing="info"]', 'color:var(--color-info); background:var(--color-info-tint); border-color:var(--color-info);')}
+  ${rule('.status-badge.green|.tag.green|.health-badge.green|.tracker-health.green|.rubrics-status-pill[data-configured="true"]|.review-config-card[data-state="ready"] .review-config-pill|.review-graded-pill[data-completion="complete"]|.review-header-line .review-header-due[data-timing="success"]', 'color:var(--color-success); background:var(--color-success-tint); border-color:var(--color-success);')}
+  ${rule('.status-badge.orange|.tag.orange|.health-badge.orange|.tracker-health.orange|.flag|.rubrics-status-pill[data-configured="false"]|.review-config-card[data-state="invalid"] .review-config-pill|.review-config-card[data-state="definitions-missing"] .review-config-pill|.review-config-card[data-state="definitions-empty"] .review-config-pill|.review-config-card[data-state="storage-missing"] .review-config-pill|.review-config-card[data-state="storage-empty"] .review-config-pill|.review-config-card[data-state="error"] .review-config-pill|.review-header-line .review-header-due[data-timing="warning"]', 'color:var(--color-warning); background:var(--color-warning-tint); border-color:var(--color-warning);')}
+  ${rule('.status-badge.red|.tag.red|.health-badge.red|.tracker-health.red|.role-load-error|.drawer-error|.review-marks-error|.review-header-line .review-header-due[data-timing="danger"]', 'color:var(--color-danger); background:var(--color-danger-tint); border-color:var(--color-danger);')}
+  ${rule('.status-badge.blue|.tag.blue|.committee-avatar|.review-header-line .review-header-due[data-timing="info"]', 'color:var(--color-info); background:var(--color-info-tint); border-color:var(--color-info);')}
   ${rule('.status-badge.gray|.tag.gray', 'color:var(--color-ink-muted); background:var(--color-soft);')}
   ${rule('.drawer-status-good|.stat.green .stat-num|.coord-stat.green .coord-stat-num', 'color:var(--color-success);')}
   ${rule('.drawer-status-warn|.flag-text|.stat.orange .stat-num|.coord-stat.orange .coord-stat-num', 'color:var(--color-warning);')}
@@ -1219,65 +1219,64 @@ function getEditorialStyles_() {
   ${rule('.app-content-loading', '--loading-surface:var(--color-paper);')}
 
   /* Body-mounted drawers, native dialogs and SweetAlert share the same typography. */
-  ${rule('.team-drawer|.review1-drawer|.swal2-popup', 'font-family:var(--editorial-body); background:var(--color-paper); color:var(--color-ink); border-color:var(--color-border); box-shadow:0 16px 48px rgba(30,37,34,.12);')}
-  ${rule('.team-drawer-header|.review1-assessment-navigation|.review1-footer', 'background:var(--color-canvas); border-color:var(--color-border);')}
+  ${rule('.team-drawer|.review-drawer|.swal2-popup', 'font-family:var(--editorial-body); background:var(--color-paper); color:var(--color-ink); border-color:var(--color-border); box-shadow:0 16px 48px rgba(30,37,34,.12);')}
+  ${rule('.team-drawer-header|.review-assessment-navigation|.review-footer', 'background:var(--color-canvas); border-color:var(--color-border);')}
   ${rule('.team-drawer-backdrop|dialog::backdrop', 'background:rgba(30,37,34,.3);')}
   ${rule('.swal2-popup', 'border-radius:8px;')}
   ${rule('.swal2-title', 'font-family:var(--editorial-heading); color:var(--color-ink);')}
   ${rule('.swal2-html-container|.swal2-input-label', 'color:var(--color-ink-muted);')}
   ${rule('.swal2-styled.swal2-confirm', 'background:var(--color-accent-primary); color:#fff; border-radius:6px;')}
   ${rule('.swal2-styled.swal2-cancel', 'background:var(--color-soft); color:var(--color-ink); border-radius:6px;')}
-  ${rule('.announcement-link|.announcement-empty-icon|.review1-header-review|.review1-criterion-meta span|.review1-graded-pill[data-completion="partial"]', 'color:var(--color-accent-primary); background:var(--color-accent-tint); border-color:var(--color-accent-secondary);')}
-  ${rule('.review1-criterion[data-index]|.review1-individual-rubric[data-index]', 'background:var(--color-paper); border-color:var(--color-border); border-top:3px solid var(--color-accent-secondary); border-radius:8px;')}
-  ${rule('.review1-criterion[data-index] .review1-card-title', 'font-family:var(--editorial-heading); font-size:18px; color:var(--color-ink);')}
-  ${rule('.review1-criteria-tabs|.review1-levels|.review1-stepper', 'background:var(--color-soft); border-color:var(--color-border); border-radius:6px;')}
-  ${rule('.review1-drawer .review1-criteria-tabs [role="tab"]|.review1-drawer .review1-levels button|.review1-drawer .review1-pi-pills button', 'font-family:var(--editorial-body); color:var(--color-ink-muted); background:var(--color-paper); border-color:var(--color-border); box-shadow:none;')}
-  ${rule('.review1-drawer .review1-criteria-tabs [aria-selected="true"]|.review1-drawer .review1-criteria-tabs [data-criteria-tab="individual"][aria-selected="true"]', 'background:var(--color-accent-tint); color:var(--color-accent-primary); border-color:var(--color-accent-secondary);')}
-  ${rule('.review1-drawer .review1-pi-pills button[aria-pressed="true"]|.review1-drawer .review1-pi-pills button[aria-pressed="true"]:hover|.review1-drawer .review1-pi-pills[data-individual-pills] button[aria-pressed="true"]|.review1-drawer .review1-pi-pills[data-individual-pills] button[aria-pressed="true"]:hover|.review1-drawer .review1-levels button[aria-pressed="true"]|.review1-criterion[data-index] .review1-levels button[aria-pressed="true"]', 'background:var(--color-accent-primary); color:#fff; border-color:var(--color-accent-primary); box-shadow:none;')}
-  ${rule('.review1-descriptor|.review1-accordion > summary', 'background:var(--color-accent-tint); color:var(--color-accent-hover); border-color:var(--color-accent-secondary); border-radius:6px;')}
-  ${rule('.review1-criterion .review1-feedback-options', '--pill-border:var(--color-accent-secondary); --pill-bg:var(--color-accent-tint); --pill-text:var(--color-accent-primary); --pill-active:var(--color-accent-primary); --pill-hover:var(--color-accent-hover);')}
-  ${rule('.review1-criterion:is([data-level="0"],[data-level="1"]) .review1-feedback-options', '--pill-border:var(--color-warning); --pill-bg:var(--color-warning-tint); --pill-text:var(--color-warning); --pill-active:var(--color-warning); --pill-hover:#644300;')}
-  ${rule('.review1-criterion [data-marks-slider]', 'accent-color:var(--color-accent-primary);')}
-  ${rule('.review1-progress-students|.review1-slider-values .is-selected|.review1-project-title-row .lucide-icon|.review1-criterion details', 'color:var(--color-accent-primary);')}
-  ${rule('.review1-actions|.collapsible summary', 'background:var(--color-paper); border-color:var(--color-border); border-radius:6px; box-shadow:none;')}
-  ${rule('.review1-actions [data-submit]|.review1-drawer [data-target]|.filter-tab.active:hover:enabled|.pagination-buttons button.active:hover:enabled', 'background:var(--color-accent-primary); color:#fff; border-color:var(--color-accent-primary);')}
-  ${rule('.review1-actions [data-submit]:hover:enabled|.review1-drawer [data-target]:hover:enabled', 'background:var(--color-accent-hover); color:#fff;')}
-  ${rule('.review1-progress progress|.review1-progress progress::-webkit-progress-bar', 'background:var(--color-soft); accent-color:var(--color-accent-primary);')}
-  ${rule('.review1-progress progress::-webkit-progress-value', 'background:var(--color-accent-primary);')}
-  ${rule('.review1-progress progress::-moz-progress-bar', 'background:var(--color-accent-primary);')}
-  ${rule('.review1-progress-students::before', 'background:var(--color-accent-primary);')}
-  ${rule('.review1-progress-completion > span::before', 'background:var(--color-warning);')}
+  ${rule('.announcement-link|.announcement-empty-icon|.review-header-review|.review-criterion-meta span|.review-graded-pill[data-completion="partial"]', 'color:var(--color-accent-primary); background:var(--color-accent-tint); border-color:var(--color-accent-secondary);')}
+  ${rule('.review-criterion[data-index]|.review-individual-rubric[data-index]', 'background:var(--color-paper); border-color:var(--color-border); border-top:3px solid var(--color-accent-secondary); border-radius:8px;')}
+  ${rule('.review-criterion[data-index] .review-card-title', 'font-family:var(--editorial-heading); font-size:18px; color:var(--color-ink);')}
+  ${rule('.review-criteria-tabs|.review-levels|.review-stepper', 'background:var(--color-soft); border-color:var(--color-border); border-radius:6px;')}
+  ${rule('.review-drawer .review-criteria-tabs [role="tab"]|.review-drawer .review-levels button|.review-drawer .review-pi-pills button', 'font-family:var(--editorial-body); color:var(--color-ink-muted); background:var(--color-paper); border-color:var(--color-border); box-shadow:none;')}
+  ${rule('.review-drawer .review-criteria-tabs [aria-selected="true"]|.review-drawer .review-criteria-tabs [data-criteria-tab="individual"][aria-selected="true"]', 'background:var(--color-accent-tint); color:var(--color-accent-primary); border-color:var(--color-accent-secondary);')}
+  ${rule('.review-drawer .review-pi-pills button[aria-pressed="true"]|.review-drawer .review-pi-pills button[aria-pressed="true"]:hover|.review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="true"]|.review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="true"]:hover|.review-drawer .review-levels button[aria-pressed="true"]|.review-criterion[data-index] .review-levels button[aria-pressed="true"]', 'background:var(--color-accent-primary); color:#fff; border-color:var(--color-accent-primary); box-shadow:none;')}
+  ${rule('.review-descriptor|.review-accordion > summary', 'background:var(--color-accent-tint); color:var(--color-accent-hover); border-color:var(--color-accent-secondary); border-radius:6px;')}
+  ${rule('.review-criterion .review-feedback-options', '--pill-border:var(--color-accent-secondary); --pill-bg:var(--color-accent-tint); --pill-text:var(--color-accent-primary); --pill-active:var(--color-accent-primary); --pill-hover:var(--color-accent-hover);')}
+  ${rule('.review-criterion:is([data-level="0"],[data-level="1"]) .review-feedback-options', '--pill-border:var(--color-warning); --pill-bg:var(--color-warning-tint); --pill-text:var(--color-warning); --pill-active:var(--color-warning); --pill-hover:#644300;')}
+  ${rule('.review-criterion [data-marks-slider]', 'accent-color:var(--color-accent-primary);')}
+  ${rule('.review-progress-students|.review-slider-values .is-selected|.review-project-title-row .lucide-icon|.review-criterion details', 'color:var(--color-accent-primary);')}
+  ${rule('.review-actions|.collapsible summary', 'background:var(--color-paper); border-color:var(--color-border); border-radius:6px; box-shadow:none;')}
+  ${rule('.review-actions [data-submit]|.review-drawer [data-target]|.filter-tab.active:hover:enabled|.pagination-buttons button.active:hover:enabled', 'background:var(--color-accent-primary); color:#fff; border-color:var(--color-accent-primary);')}
+  ${rule('.review-actions [data-submit]:hover:enabled|.review-drawer [data-target]:hover:enabled', 'background:var(--color-accent-hover); color:#fff;')}
+  ${rule('.review-progress progress|.review-progress progress::-webkit-progress-bar', 'background:var(--color-soft); accent-color:var(--color-accent-primary);')}
+  ${rule('.review-progress progress::-webkit-progress-value', 'background:var(--color-accent-primary);')}
+  ${rule('.review-progress progress::-moz-progress-bar', 'background:var(--color-accent-primary);')}
+  ${rule('.review-progress-students::before', 'background:var(--color-accent-primary);')}
+  ${rule('.review-progress-completion > span::before', 'background:var(--color-warning);')}
   /* Secondary staff tools and semantic variants use the same palette. */
-  ${rule('.needs-attention|.assessment-overview|.github-config|.pipeline-stage|.reviewer-marks-dialog fieldset', 'background:var(--color-paper); color:var(--color-ink); border:1px solid var(--color-border); border-radius:8px; box-shadow:none;')}
-  ${rule('.reviewer-marks-dialog|.reviewer-marks-footer', 'background:var(--color-canvas); color:var(--color-ink); font-family:var(--editorial-body);')}
-  ${rule('.reviewer-marks-dialog .marks-save|.mini.approve', 'background:var(--color-accent-primary); color:#fff; border-color:var(--color-accent-primary);')}
-  ${rule('.reviewer-marks-dialog .marks-save:hover:enabled|.mini.approve:hover:enabled', 'background:var(--color-accent-hover); color:#fff; border-color:var(--color-accent-hover);')}
+  ${rule('.needs-attention|.assessment-overview|.github-config|.pipeline-stage', 'background:var(--color-paper); color:var(--color-ink); border:1px solid var(--color-border); border-radius:8px; box-shadow:none;')}
+  ${rule('.mini.approve', 'background:var(--color-accent-primary); color:#fff; border-color:var(--color-accent-primary);')}
+  ${rule('.mini.approve:hover:enabled', 'background:var(--color-accent-hover); color:#fff; border-color:var(--color-accent-hover);')}
   ${rule('.mini.revise|.tracker-tabs .deadline-pill|.tracker-tabs .tab[data-filter="ontrack"]', 'background:var(--color-soft); color:var(--color-ink-muted); border-color:var(--color-control-border);')}
   ${rule('.tracker-tabs .tab[data-filter="attention"]|.tracker-tabs .deadline-pill.deadline-overdue', 'background:var(--color-danger-tint); color:var(--color-danger); border-color:var(--color-danger);')}
   ${rule('.tracker-tabs .tab.active|.tracker-tabs .tab.active:hover', 'background:var(--color-accent-primary); color:#fff; border-color:var(--color-accent-primary);')}
   ${rule('.stage-label|.stage-count|.assessment-name|.github-title|.system-status-card .github-label|.system-status-card .rubrics-assessment-list dt', 'color:var(--color-ink);')}
-  ${rule('.stage-subtitle|.stage-percent|.semester-dates|.development-legend|.assessment-pct|.github-label|.github-value|.system-status-card .github-value|.system-status-card .rubrics-assessment-list dd|.reviewer-review-cell small|.reviewer-marks-dialog small|.role-menu-toggle .role-menu-caption', 'color:var(--color-ink-muted);')}
+  ${rule('.stage-subtitle|.stage-percent|.semester-dates|.development-legend|.assessment-pct|.github-label|.github-value|.system-status-card .github-value|.system-status-card .rubrics-assessment-list dd|.reviewer-review-cell small|.role-menu-toggle .role-menu-caption', 'color:var(--color-ink-muted);')}
   ${rule('.progress-bar|.stage-icon|.coordinator-stats-grid .lucide-icon.stat-icon|.coordinator-stats-grid .stat-pct', 'background:var(--color-soft); color:var(--color-ink-muted); border-color:var(--color-border);')}
   ${rule('.progress-fill.blue|.progress-fill.green|.progress-fill.gray', 'background:var(--color-success);')}
   ${rule('.stage-icon.completed|.github-status.configured|.system-status-card .github-status.configured|.coordinator-stats-grid .stat-registered', 'background:var(--color-success-tint); color:var(--color-success); border-color:var(--color-success);')}
   ${rule('.stage-icon.pending|.stage-icon.development', 'background:var(--color-warning-tint); color:var(--color-warning); border-color:var(--color-warning);')}
   ${rule('.coordinator-stats-grid .stat-card[data-completion-tone] .stat-icon|.coordinator-stats-grid .stat-card[data-completion-tone] .stat-pct', 'background:var(--stat-tint); color:var(--stat-tone);')}
-  ${rule('.review1-header-line|.review1-project-title-row > summary|.review1-project-title-row > p|.review1-progress|.review1-feedback-title strong|.review1-assessment-summary dd', 'color:var(--color-ink);')}
-  ${rule('.review1-drawer .review1-pi-pills button[aria-pressed="false"]:not(:disabled):hover|.review1-drawer .review1-pi-pills[data-individual-pills] button[aria-pressed="false"]:not(:disabled):hover', 'background:var(--color-accent-tint); color:var(--color-accent-primary); border-color:var(--color-accent-secondary);')}
-  ${rule('.review1-individual-rubric[data-index] .review1-criterion-meta span:first-child|.review1-drawer .review1-other-feedback[aria-pressed="true"]', 'background:var(--color-accent-tint); color:var(--color-accent-primary); border-color:var(--color-accent-secondary);')}
-  ${rule('.review1-criterion:is([data-level="0"],[data-level="1"]) .review1-descriptor|.review1-feedback-heading [data-feedback-required]|.review1-assessment-summary .review1-summary-status[data-tone="pending"] dd', 'background:var(--color-warning-tint); color:var(--color-warning); border-color:var(--color-warning);')}
-  ${rule('.review1-criterion:is([data-level="3"],[data-level="4"],[data-level="5"]) [data-feedback-status]|.review1-assessment-summary .review1-summary-status[data-tone="complete"] dd|.review1-drawer .review1-pi-pills [data-complete="true"]:not([aria-pressed="true"])', 'background:var(--color-success-tint); color:var(--color-success); border-color:var(--color-success);')}
-  ${rule('.review1-assessment-summary .review1-summary-status[data-tone="exception"] dd', 'background:var(--color-danger-tint); color:var(--color-danger);')}
-  ${rule('.review1-criterion[data-index] .review1-control-title|.review1-criterion-meta span:last-child|.review1-history summary|.review1-history-status', 'color:var(--color-ink-muted);')}
-  ${rule('.review1-assessment-summary .review1-summary-total', 'border-color:var(--color-accent-secondary);')}
-  ${rule('.review1-assessment-summary .review1-summary-total[data-resolved="true"] dd', 'color:var(--color-ink);')}
-  ${rule('.review1-drawer .review1-header-students button', 'background:var(--color-paper); color:var(--color-ink); border-color:var(--color-control-border); border-radius:var(--editorial-radius); box-shadow:none; font-family:var(--editorial-body);')}
-  ${rule('.review1-drawer .review1-header-students button[aria-pressed="false"]:not(:disabled):hover', 'background:var(--color-soft); border-color:var(--color-ink-muted);')}
-  ${rule('.review1-drawer .review1-header-students button[aria-pressed="true"]|.review1-drawer .review1-header-students button[aria-pressed="true"]:hover', 'background:var(--color-accent-tint); color:var(--color-accent-primary); border-color:var(--color-accent-primary); box-shadow:inset 0 0 0 1px var(--color-accent-primary);')}
-  ${rule('.review1-header-students .review1-avatar', 'background:var(--color-soft); color:var(--color-ink-muted);')}
-  ${rule('.review1-header-students [aria-pressed="true"] .review1-avatar', 'background:var(--color-accent-primary); color:var(--color-paper);')}
-  ${rule('.review1-header-students .review1-student-score', 'color:var(--color-ink); border-color:var(--color-border);')}
-  ${rule('.review1-drawer :is(button,input,summary,textarea):focus-visible|.review1-criterion .review1-feedback-options button:focus-visible|.reviewer-marks-dialog :is(button,select,textarea):focus-visible', 'outline:3px solid var(--color-accent-primary); outline-offset:3px;')}
+  ${rule('.review-header-line|.review-project-title-row > summary|.review-project-title-row > p|.review-progress|.review-feedback-title strong|.review-assessment-summary dd', 'color:var(--color-ink);')}
+  ${rule('.review-drawer .review-pi-pills button[aria-pressed="false"]:not(:disabled):hover|.review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="false"]:not(:disabled):hover', 'background:var(--color-accent-tint); color:var(--color-accent-primary); border-color:var(--color-accent-secondary);')}
+  ${rule('.review-individual-rubric[data-index] .review-criterion-meta span:first-child|.review-drawer .review-other-feedback[aria-pressed="true"]', 'background:var(--color-accent-tint); color:var(--color-accent-primary); border-color:var(--color-accent-secondary);')}
+  ${rule('.review-criterion:is([data-level="0"],[data-level="1"]) .review-descriptor|.review-feedback-heading [data-feedback-required]|.review-assessment-summary .review-summary-status[data-tone="pending"] dd', 'background:var(--color-warning-tint); color:var(--color-warning); border-color:var(--color-warning);')}
+  ${rule('.review-criterion:is([data-level="3"],[data-level="4"],[data-level="5"]) [data-feedback-status]|.review-assessment-summary .review-summary-status[data-tone="complete"] dd|.review-drawer .review-pi-pills [data-complete="true"]:not([aria-pressed="true"])', 'background:var(--color-success-tint); color:var(--color-success); border-color:var(--color-success);')}
+  ${rule('.review-assessment-summary .review-summary-status[data-tone="exception"] dd', 'background:var(--color-danger-tint); color:var(--color-danger);')}
+  ${rule('.review-criterion[data-index] .review-control-title|.review-criterion-meta span:last-child|.review-history summary|.review-history-status', 'color:var(--color-ink-muted);')}
+  ${rule('.review-assessment-summary .review-summary-total', 'border-color:var(--color-accent-secondary);')}
+  ${rule('.review-assessment-summary .review-summary-total[data-resolved="true"] dd', 'color:var(--color-ink);')}
+  ${rule('.review-drawer .review-header-students button', 'background:var(--color-paper); color:var(--color-ink); border-color:var(--color-control-border); border-radius:var(--editorial-radius); box-shadow:none; font-family:var(--editorial-body);')}
+  ${rule('.review-drawer .review-header-students button[aria-pressed="false"]:not(:disabled):hover', 'background:var(--color-soft); border-color:var(--color-ink-muted);')}
+  ${rule('.review-drawer .review-header-students button[aria-pressed="true"]|.review-drawer .review-header-students button[aria-pressed="true"]:hover', 'background:var(--color-accent-tint); color:var(--color-accent-primary); border-color:var(--color-accent-primary); box-shadow:inset 0 0 0 1px var(--color-accent-primary);')}
+  ${rule('.review-header-students .review-avatar', 'background:var(--color-soft); color:var(--color-ink-muted);')}
+  ${rule('.review-header-students [aria-pressed="true"] .review-avatar', 'background:var(--color-accent-primary); color:var(--color-paper);')}
+  ${rule('.review-header-students .review-student-score', 'color:var(--color-ink); border-color:var(--color-border);')}
+  ${rule('.review-drawer :is(button,input,summary,textarea):focus-visible|.review-criterion .review-feedback-options button:focus-visible', 'outline:3px solid var(--color-accent-primary); outline-offset:3px;')}
   @media(max-width:760px) {
     ${scope} { padding:20px 16px 40px; }
     ${rule('h1|.dashboard-body-surface h1|.announcement-tab-surface .announcement-header h2', 'font-size:28px;')}
@@ -1285,7 +1284,7 @@ function getEditorialStyles_() {
     ${rule('.dashboard-navigation', 'padding:6px;')}
     ${rule('.dashboard-navigation .role-tab-btn', 'border-radius:4px;')}
     ${rule('.dashboard-navigation .role-tab-btn.active', 'box-shadow:inset 3px 0 var(--color-accent-primary);')}
-    ${rule('button|.dashboard-body-surface button|.announcement-tab-surface button|.review1-drawer button|.review1-drawer .review1-pi-pills button|.review1-criterion[data-index] .review1-feedback-options button|.shared-timeline .timeline-nav|.btn-outline|.mini|.team-action-icon|.announcement-link', 'min-height:44px;')}
+    ${rule('button|.dashboard-body-surface button|.announcement-tab-surface button|.review-drawer button|.review-drawer .review-pi-pills button|.review-criterion[data-index] .review-feedback-options button|.shared-timeline .timeline-nav|.btn-outline|.mini|.team-action-icon|.announcement-link', 'min-height:44px;')}
     ${rule('.shared-timeline .timeline-nav|.team-action-icon|.team-drawer-close', 'min-width:44px;')}
     ${rule('input:not([type=checkbox]):not([type=radio]):not([type=range])|select|textarea', 'font-size:16px;')}
     ${rule('.card-body', 'padding:var(--dashboard-content-gap) var(--dashboard-section-gap) 6px;')}

@@ -63,8 +63,7 @@ const FIELD_DEFINITIONS = {
     REVIEWER1_NAME: 'Reviewer 1 Name', REVIEWER1_EMAIL: 'Reviewer 1 Email',
     REVIEWER2_NAME: 'Reviewer 2 Name', REVIEWER2_EMAIL: 'Reviewer 2 Email',
     REVIEWER3_NAME: 'Reviewer 3 Name', REVIEWER3_EMAIL: 'Reviewer 3 Email',
-    REVIEWER4_NAME: 'Reviewer 4 Name', REVIEWER4_EMAIL: 'Reviewer 4 Email',
-    MARKS_SHEET_ID: 'Marks Sheet ID'
+    REVIEWER4_NAME: 'Reviewer 4 Name', REVIEWER4_EMAIL: 'Reviewer 4 Email'
   },
 
   ANNOUNCEMENTS: {

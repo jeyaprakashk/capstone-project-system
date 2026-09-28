@@ -293,17 +293,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   // REVIEW MARKS — ASYNCHRONOUS
   // ===============================================================
 
-  // Do not block the main Student dashboard while the separate marks
-  // spreadsheet is opened. The browser replaces this placeholder after
-  // the core dashboard is already visible.
-  const marksSection = `
-    <div class="marks-card" id="studentMarksAsync">
-      <h3>Your Marks</h3>
-      <div class="marks-row">
-        <span>Review marks</span>
-        ${getSkeletonMarkup_('inline', 'Loading marks')}
-      </div>
-    </div>`;
+
 
 
   // ===============================================================
@@ -334,34 +324,11 @@ function buildStudentContent(email, teamId, teamStatusRow) {
       ${logCard}
     </div>
 
-    ${marksSection}
-    <section id="studentReview1Evaluation" class="assessment-section" aria-live="polite"></section>
-    <section id="studentReview2Evaluation" class="assessment-section" aria-live="polite"></section>
+    ${getAssessmentDefinitions_().filter(d=>d.type==='REVIEW').map(d=>'<section id="studentAssessment-'+escapeHtml(d.key)+'" data-review-result="'+escapeHtml(d.key)+'" class="assessment-section" aria-live="polite"></section>').join('')}
     <section id="studentGuideEvaluation" class="assessment-section" aria-live="polite">${getSkeletonMarkup_('panel', 'Loading guide evaluation')}</section>
 
 
   </div>`;
-}
-
-/**
- * Loaded independently after the Student core dashboard is visible.
- * No CacheService is used; marks are read fresh on every page load.
- */
-function loadStudentMarksSection() {
-  const email = Session.getActiveUser().getEmail();
-  if (!email) throw new Error('Could not identify your account.');
-
-  const allReviewMarks = getStudentAllReviewMarks(email);
-
-
-  function row_(label, marks) {
-    return marks && marks.completed
-      ? `<div class="marks-row"><span>${escapeHtml(label)}</span><span class="marks-value">${escapeHtml(marks.totalMarks)} / ${escapeHtml(marks.maxMarks)}</span></div>`
-      : `<div class="marks-row"><span>${escapeHtml(label)}</span><span class="marks-pending">Not yet entered</span></div>`;
-  }
-
-  return `<h3>Your Marks</h3>
-    ${getInternalReviews_().filter(review=>!['review1','review2'].includes(review.key)).map(review => row_(review.label, allReviewMarks && allReviewMarks[review.key])).join('')}`;
 }
 
 function buildStudentPage(email, teamId) {

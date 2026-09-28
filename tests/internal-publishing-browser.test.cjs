@@ -2,6 +2,22 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const {parseHTML}=require('linkedom');
 const {publishingFixture}=require('./internal-publishing-fixture.cjs');
 const flush=async()=>{for(let i=0;i<15;i++)await Promise.resolve();};
+
+test('native uncertain publication reconciles from its journal event after a later reopen',async()=>{
+ const f=fixture();await f.load();f.host().querySelector('[data-publish]').click();await flush();const request=f.calls[1];
+ f.server.report();f.server.c[request.method](request.args[0]);
+ const revision=f.server.report().teams[0].revision;f.server.c.reopenInternalAssessment({assessmentId:'review1',team:'g18',revision,requestId:crypto.randomUUID(),reason:'Correction'});
+ await f.settleMutation(request,'Network disconnected');await f.settleRead();
+ assert(!f.host().querySelector('[data-retry-operation]'));assert.match(f.section().textContent,/1\/1 publication requests confirmed/);assert.match(f.host().textContent,/Under correction/);
+});
+
+test('uncertain reopening reconciles even after resubmission and uses accurate confirmation text',async()=>{
+ const f=fixture();await f.load();f.host().querySelector('[data-reopen]').click();await flush();const request=f.calls[1];
+ assert.doesNotMatch(f.questions[0],/cleared|withdraw/);assert.match(f.questions[0],/Copies evidence/);
+ f.server.report();f.server.c[request.method](request.args[0]);f.server.submit();
+ await f.settleMutation(request,'Connection lost');await f.settleRead();assert(!f.host().querySelector('[data-retry-operation]'));
+ assert.match(f.host().textContent,/1\/1 reopening requests confirmed/);
+});
 function fixture(key='review1') {
   const server=publishingFixture(key);if(key==='guide_eval')server.students.forEach(s=>server.guideSubmit(s.regNo));else server.submit();
   const {window}=parseHTML('<html><body>'+server.c.buildInternalAssessmentPublishing_(key)+'</body></html>'),document=window.document;
@@ -39,7 +55,7 @@ test('search, publication filter and explicit details work without changing publ
 });
 
 for(const key of ['review1','review2'])test(key+': team UI calls native endpoint once and blocks double clicks',async()=>{
-  const f=fixture(key);await f.load();const button=f.host().querySelector('[data-publish]:not([data-student])');button.click();button.click();await flush();assert.equal(f.questions.length,1);assert.equal(f.calls.length,2);assert.equal(f.calls[1].method,key==='review1'?'publishReview1Evaluation':'publishReview2Evaluation');assert.equal(f.calls[1].args[0].student,undefined);
+  const f=fixture(key);await f.load();const button=f.host().querySelector('[data-publish]:not([data-student])');button.click();button.click();await flush();assert.equal(f.questions.length,1);assert.equal(f.calls.length,2);assert.equal(f.calls[1].method,'publishInternalAssessment');assert.equal(f.calls[1].args[0].student,undefined);
   await f.settleMutation(f.calls[1]);await f.settleRead();assert.match(f.host().textContent,/Published/);assert(!f.host().querySelector('[data-publish]'));
 });
 
@@ -54,17 +70,17 @@ test('cancelled confirmation sends nothing and restores controls',async()=>{
 test('Guide team UI serializes calls, reports failure, refreshes actual state and retries original request',async()=>{
   const f=fixture('guide_eval');await f.load();f.host().querySelector('[data-publish]:not([data-student])').click();await flush();assert.equal(f.calls.length,2);assert.equal(f.calls[1].args[0].student,'s1');
   await f.settleMutation(f.calls[1]);assert.equal(f.calls.length,3);assert.equal(f.calls[2].args[0].student,'s2');const failedInput=f.calls[2].args[0];await f.settleMutation(f.calls[2],'Another evaluation is saving. Retry shortly.');assert.equal(f.calls.length,4);await f.settleMutation(f.calls[3]);await f.settleRead();
-  assert.match(f.host().textContent,/2\/3 students published successfully/);assert.match(f.host().textContent,/1 failed/);assert.match(f.host().textContent,/Needs attention/);f.host().querySelector('[data-retry-operation]').click();await flush();assert.deepEqual(f.calls.at(-1).args[0],failedInput);await f.settleMutation(f.calls.at(-1));await f.settleRead();assert.match(f.host().textContent,/Published/);assert(!f.host().querySelector('[data-retry-operation]'));
+  assert.match(f.host().textContent,/2\/3 publication requests confirmed/);assert.match(f.host().textContent,/1 failed/);assert.match(f.host().textContent,/Needs attention/);f.host().querySelector('[data-retry-operation]').click();await flush();assert.deepEqual(f.calls.at(-1).args[0],failedInput);await f.settleMutation(f.calls.at(-1));await f.settleRead();assert.match(f.host().textContent,/Published/);assert(!f.host().querySelector('[data-retry-operation]'));
 });
 
 test('Guide unknown completion reconciles by request ID and never republishes confirmed writes',async()=>{
-  const f=fixture('guide_eval');await f.load();f.host().querySelector('[data-publish]').click();await flush();const first=f.calls[1];f.server.c[first.method](first.args[0]);await f.settleMutation(first,'Network disconnected');await f.settleMutation(f.calls[2]);await f.settleMutation(f.calls[3]);await f.settleRead();assert.match(f.section().textContent,/3\/3 students published successfully/);assert(!f.host().querySelector('[data-retry-operation]'));assert.equal(f.server.tables.GuideEvaluations.length,7);
+  const f=fixture('guide_eval');await f.load();f.host().querySelector('[data-publish]').click();await flush();const first=f.calls[1];f.server.c[first.method](first.args[0]);await f.settleMutation(first,'Network disconnected');await f.settleMutation(f.calls[2]);await f.settleMutation(f.calls[3]);await f.settleRead();assert.match(f.section().textContent,/3\/3 publication requests confirmed/);assert(!f.host().querySelector('[data-retry-operation]'));assert.equal(f.server.tables.GuideEvaluations.length,7);
 });
 
 test('Guide individual action calls only the selected existing student endpoint',async()=>{
   const f=fixture('guide_eval');await f.load();f.host().querySelector('[data-details]').click();f.host().querySelector('[data-publish][data-student="1"]').click();await flush();
-  assert.equal(f.calls[1].method,'publishGuideEvaluation');assert.equal(f.calls[1].args[0].student,'s2');await f.settleMutation(f.calls[1]);await f.settleRead();
-  assert.equal(f.calls.filter(call=>call.method==='publishGuideEvaluation').length,1);const team=f.server.report().teams[0];assert.equal(team.publishedStudents,1);assert.equal(team.students[0].publicationStatus,'NOT_PUBLISHED');
+  assert.equal(f.calls[1].method,'publishInternalAssessment');assert.equal(f.calls[1].args[0].student,'s2');await f.settleMutation(f.calls[1]);await f.settleRead();
+  assert.equal(f.calls.filter(call=>call.method==='publishInternalAssessment').length,1);const team=f.server.report().teams[0];assert.equal(team.publishedStudents,1);assert.equal(team.students[0].publicationStatus,'NOT_PUBLISHED');
 });
 
 test('reopening sends reason with team scope for Review and student scope for Guide',async()=>{

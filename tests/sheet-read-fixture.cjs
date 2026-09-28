@@ -7,6 +7,7 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'sheet-reads.js'), 'ut
 function createSheetReadContext(globals) {
   const context = vm.createContext(globals);
   vm.runInContext(source, context);
+  context.getAssessmentDefinitions_=()=>[];
   return context;
 }
 module.exports = { createSheetReadContext };

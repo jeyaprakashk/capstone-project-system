@@ -10,12 +10,12 @@ const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID')
 const GITHUB_TOKEN = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
 
 let configExecutionValues_ = null;
-/** Reviews are committee-graded Milestones, ordered by due date. */
+/** Reviews are registry instances, ordered by configured sequence. */
 function getInternalReviewsCount_() {
   return getInternalReviews_().length;
 }
 function getInternalReviews_() {
-  return reviewsFromMilestones_(getMilestones_());
+  return Object.freeze(getAssessmentDefinitions_().filter(d=>d.type==='REVIEW'));
 }
 
 function getConfig(key) {
@@ -197,9 +197,7 @@ function buildColumnMap(sheet, fieldNameMap, headers) {
   const result = {};
   const missing = [];
   Object.entries(fieldNameMap).forEach(([key, expectedHeader]) => {
-    const idx = key === 'MARKS_SHEET_ID'
-      ? (headerIndex['marks sheets id'] ?? headerIndex[normalize(expectedHeader)])
-      : headerIndex[normalize(expectedHeader)];
+    const idx = headerIndex[normalize(expectedHeader)];
     if (idx === undefined) missing.push(expectedHeader);
     else result[key] = idx;
   });
@@ -282,27 +280,27 @@ function urlResolves(url) {
 // ===================================================================
 function similarity(a, b) {
   if (!a || !b) return 0;
-  
+
   // Normalize both strings
   const normalize = s => String(s).trim().toUpperCase();
   const strA = normalize(a);
   const strB = normalize(b);
-  
+
   // EXACT MATCH - return 1.0 (100%)
   if (strA === strB) return 1.0;
-  
+
   // EXTRACT WORDS (split by non-alphanumeric characters)
   const getWords = s => s.split(/\s+/).filter(w => w.length > 0);
   const wordsA = getWords(strA);
   const wordsB = getWords(strB);
-  
+
   // CHECK FOR SAME WORDS IN DIFFERENT ORDER
   if (wordsA.length === wordsB.length && wordsA.length > 0) {
     const sortedA = wordsA.sort().join(' ');
     const sortedB = wordsB.sort().join(' ');
     if (sortedA === sortedB) return 1.0; // 100% - same words, different order
   }
-  
+
   // WORD-LEVEL SIMILARITY (Jaccard Index on words)
   if (wordsA.length > 0 && wordsB.length > 0) {
     const setA = new Set(wordsA);
@@ -310,13 +308,13 @@ function similarity(a, b) {
     const intersection = [...setA].filter(w => setB.has(w)).length;
     const union = new Set([...setA, ...setB]).size;
     const wordSimilarity = intersection / union;
-    
+
     // If word similarity is high (>50%), return it as the score
     if (wordSimilarity >= 0.5) {
       return wordSimilarity;
     }
   }
-  
+
   // TRIGRAM-BASED SIMILARITY (fallback for character-level matching)
   const grams = s => new Set(s.replace(/\s+/g, '').match(/.{1,3}/g) || []);
   const A = grams(strA), B = grams(strB);
@@ -452,8 +450,7 @@ function getCommitteeInfo(committeeNumber) {
     reviewer3Name: row[RC.REVIEWER3_NAME],
     reviewer3Email: row[RC.REVIEWER3_EMAIL],
     reviewer4Name: row[RC.REVIEWER4_NAME],
-    reviewer4Email: row[RC.REVIEWER4_EMAIL],
-    marksSheetId: row[RC.MARKS_SHEET_ID]
+    reviewer4Email: row[RC.REVIEWER4_EMAIL]
   };
 }
 
@@ -651,14 +648,16 @@ function getProjectSchedule_() {
   if (projectScheduleExecution_) return projectScheduleExecution_;
   const timezone = getSpreadsheet().getSpreadsheetTimeZone();
   const milestones = getMilestones_();
-  const schedule = { timezone, reviews:getInternalReviews_(), milestones };
+  const assessments=getAssessmentDefinitions_();
+  composeProjectTimeline_(milestones,assessments);
+  const schedule = { timezone, reviews:assessments.filter(d=>d.type==='REVIEW'), milestones, assessments };
   ['start','formation','title','report'].forEach(key => {
     const milestone = milestones.find(item=>item.key===key);
     if (!milestone) throw new Error('Milestones requires ' + key + '.');
     schedule[key] = milestone.day;
   });
   schedule.end = schedule.report;
-  milestones.forEach(item=>{ schedule[item.key] = item.day; });
+  [...milestones,...assessments].forEach(item=>{ schedule[item.key] = item.day; });
   const weekday = new Date(schedule.title * PROJECT_DAY_MS_).getUTCDay();
   schedule.week1 = schedule.title + ((8 - weekday) % 7 || 7);
   validateProjectSchedule_(schedule);
@@ -757,11 +756,11 @@ function renderAssessmentHistory_(decisions) {
     const actions={exception:'Absence details updated',targetSubmit:'Assessment completed',targetDraft:'Assessment draft saved',MAKEUP_ALTERNATIVE_ASSESSMENT:'Assessment authorized',DEFERRED_ASSESSMENT:'Assessment deferred',TEAM_MARK_APPLICABLE:'Team mark approved',TEAM_MARK_NOT_APPLICABLE:'Team mark not applicable',OTHER:'Academic decision recorded'};
     const statuses={COMPLETED:'Completed',MAKEUP_PENDING:'Awaiting makeup',COMPLETED_AFTER_MAKEUP:'Completed after makeup',ABSENT_UNAPPROVED:'Unapproved absence',ACADEMIC_DECISION_PENDING:'Awaiting academic decision',NON_PARTICIPATION:'Non-participation',INCOMPLETE:'Incomplete'};
     const automaticReasons=['Prolonged absence source facts updated.','Review-day absence recorded as unapproved.'];
-    return '<details class="review1-history"><summary>Assessment history <span>'+decisions.length+'</span></summary><ol>'+decisions.slice().reverse().map(d=>{
+    return '<details class="review-history"><summary>Assessment history <span>'+decisions.length+'</span></summary><ol>'+decisions.slice().reverse().map(d=>{
       const date=new Date(d.at),valid=Number.isFinite(date.getTime());
       const when=valid?date.toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
       const reason=String(d.reason||'');
       const note=reason && !automaticReasons.includes(reason) && !reason.startsWith('Absence details recorded: ')?'<p>'+escape(reason)+'</p>':'';
-      return '<li><div class="review1-history-heading"><strong>'+escape(actions[d.decision]||'Assessment updated')+'</strong>'+(when?'<time datetime="'+escape(date.toISOString())+'">'+escape(when)+'</time>':'')+'</div><div class="review1-history-status">'+escape(statuses[d.previousStatus]||'Not assessed')+' <span aria-label="changed to">→</span> '+escape(statuses[d.resultingStatus]||'Updated')+'</div>'+note+(d.reviewer?'<small>'+escape(d.reviewer)+'</small>':'')+'</li>';
+      return '<li><div class="review-history-heading"><strong>'+escape(actions[d.decision]||'Assessment updated')+'</strong>'+(when?'<time datetime="'+escape(date.toISOString())+'">'+escape(when)+'</time>':'')+'</div><div class="review-history-status">'+escape(statuses[d.previousStatus]||'Not assessed')+' <span aria-label="changed to">→</span> '+escape(statuses[d.resultingStatus]||'Updated')+'</div>'+note+(d.reviewer?'<small>'+escape(d.reviewer)+'</small>':'')+'</li>';
     }).join('')+'</ol></details>';
   }

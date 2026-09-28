@@ -32,8 +32,7 @@ test('loader returns immutable review criteria from the sheet',()=>{
 test('shared rubrics preserve weights and independently validate every graded assessment',()=>{
  const f=fixture();f.populate();
  f.c.definitions[0].weight=12.5;
- f.c.definitions.push({key:'see',label:'SEE',weight:40,gradedBy:'SEE Committee'},
-  {key:'formation',label:'Formation',weight:0,gradedBy:'Not Applicable'});
+ f.c.definitions.push({key:'future_demo',rubricReference:'future_demo',type:'REVIEW',label:'Future demo',weight:40,gradedBy:'Review Committee'});
  f.rows[1][3]='<script>example</script>';
  f.rows.find(row=>row[0]==='review2')[5]=-1;
  const data=f.c.getSharedRubricsData_();
@@ -49,7 +48,7 @@ test('shared rubrics preserve weights and independently validate every graded as
 
 test('shared rubrics handle missing sheets, headers and guide descriptors',()=>{
  const f=fixture();assert(f.c.getSharedRubricsData_().assessments.every(a=>!a.available));f.populate();
- f.c.definitions.push({key:'guide_eval',label:'Guide Eval',weight:20,gradedBy:'Project Guide'});
+ f.c.definitions.push({key:'guide_eval',rubricReference:'guide_eval',type:'INDIVIDUAL_RUBRIC',label:'Guide Eval',weight:20,gradedBy:'Project Guide'});
  f.rows.push(['guide_eval',1,'PI1','Guide criterion','CO1',100,'Individual']);
  assert.equal(f.c.getSharedRubricsData_().assessments.at(-1).available,false);
  f.rows[0].push(...Array.from({length:6},(_,i)=>'Level '+i));f.rows.at(-1).push(...Array(6).fill('Descriptor'));
@@ -67,7 +66,7 @@ test('shared endpoint authorizes every dashboard role before reading definitions
  assert.equal(f.metrics().reads,4);
 });
 
-test('milestone-defined review IDs control requirements',()=>{
+test('registry-defined review IDs control requirements',()=>{
  const f=fixture();f.populate();f.c.setReviews(3);
  assert.throws(()=>f.c.getRubricStructure_(),/review3/);
  f.rows.push(...f.rows.filter(row=>row[0]==='review2').map(row=>['review3',...row.slice(1)]));
@@ -75,12 +74,12 @@ test('milestone-defined review IDs control requirements',()=>{
 });
 test('preflight uses Milestones headers, arbitrary IDs, and live rubric data',()=>{
  const f=fixture();f.populate();
- const milestones=[['Milestone ID','Milestone Name','Due Date','Graded By','Weight (%)'],['review1','Design review','2026-10-12','Review Committee',25],['review2','Final review','2026-11-23','Review Committee',25]];
- assert.equal(f.c.validateReviewConfigurationRows_(milestones,f.rows,'UTC').valid,true);
- assert.match(f.c.validateReviewConfigurationRows_([...milestones,milestones[1]],f.rows,'UTC').issues[0].message,/Duplicate/);
- milestones[1][2]='invalid';assert.match(f.c.validateReviewConfigurationRows_(milestones,f.rows,'UTC').issues[0].message,/Due Date/);
+ const milestones=[['Milestone ID','Milestone Name','Due Date','Graded By','Weight (%)'],['formation','Formation','2026-10-12','Not Applicable',0],['report','Report','2026-11-23','Not Applicable',0]];
+ assert.equal(f.c.validateReviewConfigurationRows_(milestones,f.rows,'UTC',f.c.definitions).valid,true);
+ assert.match(f.c.validateReviewConfigurationRows_([...milestones,milestones[1]],f.rows,'UTC',f.c.definitions).issues[0].message,/Duplicate/);
+ milestones[1][2]='invalid';assert.match(f.c.validateReviewConfigurationRows_(milestones,f.rows,'UTC',f.c.definitions).issues[0].message,/Due Date/);
  milestones[1][2]='2026-10-12';f.rows[1][5]=-1;
- assert.match(f.c.validateReviewConfigurationRows_(milestones,f.rows,'UTC').issues[0].message,/Max Marks/);
+ assert.match(f.c.validateReviewConfigurationRows_(milestones,f.rows,'UTC',f.c.definitions).issues[0].message,/Max Marks/);
 });
 
 test('configuration status endpoint rejects unauthorized callers before reading sheets',()=>{
@@ -123,17 +122,17 @@ test('rubric labels are normalized while criterion wording is preserved',()=>{
 test('read-only status requires rubric coverage for every graded assessment',()=>{
  const f=fixture();assert.equal(f.c.getRubricsStatus_().configured,false);f.populate();
  assert.equal(f.c.getRubricsStatus_().configured,true);
- f.c.definitions.push({key:'see',label:'SEE',gradedBy:'SEE Committee'});
- assert.match(f.c.getRubricsStatus_().detail,/Missing rubrics: SEE/);
- f.rows.push(['see',1,'PI1','Example SEE criterion','CO1',100,'Individual']);
+ f.c.definitions.push({key:'future_demo',rubricReference:'future_demo',type:'REVIEW',label:'Future demo',gradedBy:'Review Committee'});
+ assert.match(f.c.getRubricsStatus_().detail,/Missing rubrics: Future demo/);
+ f.rows.push(['future_demo',1,'PI1','Example future criterion','CO1',100,'Individual']);
  assert.equal(f.c.getRubricsStatus_().configured,true);
  f.rows.at(-1)[5]=-1;assert.equal(f.c.getRubricsStatus_().configured,false);
  f.rows.splice(1);assert.match(f.c.getRubricsStatus_().detail,/no criteria/);
 });
 test('status ignores ungraded milestones and rejects missing guide descriptors',()=>{
- const f=fixture();f.populate();f.c.definitions.push({key:'formation',gradedBy:'Not Applicable'});
+ const f=fixture();f.populate();f.c.getMilestones_=()=>[{key:'formation',gradedBy:'Not Applicable'}];
  assert.equal(f.c.getRubricsStatus_().configured,true);
- f.c.definitions.push({key:'guide_eval',label:'Guide Eval',gradedBy:'Project Guide'});
+ f.c.definitions.push({key:'guide_eval',rubricReference:'guide_eval',type:'INDIVIDUAL_RUBRIC',label:'Guide Eval',gradedBy:'Project Guide'});
  f.rows.push(['guide_eval',1,'PI1','Example criterion','CO1',100,'Individual']);
  assert.match(f.c.getRubricsStatus_().detail,/Level 0–5/);
  f.rows[0].push(...Array.from({length:6},(_,i)=>'Level '+i));f.rows.at(-1).push(...Array(6).fill('Example descriptor'));

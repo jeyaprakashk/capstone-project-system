@@ -158,7 +158,7 @@ ${getGuideStyles()}
 ${getCoordinatorStyles()}
 ${getStudentPageStyles()}
 ${getReviewerStyles()}
-${getReview1EvaluationStyles_()}
+${getReviewEvaluationStyles_()}
 ${getSharedTimelineStyles_()}
 ${getLoadingStyles_()}
 ${getDashboardSurfaceStyles_()}
@@ -259,8 +259,7 @@ ${systemPanel}
 ${getDashboardClientScript()}
 ${getInternalAssessmentPublishingClientScript_()}
 ${getGuideEvaluationClientScript()}
-${getReviewerMarkingScript_()}
-${getReview1EvaluationClientScript_()}
+${getReviewEvaluationClientScript_()}
 </script>
 </body>
 </html>`;
@@ -278,10 +277,10 @@ function loadSharedProjectTimeline() {
 function getSharedProjectTimelineData_() {
   const schedule = getProjectSchedule_();
   const clock = getProjectClock_(schedule);
-  const definitions = [...schedule.milestones.filter(item=>item.gradedBy!=='SEE Committee'), {key:'week1',label:'Weekly logging starts',day:schedule.week1}];
+  const definitions = [...composeProjectTimeline_(schedule.milestones,schedule.assessments), {key:'week1',label:'Weekly logging starts',day:schedule.week1}];
   return {
     schedule, today:clock.today, todayLabel:formatProjectDay_(clock.today),
     week:clock.week, active:clock.active, totalWeeks:Math.ceil((schedule.end - schedule.week1 + 1) / 7),
-    milestones:definitions.map(({key,label,day}) => ({key,label,day,date:formatProjectDay_(day)})).sort((a,b) => a.day - b.day)
+    milestones:definitions.map(({key,label,day,opens,sequence}) => ({key,label,day,opens,sequence,date:formatProjectDay_(day),openingDate:Number.isFinite(opens)?formatProjectDay_(opens):null})).sort((a,b) => a.day - b.day)
   };
 }

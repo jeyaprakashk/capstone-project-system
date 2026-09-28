@@ -62,7 +62,7 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
   const total = statusRows.length;
   const titleApproved = statusRows.filter(r => textEquals_(r[TS.REVIEWER_DECISION], 'Approved')).length;
   const reposReady = statusRows.filter(r => repoUrlMap[normalizeText_(r[TS.TEAM_ID])]).length;
-  
+
   let schedule = null;
   try { schedule = measure('schedule', () => getProjectSchedule_()); } catch (err) { /* Configuration card provides recovery. */ }
   const clock = schedule ? getProjectClock_(schedule) : null;
@@ -570,22 +570,24 @@ function buildTeamTrackerTable(teamData, deadlinePills) {
 
 function buildCommitteeDirectory_(committees) {
   const items = (committees || []).map(committee => {
-    const linked = /^[a-zA-Z0-9_-]+$/.test(committee.sheetId);
     return `<details class="committee-item" data-committee-key="${escapeHtml(normalizeText_(committee.number))}">
-      <summary><span class="committee-summary-name">Committee ${escapeHtml(committee.number)}<small>${committee.members.length} reviewers · ${committee.teams.length} teams</small></span><span class="committee-sheet-status ${linked ? 'linked' : ''}">${linked ? 'Sheet linked' : 'Not created'}</span><span aria-hidden="true" class="committee-chevron">${renderLucideIcon_('chevron-down')}</span></summary>
+      <summary><span class="committee-summary-name">Committee ${escapeHtml(committee.number)}<small>${committee.members.length} reviewers · ${committee.teams.length} teams</small></span><span aria-hidden="true" class="committee-chevron">${renderLucideIcon_('chevron-down')}</span></summary>
       <div class="committee-body"><ul class="committee-members">${committee.members.length ? committee.members.map(member => `<li><span class="committee-avatar" aria-hidden="true">${escapeHtml((member.name || member.email).slice(0,1).toUpperCase())}</span><div><strong>${escapeHtml(member.name || 'Name not provided')}</strong><span class="committee-email">${escapeHtml(member.email || 'Email not provided')}</span></div></li>`).join('') : '<li>No reviewers assigned.</li>'}</ul>
-      <div class="committee-teams"><span>Assigned teams</span><div>${committee.teams.length ? committee.teams.map(team => `<span class="committee-team-chip">${escapeHtml(team)}</span>`).join('') : 'No teams assigned'}</div></div>
-      <div class="committee-sheet-link">${linked ? `<a href="https://docs.google.com/spreadsheets/d/${encodeURIComponent(committee.sheetId)}/edit" target="_blank" rel="noopener">Open marking spreadsheet ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a>` : '<span>Create the marking spreadsheet using the setup button below.</span>'}</div></div>
+      <div class="committee-teams"><span>Assigned teams</span><div>${committee.teams.length ? committee.teams.map(team => `<span class="committee-team-chip">${escapeHtml(team)}</span>`).join('') : 'No teams assigned'}</div></div></div>
     </details>`;
   }).join('');
-  return `<div class="committee-directory"><div class="committee-directory-heading"><h4>Review committees <span>(${(committees || []).length})</span></h4><span>Select a committee to see reviewers and its marking sheet</span></div><div class="committee-grid">${items || '<p>No review committees configured.</p>'}</div></div>`;
+  return `<div class="committee-directory"><div class="committee-directory-heading"><h4>Review committees <span>(${(committees || []).length})</span></h4><span>Select a committee to see reviewers and assigned teams</span></div><div class="committee-grid">${items || '<p>No review committees configured.</p>'}</div></div>`;
 }
 
 function buildReviewConfigurationCard_() {
   return `<section id="reviewConfigurationCard" class="review-config-card" aria-labelledby="reviewConfigurationHeading" aria-busy="true">
     <div class="review-config-heading"><h4 id="reviewConfigurationHeading">Assessment readiness</h4><span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span><button id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
     <ul id="reviewConfigurationIssues" hidden></ul>
-    <div class="review-config-footer"><a id="reviewConfigLink" hidden target="_blank" rel="noopener">Milestones ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><a id="reviewRubricsLink" hidden target="_blank" rel="noopener">Rubric criteria ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><span id="reviewConfigurationCheckedAt"></span></div>
+    <button type="button" id="createAssessmentDefinitionsButton" hidden disabled onclick="DashboardUI.bootstrapAssessmentDefinitions()">Create assessment definitions tab</button>
+    <p>First create the definitions schema, then use Assessment definitions to enter the academic configuration. Setup never supplies assessment instances or policy choices.</p>
+    <ul id="reviewAssessmentReadiness" class="review-assessment-readiness" aria-label="Readiness by assessment"></ul>
+    <p class="review-readiness-note">Storage readiness is separate from team entry availability, which also checks reviewer assignment, opening dates and prerequisites.</p>
+    <div class="review-config-footer"><a id="reviewDefinitionsLink" hidden target="_blank" rel="noopener">Assessment definitions ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><a id="reviewConfigLink" hidden target="_blank" rel="noopener">Milestones ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><a id="reviewRubricsLink" hidden target="_blank" rel="noopener">Rubric criteria ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><span id="reviewConfigurationCheckedAt"></span></div>
   </section>`;
 }
 
@@ -712,7 +714,7 @@ function getCoordinatorStyles() {
 ${getBaseStyles()}${getStatusBadgeStyles()}${getTableStyles()}${getFilterTabStyles()}${getCollapsibleStyles()}
 body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .coordinator-container { display: flex; flex-direction: column; gap: 15px; }
-.reviewer-setup { min-width:0; }
+.assessment-setup { min-width:0; }
 .committee-directory { margin:0; padding:0; }
 .committee-directory-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
 .committee-directory-heading h4 { margin:0; font-size:13px; }
@@ -724,8 +726,6 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .committee-item summary:focus-visible { outline:2px solid #6366f1; outline-offset:-3px; }
 .committee-summary-name { flex:1; min-width:0; overflow-wrap:anywhere; font-size:13px; font-weight:600; }
 .committee-summary-name small { display:block; margin-top:4px; color:#64748b; font-weight:400; font-size:11px; }
-.committee-sheet-status { font-size:11px; padding:4px 7px; border-radius:6px; color:#92400e; background:#fffbeb; white-space:nowrap; }
-.committee-sheet-status.linked { color:#166534; background:#f0fdf4; }
 .committee-item[open] .committee-chevron { transform:rotate(180deg); }
 .committee-body { padding:0 14px 14px; border-top:1px solid #f1f5f9; }
 .committee-members { list-style:none; padding:0; margin:12px 0; display:grid; gap:10px; }
@@ -737,10 +737,8 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .committee-teams { font-size:12px; color:#64748b; }
 .committee-teams > div { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
 .committee-team-chip { background:#f1f5f9; color:#334155; border-radius:5px; padding:3px 7px; overflow-wrap:anywhere; }
-.committee-sheet-link { margin-top:12px; font-size:12px; color:#64748b; }
-.committee-sheet-link a { color:#4338ca; font-weight:600; }
-.reviewer-setup > .assessment-title { margin-top:0; margin-bottom:8px; }
-.reviewer-setup-intro { margin:0 0 16px; color:#64748b; font-size:13px; line-height:1.5; }
+.assessment-setup > .assessment-title { margin-top:0; margin-bottom:8px; }
+.assessment-setup-intro { margin:0 0 16px; color:#64748b; font-size:13px; line-height:1.5; }
 .system-status-primary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:stretch; margin-bottom:16px; }
 .system-status-primary > * { min-width:0; margin:0; }
 
@@ -759,32 +757,40 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .rubrics-assessment-list dd { margin:0; color:#64748b; font-variant-numeric:tabular-nums; }
 @media(max-width:900px) { .system-status-primary { grid-template-columns:minmax(0,1fr); } }
 .review-config-card { padding:10px 12px; margin-bottom:14px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#0f172a; }
-.reviewer-setup-panels { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px; align-items:stretch; }
-.reviewer-setup-panels .review-config-card { min-width:0; margin:0; padding:14px; }
-.reviewer-setup-action { display:flex; flex-direction:column; align-items:flex-start; gap:12px; min-width:0; padding:14px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; }
-.reviewer-setup-action > div { min-width:0; }
-.marking-sheets-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px; width:100%; }
-.reviewer-setup-action .marking-sheets-heading h4 { margin:0; }
-@media (max-width:760px) { .reviewer-setup-panels { grid-template-columns:minmax(0,1fr); } }
-.reviewer-setup-action h4 { margin:0 0 6px; font-size:13px; font-weight:600; }
-.reviewer-setup-action p { margin:0; font-size:13px; line-height:1.6; color:#475569; }
-.reviewer-setup-action p.reviewer-setup-note { margin-top:4px; font-size:12px; color:#64748b; }
-.reviewer-setup #createReviewerSheetsButton { width:auto; max-width:100%; margin:0 0 0 auto; padding:4px 10px; border:1px solid #1f2430; border-radius:6px; font-size:12px; white-space:normal; }
-.reviewer-setup [hidden] { display:none !important; }
-#reviewerSheetsStatus:empty,#reviewerSheetsResults:empty { display:none; }
+.assessment-setup-panels { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px; align-items:stretch; }
+.assessment-setup-panels .review-config-card { min-width:0; margin:0; padding:14px; }
+.assessment-setup-action { display:flex; flex-direction:column; align-items:flex-start; gap:12px; min-width:0; padding:14px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; }
+.assessment-setup-action > div { min-width:0; }
+.assessment-storage-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px; width:100%; }
+.assessment-setup-action .assessment-storage-heading h4 { margin:0; }
+@media (max-width:760px) { .assessment-setup-panels { grid-template-columns:minmax(0,1fr); } }
+.assessment-setup-action h4 { margin:0 0 6px; font-size:13px; font-weight:600; }
+.assessment-setup-action p { margin:0; font-size:13px; line-height:1.6; color:#475569; }
+.assessment-setup-action p.assessment-setup-note { margin-top:4px; font-size:12px; color:#64748b; }
+.assessment-setup #initializeAssessmentStorageButton { width:auto; max-width:100%; margin:0 0 0 auto; padding:4px 10px; border:1px solid #1f2430; border-radius:6px; font-size:12px; white-space:normal; }
+.assessment-setup [hidden] { display:none !important; }
+#assessmentStorageStatus:empty,#assessmentStorageResults:empty { display:none; }
 .review-config-pill { display:inline-flex; padding:4px 9px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:600; line-height:1.4; }
 .review-config-card[data-state="ready"] .review-config-pill { color:#166534; background:#dcfce7; }
 .review-config-card[data-state="invalid"] .review-config-pill { color:#92400e; background:#fef3c7; }
-.review-config-heading,.review-config-footer { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.review-config-heading,.review-assessment-readiness { display:grid; gap:8px; margin:12px 0; padding:0; list-style:none; }
+.review-assessment-readiness li { padding:8px 10px; border:1px solid var(--color-border,#e4e7ec); border-radius:6px; overflow-wrap:anywhere; }
+.review-assessment-readiness small { display:block; margin-top:4px; }
+.review-readiness-note { font-size:12px; color:var(--color-ink-muted,#64748b); }
+.review-config-footer { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
 .review-config-heading { gap:8px; }
 .review-config-heading button { margin-left:auto; }
 .review-config-heading h4 { margin:0; font-size:13px; font-weight:600; }
 .review-config-heading button { border:1px solid #94a3b8; border-radius:6px; padding:4px 10px; background:white; color:#0f172a; cursor:pointer; }
+.review-assessment-readiness { display:grid; gap:8px; margin:12px 0; padding:0; list-style:none; }
+.review-assessment-readiness li { padding:8px 10px; border:1px solid var(--color-border,#e4e7ec); border-radius:6px; overflow-wrap:anywhere; }
+.review-assessment-readiness small { display:block; margin-top:4px; }
+.review-readiness-note { font-size:12px; color:var(--color-ink-muted,#64748b); }
 .review-config-footer { margin-top:8px; gap:6px 14px; font-size:11px; color:#64748b; }
 #reviewConfigurationIssues { margin:10px 0 0; padding-left:18px; font-size:12px; }
 .review-config-card li { margin:8px 0; }
 .review-config-card p { margin:8px 0; font-size:13px; line-height:1.5; }
-#createReviewerSheetsButton:disabled { opacity:.55; cursor:not-allowed; }
+#initializeAssessmentStorageButton:disabled { opacity:.55; cursor:not-allowed; }
 .coord-stats.coordinator-stats-grid { display:grid; width:100%; grid-template-columns:repeat(4,minmax(0,1fr)); grid-auto-rows:1fr; gap:12px; margin-bottom:24px; }
 .coordinator-stats-grid .stat-card { position:relative; display:flex; flex-direction:column; gap:8px; min-width:0; min-height:114px; box-sizing:border-box; padding:13px; background:#fff; border:1px solid #f0edf8; border-radius:7px; box-shadow:0 1px 1px rgba(15,23,42,.02); }
 .coordinator-stats-grid .stat-label { min-height:22px; padding-right:29px; font-size:9px; color:#64748b; font-weight:500; letter-spacing:.45px; text-transform:uppercase; line-height:1.4; }
@@ -1505,7 +1511,6 @@ function buildCoordinatorPage(data) {
 function buildCommitteeData_(committeeRows, statusRows, RC, TS) {
   return committeeRows.filter(row => String(row[RC.COMMITTEE_NUMBER] || '').trim()).map(row => ({
       number:String(row[RC.COMMITTEE_NUMBER]).trim(),
-      sheetId:String(row[RC.MARKS_SHEET_ID] || '').trim(),
       members:[1,2,3,4].map(index => ({name:String(row[RC['REVIEWER' + index + '_NAME']] || '').trim(), email:String(row[RC['REVIEWER' + index + '_EMAIL']] || '').trim()})).filter(member => member.name || member.email),
       teams:statusRows.filter(team => textEquals_(team[TS.COMMITTEE_NUMBER], row[RC.COMMITTEE_NUMBER])).map(team => String(team[TS.TEAM_ID]))
     })).sort((a,b) => a.number.localeCompare(b.number, undefined, {numeric:true}));
@@ -1532,18 +1537,19 @@ function loadCoordinatorSystemStatus() {
     const access = {coordUsername:String(getConfig('COLLABORATOR_GITHUB_USERNAME') || '').trim(),
       reposWithAccess:Number(getConfig('COLLABORATOR_REPOS_ACCESS')) || 0,
       totalRepos:rows.filter(row => repos[normalizeText_(row[TS.TEAM_ID])]).length};
+    let publishing;
+    try {publishing=publicationDefinitions_().map(d=>buildInternalAssessmentPublishing_(d.key)).join('');}
+    catch(err){publishing='<p role="status">Assessment configuration needs attention. Use Assessment readiness below.</p>';}
     return `<div class="coordinator-container">
       <div class="system-status-primary">${buildGithubAccessSection(access)}</div>
-      ${buildGuideEvaluationAdmin_()}
-      ${buildInternalAssessmentPublishing_('review1')}
-      ${buildInternalAssessmentPublishing_('review2')}
-      <section class="assessment-section reviewer-setup" aria-label="Review committees and marking sheets">
+      ${publishing}
+      <section class="assessment-section assessment-setup" aria-label="Review committee assignments and assessment storage">
         ${buildCommitteeDirectory_(committees)}
-        <div class="reviewer-setup-panels">${buildReviewConfigurationCard_()}
-          <div class="reviewer-setup-action"><div class="marking-sheets-heading"><h4>Committee marking sheets</h4>
-          <button type="button" id="createReviewerSheetsButton" disabled aria-describedby="reviewConfigurationSummary" class="run-sync-btn" onclick="createReviewerSheets()">Create missing sheets</button></div>
-          <p>Create only missing sheets. Existing sheets stay unchanged.</p></div></div>
-        <p id="reviewerSheetsStatus" role="status" aria-live="polite"></p><ul id="reviewerSheetsResults"></ul>
+        <div class="assessment-setup-panels">${buildReviewConfigurationCard_()}
+          <div class="assessment-setup-action"><div class="assessment-storage-heading"><h4>Assessment storage</h4>
+          <button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="run-sync-btn" onclick="initializeAssessmentStorage()">Create missing assessment storage</button></div>
+          <p>Prepare configured assessment journals. Existing assessment data stays unchanged.</p></div></div>
+        <p id="assessmentStorageStatus" role="status" aria-live="polite"></p><ul id="assessmentStorageResults"></ul>
       </section></div>`;
   });
 }

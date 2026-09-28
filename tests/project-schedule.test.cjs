@@ -9,7 +9,7 @@ function fixture(overrides = {}, runtime = {}) {
   const settings = { reviewCount:2, start:'09/09/2026', report:'22/11/2026', formation:'11/09/2026', title:'16/09/2026', review1:'12/10/2026', review2:'23/11/2026', ...overrides };
   const entries = Object.entries(settings);
   const labels={start:'Project Sem. Start',report:'Report Submission',formation:'Team & Git Repo',title:'Title Approval'};
-  const milestoneRows=runtime.milestoneRows || [['Milestone ID','Milestone Name','Due Date','Graded By','Weight (%)'],...Object.keys(labels).map(key=>[key,labels[key],settings[key],'Not Applicable','']),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'Review '+(i+1),settings['review'+(i+1)],'Review Committee',10])];
+  const milestoneRows=runtime.milestoneRows || [['Milestone ID','Milestone Name','Due Date','Graded By','Weight (%)'],...Object.keys(labels).map(key=>[key,labels[key],settings[key],'Not Applicable',''])];
   const milestones={getDataRange:()=>({getValues:()=>{reads++;return milestoneRows;}})};
   let reads = 0;
   const sheet = {getLastRow:()=>entries.length+1, getLastColumn:()=>2, getRange:(row,col,count,width)=>({
@@ -20,16 +20,19 @@ function fixture(overrides = {}, runtime = {}) {
   const c = createSheetReadContext({Date, console,
     CacheService:runtime.cache ? {getScriptCache:()=>runtime.cache} : undefined,
     PropertiesService:{getScriptProperties:()=>({getProperty:key=>properties.get(key)||null,setProperty:(key,value)=>properties.set(key,value)})},
-    SpreadsheetApp:{openById:()=>({getSheetByName:name=>name==='Milestones'?milestones:sheet,getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),flush:()=>{}},
+    SpreadsheetApp:{openById:()=>({getSheetByName:name=>name==='AssessmentDefinitions'?null:name==='Milestones'?milestones:sheet,getSheets:()=>[],getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),flush:()=>{}},
     Utilities:{getUuid:()=>require('node:crypto').randomUUID(),formatDate:(date,tz,pattern)=> {
       const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).map(p=>[p.type,p.value]));
       if(pattern==='yyyy-MM-dd') return `${parts.year}-${parts.month}-${parts.day}`;
       return new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'short',year:'numeric'}).format(date);
     }}
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','reviewer-evaluation.js','reviewer-evaluation-client.js','review1-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
+  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
+  const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,'review'+(i+1),10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
+  const getSheet=c.getSheet;
+  c.getSheet=name=>name==='AssessmentDefinitions'?{getDataRange:()=>({getValues:()=>definitionRows})}:getSheet(name);
   const schedule = c.getProjectSchedule_();
   c.getTeamGithubSetup_=(id, options)=>({ready:!!options.repoUrl,usernamesComplete:!!options.repoUrl,message:'GitHub setup pending',verificationUnavailable:false});
   c.getTeamsGithubSetup_=(rows, columns, repos)=>Object.fromEntries(rows.map(row=>[c.normalizeText_(row[columns.TEAM_ID]),c.getTeamGithubSetup_(row[columns.TEAM_ID],{repoUrl:repos[c.normalizeText_(row[columns.TEAM_ID])]} )]));
@@ -43,12 +46,12 @@ test('Milestones read once per execution independently of legacy Config values',
  f.c.getConfig=()=>{throw Error('Legacy Config must not be read');};assert.equal(f.c.getInternalReviewsCount_(),2);
 });
 
-test('guide evaluation button opens five calendar days before assessment in the schedule timezone',()=>{
+test('guide evaluation button uses configured opening in the schedule timezone',()=>{
  const {c,schedule}=fixture();
  c.getColumnMap=()=>({TEAM_ID:0});
  c.buildRepoLine=()=>'';
  const due=c.projectDay_('2026-10-12',schedule.timezone);
- const configured={...schedule,guide_eval:due};
+ const configured={...schedule,guide_eval:due,assessments:[...schedule.assessments,{key:'guide_eval',type:'INDIVIDUAL_RUBRIC',day:due,opens:due-5}]};
  const render=(instant,plan=configured)=>c.buildTeamCard(['T1'],'NOT_SUBMITTED','',null,
    {schedule:plan,clock:c.getProjectClock_(plan,new Date(instant))});
  const before=render('2026-10-06T18:29:59Z');
@@ -60,7 +63,7 @@ test('guide evaluation button opens five calendar days before assessment in the 
    assert.doesNotMatch(html, /disabled/);
  }
  const missing=render('2026-10-07T12:00:00Z',schedule);
- assert.match(missing, /disabled title="Guide Eval assessment date is not configured/);
+ assert.match(missing, /disabled title="Guide Evaluation is not configured in AssessmentDefinitions/);
 });
 
 test('deadline pills open exactly five days before, stay overdue, and count only eligible incomplete teams',()=>{
@@ -93,11 +96,7 @@ test('one and three configured reviews drive timeline, student marks and coordin
     const milestones=f.c.getSharedProjectTimelineData_().milestones.filter(m=>/^review/.test(m.key));
     assert.equal(milestones.length,count);
     f.c.Session={getActiveUser:()=>({getEmail:()=> 'student@example.com'})};
-    f.c.getStudentAllReviewMarks=()=>({});
-    const marks=f.c.loadStudentMarksSection();
-    if(count>1) assert(marks.includes('Review '+count));
-    assert(!marks.includes('Review 1')); // Published Review 1 has a separate authenticated result section.
-    assert(!marks.includes('Review '+(count+1)));
+    assert.equal(f.c.loadStudentMarksSection,undefined); // Student results use authenticated publication snapshots only.
     const stats=Object.fromEntries(reviews.map(r=>[r.key,{completed:1,total:2,pending:1}]));
     const html=f.c.buildCoordinatorHeaderStats({total:2,reviews:stats})+f.c.buildTeamCompletionProgress({...stats,setup:{completed:1,total:2},titleApproval:{completed:1,total:2}});
     assert(html.includes('Review '+count));assert(!html.includes('Review '+(count+1)));
@@ -109,9 +108,9 @@ test('one and three configured reviews drive timeline, student marks and coordin
   }
 });
 
-test('review count comes only from committee-graded milestone rows',()=>{
+test('review count comes only from registry REVIEW instances',()=>{
  const f=fixture({reviewCount:0});assert.equal(f.c.getInternalReviewsCount_(),0);
- assert.throws(()=>fixture({reviewCount:3}),/review3 Due Date/);
+ assert.throws(()=>fixture({reviewCount:3}),/Opening and due date are required/);
  const three=fixture({reviewCount:3,review3:'30/11/2026'});assert.equal(three.schedule.reviews.length,3);
 });
 
@@ -220,7 +219,7 @@ test('student cards follow scheduled weeks and approval, not rolling inactivity'
   function render(day,approved=true,logs=[]) {
     const current=clock(day);
     c.getStudentDashboardData=()=>({repoUrl:'https://example.com/repo',githubReady:true,githubState:'done',titleStatus:approved?'APPROVED':'AWAITING_REVIEWER',title:'Project',rosterSlots:[],schedule:s,clock:current,logWeeks:c.getLogWeekSummary_(logs,s,current)});
-    return c.buildStudentContent('student@example.com','T1');
+    return (c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
   }
   assert(render('2026-09-20').includes('Week 1 starts on 21 Sept 2026'));
   assert(render('2026-09-21').includes('Weekly progress log · Week 1'));
@@ -235,7 +234,7 @@ test('student locks depend on team readiness while preserving repository and rec
     titleStatus:'APPROVED',title:'Existing title',rosterSlots:[],schedule,clock:clock('2026-09-23'),logWeeks:{missing:0,currentLogged:true}};
   c.getStudentDashboardData=()=>data;
   c.buildWeeklyLogLink=()=> 'https://example.com/log';
-  let html=c.buildStudentContent('student@example.com','T1');
+  let html=(c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
   assert(html.includes('https://github.com/org/repo'));
   assert(html.includes('Current title:</strong> Existing title'));
   assert(html.includes('Your existing log for this week is recorded.'));
@@ -243,7 +242,7 @@ test('student locks depend on team readiness while preserving repository and rec
   assert(!html.includes('https://example.com/log'));
   assert(html.includes('1 of 3 milestones complete'));
   data.githubReady=true;data.githubCanRetry=false;data.githubState='done';
-  html=c.buildStudentContent('student@example.com','T1');
+  html=(c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
   assert(html.includes('https://example.com/log'));
   assert(html.includes('2 of 3 milestones complete'));
 });
@@ -306,7 +305,7 @@ test('coordinator statistics, attention list and tracker share one health result
   assert.equal(degraded.stats.total,1);
   const html=c.buildCoordinatorContent(degraded);
   assert(!html.includes('reviewConfigurationCard'));assert(html.includes('trackerBody'));
-  assert(!html.includes('id="createReviewerSheetsButton"'));
+  assert(!html.includes('id="initializeAssessmentStorageButton"'));
   c.getInternalReviews_=()=>{throw Error('Invalid review count');};
   assert(c.buildCoordinatorContent(c.getCoordinatorDashboardData_()).includes('trackerBody'));
 });
@@ -496,6 +495,7 @@ test('timeline is single-flight and never blocks either role dashboard',async()=
   assert.equal(await vm.runInContext('DashboardSchedule.ready()',f.browser),result);
   assert.equal(f.requests.filter(r=>r.type==='timeline').length,1);
   assert(f.timeline.innerHTML.includes('timeline-track'));
+  assert.match(f.timeline.innerHTML,/title="Opens .*; due /);
   assert(!f.guide.innerHTML.includes('timeline-track'));
   assert.equal(f.timeline.attributes['aria-busy'],'false');
 });
@@ -656,7 +656,7 @@ test('approval status and committee access tolerate case and surrounding spaces'
   assert.equal(c.getTeamStatus(['Title','',' revise ']),'REVISE_AWAITING_STUDENT');
   c.getSheetRows=()=>[['Title',' APPROVED ',' pending ',' C1 ']];
   c.getCommitteeNumbersForReviewer=()=>['c1'];
-  c.getCommitteeInfo=()=>({marksSheetId:'CaseSensitiveID'});
+  c.getCommitteeInfo=()=>({});
   const data=c.getReviewerDashboardData('Reviewer@example.com');
   assert.equal(data.pending.length,1);assert.equal(data.assigned.length,1);assert.equal(data.assigned[0][3],' C1 ');
 });
@@ -873,7 +873,7 @@ test('System Status is coordinator-only and its endpoint avoids marks and dashbo
  c.getAllReviewCompletionStatus_=()=>{throw Error('must not read marks');};
  const html=c.loadCoordinatorSystemStatus();
  assert(html.includes('githubReposAccess'));assert(html.includes('reviewConfigurationCard'));
- assert(html.includes('createReviewerSheetsButton'));
+ assert(html.includes('initializeAssessmentStorageButton'));
 });
 
 test('Coordinator tracking uses small cards without a separate progress panel',()=>{
@@ -887,14 +887,14 @@ test('Coordinator tracking uses small cards without a separate progress panel',(
  assert.equal((shell.match(/coordinator-stat-placeholder/g)||[]).length,8);
 });
 
-test('timeline excludes SEE with or without a scheduled date and preserves other milestones',()=>{
- for(const day of [null,21000]) {
-  const {c,schedule}=fixture();
-  c.getProjectSchedule_=()=>({...schedule,milestones:[...schedule.milestones,{key:'final_exam',label:'SEE',day,gradedBy:'SEE Committee',weight:30}]});
-  const result=c.getSharedProjectTimelineData_();
-  assert(!result.milestones.some(m=>m.key==='final_exam'));
-  assert(result.milestones.some(m=>m.key==='report'));
-  assert(result.milestones.some(m=>m.key==='week1'));
-  assert(result.schedule.milestones.some(m=>m.key==='final_exam'));
- }
+test('timeline composes lifecycle events and configured assessments without overrides',()=>{
+ const {c,schedule}=fixture();
+ const timeline=c.getSharedProjectTimelineData_().milestones;
+ assert.equal(timeline.filter(d=>d.key==='review1').length,1);
+ assert(!schedule.milestones.some(d=>d.key==='review1'));
+ const review=timeline.find(d=>d.key==='review1');
+ assert.equal(review.opens,schedule.assessments[0].opens);
+ assert.equal(review.sequence,1);
+ assert.equal(review.openingDate,c.formatProjectDay_(review.opens));
+ assert.throws(()=>c.composeProjectTimeline_([...schedule.milestones,{key:'review1'}],schedule.assessments),/distinct/);
 });

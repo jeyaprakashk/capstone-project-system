@@ -1,29 +1,28 @@
 # Guide evaluation
 
-## Enable in a test deployment
+## Configuration
 
-1. Populate `Milestones` with the schema documented in
-   [DASHBOARD-PERFORMANCE.md](DASHBOARD-PERFORMANCE.md). Set the `guide_eval`
-   row's Graded By to `Project Guide`, enter its due date and Weight (%).
-2. Maintain the guide criteria directly in the existing `Rubrics` sheet.
-   Use `Milestone ID` = `guide_eval`, Individual type, and all six Level 0–5
-   descriptors. No rubric creation/reset action or built-in criteria are provided.
-3. Use the manually created `GuideEvaluations` tab in the main spreadsheet.
-   Its header row must be: `Assessment`, `Team`, `Student`, `Revision`, `Action`,
-   `Actor`, `At`, `Request ID`, `Payload`. The application validates these headers
-   and never creates or replaces the tab. Deploy the updated script, then refresh evaluations.
-4. Verify the entered criteria and band convention against the approved framework
-   before production grading, then refresh evaluations.
+1. In Coordinator System Status, use **Create assessment definitions tab** if the
+   registry is missing. This creates only the eleven required headers.
+2. Open **Assessment definitions** and explicitly configure ID `guide_eval`,
+   type `INDIVIDUAL_RUBRIC`, label, sequence, rubric reference, weight, opening,
+   due date, prerequisites and policy `guide-bands-v3-target-level-2`.
+   No Guide instance or academic setting is seeded.
+3. Maintain the referenced criteria in `Rubrics`. Its `Milestone ID` column
+   identifies the rubric reference. Guide criteria must be Individual with
+   all six Level 0–5 descriptors.
+4. Recheck readiness, then **Create missing assessment storage**. The configured
+   Journal or default `Assessment_guide_eval` receives the nine-column journal
+   schema. Existing compatible storage and records remain unchanged.
 
-For the previously supplied framework, enter five criteria totaling 100 marks
-and a milestone weight of 20. Grading reads these values from the sheet; the code supplies no default criteria.
-No team-level copying or inferred marks are used. SEE collection and final
-course aggregation remain outside this workflow.
+Guide discovery, dates, rubric, weight and storage come exclusively from
+`AssessmentDefinitions`. Missing configuration is reported; there is no
+Milestones fallback. See [Assessment configuration](ASSESSMENT-CONFIGURATION.md).
 
 ## Guide workflow
 
-The dashboard's Guide Evaluation button is disabled until five calendar days
-before the scheduled `guide_eval` date, using the spreadsheet timezone. While
+The dashboard's Guide Evaluation button is disabled until the configured Opening
+for `guide_eval`, using the spreadsheet timezone. While
 disabled, it shows its opening date; a missing date keeps it disabled. Refresh
 the dashboard to update the button after the opening date or a schedule change.
 The button remains available on and after the assessment date.
@@ -50,8 +49,8 @@ Scoring bands (percentage of that criterion's maximum):
 
 The server validates without first rounding percentages and calculates total
 marks against the sum of criterion maxima, and contribution as
-`total / maximum × milestone Weight (%)`, rounded to two decimals. The policy
-version is `guide-bands-v2`. Committee level-to-mark scoring is unchanged.
+`total / maximum × assessment Weight (%)`, rounded to two decimals. The policy
+version is `guide-bands-v3-target-level-2`. Committee level-to-mark scoring is unchanged.
 Late submissions remain allowed and carry a late flag; drafts after the deadline
 are shown as overdue to coordinators.
 
@@ -73,7 +72,7 @@ publication of a mismatched submission and requires reopening.
 
 ## Persistence and interfaces
 
-`GuideEvaluations` is an append-only log: Assessment, Team, Student, Revision,
+The resolved Guide journal is an append-only log: Assessment, Team, Student, Revision,
 Action, Actor, At, Request ID, Payload. The JSON payload holds the full rubric,
 score policy, per-criterion levels/marks/COs/feedback, totals, roster fingerprint,
 status, late flag, and request fingerprint. Latest revision determines state;
@@ -95,9 +94,8 @@ cannot reuse a request ID. A single append is both the action log and full state
 revision; there is no separate current-state write to diverge.
 
 No cross-request cache, localStorage or sessionStorage is introduced. Rubric
-parsing is shared with review logic, but `guide_eval` is excluded from committee
-sheet creation. Definitions now come from Milestones; existing spreadsheet data
-is not automatically migrated. Excel export and complete course-grade aggregation
+parsing and journal provisioning are shared with Review logic. Definitions come
+only from AssessmentDefinitions; existing spreadsheet data is not migrated. Excel export and complete course-grade aggregation
 are not included.
 
 ## Verification before production
@@ -117,7 +115,7 @@ In a test deployment use separate guide, coordinator and student accounts:
 - Two tabs editing the same student produce a stale-revision error instead of
   overwriting each other; double clicks do not append duplicate revisions.
 - Confirm mobile form layout, selected-level ranges, unsaved-change prompts,
-  System Status refresh behavior and unchanged reviewer sheet creation.
+  System Status refresh behavior and assessment storage initialization.
 
 These live account and visual checks have not been performed locally. History
 is sheet-backed and grows with revisions; monitor execution duration and sheet
@@ -131,7 +129,7 @@ configuration. Guide evaluation setup creates only evaluation-record storage;
 it does not create or modify rubric definitions.
 
 The read-only **System Status → Rubrics** card checks that the tab exists and
-contains valid criteria for every graded Milestones assessment, including Guide
-Evaluation and SEE. It shows a green Configured pill or an amber Not configured
+contains valid criteria for every registered graded assessment, including Guide
+Evaluation. It shows a green Configured pill or an amber Not configured
 pill with the missing/invalid configuration explained. Refresh System Status to
 read sheet changes. This card never creates or modifies rubric definitions.

@@ -73,15 +73,17 @@ function guideEvaluationBrowser_() {
     },err=>{setBusy(false);message(err.message+' Retry uses the same request ID unless you change the form.');});
   }
   function admin() { return InternalAssessmentPublishing.refresh('guide_eval'); }
+  let studentBusy=false;
   function student() {
-    const host=el('studentGuideEvaluation');if(!host)return;
-    host.innerHTML=DashboardUI.renderSkeleton('panel', 'Loading guide evaluation results');
+    const host=el('studentGuideEvaluation');if(!host || studentBusy)return;
+    studentBusy=true;const finish=DashboardUI.beginContentLoading(host,'Loading guide evaluation results');
     rpc('loadPublishedGuideEvaluation',[],result=>{
+      finish();studentBusy=false;if(el('studentGuideEvaluation')!==host)return;
       if(!result){host.textContent='Guide Evaluation: not published.';return;}
-      host.innerHTML='<h3>Guide Evaluation</h3><p>'+result.total.toFixed(2)+' / '+result.config.maximum+' · Course contribution '+result.weighted.toFixed(2)+' / '+(result.config.weight*100)+'</p>'+result.config.criteria.map(c=>{
+      host.innerHTML='<h3>'+escape(result.config.label)+'</h3>'+(result.identity?'<p>'+escape(result.identity.name+' ('+result.identity.register+')')+'</p>':'')+(result.underCorrection?'<p role="status">Under correction. These are the last published results.</p>':'')+'<p>'+result.total.toFixed(2)+' / '+result.config.maximum+' · Course contribution '+result.weighted.toFixed(2)+' / '+(result.config.weight*100)+'</p>'+result.config.criteria.map(c=>{
         const score=result.scores[c.pi];return '<p><strong>'+escape(c.name)+'</strong>: '+score.marks+' / '+c.maxMarks+' · Level '+score.level+'</p><p>'+escape(score.remark)+'</p>';
       }).join('');
-    },err=>{host.textContent='Guide evaluation unavailable. ';const button=document.createElement('button');button.textContent='Retry';button.onclick=student;host.appendChild(button);});
+    },err=>{finish();studentBusy=false;if(el('studentGuideEvaluation')!==host)return;const notice=document.createElement('p');notice.textContent='Guide evaluation unavailable. '+err.message+' ';const button=document.createElement('button');button.textContent='Retry';button.onclick=()=>{notice.remove();student();};notice.appendChild(button);host.appendChild(notice);});
   }
   window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
   return {open,admin,student};

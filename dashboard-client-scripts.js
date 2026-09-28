@@ -211,7 +211,7 @@ const DashboardUI = (function() {
     activatedRoles[key] = true;
     if (key === 'coord') initializeCoordinatorAsync();
     if (key === 'reviewer') filterReviewerAssignedTeams();
-    if (key === 'student') { loadStudentMarksAsync(); GuideEvaluation.student(); if (typeof Review1Evaluation !== 'undefined') Review1Evaluation.student(); if (typeof Review2Evaluation !== 'undefined') Review2Evaluation.student(); }
+    if (key === 'student') { GuideEvaluation.student(); if(typeof ReviewEvaluations!=='undefined')document.querySelectorAll('[data-review-result]').forEach(host=>ReviewEvaluations.student(host.dataset.reviewResult)); }
   }
 
   let sharedSchedule = null;
@@ -229,8 +229,9 @@ const DashboardUI = (function() {
       '<div class="timeline-body"><div class="timeline-navigation" hidden><button type="button" class="timeline-nav timeline-prev" aria-label="Scroll to earlier milestones">' + renderLucideIcon_('chevron-left') + '</button><button type="button" class="timeline-nav timeline-forward" aria-label="Scroll to later milestones">' + renderLucideIcon_('chevron-right') + '</button></div>' +
       '<div class="timeline-scroll" role="region" aria-label="Project milestones, scroll horizontally to see all dates" tabindex="0"><ol class="timeline-track" style="--timeline-stops:' + data.milestones.length + '">' + data.milestones.map(function(m, index) {
         const state = m.day < data.today ? 'past' : m.day <= data.today + 1 ? 'imminent' : index === highlighted ? 'next' : 'future';
+        const dateDescription=m.openingDate?'Opens '+m.openingDate+'; due '+m.date:m.date;
         const label = m.day === data.today ? 'Today' : m.day === data.today + 1 ? 'Tomorrow' : index === highlighted ? 'Up Next' : '';
-        return '<li class="timeline-stop timeline-' + state + (index === highlighted ? ' timeline-current' + (imminent ? ' timeline-upcoming' : '') : '') + (index === highlighted - 1 ? ' timeline-approaching' : '') + '"' + (index === next ? ' aria-current="step"' : '') + '><span class="timeline-dot" aria-hidden="true">' + (index === highlighted ? '<span class="timeline-node-core"></span>' : '') + '</span><strong>' + escapeClientHtml(m.label) + '</strong><span class="timeline-date" title="' + escapeClientHtml(m.date) + '" aria-label="' + escapeClientHtml(m.date) + '">' + escapeClientHtml(String(m.date).replace(/ [0-9]{4}$/, '')) + '</span>' + (label ? '<span class="timeline-state">' + label + '</span>' : '') + '</li>';
+        return '<li class="timeline-stop timeline-' + state + (index === highlighted ? ' timeline-current' + (imminent ? ' timeline-upcoming' : '') : '') + (index === highlighted - 1 ? ' timeline-approaching' : '') + '"' + (index === next ? ' aria-current="step"' : '') + '><span class="timeline-dot" aria-hidden="true">' + (index === highlighted ? '<span class="timeline-node-core"></span>' : '') + '</span><strong>' + escapeClientHtml(m.label) + '</strong><span class="timeline-date" title="' + escapeClientHtml(dateDescription) + '" aria-label="' + escapeClientHtml(dateDescription) + '">' + escapeClientHtml(String(m.date).replace(/ [0-9]{4}$/, '')) + '</span>' + (label ? '<span class="timeline-state">' + label + '</span>' : '') + '</li>';
       }).join('') + '</ol></div></div>';
     const scroll = target.querySelector('.timeline-scroll');
     const navigation = target.querySelector('.timeline-navigation');
@@ -497,21 +498,6 @@ const DashboardUI = (function() {
       .loadDashboardRoleContent(activeKey);
   }
 
-  function loadStudentMarksAsync() {
-    const marksTarget = byId('studentMarksAsync');
-    if (!marksTarget) return;
-
-    dashboardRun()
-      .withSuccessHandler(function(html) {
-        marksTarget.innerHTML = html;
-      })
-      .withFailureHandler(function(err) {
-        marksTarget.innerHTML = '<h3>Your Marks</h3><div class="marks-row"><span>Review marks</span><span class="marks-pending">Unable to load: ' +
-          escapeClientHtml(errorMessage(err)) + '</span></div>';
-      })
-      .loadStudentMarksSection();
-  }
-
   const announcementsState = { loading: false, loaded: false, query: '', page: 1, pageSize: 5 };
 
   function initializeAnnouncementSearch(target) {
@@ -656,8 +642,7 @@ const DashboardUI = (function() {
       setText('systemStatusUpdated', updatedLabel());
       reviewConfigurationValid = false;
       recheckReviewConfiguration();
-      GuideEvaluation.admin();
-      if (typeof Review1Evaluation !== 'undefined') Review1Evaluation.admin(); if (typeof Review2Evaluation !== 'undefined') Review2Evaluation.admin();
+      target.querySelectorAll('[data-publishing]').forEach(function(section) { InternalAssessmentPublishing.refresh(section.dataset.publishing); });
     }).withFailureHandler(function(err) {
       finishCards.forEach(function(finish) { finish(); });
       systemStatusState.loading = false;
@@ -1439,38 +1424,53 @@ const DashboardUI = (function() {
 
   let reviewConfigurationValid = false;
   let checkingReviewConfiguration = false;
+  let bootstrappingDefinitions = false;
+  let definitionsBootstrapAvailable = false;
   function recheckReviewConfiguration() {
     const card = byId('reviewConfigurationCard');
-    if (!card || checkingReviewConfiguration || creatingReviewerSheets) return;
+    if (!card || checkingReviewConfiguration || initializingAssessmentStorage || bootstrappingDefinitions) return;
     checkingReviewConfiguration = true;
     const finishLoading = beginContentLoading(card, 'Checking assessment readiness');
     reviewConfigurationValid = false;
     card.setAttribute('aria-busy', 'true');
     card.setAttribute('data-state', 'checking');
     byId('reviewConfigurationRecheck').disabled = true;
-    byId('createReviewerSheetsButton').disabled = true;
-    setLoading('reviewConfigurationSummary', 'Checking');
+    byId('initializeAssessmentStorageButton').disabled = true;
+    const createButton=byId('createAssessmentDefinitionsButton');
+    if(createButton)createButton.disabled=true;
     function finish(report, error) {
       finishLoading();
       checkingReviewConfiguration = false;
       if (coordinatorSectionState) coordinatorSectionState.configurationSettled = true;
       reviewConfigurationValid = !error && report.valid;
+      definitionsBootstrapAvailable = !error && report.canBootstrap === true;
+      if(createButton){createButton.hidden=!definitionsBootstrapAvailable;createButton.disabled=!definitionsBootstrapAvailable;}
       card.setAttribute('aria-busy', 'false');
-      card.setAttribute('data-state', reviewConfigurationValid ? 'ready' : 'invalid');
+      card.setAttribute('data-state', error ? 'error' : report.state);
       byId('reviewConfigurationRecheck').disabled = false;
-      byId('createReviewerSheetsButton').disabled = !reviewConfigurationValid || creatingReviewerSheets;
+      byId('initializeAssessmentStorageButton').disabled = !reviewConfigurationValid || initializingAssessmentStorage;
       const issues = error ? [{sheet:'Configuration', message:error}] : report.issues;
-      setText('reviewConfigurationSummary', reviewConfigurationValid ? 'Ready · ' + report.count + (report.count === 1 ? ' review' : ' reviews') :
-        issues.length + (issues.length === 1 ? ' issue to resolve' : ' issues to resolve'));
-      byId('reviewConfigurationSummary').title = reviewConfigurationValid ? 'Review count, dates, and rubric criteria match.' : 'Resolve the issues below before creating marking sheets.';
+      if(report)setText('reviewConfigurationSummary',report.summary);
+      else if(!card.hasAttribute('data-readiness-loaded'))setText('reviewConfigurationSummary','Unable to check readiness');
+      byId('reviewConfigurationSummary').title = reviewConfigurationValid ? 'Assessment definitions and rubric criteria are valid.' : 'Resolve the issues below before initializing assessment storage.';
       const list = byId('reviewConfigurationIssues');
       list.textContent = ''; list.hidden = !issues.length;
       issues.forEach(function(issue) {
         const item = document.createElement('li'); item.textContent = issue.sheet + ': ' + issue.message; list.appendChild(item);
       });
       if (report) {
+        const readiness=byId('reviewAssessmentReadiness');
+        readiness.textContent='';
+        report.storage.forEach(function(entry){
+          const item=document.createElement('li');item.setAttribute('data-assessment',entry.assessment);item.setAttribute('data-state',entry.state);
+          const heading=document.createElement('strong');heading.textContent=entry.label+' · '+entry.state;item.appendChild(heading);
+          const detail=document.createElement('small');detail.textContent='Journal: '+entry.journal;item.appendChild(detail);
+          if(entry.error){const issue=document.createElement('small');issue.textContent=entry.error;item.appendChild(issue);}
+          readiness.appendChild(item);
+        });
+        card.setAttribute('data-readiness-loaded','true');
         setText('reviewConfigurationCheckedAt', 'Last checked: ' + new Date(report.checkedAt).toLocaleString());
-        [['reviewConfigLink','config'],['reviewRubricsLink','rubrics']].forEach(function(pair) {
+        [['reviewDefinitionsLink','definitions'],['reviewConfigLink','config'],['reviewRubricsLink','rubrics']].forEach(function(pair) {
           const link = byId(pair[0]), url = report.links[pair[1]];
           link.hidden = !url; if (url) link.href = url;
         });
@@ -1481,60 +1481,54 @@ const DashboardUI = (function() {
       .getCoordinatorReviewConfiguration();
   }
 
-  let creatingReviewerSheets = false;
-  function createReviewerSheets() {
-    if (creatingReviewerSheets || !reviewConfigurationValid || checkingReviewConfiguration) return;
-    creatingReviewerSheets = true;
-    const button = byId('createReviewerSheetsButton');
-    const results = byId('reviewerSheetsResults');
-    if (button) button.disabled = true;
-    if (results) results.textContent = '';
-    const attempted = [];
-    let created = 0, failed = 0;
-    function finish(message) {
-      creatingReviewerSheets = false;
-      if (button) button.disabled = !reviewConfigurationValid;
-      setText('reviewerSheetsStatus', message);
+  function bootstrapAssessmentDefinitions() {
+    if(!definitionsBootstrapAvailable||bootstrappingDefinitions||checkingReviewConfiguration||initializingAssessmentStorage)return;
+    bootstrappingDefinitions=true;
+    const card=byId('reviewConfigurationCard'),button=byId('createAssessmentDefinitionsButton');
+    const finishLoading=beginContentLoading(card,'Creating assessment definitions schema');
+    button.disabled=true;
+    byId('reviewConfigurationRecheck').disabled=true;
+    setText('assessmentStorageStatus','Creating assessment definitions schema…');
+    function finish(message){
+      finishLoading();
+      bootstrappingDefinitions=false;
+      setText('assessmentStorageStatus',message);
       recheckReviewConfiguration();
     }
-    function next() {
-      setText('reviewerSheetsStatus', 'Setting up committee spreadsheets… ' + created + ' created, ' + failed + ' failed.');
-      dashboardRun().withSuccessHandler(function(result) {
-        if (result.done) {
-          finish(created + ' created; ' + failed + ' failed. Existing linked spreadsheets were left unchanged.');
-          return;
-        }
-        attempted.push(result.key);
-        if (result.ok) {
-          created++;
-          document.querySelectorAll('.committee-item').forEach(function(card) {
-            if (card.getAttribute('data-committee-key') !== result.key) return;
-            const badge = card.querySelector('.committee-sheet-status');
-            badge.textContent = 'Sheet linked'; badge.classList.add('linked');
-            const target = card.querySelector('.committee-sheet-link');
-            const link = document.createElement('a');
-            link.href = 'https://docs.google.com/spreadsheets/d/' + encodeURIComponent(result.id) + '/edit';
-            link.target = '_blank'; link.rel = 'noopener'; link.innerHTML = 'Open marking spreadsheet ' + renderLucideIcon_('external-link');
-            target.textContent = ''; target.appendChild(link);
-          });
-        } else failed++;
-        if (results) {
-          const item = document.createElement('li');
-          item.textContent = 'Committee ' + result.committee + ': ' + (result.ok ? 'Created. ' : result.error + (result.id ? ' Saved file ID: ' + result.id : ''));
-          if (result.ok) {
-            const link = document.createElement('a');
-            link.href = 'https://docs.google.com/spreadsheets/d/' + encodeURIComponent(result.id) + '/edit';
-            link.textContent = 'Open spreadsheet'; link.target = '_blank'; link.rel = 'noopener';
-            item.appendChild(link);
-          }
-          results.appendChild(item);
-        }
-        next();
-      }).withFailureHandler(function(err) {
-        finish('Setup stopped: ' + errorMessage(err) + '. Retry to resume unfinished committees.');
-      }).createNextReviewerSpreadsheet(attempted);
+    dashboardRun().withSuccessHandler(function(result){
+      finish(result.created?'AssessmentDefinitions created with headers only. Open Assessment definitions to configure the graded assessments, then Recheck.':'AssessmentDefinitions already exists. Existing configuration was left unchanged.');
+    }).withFailureHandler(function(err){
+      finish('Definitions setup stopped: '+errorMessage(err));
+    }).createAssessmentDefinitions();
+  }
+
+  let initializingAssessmentStorage = false;
+  function initializeAssessmentStorage() {
+    if(initializingAssessmentStorage||!reviewConfigurationValid||checkingReviewConfiguration||bootstrappingDefinitions)return;
+    initializingAssessmentStorage=true;
+    const button=byId('initializeAssessmentStorageButton'),results=byId('assessmentStorageResults');
+    if(button)button.disabled=true;
+    if(results)results.textContent='';
+    setText('assessmentStorageStatus','Preparing assessment storage…');
+    function finish(message){
+      initializingAssessmentStorage=false;
+      if(button)button.disabled=!reviewConfigurationValid;
+      setText('assessmentStorageStatus',message);
+      recheckReviewConfiguration();
     }
-    next();
+    dashboardRun().withSuccessHandler(function(result){
+      const journals=result.journals;
+      journals.forEach(function(journal){
+        if(!results)return;
+        const item=document.createElement('li');
+        item.textContent=journal.label+': '+journal.journal+' — '+(journal.created?'created':journal.initialized?'initialized':'existing storage retained')+'.';
+        results.appendChild(item);
+      });
+      finish(journals.length+' assessment journals ready. Existing assessment data was left unchanged.');
+      document.querySelectorAll('[data-publishing]').forEach(function(section){InternalAssessmentPublishing.refresh(section.dataset.publishing);});
+    }).withFailureHandler(function(err){
+      finish('Setup stopped: '+errorMessage(err)+'. Retry to resume missing assessment storage.');
+    }).prepareReviewAssessmentStorage();
   }
 
   function runGithubSync() {
@@ -1693,7 +1687,7 @@ const DashboardUI = (function() {
     renderIcon: renderLucideIcon_,
     renderIcon: renderLucideIcon_,
     decide,
-    openReviewerMarks: function(team, review, button) { ReviewerMarks.open(team, review, button); },
+    openReviewerMarks: function(team, review, button) { ReviewEvaluations.open(team, review, button); },
     filterReviewerAssignedTeams,
     changeTeamPageSize,
     reviewerDecide,
@@ -1706,7 +1700,8 @@ const DashboardUI = (function() {
     showAllCoordinatorTeams,
     runGithubSync,
     loadCoordinatorWeeklyActivity,
-    createReviewerSheets,
+    initializeAssessmentStorage,
+    bootstrapAssessmentDefinitions,
     recheckReviewConfiguration,
     initializeCoordinatorTracker
   };
@@ -1732,7 +1727,7 @@ function showAllCoordinatorTeams() { DashboardUI.showAllCoordinatorTeams(); }
 function runGithubSync() { DashboardUI.runGithubSync(); }
 function loadCoordinatorWeeklyActivity() { DashboardUI.loadCoordinatorWeeklyActivity(); }
 function retryCoordinatorSection(section) { DashboardUI.loadCoordinatorSectionAsync(section); }
-function createReviewerSheets() { DashboardUI.createReviewerSheets(); }
+function initializeAssessmentStorage() { DashboardUI.initializeAssessmentStorage(); }
 function recheckReviewConfiguration() { DashboardUI.recheckReviewConfiguration(); }
 function closeCoordinatorTeamDrawer() {
   DashboardUI.closeCoordinatorTeamDrawer();

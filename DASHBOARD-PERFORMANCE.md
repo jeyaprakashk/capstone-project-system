@@ -129,50 +129,43 @@ switching tabs reuses loaded content, and selective preloading remains enabled.
 Reloading the page discards that browser state and fetches fresh data. System
 Status and Announcements also retain their explicit Refresh controls.
 
-## Milestones configuration (breaking change)
+## Lifecycle and assessment configuration
 
-The `Milestones` tab is now the only source of milestone dates and review
-count. Headers are `Milestone ID`, `Milestone Name`, `Due Date`, `Graded By`,
-`Weight (%)`. No legacy Config count/date or Reviews-tab fallback exists.
+`Milestones` contains only non-assessment lifecycle events. Its headers remain
+`Milestone ID`, `Milestone Name`, `Due Date`, `Graded By`, `Weight (%)`.
+Graded By must be `Not Applicable`, with blank or zero weight. Graded rows are
+rejected with a configuration message; they never discover or configure assessments.
+Required schedule IDs remain `formation`, `start`, `title`, and `report`.
+Logging starts on the first Monday strictly after title approval and ends on report
+submission. Dates accept Sheets date cells, DD/MM/YYYY or YYYY-MM-DD.
 
-Rows graded by `Review Committee` define the reviews; their count is derived,
-not configured separately. IDs are stable keys; names are display labels.
-Due dates determine display order (sheet order breaks ties). Other permitted
-roles are `Project Guide`, `SEE Committee`, and `Not Applicable`. Use numeric
-percentage points, e.g. `25` for 25%. Graded rows require positive weights;
-non-graded rows use blank or zero. The sum must not exceed 100%.
+`AssessmentDefinitions` is the sole authority for graded assessments. Coordinator
+System Status can create its eleven-column schema without academic rows. The
+Coordinator explicitly configures instances using the direct sheet link, validates,
+then provisions journals through the separate storage action. Reviews are ordered
+by Sequence; no review count or numbered implementation is configured in code.
+Guide Evaluation requires an explicit `guide_eval` / `INDIVIDUAL_RUBRIC` definition.
 
-The timeline displays milestone rows except those graded by SEE Committee, plus
-the calculated weekly-log start. SEE remains part of assessment/rubric validation;
-its Due Date may be blank and it stays off the timeline even if a date is entered.
-Required schedule IDs are `formation`, `start`, `title`, and `report`.
-Logging begins on the first Monday strictly after `title` and ends on `report`.
-`guide_eval` is the ID for the individual Project Guide assessment; its due date
-and weight come from Milestones. Dates accept Sheets date cells, DD/MM/YYYY,
-or YYYY-MM-DD. A missing or invalid configuration is reported rather than
-replaced with hardcoded dates.
+The timeline composes non-assessment events and configured assessments for display
+by due date, using Sequence to order assessments on the same date, then adds weekly
+logging start. IDs cannot collide. Neither source overrides the other, and no
+duplicate Review row is required in Milestones. Assessment opening dates are supplied
+directly to timeline metadata. See [Assessment configuration](ASSESSMENT-CONFIGURATION.md).
 
 Rubrics now uses `Milestone ID` instead of the old `Review` header:
 
 `Milestone ID | Order | PI | Criterion | CO | Max Marks | Type | Level 0 | Level 1 | Level 2 | Level 3 | Level 4 | Level 5`
 
-Maintain criteria directly in the existing Rubrics sheet, using the matching
-Milestone IDs. Guide criteria require all six descriptors and Individual type.
+Maintain criteria directly in the existing Rubrics sheet, using the referenced
+rubric IDs. Guide criteria require all six descriptors and Individual type.
 There is no rubric creation/reset endpoint, framework catalog, or setup card.
 The application reads and validates sheet definitions without supplying defaults.
-Existing Rubrics contents, marking sheets and evaluation records are unchanged.
+Existing Rubrics contents and evaluation records are preserved. REVIEW instances
+come from AssessmentDefinitions. The shared evaluation drawer persists revisions
+in definition-driven journals in the main spreadsheet. Coordinator setup creates
+or initializes missing journals; it does not rewrite existing assessment data.
+See [Review evaluation](REVIEW-EVALUATION.md) for the current setup contract.
 
-Committee marking-sheet names now use stable IDs, for example
-`Committee 1 - review1` or `Committee 1 - design_check`. Renaming a milestone's
-label does not change this name. There is no lookup of old `Committee 1 - Review 1`
-tabs. Before deployment, rename corresponding existing tabs after verifying their
-criteria, or create new matching tabs. `seedCommitteeMarksSheets()` only adds
-missing tabs; it does not copy old scores. Existing linked committee files are
-not recreated automatically. Verify permissions for any newly added tabs.
-
-Update Milestones and the Rubrics header/IDs before deploying this version.
-Legacy Config review count and date entries can be removed; they are ignored.
-No live spreadsheet contents or deployment were changed by this implementation.
 Each new request reads current definitions; only execution-local reuse and the
 existing browser tab reuse remain. Run `npm test` for schema, date, rubric,
 review completion, provisioning, guide workflow, and tab-loading regressions.
@@ -321,7 +314,7 @@ Do not sum parent and child durations. No persistent caching is introduced.
 System Status is shown only when the shell includes the Coordinator role. Its
 `loadCoordinatorSystemStatus` endpoint independently authorizes the current user
 before reading data. GitHub access/sync, the committee directory, assessment
-readiness, and missing-sheet creation live together in this tab. The Coordinator
+readiness, and assessment storage initialization live together in this tab. The Coordinator
 progress dashboard retains summaries, assessments, completion, and the tracker.
 
 System Status loads on first click, or once in the background after a role has
@@ -334,7 +327,7 @@ opening the tab or selecting Refresh retries. Loaded content is reused.
 Refresh keeps old content on failure and disables its action buttons during
 replacement. Refresh is deferred by an explanatory message while any tracked
 operation is running; the user can retry once it finishes. This prevents refresh
-from replacing controls during GitHub sync, configuration checks or sheet creation.
+from replacing controls during GitHub sync, configuration checks or storage initialization.
 Configuration is rechecked after each successful status load. Existing action
 endpoints retain their own authorization and configuration checks.
 
@@ -342,7 +335,7 @@ The status endpoint reads only operational status/committee/repository/config
 inputs; it does not read marks, roster or historical activity. Coordinator overview
 no longer renders system cards or initiates configuration checks. Progress still
 reads committee assignments as required by review completion. This separation
-improves loading priority and organization; it does not eliminate marks-sheet cost.
+improves loading priority and organization; assessment journals still require reads.
 Tests cover tab visibility, server authorization, deferred loading, click deduping,
 retry, and preservation of loaded status content on refresh failure.
 
@@ -379,7 +372,7 @@ setup/configuration errors and submission management. See GUIDE-EVALUATION.md
 for the scoring policy, setup routine, endpoint contracts and live rollout checks.
 
 The read-only **System Status → Rubrics** card checks that the tab exists and
-contains valid criteria for every graded Milestones assessment, including Guide
-Evaluation and SEE. It shows a green Configured pill or an amber Not configured
+contains valid criteria for every registered graded assessment, including Guide
+Evaluation. It shows a green Configured pill or an amber Not configured
 pill with the missing/invalid configuration explained. Refresh System Status to
 read sheet changes. This card never creates or modifies rubric definitions.

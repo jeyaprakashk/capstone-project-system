@@ -68,18 +68,14 @@ function buildReviewerTitleApproval_(r, TS, status) {
 
 function buildReviewerReviewCells_(r, TS, progress) {
   const approved=String(r[TS.TITLE] || '').trim() && textEquals_(r[TS.REVIEWER_DECISION],'Approved');
-  let unlocked=!!approved;
   return progress.reviews.map(review => {
     const state=(progress.teams[normalizeReviewKey_(r[TS.TEAM_ID])] || {})[review.key];
     const available=state && state.available;
-    const first=['review1','review2'].includes(review.key);
-    const firstState=(progress.teams[normalizeReviewKey_(r[TS.TEAM_ID])] || {}).review1;
-    const ready=review.key==='review2'?approved && !!(firstState && (firstState.recorded ?? firstState.completed)):unlocked;
-    const enabled=available && (first ? state.readable && (review.key==='review1' || ready) : ready);
-    const hint=first ? (!available ? (state && state.error || 'Marks unavailable.') : state.reason || state.status) : !ready ? (approved ? 'Complete the previous review first.' : 'Approve the title first.') : !available ? (state && state.error || 'Marks unavailable.') : '';
-    const label=first && state && ['Submitted','Published'].includes(state.status) ? 'View marks' : state && state.completed ? 'Edit marks' : 'Enter marks';
+    const ready=approved && !state?.prerequisiteReason;
+    const enabled=available && state.readable && ready;
+    const hint=!available ? (state && state.error || 'Marks unavailable.') : state.reason || state.status;
+    const label=state && ['Submitted','Published'].includes(state.status) ? 'View marks' : state && state.completed ? 'Edit marks' : 'Enter marks';
     const cell=`<td class="reviewer-review-cell"><button type="button" class="btn-outline" ${enabled ? '' : 'disabled'} data-team="${escapeHtml(r[TS.TEAM_ID])}" data-review="${escapeHtml(review.key)}" onclick="DashboardUI.openReviewerMarks(this.dataset.team, this.dataset.review, this)">${renderLucideIcon_(enabled ? 'clipboard-check' : 'lock-keyhole')} ${label}</button><small>${hint ? escapeHtml(hint) : state.completed ? 'Completed' : state.markedStudents + '/' + state.totalStudents + ' students marked'}</small></td>`;
-    unlocked=unlocked && available && state.completed;
     return cell;
   }).join('');
 }
@@ -158,20 +154,7 @@ body { max-width: 980px; margin: 24px auto; padding: 0 16px; }
 .reviewer-review-cell { min-width:150px; }
 .reviewer-review-cell small { display:block; margin-top:6px; color:#667085; }
 .reviewer-review-cell button:disabled { opacity:.5; cursor:not-allowed; }
-.reviewer-marks-dialog { position:fixed; inset:0 0 0 auto; margin:0; width:min(780px,100vw); height:100dvh; max-width:100vw; max-height:100dvh; border:0; border-left:1px solid #e4e7ec; padding:24px; box-sizing:border-box; background:#f8fafc; color:#182230; overflow:auto; }
-.reviewer-marks-dialog::backdrop { background:rgba(15,23,42,.45); }
-.reviewer-marks-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.reviewer-marks-dialog button,.reviewer-marks-dialog select,.reviewer-marks-dialog textarea { font:inherit; }
-.reviewer-marks-dialog button { padding:10px 14px; border:1px solid #d0d5dd; border-radius:8px; background:#fff; cursor:pointer; }
-.reviewer-marks-dialog button:disabled { opacity:.5; cursor:wait; }
-.reviewer-marks-dialog :is(button,select,textarea):focus-visible { outline:3px solid #9e77ed; outline-offset:3px; }
-.reviewer-marks-dialog fieldset { margin:18px 0; padding:16px; border:1px solid #e4e7ec; border-radius:12px; background:#fff; min-width:0; }
-.reviewer-marks-dialog label { display:block; font-size:13px; margin:14px 0; }
-.reviewer-marks-dialog select,.reviewer-marks-dialog textarea { display:block; width:100%; padding:10px; margin-top:6px; border:1px solid #d0d5dd; border-radius:8px; background:#fff; }
-.reviewer-marks-dialog small { color:#667085; }
-.reviewer-marks-footer { display:flex; gap:12px; position:sticky; bottom:-24px; padding:16px 0; background:#f8fafc; }
-.reviewer-marks-dialog .marks-save { color:white; background:#6941c6; border-color:#6941c6; }
-@media(max-width:640px) { .reviewer-marks-dialog { padding:16px; } }`;
+`;
 }
 
 function buildReviewerPage(email, data) {

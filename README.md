@@ -90,14 +90,23 @@ Coordinator indicators distinguish repository availability from setup completion
 
 Run `npm test` for dashboard, registration, authorization, and workflow checks.
 
-## Evaluation sheet tabs
+## Review assessment setup
 
-Evaluation storage is mapped by stable Milestone ID: `review1` →
-`Review1Evaluations`, `review2` → `Review2Evaluations`, and `guide_eval` →
-`GuideEvaluations`. Review tabs live in the committee marking spreadsheet;
-guide storage lives in the main spreadsheet. Labels and due-date order do not
-change this mapping. Custom committee milestones retain `Committee <id> - <milestone ID>` names.
+Start in Coordinator System Status. If `AssessmentDefinitions` is missing, use
+**Create assessment definitions tab**. This creates only its validated headers.
+Follow the definitions link to configure academic instances explicitly, then Recheck.
 
-Before using this version with existing marks, rename the existing `review1`
-and `review2` tabs to the names above in each committee spreadsheet. Preserve
-their contents; the application does not automatically migrate or merge old tabs.
+Configure REVIEW instances in `AssessmentDefinitions`, with rubric references into
+`Rubrics`. The Coordinator uses System Status to check readiness and create or
+initialize missing assessment storage. Each instance uses its explicit Journal
+binding or `Assessment_<assessmentId>` in the main spreadsheet.
+
+Reviewers enter marks only in the shared ReviewEvaluations drawer. Drafts and
+submissions append revisions to the nine-column assessment journal; journal cells
+are not the marking interface. Committee data describes assignments only.
+
+See [Review evaluation](REVIEW-EVALUATION.md) for configuration, readiness, storage
+and workflow details. Guide Evaluation must also have an explicit
+`INDIVIDUAL_RUBRIC` definition (`guide_eval`) and uses its configured Journal or
+`Assessment_guide_eval`. `Milestones` contains only non-assessment lifecycle events.
+See [Assessment configuration](ASSESSMENT-CONFIGURATION.md) for the full setup contract.
