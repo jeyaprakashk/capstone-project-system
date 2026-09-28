@@ -30,7 +30,7 @@ function fixture() {
   for(const file of ['review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','review-evaluation.js','reviewer-evaluation.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
   sheet('Review1Evaluations',[Array.from(vm.runInContext('REVIEW_JOURNAL_HEADERS_',c))]);
   sheet('Review2Evaluations',[Array.from(vm.runInContext('REVIEW_JOURNAL_HEADERS_',c))]);
-  c.getAssessmentDefinitions_=()=>reviews.map((r,i)=>({...r,type:'REVIEW',sequence:i+1,rubricReference:r.key,opens:r.opens??r.day-7,academicPolicyVersion:r.academicPolicyVersion||'review-attendance-v1',journal:r.journal||'Review'+(i+1)+'Evaluations',prerequisites:r.prerequisites??(i?[{assessmentId:reviews[i-1].key,condition:'RECORDED'}]:[])}));
+  c.getAssessmentDefinitions_=()=>reviews.map((r,i)=>({...r,type:'REVIEW',sequence:i+1,opens:r.opens??r.day-7,academicPolicyVersion:r.academicPolicyVersion||'review-attendance-v1',journal:r.journal||'Review'+(i+1)+'Evaluations',prerequisites:r.prerequisites??(i?[{assessmentId:reviews[i-1].key,condition:'RECORDED'}]:[])}));
   c.assessmentRubric_=d=>reviews.find(r=>r.key===d.key).rubric;
   const load=()=>c.loadReviewEvaluation('T1','review1');
   const input=(d=load())=>({team:'T1',revision:d.revision,token:d.token,requestId:crypto.randomUUID(),teamScores:{T:{level:3,marks:48,remark:''}},
@@ -197,7 +197,7 @@ test('manually created storage headers are validated without overwriting',()=>{
 });
 test('missing storage, oversized payload and unavailable lock fail without revision writes',()=>{
   const f=fixture(),input=f.input();f.lock(false);assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/saving/);f.lock(true);
-  delete f.sheets.Review1Evaluations;assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/Create missing assessment storage/);
+  delete f.sheets.Review1Evaluations;assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/Error in Initialization/);
   const big=fixture();big.reviews[0].rubric[0].descriptors=Array(6).fill('x'.repeat(10000));assert.throws(()=>big.c.submitReviewEvaluation({...(big.input()),assessmentId:'review1'}),/too large/);assert.equal(big.tables.Review1Evaluations.length,1);
 });
 test('coordinator report lists team statuses and totals without requiring reviewer assignment',()=>{
@@ -251,11 +251,15 @@ function browserFixture(extended=false,key='review1') {
         const controls={};
         for(const m of match[2].matchAll(/<select data-fact="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g))controls[m[1]]=control((m[2].match(/value="([^"]*)" selected/)||[])[1]||'','select');
         controls.reason=control((match[2].match(/<textarea data-fact="reason"[^>]*>([\s\S]*?)<\/textarea>/)||[])[1]||'','textarea');
-        const nodes={'[data-exception-fields]':{},'[data-prolonged-fields]':{},['[data-effective="'+match[1]+'"]']:{}};
+        const nodes={'[data-exception-fields]':{},'[data-prolonged-fields]':{},'[data-approval-field]':{},['[data-effective="'+match[1]+'"]']:{}};
         const host={dataset:{absence:match[1]},controls,nodes,pills:[],querySelector(selector){const name=(selector.match(/data-fact="([^"]+)"/)||[])[1];return name?controls[name]:nodes[selector];},querySelectorAll:()=>host.pills};
         host.pills=Array.from(match[2].matchAll(/data-reason-suggestion="(\d+)"/g),m=>{
           const pill=button('data-reason-suggestion',m[1]);pill.closest=selector=>selector==='[data-absence]'?host:selector==='button'?pill:null;return pill;
         });
+        const evidenceOptions=Array.from(match[2].matchAll(/<input type="checkbox" data-supporting-evidence value="([^"]+)"([^>]*)>/g),m=>({...control(m[1]),checked:m[2].includes('checked')}));
+        const evidenceDetail=control((match[2].match(/<textarea data-other-evidence[^>]*>([\s\S]*?)<\/textarea>/)||[])[1]||'','textarea'),evidenceLabel={};
+        nodes['[data-other-evidence]']=evidenceDetail;
+        nodes['[data-absence-evidence]']={options:evidenceOptions,querySelector:selector=>selector==='[data-other-evidence]'?evidenceDetail:evidenceLabel,querySelectorAll:selector=>selector.includes(':checked')?evidenceOptions.filter(n=>n.checked):[...evidenceOptions,evidenceDetail]};
         absenceNodes.set(match[1],host);
       }
       for(const match of value.matchAll(/<fieldset[^>]*data-index="(\d+)" data-owner="([^"]+)"[^>]*>([\s\S]*?)<\/fieldset>/g)){
@@ -269,7 +273,7 @@ function browserFixture(extended=false,key='review1') {
       }
     },get innerHTML(){return html;},
     querySelector(selector){
-      if(selector.startsWith('[data-summary-values='))return headerNodes[selector]||={};
+      if(selector==='[data-summary-unsaved]' || selector.startsWith('[data-summary-values='))return headerNodes[selector]||={};
       if(selector.startsWith('[data-footer-team=') || selector.startsWith('[data-footer-individual=') || selector.startsWith('[data-footer-total='))return headerNodes[selector]||={};
       if(selector==='[data-team-mark]' || selector.startsWith('[data-individual-mark=') || selector.startsWith('[data-assessment-status='))return headerNodes[selector]||=( {} );
       if(extended){
@@ -300,7 +304,8 @@ function browserFixture(extended=false,key='review1') {
 // Both configured reviews must obey the same policy without sharing records or rubric content.
 function absenceFixture(key='review1') {
   const f=fixture();
-  if(key==='review2'){f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});f.today(20030);}
+  if(key==='review_extra'){f.reviews[1].key=key;f.reviews[1].label='Additional Review';}
+  if(key!=='review1'){f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});f.today(20030);}
   const load=()=>f.c.getReviewEvaluation_('T1',key);
   const input=(data=load())=>f.input(data);
   const submit=value=>f.c.reviewWrite_('submit',value,key);
@@ -933,4 +938,156 @@ test('deselecting the last required feedback prevents submission until feedback 
   for(const field of f.fields().slice(1)){field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='32';}
   f.toggle(1);f.toggle(1);await f.click('data-submit');assert.equal(f.requests.length,1);
   f.toggle(1);await f.click('data-submit');assert.equal(f.requests[1].name,'submitReviewEvaluation');
+});
+
+
+test('approval hides only when irrelevant and returns when attendance or contribution changes',()=>{
+ const f=browserFixture(true);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+ const host=f.absenceNodes().get('0');
+ host.controls.type.value='PROLONGED';host.controls.contribution.value='no';host.controls.attended.value='yes';host.controls.approved.value='';f.events.input();
+ assert.equal(host.nodes['[data-approval-field]'].hidden,true);assert.equal(host.controls.approved.disabled,true);
+ host.controls.contribution.value='yes';f.events.input();assert.equal(host.nodes['[data-approval-field]'].hidden,false);assert.equal(host.controls.approved.disabled,false);
+ host.controls.contribution.value='no';host.controls.attended.value='no';f.events.input();assert.equal(host.nodes['[data-approval-field]'].hidden,false);
+ host.controls.type.value='REVIEW_DAY_ABSENCE';f.events.input();assert.equal(host.nodes['[data-approval-field]'].hidden,false);
+});
+
+test('review submission accepts irrelevant blank approval and retains individual marks',()=>{
+ const f=fixture(),input=f.input();input.students[0].absence={type:'PROLONGED',verifiedContribution:false,attended:true,approved:null};
+ f.c.submitReviewEvaluation({...input,assessmentId:'review1'});
+ const student=f.load().evaluation.students[0];assert.equal(student.assessment.teamMark,0);assert.equal(student.assessment.individualMark,32);assert.equal(student.assessment.completed,true);
+});
+
+for(const key of ['review1','review2'])test(key+' approved absence evidence survives submission and reload',()=>{
+ const f=absenceFixture(key),input=f.input();
+ input.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['MEDICAL_DOCUMENT','OTHER'],otherEvidenceText:' Hospital confirmation '};input.students[0].scores={};
+ f.submit(input);const student=f.student();
+ assert.deepEqual(Array.from(student.assessment.facts.supportingEvidence),['MEDICAL_DOCUMENT','OTHER']);assert.equal(student.assessment.facts.otherEvidenceText,'Hospital confirmation');assert.equal(student.assessment.status,'MAKEUP_PENDING');
+ const b=browserFixture(true,key);b.api.open('T1',b.trigger);b.requests[0].success(JSON.parse(JSON.stringify(f.load())));
+ const evidence=b.absenceNodes().get('0').nodes['[data-absence-evidence]'];assert.equal(evidence.hidden,false);assert.deepEqual(evidence.options.filter(n=>n.checked).map(n=>n.value),['MEDICAL_DOCUMENT','OTHER']);assert.equal(evidence.querySelector('[data-other-evidence]').value,'Hospital confirmation');
+});
+test('other absence evidence needs a description on submission',()=>{
+ const f=fixture(),input=f.input();input.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['OTHER'],otherEvidenceText:'  '};input.students[0].scores={};
+ assert.throws(()=>f.c.submitReviewEvaluation({...input,assessmentId:'review1'}),/Describe the other supporting absence evidence/);assert.equal(f.load().revision,0);
+});
+test('absence evidence appears for approved absences and hides when irrelevant',()=>{
+ const f=browserFixture(true);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+ const host=f.absenceNodes().get('0'),evidence=host.nodes['[data-absence-evidence]'];
+ host.controls.type.value='REVIEW_DAY_ABSENCE';host.controls.approved.value='yes';f.events.input();assert.equal(evidence.hidden,false);
+ evidence.options[2].checked=true;f.events.input();assert.equal(evidence.querySelector('[data-other-evidence-label]').hidden,false);
+ host.controls.approved.value='no';f.events.input();assert.equal(evidence.hidden,true);assert(evidence.options.every(n=>n.disabled));
+ host.controls.type.value='PROLONGED';host.controls.approved.value='yes';host.controls.contribution.value='no';host.controls.attended.value='yes';f.events.input();assert.equal(evidence.hidden,true);
+ host.controls.attended.value='no';f.events.input();assert.equal(evidence.hidden,false);
+});
+
+
+function correctionInput(f,absence,extra={}) {
+  const data=f.load();
+  return {assessmentId:f.key,team:'T1',student:'s1',revision:data.revision,token:data.token,requestId:crypto.randomUUID(),absence,...extra};
+}
+function submittedAbsence(key='review1',facts={type:'REVIEW_DAY_ABSENCE',approved:true}) {
+  const f=absenceFixture(key),input=f.input();input.students[0].absence=facts;
+  if(!facts.attended)input.students[0].scores={};
+  f.submit(input);return f;
+}
+for(const key of ['review1','review2','review_extra']) {
+  test(key+' absence correction appends an isolated audited revision and supports exact retry',()=>{
+    const f=submittedAbsence(key),before=f.load().evaluation,request=correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false});
+    const result=f.c.recordReviewAbsence(request),after=f.load().evaluation;
+    assert.equal(result.revision,before.revision+1);assert.equal(result.status,'Submitted');
+    assert.equal(after.students[0].total,48);assert.equal(after.students[0].needsPublication,true);
+    for(const field of ['teamScores','submittedAt','submittedDay','late','config','roster'])assert.equal(JSON.stringify(after[field]),JSON.stringify(before[field]));
+    assert.equal(JSON.stringify(after.students[1]),JSON.stringify(before.students[1]));
+    assert.equal(JSON.stringify(after.students[0].scores),JSON.stringify(before.students[0].scores));
+    const event=after.students[0].assessment.events.at(-1);
+    assert.equal(event.action,'absenceCorrection');assert.equal(event.actor,'reviewer@x');assert.equal(event.requestId,request.requestId);assert(event.at);
+    assert.equal(event.before.facts.approved,true);assert.equal(event.after.facts.approved,false);
+    assert.equal(event.before.outcome.total,null);assert.equal(event.after.outcome.total,48);assert.equal(event.reason,undefined);
+    assert.equal(f.c.recordReviewAbsence(request).revision,after.revision);assert.equal(f.load().revision,after.revision);
+    assert.throws(()=>f.c.recordReviewAbsence({...request,absence:{type:'REVIEW_DAY_ABSENCE',approved:true}}),/different data/);
+  });
+  test(key+' absence correction keeps published results frozen until republication',()=>{
+    const f=submittedAbsence(key,{type:'REVIEW_DAY_ABSENCE',approved:false});f.publish();
+    f.actor('one@x');const released=f.c.loadPublishedReviewEvaluation(key);f.actor('reviewer@x');
+    const before=f.load().evaluation;
+    f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true}));
+    assert.equal(JSON.stringify(f.load().evaluation.students[1]),JSON.stringify(before.students[1]));
+    f.actor('one@x');const waiting=f.c.loadPublishedReviewEvaluation(key);
+    assert.equal(waiting.total,released.total);assert.equal(waiting.publication.sourceRevision,released.publication.sourceRevision);assert.equal(waiting.updatePending,true);
+    f.actor('two@x');assert.equal(f.c.loadPublishedReviewEvaluation(key).updatePending,false);f.actor('reviewer@x');
+    const sourceRevision=f.load().revision;f.publish('s1');f.actor('one@x');
+    const updated=f.c.loadPublishedReviewEvaluation(key);assert.equal(updated.total,null);assert.equal(updated.publication.sourceRevision,sourceRevision);assert.equal(updated.updatePending,false);
+  });
+  test(key+' absence correction UI saves, retries, cancels and preserves refresh failures',async()=>{
+    const server=submittedAbsence(key),b=browserFixture(true,key);b.api.open('T1',b.trigger);b.requests[0].success(JSON.parse(JSON.stringify(server.load())));
+    assert.match(b.drawer.innerHTML,/Edit absence details/);await b.click('data-edit-absence');
+    assert.equal(b.drawer.innerHTML.includes('Conduct Makeup Assessment'),false);
+    let host=b.absenceNodes().get('0');assert.equal(host.controls.approved.disabled,false);
+    assert(b.fields().every(field=>field.controls['[data-marks]'].disabled));
+    host.controls.approved.value='no';b.events.input();assert.equal(b.drawer.querySelector('[data-summary-unsaved]').hidden,false);
+    assert.match(b.drawer.querySelector('[data-summary-values="0"]').innerHTML,/48/);
+    await b.click('data-record-absence');const first=b.requests[1];assert.equal(first.name,'recordReviewAbsence');assert.equal(first.args[0].assessmentId,key);assert.equal(first.args[0].reason,undefined);
+    await b.click('data-record-absence');assert.equal(b.requests.length,2);
+    first.failure({message:'Offline'});assert.equal(host.controls.approved.value,'no');assert.equal(host.controls.approved.disabled,false);
+    await b.click('data-record-absence');assert.equal(b.requests[2].args[0].requestId,first.args[0].requestId);
+    b.requests[2].success(server.c.recordReviewAbsence(first.args[0]));assert.match(b.drawer.innerHTML,/Edit absence details/);
+    assert.equal(b.absenceNodes().get('0').controls.approved.disabled,true);
+    await b.click('data-edit-absence');host=b.absenceNodes().get('0');host.controls.approved.value='yes';b.events.input();
+    b.discard(false);await b.click('data-cancel-absence');assert.equal(host.controls.approved.value,'yes');await b.click('data-close');assert.equal(b.drawer.open,true);
+    b.discard(true);await b.click('data-reload');b.requests.at(-1).failure({message:'Unavailable'});
+    assert.equal(b.absenceNodes().get('0').controls.approved.value,'yes');assert.equal(host.controls.approved.disabled,false);assert.equal(b.loading.begun,b.loading.settled);
+    await b.click('data-cancel-absence');assert.equal(b.absenceNodes().get('0').controls.approved.value,'no');
+  });
+}
+test('absence correction enforces authorization, eligibility, concurrency and payload boundaries',()=>{
+  const f=submittedAbsence(),request=correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false}),revision=f.load().revision;
+  for(const actor of ['coord@x','guide@x','outsider@x']){f.actor(actor);assert.throws(()=>f.c.recordReviewAbsence(request),/assigned reviewer/);}
+  f.actor('reviewer@x');
+  for(const extra of [{student:'s2'},{student:'missing'},{revision:0},{token:'stale'},{scores:{}},{teamScores:{}},{makeup:{}},{decision:'OTHER'},{absence:{type:'UNSELECTED'}},{absence:{type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['OTHER'],otherEvidenceText:''}}])assert.throws(()=>f.c.recordReviewAbsence({...request,...extra}));
+  f.lock(false);assert.throws(()=>f.c.recordReviewAbsence(request),/saving/);f.lock(true);
+  f.reviews[0].weight++;assert.throws(()=>f.c.recordReviewAbsence(request),/CONFIGURATION_CHANGED/);f.reviews[0].weight--;
+  f.students.push({regNo:'s3',name:'Three',email:'three@x'});assert.throws(()=>f.c.recordReviewAbsence(request),/ROSTER_CHANGED/);f.students.pop();
+  assert.equal(f.load().revision,revision);assert.equal(f.locked(),false);
+  const draft=absenceFixture();assert.throws(()=>draft.c.recordReviewAbsence(correctionInput(draft,{type:'REVIEW_DAY_ABSENCE',approved:true})),/Submit the evaluation/);
+});
+test('absence corrections preserve makeup drafts and completed provenance as applicability changes',()=>{
+  const f=submittedAbsence(),scores={I:{level:3,marks:32,remark:''}};
+  f.c.saveReviewMakeupDraft({...correctionInput(f,{}),absence:undefined,scores});
+  const draft=JSON.stringify(f.student().assessment.makeupDraft);
+  f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false}));assert.equal(JSON.stringify(f.student().assessment.makeupDraft),draft);
+  f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true}));
+  f.c.submitReviewMakeup({...correctionInput(f,{}),absence:undefined,scores});
+  const makeup=JSON.stringify(f.student().assessment.makeup),events=JSON.stringify(f.student().assessment.events);
+  f.c.recordReviewAbsence(correctionInput(f,{type:'PROLONGED',approved:true,verifiedContribution:false,attended:false}));assert.equal(f.student().total,32);
+  f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false}));assert.equal(f.student().total,48);
+  f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['OTHER'],otherEvidenceText:'Permission checked'}));assert.equal(f.student().total,80);
+  assert.equal(JSON.stringify(f.student().assessment.makeup),makeup);assert.equal(JSON.stringify(f.student().assessment.events.slice(0,JSON.parse(events).length)),events);
+  assert.throws(()=>f.c.recordReviewAbsence(correctionInput(f,{type:'NORMAL'})),/coordinator to reopen/);
+  assert.throws(()=>f.c.recordReviewAbsence(correctionInput(f,{type:'PROLONGED',approved:true,verifiedContribution:true,attended:true})),/coordinator to reopen/);
+});
+test('attended absence can become normal using existing normal scores; evidence-only edits retain outcomes',()=>{
+  const f=submittedAbsence('review1',{type:'PROLONGED',approved:true,verifiedContribution:true,attended:true}),before=f.student();
+  f.c.recordReviewAbsence(correctionInput(f,{...before.assessment.facts,supportingEvidence:['MEDICAL_DOCUMENT']}));assert.equal(f.student().total,before.total);
+  f.c.recordReviewAbsence(correctionInput(f,{type:'NORMAL'}));assert.equal(f.student().total,80);assert.equal(JSON.stringify(f.student().scores),JSON.stringify(before.scores));
+  assert.throws(()=>f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true})),/existing absences/);
+});
+
+
+test('correction UI validates facts and evidence without sending invalid saves',async()=>{
+  const server=submittedAbsence(),b=browserFixture(true);b.api.open('T1',b.trigger);b.requests[0].success(JSON.parse(JSON.stringify(server.load())));await b.click('data-edit-absence');
+  const host=b.absenceNodes().get('0');
+  for(const type of ['','NORMAL']){host.controls.type.value=type;b.events.input();await b.click('data-record-absence');assert.equal(b.requests.length,1);}
+  host.controls.type.value='REVIEW_DAY_ABSENCE';const evidence=host.nodes['[data-absence-evidence]'];evidence.options.find(n=>n.value==='OTHER').checked=true;b.events.input();await b.click('data-record-absence');assert.equal(b.requests.length,1);assert.match(b.status.textContent,/Describe/);
+  evidence.querySelector('[data-other-evidence]').value='Reviewed permission';b.events.input();await b.click('data-record-absence');assert.equal(b.requests.length,2);
+  assert.deepEqual(Array.from(b.requests[1].args[0].absence.supportingEvidence),['OTHER']);
+});
+test('completed absence remains accessible alongside pending makeup; student switching confirms discard',async()=>{
+  // A finalized fixture with one pending and one completed absence.
+  const f=absenceFixture(),data=f.input();data.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true};data.students[0].scores={};data.students[1].absence={type:'REVIEW_DAY_ABSENCE',approved:false};data.students[1].scores={};f.submit(data);
+  const b=browserFixture(true);b.api.open('T1',b.trigger);b.requests[0].success(JSON.parse(JSON.stringify(f.load())));
+  assert.match(b.drawer.innerHTML,/<li><button[^>]*data-select-student="1"/);
+  const switchStudent=()=>{const button={dataset:{selectStudent:'1'},hasAttribute:k=>k==='data-select-student',closest:selector=>selector==='button'?button:null};return b.events.click({target:button});};
+  await b.click('data-edit-absence');b.absenceNodes().get('0').controls.approved.value='no';b.events.input();
+  b.discard(false);await switchStudent();assert.match(b.drawer.innerHTML,/data-record-absence="0"/);assert.equal(b.absenceNodes().get('0').controls.approved.value,'no');
+  b.discard(true);await switchStudent();assert.equal(b.drawer.innerHTML.includes('data-record-absence'),false);assert.equal(b.absenceNodes().get('0').controls.approved.value,'yes');
+  assert.match(b.drawer.innerHTML,/data-select-student="1" aria-pressed="true"/);
 });

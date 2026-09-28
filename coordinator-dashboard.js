@@ -89,13 +89,13 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
 
   const stages = {
     setup:{completed:Object.values(githubByTeam).filter(setup => setup.ready).length,total}, titleApproval:{completed:titleApproved,total},
-    ...reviewStats, guideEval:{completed:0,total}, see:{completed:0,total}
+    ...reviewStats, guideEval:{completed:0,total}
   };
   const assessmentProgress = {
     ...Object.fromEntries(reviews.map(review => [review.key, {
       completed:reviewStats[review.key].completed, pending:total - reviewStats[review.key].completed - reviewStats[review.key].unavailable, unavailable:reviewStats[review.key].unavailable
     }])),
-    guideEval:{completed:0,pending:total}, see:{completed:0,pending:total}
+    guideEval:{completed:0,pending:total}
   };
 
   // Needs attention teams
@@ -420,6 +420,11 @@ function buildCoordinatorHeaderStats(stats) {
   </div>`;
 }
 
+function getSeeProgressRows_() {
+  try {return getAssessmentDefinitions_().filter(d=>d.type==='SEE').map(d=>({label:d.label,external:true}));}
+  catch(err){return [];}
+}
+
 function buildTeamCompletionProgress(stages) {
   let reviews = [];
   let configurationUnavailable = false;
@@ -427,12 +432,13 @@ function buildTeamCompletionProgress(stages) {
   const rows = [{label:'GitHub Setup', stage:stages.setup},
     {label:'Title Approval', stage:stages.titleApproval},
     ...reviews.map(review => ({label:review.label, stage:stages[review.key]})),
-    {label:'Guide Evaluation', untracked:true}, {label:'SEE', untracked:true}];
+    {label:'Guide Evaluation', untracked:true}, ...getSeeProgressRows_()];
   return `<section class="assessment-section team-progress" aria-labelledby="teamProgressHeading">
     <h2 id="teamProgressHeading" class="assessment-title">Team Progress</h2>
     ${configurationUnavailable ? '<p role="status">Review configuration unavailable. Check System Status.</p>' : ''}
-    ${rows.map(({label, stage, untracked}) => {
+    ${rows.map(({label, stage, untracked, external}) => {
       const name = escapeHtml(label);
+      if (external) return `<div class="team-progress-row"><span>${name}</span><span class="team-progress-note">Evaluated outside this app</span></div>`;
       if (untracked) return `<div class="team-progress-row"><span>${name}</span><span class="team-progress-note">Not tracked</span></div>`;
       if (!stage) return `<div class="team-progress-row"><span>${name}</span><span class="team-progress-note">Unavailable</span></div>`;
       const completed = stage.completed || 0, total = stage.total || 0;
@@ -468,7 +474,7 @@ function buildAssessmentProgress(assessmentProgress) {
       return `<div class="assessment-row"><div class="assessment-label">${escapeHtml(review.label)}</div>${progress.unavailable ? "<span>Partial data: " + progress.unavailable + " unavailable</span>" : bar(progress.completed, progress.pending)}<div class="assessment-stat">${progress.completed} / ${progress.completed + progress.pending + (progress.unavailable || 0)}</div></div>`;
     }).join('')}
     <div class="assessment-row"><div class="assessment-label">Guide Evaluation</div>${bar(assessmentProgress.guideEval.completed, assessmentProgress.guideEval.pending)}<div class="assessment-stat">${assessmentProgress.guideEval.completed} / ${assessmentProgress.guideEval.completed + assessmentProgress.guideEval.pending}</div></div>
-    <div class="assessment-row"><div class="assessment-label">SEE</div>${bar(assessmentProgress.see.completed, assessmentProgress.see.pending)}<div class="assessment-stat">${assessmentProgress.see.completed} / ${assessmentProgress.see.completed + assessmentProgress.see.pending}</div></div>
+    ${getSeeProgressRows_().map(item=>`<div class="assessment-row"><div class="assessment-label">${escapeHtml(item.label)}</div><span>Evaluated outside this app</span></div>`).join('')}
   </div>`;
 }
 
@@ -576,17 +582,58 @@ function buildCommitteeDirectory_(committees) {
       <div class="committee-teams"><span>Assigned teams</span><div>${committee.teams.length ? committee.teams.map(team => `<span class="committee-team-chip">${escapeHtml(team)}</span>`).join('') : 'No teams assigned'}</div></div></div>
     </details>`;
   }).join('');
-  return `<div class="committee-directory"><div class="committee-directory-heading"><h4>Review committees <span>(${(committees || []).length})</span></h4><span>Select a committee to see reviewers and assigned teams</span></div><div class="committee-grid">${items || '<p>No review committees configured.</p>'}</div></div>`;
+  return `<div id="committeeReadinessGrid" class="committee-grid">${items}</div>`;
+}
+
+function buildCommitteeReadinessCard_() {
+  return `<section id="committeeConfigurationCard" class="assessment-section review-config-card configuration-card" aria-labelledby="committeeConfigurationHeading" aria-busy="true">
+    <div class="review-config-heading"><h4 id="committeeConfigurationHeading">Review Committees</h4><button id="committeeConfigurationRecheck" type="button" onclick="DashboardUI.recheckCommitteeConfiguration()">Recheck</button></div>
+    <span id="committeeConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline','Checking review committees')}</span>
+    <ul id="committeeConfigurationIssues" hidden></ul>
+    <p>Select a committee to see reviewers and assigned teams.</p>
+    <div id="committeeDirectoryContent"></div>
+    <div class="review-config-footer"><a id="committeeConfigLink" hidden target="_blank" rel="noopener">Review committees ${renderLucideIcon_('external-link')}</a><a id="committeeAssignmentsLink" hidden target="_blank" rel="noopener">Team assignments ${renderLucideIcon_('external-link')}</a><span id="committeeConfigurationCheckedAt"></span></div>
+  </section>`;
+}
+
+function getCoordinatorCommitteeConfiguration() {
+  const email=Session.getActiveUser().getEmail();
+  if(!email||(!emailsMatch(email,getCoordinatorEmail())&&!emailsMatch(email,getConfig('CELL_PD_EMAIL'))))throw new Error('Coordinator access is required.');
+  return withDashboardRead_(()=>{
+    const issues=[],links={},checkedAt=new Date().toISOString();let committees=[];
+    try {
+      const committeeSheet=getSheet(SHEET_NAMES.REVIEW_COMMITTEE),teamSheet=getSheet(SHEET_NAMES.TEAM_STATUS);
+      for(const [key,sheet] of [['committees',committeeSheet],['assignments',teamSheet]])if(sheet)links[key]='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit#gid='+sheet.getSheetId();
+      if(!committeeSheet)return {valid:false,state:'definitions-missing',summary:'Review committee configuration required',issues:[{message:'The ReviewCommittee tab is missing.'}],committees,html:buildCommitteeDirectory_(committees),links,checkedAt};
+      const RC=getColumnMap(SHEET_NAMES.REVIEW_COMMITTEE,FIELD_DEFINITIONS.REVIEW_COMMITTEE);
+      const rows=getSheetRows(SHEET_NAMES.REVIEW_COMMITTEE);
+      const TS=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
+      const teams=getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row=>row[TS.TEAM_ID]);
+      committees=buildCommitteeData_(rows,teams,RC,TS);
+      if(!committees.length)issues.push({message:'No review committees configured. Add committee numbers and reviewer email addresses in ReviewCommittee.'});
+      committees.filter(c=>!c.members.some(m=>m.email.trim())).forEach(c=>issues.push({message:'Committee '+c.number+' has no reviewer email addresses.'}));
+      const valid=!issues.length;
+      return {valid,state:valid?'ready':committees.length?'invalid':'definitions-empty',summary:valid?'Review committees configured':committees.length?'Configuration needs attention':'Review committee configuration required',issues,committees,html:buildCommitteeDirectory_(committees),links,checkedAt};
+    }catch(err){return {valid:false,state:'invalid',summary:'Configuration needs attention',issues:[{message:err.message}],committees,html:buildCommitteeDirectory_(committees),links,checkedAt};}
+  });
 }
 
 function buildReviewConfigurationCard_() {
-  return `<section id="reviewConfigurationCard" class="review-config-card" aria-labelledby="reviewConfigurationHeading" aria-busy="true">
-    <div class="review-config-heading"><h4 id="reviewConfigurationHeading">Assessment readiness</h4><span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span><button id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
+  return `<section id="reviewConfigurationCard" class="assessment-section review-config-card configuration-card assessment-setup" aria-labelledby="reviewConfigurationHeading" aria-busy="true">
+    <div class="review-config-heading"><h4 id="reviewConfigurationHeading">Assessment readiness</h4><button id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
+    <span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span>
     <ul id="reviewConfigurationIssues" hidden></ul>
     <button type="button" id="createAssessmentDefinitionsButton" hidden disabled onclick="DashboardUI.bootstrapAssessmentDefinitions()">Create assessment definitions tab</button>
     <p>First create the definitions schema, then use Assessment definitions to enter the academic configuration. Setup never supplies assessment instances or policy choices.</p>
     <ul id="reviewAssessmentReadiness" class="review-assessment-readiness" aria-label="Readiness by assessment"></ul>
     <p class="review-readiness-note">Storage readiness is separate from team entry availability, which also checks reviewer assignment, opening dates and prerequisites.</p>
+    <div id="assessmentStorageSetup">
+    <div class="assessment-storage-controls">
+      <p>Prepare configured assessment journals. Existing assessment data stays unchanged.</p>
+      <button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="run-sync-btn" onclick="initializeAssessmentStorage()">Create missing assessment storage</button>
+    </div>
+    <p id="assessmentStorageStatus" role="status" aria-live="polite"></p><ul id="assessmentStorageResults"></ul>
+    </div>
     <div class="review-config-footer"><a id="reviewDefinitionsLink" hidden target="_blank" rel="noopener">Assessment definitions ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><a id="reviewConfigLink" hidden target="_blank" rel="noopener">Milestones ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><a id="reviewRubricsLink" hidden target="_blank" rel="noopener">Rubric criteria ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><span id="reviewConfigurationCheckedAt"></span></div>
   </section>`;
 }
@@ -719,7 +766,7 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .committee-directory-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
 .committee-directory-heading h4 { margin:0; font-size:13px; }
 .committee-directory-heading > span,.committee-directory-heading h4 span { font-size:12px; color:#64748b; font-weight:400; }
-.committee-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:10px; align-items:start; }
+.committee-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; align-items:start; margin:10px 0; }
 .committee-item { min-width:0; border:1px solid #e2e8f0; border-radius:10px; background:#fff; overflow:hidden; }
 .committee-item summary { display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; list-style:none; }
 .committee-item summary::-webkit-details-marker { display:none; }
@@ -757,39 +804,29 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .rubrics-assessment-list dd { margin:0; color:#64748b; font-variant-numeric:tabular-nums; }
 @media(max-width:900px) { .system-status-primary { grid-template-columns:minmax(0,1fr); } }
 .review-config-card { padding:10px 12px; margin-bottom:14px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#0f172a; }
-.assessment-setup-panels { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px; align-items:stretch; }
-.assessment-setup-panels .review-config-card { min-width:0; margin:0; padding:14px; }
-.assessment-setup-action { display:flex; flex-direction:column; align-items:flex-start; gap:12px; min-width:0; padding:14px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; }
-.assessment-setup-action > div { min-width:0; }
-.assessment-storage-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px; width:100%; }
-.assessment-setup-action .assessment-storage-heading h4 { margin:0; }
-@media (max-width:760px) { .assessment-setup-panels { grid-template-columns:minmax(0,1fr); } }
-.assessment-setup-action h4 { margin:0 0 6px; font-size:13px; font-weight:600; }
-.assessment-setup-action p { margin:0; font-size:13px; line-height:1.6; color:#475569; }
-.assessment-setup-action p.assessment-setup-note { margin-top:4px; font-size:12px; color:#64748b; }
+.configuration-card { min-width:0; width:100%; box-sizing:border-box; margin:0 0 16px; padding:12px; }
+.configuration-card [hidden] { display:none !important; }
+.configuration-card .committee-item { min-width:0; margin:0; }
+.assessment-storage-controls { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-top:10px; }
+.assessment-storage-controls p { flex:1 1 260px; }
 .assessment-setup #initializeAssessmentStorageButton { width:auto; max-width:100%; margin:0 0 0 auto; padding:4px 10px; border:1px solid #1f2430; border-radius:6px; font-size:12px; white-space:normal; }
 .assessment-setup [hidden] { display:none !important; }
 #assessmentStorageStatus:empty,#assessmentStorageResults:empty { display:none; }
 .review-config-pill { display:inline-flex; padding:4px 9px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:600; line-height:1.4; }
 .review-config-card[data-state="ready"] .review-config-pill { color:#166534; background:#dcfce7; }
 .review-config-card[data-state="invalid"] .review-config-pill { color:#92400e; background:#fef3c7; }
-.review-config-heading,.review-assessment-readiness { display:grid; gap:8px; margin:12px 0; padding:0; list-style:none; }
-.review-assessment-readiness li { padding:8px 10px; border:1px solid var(--color-border,#e4e7ec); border-radius:6px; overflow-wrap:anywhere; }
-.review-assessment-readiness small { display:block; margin-top:4px; }
-.review-readiness-note { font-size:12px; color:var(--color-ink-muted,#64748b); }
-.review-config-footer { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
-.review-config-heading { gap:8px; }
-.review-config-heading button { margin-left:auto; }
+.review-config-heading { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 8px; }
+.review-config-heading button { margin-left:auto; border:1px solid #94a3b8; border-radius:6px; padding:4px 10px; background:white; color:#0f172a; cursor:pointer; }
 .review-config-heading h4 { margin:0; font-size:13px; font-weight:600; }
-.review-config-heading button { border:1px solid #94a3b8; border-radius:6px; padding:4px 10px; background:white; color:#0f172a; cursor:pointer; }
-.review-assessment-readiness { display:grid; gap:8px; margin:12px 0; padding:0; list-style:none; }
-.review-assessment-readiness li { padding:8px 10px; border:1px solid var(--color-border,#e4e7ec); border-radius:6px; overflow-wrap:anywhere; }
-.review-assessment-readiness small { display:block; margin-top:4px; }
-.review-readiness-note { font-size:12px; color:var(--color-ink-muted,#64748b); }
-.review-config-footer { margin-top:8px; gap:6px 14px; font-size:11px; color:#64748b; }
-#reviewConfigurationIssues { margin:10px 0 0; padding-left:18px; font-size:12px; }
-.review-config-card li { margin:8px 0; }
-.review-config-card p { margin:8px 0; font-size:13px; line-height:1.5; }
+.review-config-card .review-assessment-readiness { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; margin:10px 0; padding:0; list-style:none; }
+.review-config-card .review-assessment-readiness > li { box-sizing:border-box; min-width:0; margin:0; padding:8px 10px; border:1px solid var(--color-border,#e4e7ec); border-radius:6px; overflow-wrap:anywhere; }
+.review-assessment-readiness strong { font-size:13px; line-height:1.35; }
+.review-assessment-readiness small { display:block; margin-top:3px; font-size:12px; line-height:1.4; }
+.review-config-card .review-readiness-note { font-size:12px; color:var(--color-ink-muted,#64748b); }
+.review-config-footer { display:flex; align-items:center; flex-wrap:wrap; margin-top:8px; gap:6px 12px; font-size:11px; color:#64748b; }
+#reviewConfigurationIssues { margin:8px 0 0; padding-left:18px; font-size:12px; }
+.review-config-card li { margin:4px 0; }
+.review-config-card p { margin:6px 0; font-size:13px; line-height:1.4; }
 #initializeAssessmentStorageButton:disabled { opacity:.55; cursor:not-allowed; }
 .coord-stats.coordinator-stats-grid { display:grid; width:100%; grid-template-columns:repeat(4,minmax(0,1fr)); grid-auto-rows:1fr; gap:12px; margin-bottom:24px; }
 .coordinator-stats-grid .stat-card { position:relative; display:flex; flex-direction:column; gap:8px; min-width:0; min-height:114px; box-sizing:border-box; padding:13px; background:#fff; border:1px solid #f0edf8; border-radius:7px; box-shadow:0 1px 1px rgba(15,23,42,.02); }
@@ -1530,10 +1567,8 @@ function buildRubricsStatusCard_() {
 function loadCoordinatorSystemStatus() {
   return coordinatorRead_('system-status', () => {
     const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    const RC = getColumnMap(SHEET_NAMES.REVIEW_COMMITTEE, FIELD_DEFINITIONS.REVIEW_COMMITTEE);
     const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]);
     const repos = getRepoUrlMap();
-    const committees = buildCommitteeData_(getSheetRows(SHEET_NAMES.REVIEW_COMMITTEE), rows, RC, TS);
     const access = {coordUsername:String(getConfig('COLLABORATOR_GITHUB_USERNAME') || '').trim(),
       reposWithAccess:Number(getConfig('COLLABORATOR_REPOS_ACCESS')) || 0,
       totalRepos:rows.filter(row => repos[normalizeText_(row[TS.TEAM_ID])]).length};
@@ -1543,13 +1578,8 @@ function loadCoordinatorSystemStatus() {
     return `<div class="coordinator-container">
       <div class="system-status-primary">${buildGithubAccessSection(access)}</div>
       ${publishing}
-      <section class="assessment-section assessment-setup" aria-label="Review committee assignments and assessment storage">
-        ${buildCommitteeDirectory_(committees)}
-        <div class="assessment-setup-panels">${buildReviewConfigurationCard_()}
-          <div class="assessment-setup-action"><div class="assessment-storage-heading"><h4>Assessment storage</h4>
-          <button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="run-sync-btn" onclick="initializeAssessmentStorage()">Create missing assessment storage</button></div>
-          <p>Prepare configured assessment journals. Existing assessment data stays unchanged.</p></div></div>
-        <p id="assessmentStorageStatus" role="status" aria-live="polite"></p><ul id="assessmentStorageResults"></ul>
-      </section></div>`;
+      ${buildCommitteeReadinessCard_()}
+      ${buildReviewConfigurationCard_()}
+      </div>`;
   });
 }

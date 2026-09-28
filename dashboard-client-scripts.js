@@ -141,10 +141,14 @@ const DashboardUI = (function() {
   // Session-only diagnostics: no user records or extra telemetry requests.
   const performanceEvents = [];
   let pendingRequests = 0;
+  let pendingRoleRequests = 0;
+  let utilityRequestContext = false;
   let preloadTimer = null;
   let activeRole = null;
   let tabSelectedAt = 0;
-  let preloadCandidate = null;
+  let roleQueue = null;
+  let announcementsSettled = false;
+  const attemptedRoles = Object.create(null);
   const preloadedRoles = Object.create(null);
   const activatedRoles = Object.create(null);
   function recordPerformance(event) {
@@ -161,18 +165,25 @@ const DashboardUI = (function() {
   };
   function schedulePreload() {
     clearTimeout(preloadTimer);
-    const systemPending = byId('systemStatusContent') && !systemStatusState.attempted && Object.keys(loadedRoleTabs).length > 0;
-    if (pendingRequests || (!preloadCandidate && !systemPending) || document.hidden || !window.DashboardPerformance.preloading) return;
+    scheduleUtilities();
+    if (pendingRoleRequests || !roleQueue || document.hidden || !window.DashboardPerformance.preloading) return;
+    if (!roleQueue.some(key => !attemptedRoles[key] && !loadedRoleTabs[key] && !loadingRoleTabs[key])) return;
     preloadTimer = setTimeout(function() {
-      if (pendingRequests || document.hidden || !window.DashboardPerformance.preloading) return;
-      if (byId('systemStatusContent') && !systemStatusState.attempted) { ensureSystemStatusLoaded(); return; }
-      const key = preloadCandidate;
-      preloadCandidate = null;
-      if (!key || loadedRoleTabs[key] || loadingRoleTabs[key]) return;
+      if (pendingRoleRequests || document.hidden || !window.DashboardPerformance.preloading) return;
+      const key = roleQueue.find(key => !attemptedRoles[key] && !loadedRoleTabs[key] && !loadingRoleTabs[key]);
+      if (!key) return;
       preloadedRoles[key] = true;
       recordPerformance({event:'preload_started', role:key});
       loadRoleContent(key, true);
     }, 750);
+  }
+  function scheduleUtilities() {
+    if (document.hidden || !window.DashboardPerformance.preloading) return;
+    if (announcementsSettled && byId('systemStatusContent') && !systemStatusState.attempted) ensureSystemStatusLoaded();
+  }
+  function initializeLoading() {
+    ensureAnnouncementsLoaded();
+    schedulePreload();
   }
   document.addEventListener('visibilitychange', schedulePreload);
   // Wrap the immutable Apps Script runner, preserving callback and argument semantics.
@@ -184,17 +195,25 @@ const DashboardUI = (function() {
         if (method === 'withUserObject') return function(value) { return wrap(runner.withUserObject(value), success, failure); };
         return function() {
           const started = performance.now();
+          // Follow-up reads started by utility callbacks stay in the utility lane.
+          const utility = utilityRequestContext || method === 'loadAnnouncementsForCurrentUser' || method === 'loadCoordinatorSystemStatus';
           pendingRequests++;
-          clearTimeout(preloadTimer);
+          if (!utility) { pendingRoleRequests++; clearTimeout(preloadTimer); }
           let finished = false;
           function finish(ok, callback, args) {
             if (finished) return;
             finished = true;
+            const previousContext = utilityRequestContext;
+            utilityRequestContext = utility;
             try { if (callback) callback.apply(null, args); }
             finally {
+              utilityRequestContext = previousContext;
               pendingRequests--;
+              if (!utility) pendingRoleRequests--;
+              if (method === 'loadAnnouncementsForCurrentUser') announcementsSettled = true;
               recordPerformance({event:'request', method:String(method), ok:ok, durationMs:performance.now() - started});
-              schedulePreload();
+              if (utility) scheduleUtilities();
+              else schedulePreload();
             }
           }
           const request = runner.withSuccessHandler(function() { finish(true, success, arguments); })
@@ -390,7 +409,7 @@ const DashboardUI = (function() {
     closeCoordinatorTeamDrawer();
     rubricTrigger = trigger || document.activeElement;
     byId('rubricDrawerTitle').textContent = item.label;
-    byId('rubricDrawerContent').innerHTML = '<div class="drawer-section"><div class="drawer-section-title">Assessment contribution</div><div class="drawer-project-title">' + escapeClientHtml(item.weight) + '% of overall assessment</div><p class="drawer-person-meta">' + escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks</p></div>' + item.criteria.map(function(c) {
+    byId('rubricDrawerContent').innerHTML = '<div class="drawer-section"><div class="drawer-section-title">Assessment contribution</div><div class="drawer-project-title">' + escapeClientHtml(item.weight) + '% of overall assessment</div><p class="drawer-person-meta">' + escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks</p>' + (item.evaluationNotice ? '<p class="drawer-person-meta">'+escapeClientHtml(item.evaluator)+' · '+escapeClientHtml(item.evaluationNotice)+'</p>' : '') + '</div>' + item.criteria.map(function(c) {
       return '<section class="drawer-section"><div class="drawer-section-title">' + escapeClientHtml(c.pi) + ' · ' + escapeClientHtml(c.co) + ' · ' + escapeClientHtml(c.type) + ' · ' + escapeClientHtml(c.maxMarks) + ' marks</div><h3 class="drawer-project-title">' + escapeClientHtml(c.name) + '</h3><dl class="rubric-levels">' + c.descriptors.map(function(text, level) {
         return text ? '<dt>Level ' + level + '</dt><dd>' + escapeClientHtml(text) + '</dd>' : '';
       }).join('') + '</dl></section>';
@@ -461,6 +480,7 @@ const DashboardUI = (function() {
     if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderSkeleton('inline', 'Refreshing'); }
     setText(activeKey + 'RefreshStatus', '');
     loadingRoleTabs[activeKey] = true;
+    attemptedRoles[activeKey] = true;
     const requestStarted = Date.now();
 
     dashboardRun()
@@ -476,12 +496,8 @@ const DashboardUI = (function() {
         recordPerformance({event:'role_core_render', role:activeKey, background:!!background, durationMs:Date.now() - requestStarted});
         if (activeRole === activeKey) {
           recordPerformance({event:'tab_core_ready', role:activeKey, durationMs:performance.now() - tabSelectedAt});
-          activateRole(activeKey);
         }
-
-        // Preload the common Announcements tab only after the first role dashboard
-        // has finished. If the user clicked Announcements earlier, this is a no-op.
-        ensureAnnouncementsLoaded();
+        activateRole(activeKey);
       })
       .withFailureHandler(function(err) {
         finishLoading();
@@ -633,6 +649,8 @@ const DashboardUI = (function() {
     setText('systemStatusMessage', '');
     dashboardRun().withSuccessHandler(function(html) {
       finishCards.forEach(function(finish) { finish(); });
+      disconnectConfigurationGrids();
+      checkingReviewConfiguration=false;checkingCommitteeConfiguration=false;
       target.innerHTML = html;
       systemStatusState.loading = false;
       systemStatusState.loaded = true;
@@ -642,6 +660,8 @@ const DashboardUI = (function() {
       setText('systemStatusUpdated', updatedLabel());
       reviewConfigurationValid = false;
       recheckReviewConfiguration();
+      recheckCommitteeConfiguration();
+      arrangeAssessmentReadiness();
       target.querySelectorAll('[data-publishing]').forEach(function(section) { InternalAssessmentPublishing.refresh(section.dataset.publishing); });
     }).withFailureHandler(function(err) {
       finishCards.forEach(function(finish) { finish(); });
@@ -702,9 +722,7 @@ const DashboardUI = (function() {
     syncRubricsDisclosure();
     tabSelectedAt = performance.now();
     recordPerformance({event:'tab_selected', role:activeKey, cached:!!loadedRoleTabs[activeKey], prefetched:!!preloadedRoles[activeKey]});
-    const keys = Array.from(document.querySelectorAll('[data-role-content]')).map(function(el) { return el.getAttribute('data-role-content'); });
-    const index = keys.indexOf(activeKey);
-    preloadCandidate = index >= 0 ? keys.slice(index + 1).find(function(key) { return !loadedRoleTabs[key] && !loadingRoleTabs[key]; }) || null : null;
+    if (!roleQueue) roleQueue = Array.from(document.querySelectorAll('[data-role-content]')).map(function(el) { return el.getAttribute('data-role-content'); });
     clearTimeout(preloadTimer);
     if (loadedRoleTabs[activeKey]) recordPerformance({event:'tab_core_ready', role:activeKey, durationMs:0});
     document.querySelectorAll('[data-role-panel]').forEach(function(panel) {
@@ -1422,7 +1440,58 @@ const DashboardUI = (function() {
     }).loadAllTeamsWeeklyActivity();
   }
 
+  let configurationGridObserver = null;
+  function disconnectConfigurationGrids() {
+    if(configurationGridObserver)configurationGridObserver.disconnect();
+    configurationGridObserver=null;
+  }
+  function arrangeAssessmentReadiness() {
+    disconnectConfigurationGrids();
+    const grids=['committeeReadinessGrid','reviewAssessmentReadiness'].map(byId).filter(Boolean);
+    function layout() {
+      const widths=grids.map(grid=>grid.clientWidth).filter(width=>width>0);
+      const width=widths.length?Math.min(...widths):0;
+      const columns=Math.max(1,Math.floor((width+8)/268));
+      grids.forEach(grid=>{grid.style.gridTemplateColumns='repeat('+columns+', minmax(0, 1fr))';});
+    }
+    layout();
+    if(typeof ResizeObserver!=='undefined'){
+      configurationGridObserver=new ResizeObserver(layout);
+      grids.forEach(grid=>configurationGridObserver.observe(grid));
+    }
+  }
+
+  let checkingCommitteeConfiguration=false;
+  function recheckCommitteeConfiguration() {
+    const card=byId('committeeConfigurationCard');if(!card||checkingCommitteeConfiguration)return;
+    checkingCommitteeConfiguration=true;
+    const finishLoading=beginContentLoading(card,'Checking review committees');
+    const button=byId('committeeConfigurationRecheck');button.disabled=true;
+    const content=byId('committeeDirectoryContent');
+    const expanded=new Set(Array.from(content.querySelectorAll('details[open]')).map(item=>item.getAttribute('data-committee-key')));
+    function finish(report,error){
+      finishLoading();
+      if(byId('committeeConfigurationCard')!==card)return;
+      checkingCommitteeConfiguration=false;button.disabled=false;card.setAttribute('aria-busy','false');
+      card.setAttribute('data-state',error?'error':report.state);
+      const issues=byId('committeeConfigurationIssues');issues.textContent='';
+      const messages=error?[{message:'Unable to check review committees: '+error+'. Try Recheck.'}]:report.issues;
+      issues.hidden=!messages.length;
+      messages.forEach(issue=>{const li=document.createElement('li');li.textContent=issue.message;issues.appendChild(li);});
+      if(error){if(!card.hasAttribute('data-readiness-loaded'))setText('committeeConfigurationSummary','Unable to check readiness');return;}
+      setText('committeeConfigurationSummary',report.summary);
+      content.innerHTML=report.html;
+      content.querySelectorAll('details').forEach(item=>{item.open=expanded.has(item.getAttribute('data-committee-key'));});
+      card.setAttribute('data-readiness-loaded','true');
+      setText('committeeConfigurationCheckedAt','Last checked: '+new Date(report.checkedAt).toLocaleString());
+      [['committeeConfigLink','committees'],['committeeAssignmentsLink','assignments']].forEach(([id,key])=>{const link=byId(id),url=report.links[key];link.hidden=!url;if(url)link.href=url;});
+      arrangeAssessmentReadiness();
+    }
+    dashboardRun().withSuccessHandler(report=>finish(report,null)).withFailureHandler(error=>finish(null,errorMessage(error))).getCoordinatorCommitteeConfiguration();
+  }
+
   let reviewConfigurationValid = false;
+  let assessmentStorageAvailable = false;
   let checkingReviewConfiguration = false;
   let bootstrappingDefinitions = false;
   let definitionsBootstrapAvailable = false;
@@ -1440,15 +1509,17 @@ const DashboardUI = (function() {
     if(createButton)createButton.disabled=true;
     function finish(report, error) {
       finishLoading();
+      if(byId('reviewConfigurationCard')!==card)return;
       checkingReviewConfiguration = false;
       if (coordinatorSectionState) coordinatorSectionState.configurationSettled = true;
       reviewConfigurationValid = !error && report.valid;
+      assessmentStorageAvailable = reviewConfigurationValid && report.canInitializeStorage !== false;
       definitionsBootstrapAvailable = !error && report.canBootstrap === true;
       if(createButton){createButton.hidden=!definitionsBootstrapAvailable;createButton.disabled=!definitionsBootstrapAvailable;}
       card.setAttribute('aria-busy', 'false');
       card.setAttribute('data-state', error ? 'error' : report.state);
       byId('reviewConfigurationRecheck').disabled = false;
-      byId('initializeAssessmentStorageButton').disabled = !reviewConfigurationValid || initializingAssessmentStorage;
+      byId('initializeAssessmentStorageButton').disabled = !assessmentStorageAvailable || initializingAssessmentStorage;
       const issues = error ? [{sheet:'Configuration', message:error}] : report.issues;
       if(report)setText('reviewConfigurationSummary',report.summary);
       else if(!card.hasAttribute('data-readiness-loaded'))setText('reviewConfigurationSummary','Unable to check readiness');
@@ -1459,15 +1530,23 @@ const DashboardUI = (function() {
         const item = document.createElement('li'); item.textContent = issue.sheet + ': ' + issue.message; list.appendChild(item);
       });
       if (report) {
+        const setup=byId('assessmentStorageSetup');
+        if(setup)setup.hidden=report.storageComplete===true;
         const readiness=byId('reviewAssessmentReadiness');
         readiness.textContent='';
         report.storage.forEach(function(entry){
           const item=document.createElement('li');item.setAttribute('data-assessment',entry.assessment);item.setAttribute('data-state',entry.state);
-          const heading=document.createElement('strong');heading.textContent=entry.label+' · '+entry.state;item.appendChild(heading);
-          const detail=document.createElement('small');detail.textContent='Journal: '+entry.journal;item.appendChild(detail);
+          const heading=document.createElement('strong');heading.textContent=entry.label+' \u00b7 '+(entry.ready?'Ready':'Needs attention');item.appendChild(heading);
+          const rubric=entry.rubric || {state:'MISSING'};
+          const labels={READY:'Ready',MISSING:'Missing',INVALID:'Invalid',EMPTY:'Needs initialization',ERROR:'Error',NOT_REQUIRED:'Not required'};
+          const rubricLine=document.createElement('small');rubricLine.textContent='Rubric: '+labels[rubric.state]+(rubric.state==='READY'?' \u00b7 '+rubric.criterionCount+' '+(rubric.criterionCount===1?'criterion':'criteria')+' \u00b7 '+rubric.maximumMarks+' marks':'');item.appendChild(rubricLine);
+          const storageLine=document.createElement('small');storageLine.textContent='Storage: '+labels[entry.state]+(entry.state==='NOT_REQUIRED'?' \u00b7 Evaluated outside this app':'');item.appendChild(storageLine);
+          if(entry.state!=='NOT_REQUIRED'){const journal=document.createElement('small');journal.textContent='Journal: '+entry.journal;item.appendChild(journal);}
+          if(rubric.error){const issue=document.createElement('small');issue.textContent=rubric.error;item.appendChild(issue);}
           if(entry.error){const issue=document.createElement('small');issue.textContent=entry.error;item.appendChild(issue);}
           readiness.appendChild(item);
         });
+        arrangeAssessmentReadiness(readiness);
         card.setAttribute('data-readiness-loaded','true');
         setText('reviewConfigurationCheckedAt', 'Last checked: ' + new Date(report.checkedAt).toLocaleString());
         [['reviewDefinitionsLink','definitions'],['reviewConfigLink','config'],['reviewRubricsLink','rubrics']].forEach(function(pair) {
@@ -1504,7 +1583,7 @@ const DashboardUI = (function() {
 
   let initializingAssessmentStorage = false;
   function initializeAssessmentStorage() {
-    if(initializingAssessmentStorage||!reviewConfigurationValid||checkingReviewConfiguration||bootstrappingDefinitions)return;
+    if(initializingAssessmentStorage||!reviewConfigurationValid||!assessmentStorageAvailable||checkingReviewConfiguration||bootstrappingDefinitions)return;
     initializingAssessmentStorage=true;
     const button=byId('initializeAssessmentStorageButton'),results=byId('assessmentStorageResults');
     if(button)button.disabled=true;
@@ -1512,7 +1591,7 @@ const DashboardUI = (function() {
     setText('assessmentStorageStatus','Preparing assessment storage…');
     function finish(message){
       initializingAssessmentStorage=false;
-      if(button)button.disabled=!reviewConfigurationValid;
+      if(button)button.disabled=!assessmentStorageAvailable;
       setText('assessmentStorageStatus',message);
       recheckReviewConfiguration();
     }
@@ -1681,6 +1760,7 @@ const DashboardUI = (function() {
     showRoleTab,
     toggleRoleMenu,
     initializeRoleMenu,
+    initializeLoading,
     refreshAnnouncements,
     toggleProblem,
     renderExpandableText,
@@ -1701,6 +1781,7 @@ const DashboardUI = (function() {
     runGithubSync,
     loadCoordinatorWeeklyActivity,
     initializeAssessmentStorage,
+    recheckCommitteeConfiguration,
     bootstrapAssessmentDefinitions,
     recheckReviewConfiguration,
     initializeCoordinatorTracker
@@ -1739,6 +1820,7 @@ function initializeFirstRoleTab() {
   if (activePanel) {
     DashboardUI.showRoleTab(activePanel.getAttribute('data-role-panel'));
   }
+  DashboardUI.initializeLoading();
   DashboardSchedule.ready().catch(function() {});
   DashboardUI.loadSharedRubrics().catch(function() {});
 }

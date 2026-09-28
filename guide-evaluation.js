@@ -23,7 +23,7 @@ function guideFingerprint_(value) {
 }
 function guideConfiguration_() {
   const definition=assessmentDefinition_('guide_eval');
-  if(definition.type!=='INDIVIDUAL_RUBRIC')throw new Error('Configure guide_eval as INDIVIDUAL_RUBRIC in AssessmentDefinitions.');
+  if(definition.type!=='GUIDE_EVALUATION')throw new Error('Configure guide_eval as GUIDE_EVALUATION in AssessmentDefinitions.');
   const criteria=assessmentRubric_(definition);
   if(criteria.some(c=>c.type!=='Individual'||c.descriptors.some(t=>!t)))throw new Error('Guide rubric requires individual criteria with all Level 0–5 descriptors.');
   return {key:definition.key,label:definition.label,criteria,maximum:criteria.reduce((n,c)=>n+c.maxMarks,0),due:definition.day,opens:definition.opens,timezone:getSpreadsheet().getSpreadsheetTimeZone(),policy:definition.academicPolicyVersion,weight:definition.weight/100};

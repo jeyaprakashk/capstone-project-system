@@ -6,16 +6,11 @@ function validateReviewConfigurationRows_(milestoneRows, rubricRows, timezone, d
     milestones=milestoneRows ? parseMilestoneRows_(milestoneRows,timezone) : [];
     composeProjectTimeline_(milestones,definitions);
   }catch(err){issues.push({sheet:'Milestones',message:err.message});}
-  try {
-    if(!definitions.length)throw new Error('Configure graded assessments in AssessmentDefinitions.');
-    const refs=[...new Set(definitions.map(d=>d.rubricReference))].map(key=>({key}));
-    const parsed=parseRubricRows_(rubricRows,refs);
-    structure=Object.freeze(Object.fromEntries(definitions.map(d=>[d.key,parsed[d.rubricReference]])));
-    definitions.filter(d=>d.type==='INDIVIDUAL_RUBRIC').forEach(d=>{
-      if(structure[d.key].some(c=>c.type!=='Individual'||c.descriptors.some(text=>!text)))throw new Error(d.label+' requires individual criteria and all Level 0–5 descriptors.');
-    });
-  }catch(err){issues.push({sheet:'Rubrics',message:err.message});}
-  return {valid:!issues.length,count:definitions.filter(d=>d.type==='REVIEW').length,issues,milestones,structure};
+  const rubricReport=getAssessmentRubricReadiness_(rubricRows,definitions);
+  if(!definitions.length)issues.push({sheet:'AssessmentDefinitions',message:'Configure graded assessments in AssessmentDefinitions.'});
+  issues.push(...rubricReport.issues);
+  structure=rubricReport.structure;
+  return {valid:!issues.length,count:definitions.filter(d=>d.type==='REVIEW').length,issues,milestones,structure,rubrics:rubricReport.reports};
 }
 function checkReviewConfiguration_() {
   const checkedAt=new Date().toISOString(),links={};
@@ -34,19 +29,23 @@ function checkReviewConfiguration_() {
       return blocked('definitions-empty','Assessment definitions required','AssessmentDefinitions contains no graded assessments. Open Assessment definitions and configure the required instances before initializing storage.');
     }
     registryState='VALID';
-    const result=validateReviewConfigurationRows_(milestones?milestones.getDataRange().getValues():null,rubrics?rubrics.getDataRange().getValues():[],getSpreadsheet().getSpreadsheetTimeZone(),definitions);
+    const result=validateReviewConfigurationRows_(milestones?milestones.getDataRange().getValues():null,rubrics?rubrics.getDataRange().getValues():null,getSpreadsheet().getSpreadsheetTimeZone(),definitions);
     const storage=definitions.map(d=>{
-      const item={assessment:d.key,label:d.label,journal:d.journal};
-      if(!result.valid)return {...item,state:'ERROR',error:result.issues.map(issue=>issue.message).join(' ')};
+      const item={assessment:d.key,label:d.label,journal:d.journal,rubric:result.rubrics[d.key]};
+      if(d.type==='SEE')return {...item,state:'NOT_REQUIRED',detail:'Not required — evaluated outside this app.'};
       try {const resolved=assessmentJournal_(d);return {...item,journal:resolved.name,state:resolved.state};}
       catch(err){return {...item,state:'ERROR',error:err.message};}
     });
-    const issues=[...result.issues,...(result.valid?storage.filter(item=>item.state==='ERROR').map(item=>({sheet:item.label,message:item.error})):[])];
-    const valid=!issues.length,ready=valid&&storage.every(item=>item.state==='READY');
+    storage.forEach(item=>{item.ready=item.rubric.state==='READY'&&['READY','NOT_REQUIRED'].includes(item.state);});
+    const issues=[...result.issues,...storage.filter(item=>item.state==='ERROR').map(item=>({sheet:item.label,message:item.error}))];
+    const valid=!issues.length,ready=valid&&storage.every(item=>item.ready);
     const missing=storage.filter(item=>item.state==='MISSING').length,empty=storage.filter(item=>item.state==='EMPTY').length;
-    const summary=!valid?'Configuration needs attention':ready?storage.length+' assessment journals READY':'Configuration valid · '+missing+' missing journals · '+empty+' journals need initialization. Use Create missing assessment storage.';
+    const storageComplete=storage.length>0&&storage.every(item=>['READY','NOT_REQUIRED'].includes(item.state));
+    const canInitializeStorage=valid&&(missing>0||empty>0);
+    const readyCount=storage.filter(item=>item.ready).length;
+    const summary=readyCount+' / '+definitions.length+' assessments ready'+(!valid?' \u00b7 Configuration needs attention':ready?'': ' \u00b7 '+missing+' missing journals \u00b7 '+empty+' journals need initialization. Use Create missing assessment storage.');
     if(valid){rubricExecutionStructure_=result.structure;projectScheduleExecution_=null;}
-    return {valid,ready,state:!valid?'invalid':ready?'ready':missing?'storage-missing':'storage-empty',registryState,canBootstrap:false,summary,count:result.count,issues,checkedAt,links,storage};
+    return {valid,ready,state:!valid?'invalid':ready?'ready':missing?'storage-missing':'storage-empty',registryState,canBootstrap:false,canInitializeStorage,storageComplete,summary,count:result.count,issues,checkedAt,links,storage};
   }catch(err){return blocked('invalid','Configuration needs attention',err.message);}
 }
 function getCoordinatorReviewConfiguration() {

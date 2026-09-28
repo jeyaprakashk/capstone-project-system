@@ -5,11 +5,19 @@ function reviewPolicyFacts_(value) {
   if(f.type==='UNSELECTED')return {type:'UNSELECTED',attended:null};
   if(f.type==='NORMAL')return {type:'NORMAL',attended:true};
   if(!['REVIEW_DAY_ABSENCE','PROLONGED'].includes(f.type))throw new Error('Invalid attendance classification.');
-  if(typeof f.approved!=='boolean')throw new Error('Absence Approved must be Yes or No.');
-  if(f.type==='REVIEW_DAY_ABSENCE')return {type:f.type,approved:f.approved,attended:false};
+  const approvalNotApplicable=f.type==='PROLONGED' && f.verifiedContribution===false && f.attended===true;
+  if(!approvalNotApplicable && typeof f.approved!=='boolean')throw new Error('Absence Approved must be Yes or No.');
+  let evidence={};
+  if(f.approved===true && !approvalNotApplicable && (Object.prototype.hasOwnProperty.call(f,'supportingEvidence') || Object.prototype.hasOwnProperty.call(f,'otherEvidenceText'))) {
+    const selected=f.supportingEvidence??[],detail=String(f.otherEvidenceText??'').trim();
+    if(!Array.isArray(selected)||new Set(selected).size!==selected.length||selected.some(value=>!['MEDICAL_DOCUMENT','APPROVAL_DOCUMENT','OTHER'].includes(value)))throw new Error('Invalid supporting absence evidence selection.');
+    if(detail.length>2000)throw new Error('Supporting absence evidence description must be 2000 characters or fewer.');
+    evidence={supportingEvidence:selected.slice(),otherEvidenceText:selected.includes('OTHER')?detail:null};
+  }
+  if(f.type==='REVIEW_DAY_ABSENCE')return {type:f.type,approved:f.approved,attended:false,...evidence};
   if(typeof f.verifiedContribution!=='boolean')throw new Error('Contribution Established must be Yes or No.');
   if(typeof f.attended!=='boolean')throw new Error('Attended the Review must be Yes or No.');
-  return {type:f.type,approved:f.approved,verifiedContribution:f.verifiedContribution,attended:f.attended};
+  return {type:f.type,approved:typeof f.approved==='boolean'?f.approved:null,verifiedContribution:f.verifiedContribution,attended:f.attended,...evidence};
 }
 function reviewPolicyScoresComplete_(criteria,scores) {
   const bands=[0,40,60,75,85,95,100];

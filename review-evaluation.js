@@ -7,7 +7,7 @@ function reviewConfiguration_(key) {
   const criteria=assessmentRubric_(d);
   return {key:d.key,label:d.label,criteria,maximum:criteria.reduce((n,c)=>n+c.maxMarks,0),due:d.day,opens:d.opens,
     timezone:getSpreadsheet().getSpreadsheetTimeZone(),weight:d.weight/100,academicPolicyVersion:d.academicPolicyVersion,
-    prerequisites:d.prerequisites,sequence:d.sequence,rubricReference:d.rubricReference};
+    prerequisites:d.prerequisites,sequence:d.sequence};
 }
 
 /** Team readiness is independent of Review sequence. */
@@ -115,6 +115,7 @@ function reviewScore_(config, roster, input, complete, previous) {
   const students=roster.students.map(member=>{
     const entry=input.students.find(s=>s.register===member.register),prior=previous&&previous.students.find(s=>s.register===member.register);
     const facts=reviewAbsenceFacts_(entry.absence);
+    if(complete && facts.supportingEvidence?.includes('OTHER') && !facts.otherEvidenceText)throw new Error('Describe the other supporting absence evidence.');
     if(complete&&facts.type==='UNSELECTED')throw new Error('Select attendance for every student before submitting.');
     const normal=facts.type==='NORMAL'||facts.type==='PROLONGED'&&facts.attended;
     const supplied=entry.scores||{};
@@ -130,7 +131,7 @@ function reviewWrite_(action,input,key) {
   if(action==='publish'){const result=publishInternalAssessment({...input,assessmentId:key});return reviewWriteResult_(result.revision,reviewRecords_(key).records.find(r=>r.team===normalizeText_(input.team)&&r.revision===result.revision));}
   const staff=action==='reopen';
   const actor=guideActor_(staff);
-  if(!['draft','submit','publish','reopen','makeupDraft','makeupSubmit'].includes(action))throw new Error('Unsupported Review command.');
+  if(!['draft','submit','publish','reopen','makeupDraft','makeupSubmit','absenceCorrection'].includes(action))throw new Error('Unsupported Review command.');
   return evaluationCommand_(action,input,fingerprint=>{
     const context=reviewContext_(input.team,staff,key), {sheet,records}=reviewRecords_(key);
     if (!sheet) throw new Error(assessmentStorageMissing_(reviewHistoryName_(key)));
@@ -153,6 +154,12 @@ function reviewWrite_(action,input,key) {
         Object.assign(payload,{status:'Draft',reason,copiedFromRevision:latest.revision,submittedAt:null,submittedDay:null,late:false,fingerprint});
         delete payload.publishedStudents;
         payload.students=payload.students.map(s=>reviewEffectiveStudent_(payload.config,payload.teamScores,{...s,needsPublication:true}));
+    } else if (action==='absenceCorrection') {
+      if(!latest || !['Submitted','Published'].includes(latest.status))throw new Error('Submit the evaluation before correcting absence details.');
+      evaluationAssertCompatible_(latest,reviewConfiguration_(key),context.roster);
+      if(input.token!==guideFingerprint_({roster:context.roster,config:latest.config}))throw new Error('Roster or rubric changed. Reload before correcting absence details.');
+      payload=reviewAbsenceCorrection_(latest,input,actor);
+      payload.fingerprint=fingerprint;
     } else if (['makeupDraft','makeupSubmit'].includes(action)) {
       if(!latest || !['Submitted','Published'].includes(latest.status))throw new Error('Submit the team evaluation before Individual Makeup.');
       evaluationAssertCompatible_(latest,reviewConfiguration_(key),context.roster);
@@ -191,6 +198,27 @@ function submitReviewEvaluation(input) {return reviewWrite_('submit',input,input
 function reopenReviewEvaluation(input) {return reviewWrite_('reopen',input,input.assessmentId);}
 function saveReviewMakeupDraft(input) {return reviewWrite_('makeupDraft',input,input.assessmentId);}
 function submitReviewMakeup(input) {return reviewWrite_('makeupSubmit',input,input.assessmentId);}
+function recordReviewAbsence(input) {return reviewWrite_('absenceCorrection',input,input.assessmentId);}
+function reviewAbsenceCorrection_(latest,input,actor) {
+  const allowed=['assessmentId','team','student','revision','token','requestId','absence'];
+  if(Object.keys(input).some(key=>!allowed.includes(key)))throw new Error('Absence correction changes only absence details.');
+  const original=latest.students.find(s=>s.register===normalizeReviewKey_(input.student));
+  if(!original || !(['REVIEW_DAY_ABSENCE','PROLONGED'].includes(original.assessment.facts.type) || original.assessment.nextActions.makeup))throw new Error('Only existing absences or pending makeup can be corrected.');
+  const facts=reviewAbsenceFacts_(input.absence);
+  if(facts.type==='UNSELECTED')throw new Error('Select attendance before saving absence details.');
+  if(facts.supportingEvidence?.includes('OTHER') && !facts.otherEvidenceText)throw new Error('Describe the other supporting absence evidence.');
+  const student=JSON.parse(JSON.stringify(original));
+  student.assessment.facts=facts;
+  const result=reviewEffectiveStudent_(latest.config,latest.teamScores,student);
+  if(facts.attended && result.assessment.individualState!=='RESOLVED')throw new Error('Normal individual marks are missing. Ask the coordinator to reopen the evaluation to enter those marks.');
+  const outcome=s=>({total:s.total,weighted:s.weighted,...Object.fromEntries(['status','completed','teamMark','individualMark','teamState','individualState','teamSource','individualSource','effectiveScores'].map(key=>[key,s.assessment[key]]))});
+  result.assessment.events=[...(result.assessment.events||[]),{action:'absenceCorrection',actor,at:new Date().toISOString(),requestId:input.requestId,
+    before:{facts:original.assessment.facts,outcome:outcome(original)},after:{facts:result.assessment.facts,outcome:outcome(result)}}];
+  result.needsPublication=true;
+  const payload={...latest,students:latest.students.map(s=>s.register===original.register?result:s),status:'Submitted'};
+  delete payload.publishedStudents;
+  return payload;
+}
 function reviewAbsenceFacts_(value) {return reviewPolicyFacts_(value);}
 function reviewScoresComplete_(criteria,scores) {return reviewPolicyScoresComplete_(criteria,scores);}
 function reviewEffectiveStudent_(config,teamScores,student) {return reviewPolicyCalculate_(config,teamScores,student);}

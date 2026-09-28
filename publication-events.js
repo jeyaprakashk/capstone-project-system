@@ -8,7 +8,7 @@ function publicationAdapters_() {
       reopen:input=>reopenReviewEvaluation(input),
       reopenDescription:'Copies evidence into a correction draft. The previous publication remains visible under correction.',
       reopenChanges:(record,key,roster)=>evaluationReopenChanges_(record,reviewConfiguration_(key),roster)},
-    INDIVIDUAL_RUBRIC: {teamPublication:'sequential',reopenScope:'student',
+    GUIDE_EVALUATION: {teamPublication:'sequential',reopenScope:'student',
       read:()=>guideRecords_(),config:()=>guideConfiguration_(),
       latest:(records,team,student)=>guideLatest_(records,team,student),
       reopen:input=>reopenGuideEvaluation(input),

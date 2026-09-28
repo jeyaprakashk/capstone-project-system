@@ -9,6 +9,6 @@ exports.install=function(c,count=2){
  }
  vm.runInContext('const PROJECT_DAY_MS_ = 86400000;',c);
  vm.runInContext(fs.readFileSync(path.join(__dirname,'..','milestone-config.js'),'utf8'),c);
- c.setReviews=n=>{c.definitions=Array.from({length:n},(_,i)=>({key:'review'+(i+1),label:'Review '+(i+1),type:'REVIEW',sequence:i+1,rubricReference:'review'+(i+1),opens:19990,day:20000+i,gradedBy:'Review Committee',weight:10}));};
+ c.setReviews=n=>{c.definitions=Array.from({length:n},(_,i)=>({key:'review'+(i+1),label:'Review '+(i+1),type:'REVIEW',sequence:i+1,opens:19990,day:20000+i,gradedBy:'Review Committee',weight:10}));};
  c.setReviews(count);c.getMilestones_=()=>[];
 };

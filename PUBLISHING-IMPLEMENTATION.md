@@ -8,7 +8,9 @@ Implemented against the existing evaluation refactor on 28 September 2026. No de
 
 The Coordinator publishing sections and their refresh initialization now discover configured assessments instead of enumerating Review 1 and Review 2. Labels and ordering come from assessment definitions. Guide must be explicitly registered in AssessmentDefinitions; there is no Milestones fallback. This configuration-source change does not alter publication policy or snapshot semantics.
 
-`publication-events.js` registers two type adapters: REVIEW and INDIVIDUAL_RUBRIC. All configured Review instances use the same adapter and existing Review engine. Guide retains its individual evaluation and reopening behavior. Its team publication action remains a sequence of independent student commands, with partial-success reporting.
+SEE is display-only and is excluded from publication discovery and commands.
+
+`publication-events.js` registers two type adapters: REVIEW and GUIDE_EVALUATION. All configured Review instances use the same adapter and existing Review engine. Guide retains its individual evaluation and reopening behavior. Its team publication action remains a sequence of independent student commands, with partial-success reporting.
 
 The public commands are:
 

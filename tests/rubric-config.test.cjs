@@ -12,7 +12,7 @@ require('./milestone-fixture.cjs').install(c);
  vm.runInContext(fs.readFileSync(path.join(__dirname,'..','rubric-config.js'),'utf8'),c);
  vm.runInContext(fs.readFileSync(path.join(__dirname,'..','review-configuration.js'),'utf8'),c);
  function populate() {
-  rows=[['Milestone ID','Order','PI','Criterion','CO','Max Marks','Type'],
+  rows=[['Assessment ID','Order','PI','Criterion','CO','Max Marks','Type'],
    ...['review1','review2'].flatMap(review=>Array.from({length:7},(_,i)=>
     [review,i+1,'PI'+(i+1),'Test criterion '+(i+1),'CO1',i===6?10:15,'Team']))];
  }
@@ -32,7 +32,7 @@ test('loader returns immutable review criteria from the sheet',()=>{
 test('shared rubrics preserve weights and independently validate every graded assessment',()=>{
  const f=fixture();f.populate();
  f.c.definitions[0].weight=12.5;
- f.c.definitions.push({key:'future_demo',rubricReference:'future_demo',type:'REVIEW',label:'Future demo',weight:40,gradedBy:'Review Committee'});
+ f.c.definitions.push({key:'future_demo',type:'REVIEW',label:'Future demo',weight:40,gradedBy:'Review Committee'});
  f.rows[1][3]='<script>example</script>';
  f.rows.find(row=>row[0]==='review2')[5]=-1;
  const data=f.c.getSharedRubricsData_();
@@ -48,7 +48,7 @@ test('shared rubrics preserve weights and independently validate every graded as
 
 test('shared rubrics handle missing sheets, headers and guide descriptors',()=>{
  const f=fixture();assert(f.c.getSharedRubricsData_().assessments.every(a=>!a.available));f.populate();
- f.c.definitions.push({key:'guide_eval',rubricReference:'guide_eval',type:'INDIVIDUAL_RUBRIC',label:'Guide Eval',weight:20,gradedBy:'Project Guide'});
+ f.c.definitions.push({key:'guide_eval',type:'GUIDE_EVALUATION',label:'Guide Eval',weight:20,gradedBy:'Project Guide'});
  f.rows.push(['guide_eval',1,'PI1','Guide criterion','CO1',100,'Individual']);
  assert.equal(f.c.getSharedRubricsData_().assessments.at(-1).available,false);
  f.rows[0].push(...Array.from({length:6},(_,i)=>'Level '+i));f.rows.at(-1).push(...Array(6).fill('Descriptor'));
@@ -122,7 +122,7 @@ test('rubric labels are normalized while criterion wording is preserved',()=>{
 test('read-only status requires rubric coverage for every graded assessment',()=>{
  const f=fixture();assert.equal(f.c.getRubricsStatus_().configured,false);f.populate();
  assert.equal(f.c.getRubricsStatus_().configured,true);
- f.c.definitions.push({key:'future_demo',rubricReference:'future_demo',type:'REVIEW',label:'Future demo',gradedBy:'Review Committee'});
+ f.c.definitions.push({key:'future_demo',type:'REVIEW',label:'Future demo',gradedBy:'Review Committee'});
  assert.match(f.c.getRubricsStatus_().detail,/Missing rubrics: Future demo/);
  f.rows.push(['future_demo',1,'PI1','Example future criterion','CO1',100,'Individual']);
  assert.equal(f.c.getRubricsStatus_().configured,true);
@@ -132,7 +132,7 @@ test('read-only status requires rubric coverage for every graded assessment',()=
 test('status ignores ungraded milestones and rejects missing guide descriptors',()=>{
  const f=fixture();f.populate();f.c.getMilestones_=()=>[{key:'formation',gradedBy:'Not Applicable'}];
  assert.equal(f.c.getRubricsStatus_().configured,true);
- f.c.definitions.push({key:'guide_eval',rubricReference:'guide_eval',type:'INDIVIDUAL_RUBRIC',label:'Guide Eval',gradedBy:'Project Guide'});
+ f.c.definitions.push({key:'guide_eval',type:'GUIDE_EVALUATION',label:'Guide Eval',gradedBy:'Project Guide'});
  f.rows.push(['guide_eval',1,'PI1','Example criterion','CO1',100,'Individual']);
  assert.match(f.c.getRubricsStatus_().detail,/Level 0–5/);
  f.rows[0].push(...Array.from({length:6},(_,i)=>'Level '+i));f.rows.at(-1).push(...Array(6).fill('Example descriptor'));

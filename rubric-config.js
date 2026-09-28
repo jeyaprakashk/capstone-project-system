@@ -14,16 +14,17 @@ function getSharedRubricsData_() {
   const assessments = requireAssessmentDefinitions_();
   const sheet = getSheet('Rubrics');
   const rows = sheet ? sheet.getDataRange().getValues() : [];
-  const column = (rows[0] || []).map(normalizeText_).indexOf('milestone id');
+  const column = (rows[0] || []).map(normalizeText_).indexOf('assessment id');
   return {assessments: assessments.map(item => {
     const result = {key:item.key, label:item.label, weight:item.weight, available:false,
+      evaluator:item.gradedBy, evaluationNotice:item.type==='SEE'?'Evaluated outside this app':'',
       criterionCount:0, totalMarks:0, criteria:[], status:'Rubric unavailable'};
     if (!sheet) return {...result, status:'Rubric not configured'};
     if (column < 0) return {...result, status:'Rubric needs correction'};
-    const selected = rows.slice(1).filter(row => normalizeText_(row[column]) === (item.rubricReference));
+    const selected = rows.slice(1).filter(row => normalizeText_(row[column]) === (item.key));
     if (!selected.length) return {...result, status:'Rubric not configured'};
     try {
-      const criteria = parseRubricRows_([rows[0], ...selected], [{...item,key:item.rubricReference}])[item.rubricReference];
+      const criteria = parseRubricRows_([rows[0], ...selected], [item])[item.key];
       if (item.gradedBy === 'Project Guide' && criteria.some(c => c.type !== 'Individual' || c.descriptors.some(text => !text))) {
         return {...result, status:'Guide rubric incomplete'};
       }
@@ -43,13 +44,13 @@ function getRubricsStatus_() {
     if (!assessments.length) return {assessments:summaries,configured:false,detail:'No graded assessments are defined in AssessmentDefinitions.'};
     const rows = sheet.getDataRange().getValues();
     if (!rows.slice(1).some(row=>row.some(value=>String(value??'').trim()))) return {assessments:summaries,configured:false,detail:'The Rubrics tab has no criteria yet.'};
-    const column = (rows[0] || []).map(normalizeText_).indexOf('milestone id');
+    const column = (rows[0] || []).map(normalizeText_).indexOf('assessment id');
     summaries = assessments.map(item=>{
-      const selected = column < 0 ? [] : rows.slice(1).filter(row=>normalizeText_(row[column])===(item.rubricReference));
+      const selected = column < 0 ? [] : rows.slice(1).filter(row=>normalizeText_(row[column])===(item.key));
       if (column < 0) return {label:item.label,summary:'Check column headers'};
       if (!selected.length) return {label:item.label,summary:'Missing'};
       try {
-        const criteria = parseRubricRows_([rows[0],...selected],[{...item,key:item.rubricReference}])[item.rubricReference];
+        const criteria = parseRubricRows_([rows[0],...selected],[item])[item.key];
         if (item.gradedBy==='Project Guide' && criteria.some(c=>c.type!=='Individual' || c.descriptors.some(text=>!text))) return {label:item.label,summary:'Incomplete guide rubric'};
         const maximum = criteria.reduce((sum,c)=>sum+c.maxMarks,0);
         return {label:item.label,summary:criteria.length+' '+(criteria.length===1?'criterion':'criteria')+' · '+Number(maximum.toFixed(2))+' marks'};
@@ -57,12 +58,10 @@ function getRubricsStatus_() {
     });
     if (column >= 0) {
       const groups = new Set(rows.slice(1).map(row=>normalizeText_(row[column])));
-      const missing = assessments.filter(item=>!groups.has(item.rubricReference));
+      const missing = assessments.filter(item=>!groups.has(item.key));
       if (missing.length) return {assessments:summaries,configured:false,detail:'Missing rubrics: '+missing.map(item=>item.label+' ('+item.key+')').join(', ')+'.'};
     }
-    const references=[...new Map(assessments.map(item=>[item.rubricReference,{key:item.rubricReference}])).values()];
-    const parsed=parseRubricRows_(rows,references);
-    const structure=Object.fromEntries(assessments.map(item=>[item.key,parsed[item.rubricReference]]));
+    const structure=parseRubricRows_(rows,assessments);
     assessments.filter(item=>item.gradedBy==='Project Guide').forEach(item=>{
       if (structure[item.key].some(c=>c.type!=='Individual' || c.descriptors.some(text=>!text))) throw new Error(item.label+' requires individual criteria and all Level 0–5 descriptors.');
     });
@@ -72,9 +71,8 @@ function getRubricsStatus_() {
   }
 }
 
-function parseRubricRows_(rows, reviews) {
-  reviews = reviews || [...new Set(requireAssessmentDefinitions_().map(d=>d.rubricReference))].map(key=>({key}));
-  const required = ['Milestone ID','Order','PI','Criterion','CO','Max Marks','Type'];
+function rubricColumns_(rows) {
+  const required = ['Assessment ID','Order','PI','Criterion','CO','Max Marks','Type'];
   if (!Array.isArray(rows) || !rows.length) throw new Error('Rubrics Sheet is empty. Add the required column headers and review criteria.');
   const headers = rows[0].map(value => String(value).trim().toLowerCase());
   const columns = required.map(name => {
@@ -82,6 +80,16 @@ function parseRubricRows_(rows, reviews) {
     if (index < 0 || headers.lastIndexOf(key) !== index) throw new Error('Rubrics Sheet requires exactly one column named ' + name);
     return index;
   });
+  for (let level=0;level<=5;level++) {
+    const key='level '+level,index=headers.indexOf(key);
+    if(index>=0 && headers.lastIndexOf(key)!==index)throw new Error('Rubrics Sheet has duplicate '+key+' column.');
+  }
+  return {headers,columns};
+}
+
+function parseRubricRows_(rows, reviews) {
+  reviews = reviews || requireAssessmentDefinitions_();
+  const {headers,columns}=rubricColumns_(rows);
   const grouped = Object.create(null);
   rows.slice(1).forEach((row,index) => {
     const values = columns.map(column => row[column]);
@@ -91,7 +99,7 @@ function parseRubricRows_(rows, reviews) {
     const pi = normalizeText_(rawPi).toUpperCase(), co = normalizeText_(rawCo).toUpperCase();
     const type = ({team:'Team',individual:'Individual'})[normalizeText_(rawType)] || rawType;
     const fail = message => { throw new Error('Rubrics Sheet row ' + (index + 2) + ': ' + message); };
-    if (!reviews.some(item => item.key === review)) fail('Milestone ID must identify a rubric reference in AssessmentDefinitions.');
+    if (!reviews.some(item => item.key === review)) fail('Assessment ID must identify an assessment in AssessmentDefinitions.');
     if (!/^\d+$/.test(order) || !Number.isSafeInteger(Number(order)) || Number(order) < 1) fail('Order must be a positive integer.');
     if (!/^PI[1-9]\d*$/.test(pi) || !/^CO[1-9]\d*$/.test(co)) fail('Use PI1, PI2… and CO1, CO2… identifiers.');
     if (!name) fail('Criterion is required.');
@@ -122,9 +130,41 @@ function getRubricStructure_() {
   if (!sheet) throw new Error('Rubrics Sheet tab not found. Restore the Rubrics Sheet tab in the configured spreadsheet.');
   const rows = sheet.getDataRange().getValues();
   const assessments=requireAssessmentDefinitions_();
-  const refs=[...new Set(assessments.map(d=>d.rubricReference))].map(key=>({key}));
-  const parsed=parseRubricRows_(rows,refs);
-  const structure=Object.fromEntries(assessments.map(d=>[d.key,parsed[d.rubricReference]]));
+  const structure=parseRubricRows_(rows,assessments);
   rubricExecutionStructure_ = Object.freeze(structure);
   return rubricExecutionStructure_;
+}
+
+
+/** Independent rubric reports; blank placeholders preserve original sheet row numbers. */
+function getAssessmentRubricReadiness_(rows, definitions) {
+  const issues=[],structure=Object.create(null),reports=Object.create(null);
+  const report=(state,error)=>({state,criterionCount:0,maximumMarks:0,...(error?{error}:{})});
+  if(!rows || !rows.length) {
+    const message=rows?'The Rubrics tab has no criteria yet.':'The Rubrics tab is missing.';
+    definitions.forEach(d=>reports[d.key]=report('MISSING',message));
+    return {reports,structure,issues:[{sheet:'Rubrics',message}]};
+  }
+  let columns;
+  try {columns=rubricColumns_(rows).columns;}
+  catch(err){definitions.forEach(d=>reports[d.key]=report('INVALID',err.message));return {reports,structure,issues:[{sheet:'Rubrics',message:err.message}]};}
+  const ids=new Set(definitions.map(d=>d.key)),idColumn=columns[0];
+  rows.slice(1).forEach((row,index)=>{
+    if(columns.every(column=>row[column]==='' || row[column]===null || row[column]===undefined))return;
+    if(!ids.has(normalizeText_(row[idColumn])))issues.push({sheet:'Rubrics',message:'Rubrics Sheet row '+(index+2)+': Assessment ID must identify an assessment in AssessmentDefinitions.'});
+  });
+  definitions.forEach(d=>{
+    const selected=[rows[0],...rows.slice(1).map(row=>normalizeText_(row[idColumn])===d.key?row:[])];
+    if(!selected.slice(1).some(row=>row.length)) {
+      const message='No rubric criteria configured for '+d.label+' ('+d.key+').';
+      reports[d.key]=report('MISSING',message);issues.push({sheet:'Rubrics',assessment:d.key,message});return;
+    }
+    try {
+      const criteria=parseRubricRows_(selected,[d])[d.key];
+      if(d.type==='GUIDE_EVALUATION' && criteria.some(c=>c.type!=='Individual'||c.descriptors.some(text=>!text)))throw new Error(d.label+' requires individual criteria and all Level 0\u20135 descriptors.');
+      structure[d.key]=criteria;
+      reports[d.key]={state:'READY',criterionCount:criteria.length,maximumMarks:Number(criteria.reduce((sum,c)=>sum+c.maxMarks,0).toFixed(2))};
+    } catch(err){reports[d.key]=report('INVALID',err.message);issues.push({sheet:'Rubrics',assessment:d.key,message:err.message});}
+  });
+  return {reports,structure:Object.freeze(structure),issues};
 }

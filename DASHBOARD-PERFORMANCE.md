@@ -97,7 +97,7 @@ After checks, update the versioned web-app deployment to the tested version.
 Keep the prior deployment version recorded for rollback. Local tests cannot verify
 Google account identity, live service latency or deployment permissions.
 
-Role tabs load on demand or through selective preloading (described below), and reuse their rendered content while the page remains
+Role tabs load on demand or through sequential preloading (described below), and reuse their rendered content while the page remains
 open. Each server request authorizes the requested role again.
 
 ## Shared timeline UI
@@ -125,7 +125,7 @@ its required data from the sheets; repeated reads within that execution can reus
 its local snapshot. Config writes invalidate the relevant execution-local values.
 
 Loaded tabs and the shared timeline retain their current page-session behavior:
-switching tabs reuses loaded content, and selective preloading remains enabled.
+switching tabs reuses loaded content, and sequential preloading remains enabled.
 Reloading the page discards that browser state and fetches fresh data. System
 Status and Announcements also retain their explicit Refresh controls.
 
@@ -140,11 +140,11 @@ Logging starts on the first Monday strictly after title approval and ends on rep
 submission. Dates accept Sheets date cells, DD/MM/YYYY or YYYY-MM-DD.
 
 `AssessmentDefinitions` is the sole authority for graded assessments. Coordinator
-System Status can create its eleven-column schema without academic rows. The
+System Status can create its ten-column schema without academic rows. The
 Coordinator explicitly configures instances using the direct sheet link, validates,
 then provisions journals through the separate storage action. Reviews are ordered
 by Sequence; no review count or numbered implementation is configured in code.
-Guide Evaluation requires an explicit `guide_eval` / `INDIVIDUAL_RUBRIC` definition.
+Guide Evaluation requires an explicit `guide_eval` / `GUIDE_EVALUATION` definition.
 
 The timeline composes non-assessment events and configured assessments for display
 by due date, using Sequence to order assessments on the same date, then adds weekly
@@ -152,9 +152,9 @@ logging start. IDs cannot collide. Neither source overrides the other, and no
 duplicate Review row is required in Milestones. Assessment opening dates are supplied
 directly to timeline metadata. See [Assessment configuration](ASSESSMENT-CONFIGURATION.md).
 
-Rubrics now uses `Milestone ID` instead of the old `Review` header:
+Rubrics uses `Assessment ID` to match `AssessmentDefinitions`:
 
-`Milestone ID | Order | PI | Criterion | CO | Max Marks | Type | Level 0 | Level 1 | Level 2 | Level 3 | Level 4 | Level 5`
+`Assessment ID | Order | PI | Criterion | CO | Max Marks | Type | Level 0 | Level 1 | Level 2 | Level 3 | Level 4 | Level 5`
 
 Maintain criteria directly in the existing Rubrics sheet, using the referenced
 rubric IDs. Guide criteria require all six descriptors and Individual type.
@@ -211,22 +211,30 @@ between requests. These are local service-mock tests; production latency must be
 measured against the deployed spreadsheet and Apps Script service.
 
 
-## Selective tab preloading and measurements
+## Sequential tab preloading and measurements
 
-After a role is selected, the browser may preload one subsequent unloaded role in
-DOM tab order. It waits until all tracked dashboard RPCs settle, then waits 750 ms.
-Announcements retains its existing load-after-role/click-to-load behavior. There
-is no automatic cascade through every remaining role. Selecting another tab
-replaces the pending candidate; foreground requests start immediately. An already
-running background RPC cannot be cancelled, but clicking its tab reuses that request.
-Hidden pages do not start preloads. Failed role loads can be retried by selecting
-the tab again. Preloading can add work for tabs never visited.
+The first role starts immediately. Remaining roles preload sequentially in DOM
+tab order after non-utility dashboard RPCs settle, with a 750 ms idle delay.
+Each role initializes its full initial content, including Coordinator overview,
+progress and weekly activity, and Student marks, before the next role starts.
+Requests within a role retain their existing concurrency. Drawers and administrative
+actions remain user-triggered. Background rendering does not select a tab or move focus.
 
-Coordinator preloading fetches only its shell: overview, progress, configuration,
-and weekly activity start on first activation. Student marks likewise wait for
-activation. Other roles preload their core content. Existing role authorization
-is unchanged. The timeline continues to share its pending promise and immutable
-result; protected role datasets are not combined into a cross-role client cache.
+Announcements starts alongside the first role. Once its initial request settles
+(success or failure), System Status starts if available. These utility requests
+and callback-triggered follow-up reads do not block the role sequence or reset its
+idle timer. Announcements failure retains its retry action without blocking Status.
+
+Clicking an unloaded tab starts its request immediately; selecting a pending tab
+reuses its request. The remaining role queue survives tab changes and resumes in
+displayed order. Each role is attempted automatically at most once per page session;
+failures advance the queue and remain manually retryable. Hidden pages and disabled
+preloading pause new background work, resuming when eligible. In-flight requests
+finish normally. Preloading adds work for tabs never visited.
+
+Existing role authorization is unchanged. The timeline continues to share its
+pending promise and immutable result; protected role datasets are not combined
+into a cross-role client cache.
 Existing mutation refresh paths remain unchanged; rendered tabs retain their
 existing page-session freshness behavior.
 
@@ -234,7 +242,7 @@ Browser developer console:
 
 ```js
 DashboardPerformance.setPreloading(false); // Baseline: run before first preload
-DashboardPerformance.setPreloading(true);  // Enable selective preloading
+DashboardPerformance.setPreloading(true);  // Resume sequential preloading
 console.table(DashboardPerformance.snapshot());
 ```
 
@@ -317,9 +325,9 @@ before reading data. GitHub access/sync, the committee directory, assessment
 readiness, and assessment storage initialization live together in this tab. The Coordinator
 progress dashboard retains summaries, assessments, completion, and the tracker.
 
-System Status loads on first click, or once in the background after a role has
-loaded and all tracked RPCs have settled, with the scheduler's 750 ms delay.
-It precedes optional adjacent-role preloading and respects page visibility and
+System Status loads on first click, or once in the background immediately after
+the initial Announcements request settles, independently of role loading.
+Automatic loading respects page visibility and
 `DashboardPerformance.setPreloading(false)`. It does not require opening the
 Coordinator role first. Failed background attempts do not retry automatically;
 opening the tab or selecting Refresh retries. Loaded content is reused.
@@ -350,7 +358,7 @@ Timings include `review_read_row_count`, `review_read_column_count`, and
 `review_read_values`.
 
 No cross-request data cache is used. Existing request-local reuse, page-session
-loaded tabs, selective preloading, and System Status behavior remain intact.
+loaded tabs, sequential preloading, and System Status behavior remain intact.
 
 ## Coordinator tracking cards
 

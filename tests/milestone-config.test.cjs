@@ -35,14 +35,14 @@ test('lifecycle validation rejects ambiguous IDs, dates, graders and weights',()
  assert.throws(()=>fixture([[...header,'Milestone ID'],valid]).c.getMilestones_(),/exactly one/);
  for(const role of ['Review Committee','Project Guide','SEE Committee'])assert.throws(()=>fixture([header,['assessment','Assessment','2026-10-12',role,25]]).c.getMilestones_(),/AssessmentDefinitions/);
 });
-test('rubric references are registry-owned and do not require matching milestone IDs',()=>{
+test('rubric assessment IDs are registry-owned and do not require matching milestone IDs',()=>{
  const {c}=fixture([header,['formation','Formation','2026-10-01','Not Applicable',0]]);
- c.requireAssessmentDefinitions_=()=>[{key:'design_gate',rubricReference:'design_rubric'}];
- const h=['Milestone ID','Order','PI','Criterion','CO','Max Marks','Type'];
- const row=['design_rubric',1,'PI1','Reasoning','CO1',40,'Individual'];
- assert.equal(c.parseRubricRows_([h,row]).design_rubric[0].maxMarks,40);
- assert.throws(()=>c.parseRubricRows_([['Review',...h.slice(1)],row]),/Milestone ID/);
- assert.throws(()=>c.parseRubricRows_([h,['formation',...row.slice(1)]]),/rubric reference/);
+ c.requireAssessmentDefinitions_=()=>[{key:'design_gate'}];
+ const h=['Assessment ID','Order','PI','Criterion','CO','Max Marks','Type'];
+ const row=['design_gate',1,'PI1','Reasoning','CO1',40,'Individual'];
+ assert.equal(c.parseRubricRows_([h,row]).design_gate[0].maxMarks,40);
+ assert.throws(()=>c.parseRubricRows_([['Milestone ID',...h.slice(1)],row]),/Assessment ID/);
+ assert.throws(()=>c.parseRubricRows_([h,['formation',...row.slice(1)]]),/assessment in AssessmentDefinitions/);
 });
 test('date errors identify missing values and exact cells with reordered columns',()=>{
  assert.throws(()=>fixture([header,['formation','Team & Git Repo','','Not Applicable','']]).c.getMilestones_(),/row 2: formation Due Date at C2 is blank/);

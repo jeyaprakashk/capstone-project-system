@@ -3,13 +3,13 @@
 ## Configuration
 
 1. In Coordinator System Status, use **Create assessment definitions tab** if the
-   registry is missing. This creates only the eleven required headers.
+   registry is missing. This creates only the ten required headers.
 2. Open **Assessment definitions** and explicitly configure ID `guide_eval`,
-   type `INDIVIDUAL_RUBRIC`, label, sequence, rubric reference, weight, opening,
+   type `GUIDE_EVALUATION`, label, sequence, weight, opening,
    due date, prerequisites and policy `guide-bands-v3-target-level-2`.
    No Guide instance or academic setting is seeded.
-3. Maintain the referenced criteria in `Rubrics`. Its `Milestone ID` column
-   identifies the rubric reference. Guide criteria must be Individual with
+3. Maintain the criteria in `Rubrics`. Its `Assessment ID` column
+   must contain `guide_eval` for each Guide criterion. Guide criteria must be Individual with
    all six Level 0–5 descriptors.
 4. Recheck readiness, then **Create missing assessment storage**. The configured
    Journal or default `Assessment_guide_eval` receives the nine-column journal

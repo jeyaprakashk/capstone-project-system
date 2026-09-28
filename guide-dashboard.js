@@ -54,7 +54,7 @@ function submitGuideDecision(teamId, decision, notes, editedTitle) {
 function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
   const schedule = timing && timing.schedule ? timing.schedule : getProjectSchedule_();
   const clock = timing && timing.clock ? timing.clock : getProjectClock_(schedule);
-  const definition=schedule.assessments.find(d=>d.key==='guide_eval'&&d.type==='INDIVIDUAL_RUBRIC');
+  const definition=schedule.assessments.find(d=>d.key==='guide_eval'&&d.type==='GUIDE_EVALUATION');
   const evaluationOpens = definition ? definition.opens : null;
   const evaluationEnabled = evaluationOpens !== null && clock.today >= evaluationOpens;
   const evaluationNotice = evaluationOpens === null ? 'Guide Evaluation is not configured in AssessmentDefinitions.' : 'Available from ' + formatProjectDay_(evaluationOpens) + '.';

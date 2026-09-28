@@ -37,7 +37,7 @@ The alternate client, level-based mutation path, committee-file provisioner, see
 
 1. System Status loads committee membership and team assignments without an external storage identifier.
 2. Assessment readiness calls `getCoordinatorReviewConfiguration()`.
-3. Definitions, rubric references, dates, prerequisite configuration and journal compatibility are validated by server code.
+3. Definitions, assessment rubric criteria, dates, prerequisite configuration and journal compatibility are validated by server code.
 4. Each configured Review shows its returned storage state. Missing or genuinely empty storage permits initialization; conflicts and invalid configuration block it.
 5. Create missing assessment storage invokes `prepareReviewAssessmentStorage()`, which authorizes the Coordinator/PD, obtains a lock, revalidates and preflights configured Review journals.
 6. Missing tabs are created, empty tabs receive the header, and valid populated journals are preserved. Results and readiness are refreshed.

@@ -281,34 +281,101 @@ test('rubric drawer escapes text, traps focus, closes on Escape and excludes tea
  f.ui.openRubricDrawer('review1',trigger);f.ui.focusCoordinatorTeam('1');assert(!f.nodes.rubricDrawer.classList.contains('open'));
  assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
 });
-test('preload waits for announcements, loads one adjacent role, and is reused',()=>{
- const f=fixture();f.click('guide');f.done('loadDashboardRoleContent');f.tick();
- assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
- // Failure also releases the scheduler without automatically retrying announcements.
- const announcement=f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser');announcement.failure(new Error('offline'));
- f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
+test('all roles preload in order while announcements remain pending, and are reused',()=>{
+ const f=fixture();f.click('guide');vm.runInContext('DashboardUI.initializeLoading()',f.c);
+ assert.deepEqual(f.requests.map(r=>r.key),['loadDashboardRoleContent','loadAnnouncementsForCurrentUser']);
+ f.tick();assert.equal(f.requests.length,2);
+ f.done('loadDashboardRoleContent');f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
  f.done('loadDashboardRoleContent');f.tick();
- assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
- f.click('reviewer');assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+ assert.equal(f.requests.at(-1).args[0],'coord');
+ f.done('loadDashboardRoleContent');f.tick();
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,3);
+ f.click('reviewer');assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,3);
 });
 test('clicking a pending preload does not duplicate the request; hidden page skips preload',()=>{
  const f=fixture();f.click('guide');f.c.document.hidden=true;f.done('loadDashboardRoleContent');
- f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));f.tick();
+ f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
  f.c.document.hidden=false;f.click('guide');f.tick();f.click('reviewer');
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
 });
 test('diagnostics record errors and preloading can be disabled for baseline measurements',()=>{
  const f=fixture();f.c.window.DashboardPerformance.setPreloading(false);f.click('guide');
+ vm.runInContext('DashboardUI.initializeLoading()',f.c);
  f.done('loadDashboardRoleContent');f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
  assert(f.c.window.DashboardPerformance.snapshot().some(e=>e.event==='request'&&!e.ok));
 });
-test('Coordinator shell preload does not start expensive sections',()=>{
- const f=fixture();f.click('reviewer');f.done('loadDashboardRoleContent');
- f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));f.tick();
+test('Coordinator background initialization loads sections and waits for all deferred reads',()=>{
+ const f=fixture();const lookup=f.c.document.getElementById;
+ f.c.document.getElementById=id=>id==='coordinatorAsyncRoot'?root:lookup(id);
+ const queryAll=f.c.document.querySelectorAll;
+ f.c.document.querySelectorAll=selector=>{const nodes=queryAll(selector);return selector==='[data-role-content]'?[nodes[0],nodes[2],nodes[1]]:nodes;};
+ const root={};f.click('guide');f.done('loadDashboardRoleContent');f.tick();
  assert.equal(f.requests.at(-1).args[0],'coord');f.done('loadDashboardRoleContent');
- assert(!f.requests.some(r=>['loadCoordinatorSection','loadAllTeamsWeeklyActivity','getCoordinatorReviewConfiguration'].includes(r.key)));
+ assert.deepEqual(f.requests.filter(r=>r.key==='loadCoordinatorSection').map(r=>r.args[0]),['overview','progress']);
+ assert.equal(f.requests.filter(r=>r.key==='loadAllTeamsWeeklyActivity').length,1);
+ f.click('coord');assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSection').length,2);
+ for(const request of f.requests.filter(r=>r.key==='loadCoordinatorSection')) {
+  request.failure(new Error('offline'));f.tick();
+  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+ }
+ f.requests.find(r=>r.key==='loadAllTeamsWeeklyActivity').failure(new Error('offline'));f.tick();
+ assert.equal(f.requests.at(-1).args[0],'reviewer');
+});
+
+test('failed roles advance once; clicking ahead keeps earlier queued roles',()=>{
+ const f=fixture();f.click('guide');f.click('coord');
+ f.requests[0].failure(new Error('offline'));f.requests[0].done=true;
+ f.tick();assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+ f.done('loadDashboardRoleContent');f.tick();
+ assert.equal(f.requests.at(-1).args[0],'reviewer');
+ f.done('loadDashboardRoleContent');f.tick();f.tick();
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,3);
+ f.click('guide');assert.equal(f.requests.at(-1).args[0],'guide');
+});
+
+test('Student background results finish before the next role and are not repeated on click',()=>{
+ const f=fixture(),doc=f.c.document,query=doc.querySelector,queryAll=doc.querySelectorAll;
+ const student={...doc.body,innerHTML:'',getAttribute:()=> 'student'};
+ doc.querySelector=selector=>selector.includes('data-role-content="student"')?student:query(selector);
+ doc.querySelectorAll=selector=>selector==='[data-role-content]'?[queryAll(selector)[0],student,queryAll(selector)[1]]:
+  selector==='[data-review-result]'?[{dataset:{reviewResult:'review1'}}]:queryAll(selector);
+ const ui=vm.runInContext('DashboardUI',f.c);
+ f.c.GuideEvaluation.student=()=>ui.guideRun().withSuccessHandler(()=>{}).loadPublishedGuideEvaluation();
+ f.c.ReviewEvaluations={student:key=>ui.guideRun().withSuccessHandler(()=>{}).loadPublishedReviewEvaluation(key)};
+ f.click('guide');f.done('loadDashboardRoleContent');f.tick();
+ f.done('loadDashboardRoleContent');f.tick();
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+ assert.equal(doc.body.attrs['data-dashboard-theme'],'editorial');
+ f.done('loadPublishedGuideEvaluation');f.tick();
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+ f.done('loadPublishedReviewEvaluation');f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
+ f.click('student');assert.equal(f.requests.filter(r=>r.key==='loadPublishedGuideEvaluation').length,1);
+ assert.equal(f.requests.filter(r=>r.key==='loadPublishedReviewEvaluation').length,1);
+});
+
+test('utilities and role queue resume after visibility and preload setting changes',()=>{
+ const f=fixture(true);f.click('guide');vm.runInContext('DashboardUI.initializeLoading()',f.c);
+ f.c.document.hidden=true;f.done('loadAnnouncementsForCurrentUser');f.done('loadDashboardRoleContent');f.tick();
+ assert.equal(f.requests.length,2);
+ f.c.window.DashboardPerformance.setPreloading(false);f.c.document.hidden=false;f.fire('visibilitychange');f.tick();
+ assert.equal(f.requests.length,2);
+ f.c.window.DashboardPerformance.setPreloading(true);
+ assert.equal(f.requests.at(-1).key,'loadCoordinatorSystemStatus');
+ f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
+});
+
+test('System Status follow-up reads do not block roles or reset their idle timer',()=>{
+ const f=fixture(true);const ui=vm.runInContext('DashboardUI',f.c);
+ f.systemContent.querySelectorAll=selector=>selector==='[data-publishing]'?[{dataset:{publishing:'review1'}}]:[];
+ f.c.InternalAssessmentPublishing={refresh:()=>ui.guideRun().withSuccessHandler(()=>{
+  ui.guideRun().withSuccessHandler(()=>{}).utilityFollowup();
+ }).publishingRead()};
+ f.click('guide');ui.initializeLoading();f.done('loadAnnouncementsForCurrentUser');
+ f.done('loadCoordinatorSystemStatus');f.done('loadDashboardRoleContent');
+ f.done('publishingRead');f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
+ f.done('loadDashboardRoleContent');f.tick();assert.equal(f.requests.at(-1).args[0],'coord');
 });
 test('failed role can be retried by selecting it again',()=>{
  const f=fixture();f.click('guide');f.requests[0].failure(new Error('offline'));f.click('guide');
@@ -329,11 +396,12 @@ test('shared loading preserves live children and restores interaction on repeate
  assert.equal(host.attrs['aria-busy'],'false');assert.equal(host.children.length,2);
 });
 
-test('System Status waits for foreground requests, loads once and precedes adjacent preload',()=>{
- const f=fixture(true);f.click('guide');f.done('loadDashboardRoleContent');f.tick();
+test('System Status starts after announcements settle while the role is still pending',()=>{
+ const f=fixture(true);f.click('guide');vm.runInContext('DashboardUI.initializeLoading()',f.c);f.tick();
  assert(!f.requests.some(r=>r.key==='loadCoordinatorSystemStatus'));
  f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));
- f.tick();assert.equal(f.requests.at(-1).key,'loadCoordinatorSystemStatus');
+ assert.equal(f.requests.at(-1).key,'loadCoordinatorSystemStatus');
+ f.done('loadDashboardRoleContent');f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
  f.click('system-status');assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,1);
  f.done('loadCoordinatorSystemStatus','system cards');f.click('system-status');
  assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,1);
@@ -351,7 +419,6 @@ test('System Status click retries failures; failed refresh preserves cards',()=>
 test('non-student dashboard refresh replaces content once and preserves content on failure',()=>{
  const f=fixture();f.c.window.DashboardPerformance.setPreloading(false);
  f.click('reviewer');f.done('loadDashboardRoleContent','original reviewer');
- f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));
  const panel=f.c.document.querySelector('[data-role-content="reviewer"]');
  vm.runInContext("DashboardUI.refreshRoleDashboard('reviewer')",f.c);
  vm.runInContext("DashboardUI.refreshRoleDashboard('reviewer')",f.c);
@@ -467,4 +534,80 @@ test('responsive menu toggles, dismisses and resets focus across breakpoints',()
  vm.runInContext('DashboardUI.toggleRoleMenu()',f.c);resize({matches:false});assert.equal(expanded,'false');assert.equal(focused,selected);
  f.c.document.activeElement=selected;resize({matches:true});assert.equal(focused,toggle);
  assert.equal(f.requests.length,0);
+});
+
+
+test('SEE rubric cards omit external evaluation text while the drawer retains it',async()=>{
+ const f=rubricClientFixture();f.data.assessments[1]={...f.data.assessments[0],key:'see',label:'End Review (SEE)',evaluator:'SEE Committee (includes external members)',evaluationNotice:'Evaluated outside this app'};
+ const promise=f.ui.loadSharedRubrics();f.done('loadSharedRubrics',f.data);await promise;
+ assert.equal((f.nodes.sharedRubricsContent.innerHTML.match(/Evaluated outside this app/g)||[]).length,0);
+ f.ui.openRubricDrawer('see');assert(f.nodes.rubricDrawer.classList.contains('open'));
+ assert.match(f.nodes.rubricDrawerContent.innerHTML,/SEE Committee \(includes external members\)/);
+ assert.match(f.nodes.rubricDrawerContent.innerHTML,/Evaluated outside this app/);
+ assert.doesNotMatch(f.nodes.rubricDrawerContent.innerHTML,/Submit|Publish|Enter marks/);
+});
+
+test('SEE-only readiness reports storage not required and prevents setup RPC',()=>{
+ const f=fixture(),{document}=require('linkedom').parseHTML('<html><body>'+['reviewConfigurationCard','createAssessmentDefinitionsButton','reviewDefinitionsLink','reviewAssessmentReadiness','reviewConfigurationRecheck','initializeAssessmentStorageButton','reviewConfigurationSummary','reviewConfigurationIssues','reviewConfigurationCheckedAt','reviewConfigLink','reviewRubricsLink'].map(id=>'<div id="'+id+'"></div>').join('')+'</body></html>');
+ const original=f.c.document.getElementById;
+ f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{valid:true,ready:true,canInitializeStorage:false,state:'ready',summary:'Configuration valid',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[{assessment:'see',label:'End Review (SEE)',journal:'',state:'NOT_REQUIRED',detail:'Not required - evaluated outside this app.'}]});
+ assert.equal(document.getElementById('initializeAssessmentStorageButton').disabled,true);
+ assert.match(document.getElementById('reviewAssessmentReadiness').textContent,/Storage: Not required.*Evaluated outside this app/);
+ assert.doesNotMatch(document.getElementById('reviewAssessmentReadiness').textContent,/Journal:/);
+ f.c.initializeAssessmentStorage();assert(!f.requests.some(r=>r.key==='prepareReviewAssessmentStorage'));
+});
+
+
+test('readiness cards render server rubric and overall states and preserve both on failed refresh',()=>{
+ const f=fixture(),{document}=require('linkedom').parseHTML('<html><body>'+['reviewConfigurationCard','createAssessmentDefinitionsButton','reviewDefinitionsLink','reviewAssessmentReadiness','reviewConfigurationRecheck','initializeAssessmentStorageButton','reviewConfigurationSummary','reviewConfigurationIssues','reviewConfigurationCheckedAt','reviewConfigLink','reviewRubricsLink'].map(id=>'<div id="'+id+'"></div>').join('')+'</body></html>');
+ const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
+ const report={valid:false,ready:false,canInitializeStorage:false,state:'invalid',summary:'1 / 2 assessments ready',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[
+  {assessment:'review1',label:'Review 1',state:'READY',journal:'Assessment_review1',ready:false,rubric:{state:'INVALID',error:'Rubrics Sheet row 9: <invalid criterion>'}},
+  {assessment:'see',label:'End Review (SEE)',state:'NOT_REQUIRED',journal:'',ready:true,rubric:{state:'READY',criterionCount:4,maximumMarks:100}}
+ ]};
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',report);
+ const host=document.getElementById('reviewAssessmentReadiness'),[review,see]=host.children;
+ assert.match(review.textContent,/Review 1.*Needs attention/);assert.match(review.textContent,/Rubric: Invalid/);assert.match(review.textContent,/Storage: Ready/);assert.match(review.textContent,/row 9: <invalid criterion>/);assert.equal(review.querySelector('invalid'),null);
+ assert.match(see.textContent,/End Review \(SEE\).*Ready/);assert.match(see.textContent,/Rubric: Ready.*4 criteria.*100 marks/);assert.match(see.textContent,/Storage: Not required.*Evaluated outside this app/);assert.doesNotMatch(see.textContent,/Journal:/);
+ const before=host.innerHTML;f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});assert.equal(host.innerHTML,before);
+});
+
+
+function configurationCardsFixture(){
+ const f=fixture(),{document}=require('linkedom').parseHTML('<html><body></body></html>');
+ const server=vm.createContext({getSkeletonMarkup_:()=>'<span>Skeleton</span>',renderLucideIcon_:()=>''});vm.runInContext(fs.readFileSync('coordinator-dashboard.js','utf8'),server);
+ document.body.innerHTML=server.buildCommitteeReadinessCard_()+server.buildReviewConfigurationCard_();
+ const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
+ return {...f,document,ui:vm.runInContext('DashboardUI',f.c),node:id=>document.getElementById(id)};
+}
+
+test('configuration cards are siblings and committee refresh preserves expansion, retries and ignores replaced cards',()=>{
+ const f=configurationCardsFixture(),report={state:'ready',summary:'Review committees configured',issues:[],links:{committees:'https://example.test/committees'},checkedAt:new Date().toISOString(),html:'<div id="committeeReadinessGrid"><details data-committee-key="c1"><summary>Committee C1</summary><p>Reviewer</p></details></div>'};
+ assert.equal(f.node('committeeConfigurationCard').parentNode,f.node('reviewConfigurationCard').parentNode);
+ f.ui.recheckCommitteeConfiguration();f.ui.recheckCommitteeConfiguration();assert.equal(f.requests.filter(r=>r.key==='getCoordinatorCommitteeConfiguration').length,1);
+ assert.equal(f.requests.filter(r=>r.key==='getCoordinatorReviewConfiguration').length,0);
+ f.done('getCoordinatorCommitteeConfiguration',report);
+ f.node('committeeDirectoryContent').querySelector('details').setAttribute('open','');
+ f.ui.recheckCommitteeConfiguration();f.done('getCoordinatorCommitteeConfiguration',report);assert.equal(f.node('committeeDirectoryContent').querySelector('details').open,true);
+ const before=f.node('committeeDirectoryContent').innerHTML;f.ui.recheckCommitteeConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});
+ assert.equal(f.node('committeeDirectoryContent').innerHTML,before);assert.match(f.node('committeeConfigurationIssues').textContent,/Offline/);assert.equal(f.node('committeeConfigurationRecheck').disabled,false);
+ f.ui.recheckCommitteeConfiguration();const old=f.node('committeeConfigurationCard'),replacement=old.cloneNode(true);old.replaceWith(replacement);replacement.querySelector('#committeeConfigurationSummary').textContent='New card';f.done('getCoordinatorCommitteeConfiguration',report);assert.equal(f.node('committeeConfigurationSummary').textContent,'New card');
+});
+
+test('storage creation area hides only after confirmed readiness and preserves visibility on refresh failure',()=>{
+ const f=configurationCardsFixture(),report={valid:true,ready:true,state:'ready',canInitializeStorage:false,storageComplete:true,summary:'All ready',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[]};
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',report);assert.equal(f.node('assessmentStorageSetup').hidden,true);assert.equal(f.node('initializeAssessmentStorageButton').disabled,true);
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,valid:false,ready:false,state:'invalid'});assert.equal(f.node('assessmentStorageSetup').hidden,true);
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,ready:false,storageComplete:false,canInitializeStorage:true,state:'storage-missing'});assert.equal(f.node('assessmentStorageSetup').hidden,false);assert.equal(f.node('initializeAssessmentStorageButton').disabled,false);
+ f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});assert.equal(f.node('assessmentStorageSetup').hidden,false);
+});
+
+test('configuration grids share columns across unequal counts and observer cleanup',()=>{
+ const source=fs.readFileSync('dashboard-client-scripts.js','utf8'),helper=source.slice(source.indexOf('  let configurationGridObserver'),source.indexOf('  let checkingCommitteeConfiguration'));
+ let callback,disconnected=0;
+ const grids={committeeReadinessGrid:{clientWidth:900,style:{}},reviewAssessmentReadiness:{clientWidth:800,style:{}}};
+ const c=vm.createContext({byId:id=>grids[id],ResizeObserver:class{constructor(fn){callback=fn;}observe(){}disconnect(){disconnected++;}}});vm.runInContext(helper,c);
+ for(const count of [0,1,3,5,6,20]){grids.committeeReadinessGrid.children=Array(count);grids.reviewAssessmentReadiness.children=Array(count+2);c.arrangeAssessmentReadiness();assert.equal(grids.committeeReadinessGrid.style.gridTemplateColumns,'repeat(3, minmax(0, 1fr))');assert.equal(grids.committeeReadinessGrid.style.gridTemplateColumns,grids.reviewAssessmentReadiness.style.gridTemplateColumns);}
+ grids.reviewAssessmentReadiness.clientWidth=400;callback();assert.equal(grids.committeeReadinessGrid.style.gridTemplateColumns,'repeat(1, minmax(0, 1fr))');c.disconnectConfigurationGrids();assert.equal(disconnected,6);
 });

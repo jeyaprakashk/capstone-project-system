@@ -36,7 +36,7 @@ function reviewEvaluationBrowser_(reviewKey) {
 
 
 
-  let drawer,model,trigger,busy=false,dirty=false,sequence=0,pending=null,targeted=null,reading=false,finishRead=null,activeStudent=0,activeCriteria='team';
+  let drawer,model,trigger,busy=false,dirty=false,sequence=0,pending=null,targeted=null,reading=false,finishRead=null,correctionIndex=null,activeStudent=0,activeCriteria='team';
   function message(text) {drawer.querySelector('[data-message]').textContent=text;}
   function savedStudent(index) {return ((model.evaluation||{}).students||[]).find(s=>s.register===model.roster.students[index].register)||{};}
   function pendingStudents() {
@@ -47,7 +47,8 @@ function reviewEvaluationBrowser_(reviewKey) {
     });
   }
   function focusedAssessment() {return !!targeted || pendingStudents().length>0;}
-  function hiddenStudent(index) {return targeted?targeted.index!==index:focusedAssessment() && !pendingStudents().includes(index);}
+  function hiddenStudent(index) {return targeted?targeted.index!==index:focusedAssessment() && !pendingStudents().includes(index) && !absenceCorrectable(index);}
+  function absenceCorrectable(index) {const a=savedStudent(index).assessment;return !!a && (['REVIEW_DAY_ABSENCE','PROLONGED'].includes(a.facts.type) || a.nextActions?.makeup);}
   function criteriaTabs() {
     return '<div class="review-criteria-tabs" role="tablist" aria-label="Assessment components">'+['team','individual'].map(component=>{
       const label=component==='team'?'Team Criteria':'Individual',max=model.config.criteria.filter(c=>c.type.toLowerCase()===component).reduce((sum,c)=>sum+c.maxMarks,0);
@@ -121,8 +122,12 @@ function reviewEvaluationBrowser_(reviewKey) {
       if(summary)summary.hidden=hiddenStudent(index) || !selected;
     });
   }
-  function selectStudent(index) {
+  async function selectStudent(index) {
     if(busy || reading || !model || !model.roster.students[index] || hiddenStudent(index))return;
+    if(index!==activeStudent && correctionIndex!==null){
+      if(dirty && !await DashboardUI.ask('Discard unsaved absence correction?'))return;
+      correctionIndex=null;dirty=false;pending=null;activeStudent=index;render();
+    }
     activeStudent=index;syncStudentSelection();
     const group=drawer.querySelector('[data-criteria-group="individual"]');
     if(group)revealCriterion(group);
@@ -139,7 +144,7 @@ function reviewEvaluationBrowser_(reviewKey) {
   }
   function assessmentSummary(index) {
     const student=savedStudent(index).assessment?savedStudent(index):(model.assessmentResults||[]).find(s=>s.register===model.roster.students[index].register)||{};
-    const actions=!model.availability.editable && !targeted && student.assessment?makeupControls(index,student):'';
+    const actions=!model.availability.editable && !targeted && correctionIndex===null && student.assessment?makeupControls(index,student):'';
     return '<div data-summary-student="'+index+'"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+'><dl data-summary-values="'+index+'">'+assessmentSummaryValues(student)+'</dl>'+actions+'</div>';
   }
   function assessmentSummaryValues(student) {
@@ -151,7 +156,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     const tone=a.status==='COMPLETED'?'complete':a.status==='MAKEUP_PENDING'?'pending':'incomplete';
     return cells.map(([label,value],index)=>'<div'+(index===2?' class="review-summary-total" data-resolved="'+(student.total!=null)+'"':'')+'><dt>'+label+'</dt><dd>'+escape(value)+'</dd></div>').join('')+'<div class="review-summary-status" data-tone="'+tone+'"><dt>Assessment Status</dt><dd>'+escape(labels[a.status]||'Assessment Incomplete')+'</dd></div>';
   }
-  function canEditAbsence(index) {return !busy && !reading && !targeted && model.availability.editable;}
+  function canEditAbsence(index) {return !busy && !reading && !targeted && (model.availability.editable || correctionIndex===index);}
   const attendanceChoices=[['','Select attendance'],['NORMAL','Present'],['REVIEW_DAY_ABSENCE','Absent for Review'],['PROLONGED','Long Absent']];
   function attendancePicker(index,value) {
     const current=attendanceChoices.find(([key])=>key===value)||attendanceChoices[0];
@@ -168,7 +173,9 @@ function reviewEvaluationBrowser_(reviewKey) {
     const type=read('type')||'UNSELECTED',bool=name=>read(name)===''?null:read(name)==='yes';
     if(type==='NORMAL')return {type,attended:true};
     if(type==='UNSELECTED')return {type,attended:null};
-    return {type,approved:bool('approved'),attended:type==='REVIEW_DAY_ABSENCE'?false:bool('attended'),...(type==='PROLONGED'?{verifiedContribution:bool('contribution')}:{})};
+    const evidenceHost=host.querySelector('[data-absence-evidence]');
+    const evidence=evidenceHost?{supportingEvidence:Array.from(evidenceHost.querySelectorAll('[data-supporting-evidence]:checked')).map(node=>node.value),otherEvidenceText:evidenceHost.querySelector('[data-other-evidence]').value}:{};
+    return {type,approved:bool('approved'),attended:type==='REVIEW_DAY_ABSENCE'?false:bool('attended'),...(type==='PROLONGED'?{verifiedContribution:bool('contribution')}:{ }),...evidence};
   }
   function canEdit(field) {
     if(targeted)return field.dataset.owner===String(targeted.index) && targeted.components.includes(model.config.criteria[Number(field.dataset.index)].type==='Team'?'team':'individual');
@@ -192,15 +199,20 @@ function reviewEvaluationBrowser_(reviewKey) {
     return student.assessment?.nextActions?.makeup?'<button type="button" data-target="'+index+'">Conduct Makeup Assessment</button>':'';
   }
 
+  function absenceEvidenceFields(index,f) {
+    const options={MEDICAL_DOCUMENT:'Medical document provided',APPROVAL_DOCUMENT:'Official approval/permission provided',OTHER:'Other supporting evidence'};
+    return '<div data-absence-evidence hidden><fieldset><legend>Supporting absence evidence (optional)</legend>'+Object.entries(options).map(([value,label])=>'<label class="review-absence-evidence-choice"><input type="checkbox" data-supporting-evidence value="'+value+'"'+((f.supportingEvidence||[]).includes(value)?' checked':'')+'> '+label+'</label>').join('')+'</fieldset><label data-other-evidence-label hidden>Describe other supporting evidence<textarea data-other-evidence maxlength="2000">'+escape(f.otherEvidenceText||'')+'</textarea></label></div>';
+  }
+
   function absenceControl(index,student) {
     const f=student.assessment?.facts||{type:'UNSELECTED'};
     const choice=(name,value)=>'<select data-fact="'+name+'"><option value="">Select</option><option value="yes"'+(value===true?' selected':'')+'>Yes</option><option value="no"'+(value===false?' selected':'')+'>No</option></select>';
-    return '<div class="review-criterion" data-absence="'+index+'"'+(targeted?' hidden':'')+'>'+attendancePicker(index,f.type)+'<div data-exception-fields><div data-prolonged-fields><label>Contribution Established?'+choice('contribution',f.verifiedContribution)+'</label><p>The committee considers contribution evidence submitted by the team and endorsed by the Guide.</p><label>Attended the Review?'+choice('attended',f.attended)+'</label></div><label>Absence Approved?'+choice('approved',f.approved)+'</label></div><div data-effective="'+index+'"></div></div>';
+    return '<div class="review-criterion" data-absence="'+index+'"'+(targeted?' hidden':'')+'>'+attendancePicker(index,f.type)+'<div data-exception-fields><label data-approval-field>Absence Approved?'+choice('approved',f.approved)+'</label>'+absenceEvidenceFields(index,f)+'<div data-prolonged-fields><label>Contribution Established?'+choice('contribution',f.verifiedContribution)+'</label><p>The committee considers contribution evidence submitted by the team and endorsed by the Guide.</p><label>Attended the Review?'+choice('attended',f.attended)+'</label></div></div><div data-effective="'+index+'"></div>'+(!model.availability.editable && !targeted && absenceCorrectable(index)?(correctionIndex===index?'<button type="button" data-record-absence="'+index+'">Save absence details</button><button type="button" data-cancel-absence="'+index+'">Cancel editing</button>':correctionIndex===null?'<button type="button" data-edit-absence="'+index+'">Edit absence details</button>':''):'')+'</div>';
   }
   async function close() {
     if (busy || (dirty && !await DashboardUI.ask('Discard unsaved '+reviewLabel+' marks?'))) return;
     if(finishRead)finishRead();finishRead=null;reading=false;
-    sequence++;drawer.close();dirty=false;model=null;pending=null;
+    sequence++;drawer.close();dirty=false;model=null;pending=null;correctionIndex=null;
     document.body.classList.remove('team-drawer-open');
     if (trigger && trigger.isConnected) trigger.focus();
   }
@@ -264,7 +276,7 @@ function reviewEvaluationBrowser_(reviewKey) {
         return;
       }
       if(button.hasAttribute('data-criteria-tab')){selectCriteria(button.dataset.criteriaTab);return;}
-      if(button.hasAttribute('data-select-student')){selectStudent(Number(button.dataset.selectStudent));return;}
+      if(button.hasAttribute('data-select-student'))return selectStudent(Number(button.dataset.selectStudent));
       if(button.hasAttribute('data-close'))return close();
       if(button.hasAttribute('data-draft'))return save(false);
       if(button.hasAttribute('data-submit'))return save(true);
@@ -272,8 +284,11 @@ function reviewEvaluationBrowser_(reviewKey) {
 
 
 
+      if(button.hasAttribute('data-edit-absence'))return editAbsence(Number(button.dataset.editAbsence));
+      if(button.hasAttribute('data-cancel-absence'))return cancelAbsence();
+      if(button.hasAttribute('data-record-absence'))return saveAbsence();
       if(button.hasAttribute('data-target')) {
-        if(busy || reading)return;
+        if(busy || reading || correctionIndex!==null)return;
         if(dirty && !await DashboardUI.ask('Discard unsaved changes and open the Individual Makeup?'))return;
         const index=Number(button.dataset.target),a=savedStudent(index).assessment||{};
         targeted={index,components:(a.nextActions?.makeup?['individual']:[])};dirty=false;render();
@@ -362,24 +377,25 @@ function reviewEvaluationBrowser_(reviewKey) {
     const headerDetails=assessment?'<div class="review-project-meta-row"><p class="review-project-meta">Guide: '+escape(assessment.details.guideName)+'</p><p class="review-project-meta">Committee: '+escape(assessment.details.committee)+'</p></div>':'';
     const navigation=assessment?'<div class="review-assessment-navigation">'+criteriaTabs()+'<div class="review-tab-progress" data-tab-progress aria-live="polite"></div>'+teamPills()+(students.length?studentChips(students):'')+'</div>':'';
     if(assessment && students.length)body=assessmentSummaryCard(students)+body;
-    return '<div class="team-drawer-header"><div class="review-heading-details"><div class="review-header-line"><h2 class="team-drawer-title" id="'+reviewKey+'Heading">'+escape(title)+'</h2><span class="review-header-review">'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review-progress" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="team-drawer-close" data-close aria-label="Close '+escape(reviewLabel)+' drawer">×</button></div>'+navigation+'<div class="team-drawer-content">'+body+'<p data-message role="status" aria-live="polite"></p></div>'+footer;
+    const statusMessage='<p class="review-message" data-message role="status" aria-live="polite"></p>';
+    return '<div class="team-drawer-header"><div class="review-heading-details"><div class="review-header-line"><h2 class="team-drawer-title" id="'+reviewKey+'Heading">'+escape(title)+'</h2><span class="review-header-review">'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review-progress" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="team-drawer-close" data-close aria-label="Close '+escape(reviewLabel)+' drawer">×</button></div>'+navigation+'<div class="team-drawer-content">'+body+(footer?'':statusMessage)+'</div>'+(footer?'<div class="review-footer">'+statusMessage+footer+'</div>':'');
   }
 
   function open(team,button) {
     if (busy || reading) return;
     if (DashboardUI.closeRubricDrawer) DashboardUI.closeRubricDrawer(false);
     ensure();
-    const previous=drawer.open && drawer.dataset.team===team?model:null,previousDirty=dirty,previousTarget=targeted;
+    const previous=drawer.open && String(drawer.dataset.team).trim().toLowerCase()===String(team).trim().toLowerCase()?model:null,previousDirty=dirty,previousTarget=targeted;
     trigger=button;reading=true;
     if(previous && DashboardUI.beginContentLoading){finishRead=DashboardUI.beginContentLoading(drawer.querySelector('.team-drawer-content'),'Refreshing '+reviewLabel+' evaluation');const reload=drawer.querySelector('[data-reload]');if(reload)reload.disabled=true;}
-    else {activeCriteria='team';activeStudent=0;activeStudentPIs={};model=null;dirty=false;pending=null;targeted=null;drawer.dataset.team=team;drawer.innerHTML=shell(team,DashboardUI.renderSkeleton('drawer','Loading '+reviewLabel+' evaluation'));}
+    else {activeCriteria='team';activeStudent=0;activeStudentPIs={};model=null;dirty=false;pending=null;targeted=null;correctionIndex=null;drawer.dataset.team=team;drawer.innerHTML=shell(team,DashboardUI.renderSkeleton('drawer','Loading '+reviewLabel+' evaluation'));}
     const token=++sequence;
     if(!drawer.open)drawer.showModal();
     document.body.classList.add('team-drawer-open');
     rpc('loadReviewEvaluation',[team,reviewKey],data=>{
       if(token!==sequence || !drawer.open)return;
       if(finishRead)finishRead();finishRead=null;reading=false;
-      model=data;reviewLabel=data.config.label;dirty=false;pending=null;targeted=null;render();
+      model=data;reviewLabel=data.config.label;dirty=false;pending=null;targeted=null;correctionIndex=null;render();
     },error=>{
       if(token!==sequence || !drawer.open)return;
       if(finishRead)finishRead();finishRead=null;reading=false;
@@ -439,7 +455,7 @@ function reviewEvaluationBrowser_(reviewKey) {
       const student=savedStudents.find(v=>v.register===s.register)||{},a=student.assessment||{},draft=a.makeupDraft||{},scores=targeted && targeted.index===index?(draft.scores||{}):(student.scores||{});
       return '<details class="review-student-accordion" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary><span class="review-student-heading"><strong>'+escape(s.name)+'</strong><span class="review-header-mark" data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span class="review-student-subheading"><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div class="review-accordion-content">'+absenceControl(index,student)+individualPills(index)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
     }).join('');
-    drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div class="review-footer"><div class="review-actions">'+(d.availability.editable?'<button type="button" data-draft>Save Draft</button><button type="button" data-submit>Submit Evaluation</button>':'')+'<button type="button" data-reload>Reload</button><button type="button" data-close>Close</button></div></div>');
+    drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div class="review-actions">'+(d.availability.editable?'<button type="button" data-draft>Save Draft</button><button type="button" data-submit>Submit Evaluation</button>':'')+'<button type="button" data-reload>Reload</button><button type="button" data-close>Close</button></div>');
     if(targeted)drawer.querySelector('.review-actions').innerHTML='<button type="button" data-target-draft>Save Makeup Draft</button><button type="button" data-target-submit>Submit Makeup</button><button type="button" data-reload>Cancel / Reload</button><button type="button" data-close>Close</button>';
     drawer.querySelector('form').addEventListener('submit',event=>event.preventDefault());
     drawer.querySelectorAll('[data-absence] input,[data-absence] select,[data-absence] textarea').forEach(el=>el.disabled=!!targeted);
@@ -570,11 +586,21 @@ function reviewEvaluationBrowser_(reviewKey) {
     model.roster.students.forEach((s,index)=>{
       const host=drawer.querySelector('[data-absence="'+index+'"]');if(!host)return;
       const f=facts(index),old=savedStudent(index);
-      ['type','approved','contribution','attended'].forEach(name=>{const node=host.querySelector('[data-fact="'+name+'"]');if(node)node.disabled=!model.availability.editable||busy||reading;});
+      ['type','approved','contribution','attended'].forEach(name=>{const node=host.querySelector('[data-fact="'+name+'"]');if(node)node.disabled=!canEditAbsence(index);});
       const picker=host.querySelector('[data-attendance-picker]');
-      if(picker){picker.querySelector('summary').setAttribute('aria-disabled',String(!canEditAbsence(index)));if(!canEditAbsence(index))picker.open=false;picker.querySelector('[data-attendance-label]').textContent=(attendanceChoices.find(([k])=>k===f.type)||attendanceChoices[0])[1];picker.querySelectorAll('[data-attendance-option]').forEach(n=>{n.disabled=!model.availability.editable||busy||reading;n.checked=n.value===f.type;});}
+      if(picker){picker.querySelector('summary').setAttribute('aria-disabled',String(!canEditAbsence(index)));if(!canEditAbsence(index))picker.open=false;picker.querySelector('[data-attendance-label]').textContent=(attendanceChoices.find(([k])=>k===f.type)||attendanceChoices[0])[1];picker.querySelectorAll('[data-attendance-option]').forEach(n=>{n.disabled=!canEditAbsence(index);n.checked=n.value===f.type;});}
       host.querySelector('[data-exception-fields]').hidden=['NORMAL','UNSELECTED'].includes(f.type);
       host.querySelector('[data-prolonged-fields]').hidden=f.type!=='PROLONGED';
+      const approvalNotApplicable=f.type==='PROLONGED' && f.verifiedContribution===false && f.attended===true;
+      host.querySelector('[data-approval-field]').hidden=approvalNotApplicable;
+      host.querySelector('[data-fact="approved"]').disabled=approvalNotApplicable || !canEditAbsence(index);
+      const evidenceHost=host.querySelector('[data-absence-evidence]');
+      if(evidenceHost){
+        const relevant=!['NORMAL','UNSELECTED'].includes(f.type) && f.approved===true && !approvalNotApplicable;
+        evidenceHost.hidden=!relevant;
+        evidenceHost.querySelector('[data-other-evidence-label]').hidden=!(f.supportingEvidence||[]).includes('OTHER');
+        evidenceHost.querySelectorAll('input,textarea').forEach(node=>{node.disabled=!relevant || !canEditAbsence(index);});
+      }
       const teamScores={},scores={};
       model.config.criteria.forEach((c,i)=>{
         const field=drawer.querySelector('[data-index="'+i+'"][data-owner="'+(c.type==='Team'?'team':index)+'"]');
@@ -582,11 +608,11 @@ function reviewEvaluationBrowser_(reviewKey) {
         (c.type==='Team'?teamScores:scores)[c.pi]=value;
       });
       let preview=old;
-      if(model.availability.editable || targeted?.index===index){
+      if(model.availability.editable || targeted?.index===index || correctionIndex===index){
         try{
           const assessment={...old.assessment,facts:f};
           if(targeted?.index===index)assessment.makeup={scores,eventId:'preview'};
-          preview=reviewPolicyCalculate_(model.config,teamScores,{register:s.register,scores:targeted?old.scores:scores,assessment});
+          preview=reviewPolicyCalculate_(model.config,correctionIndex===index?model.evaluation.teamScores:teamScores,{register:s.register,scores:targeted || correctionIndex===index?old.scores:scores,assessment});
         }catch(error){preview={total:null,assessment:{teamMark:null,individualMark:null,status:'INCOMPLETE',teamState:'UNASSESSED',individualState:'UNASSESSED'}};}
       }
       const a=preview.assessment||{};
@@ -611,6 +637,30 @@ function reviewEvaluationBrowser_(reviewKey) {
     }
     return true;
   }
+  async function editAbsence(index) {
+    if(busy || reading || targeted || model.availability.editable || !absenceCorrectable(index))return;
+    if(dirty && !await DashboardUI.ask('Discard unsaved absence correction?'))return;
+    correctionIndex=index;activeStudent=index;activeCriteria='individual';dirty=false;pending=null;render();
+    const host=drawer.querySelector('[data-absence="'+index+'"]');revealCriterion(host);focusAttendance(host);
+  }
+  async function cancelAbsence() {
+    if(busy || reading || correctionIndex===null)return;
+    if(dirty && !await DashboardUI.ask('Discard unsaved absence correction?'))return;
+    const index=correctionIndex;correctionIndex=null;dirty=false;pending=null;render();
+    const button=drawer.querySelector('[data-edit-absence="'+index+'"]');if(button)button.focus();
+  }
+  function saveAbsence() {
+    if(correctionIndex===null || !canEditAbsence(correctionIndex))return;
+    let absence;
+    try {
+      absence=reviewPolicyFacts_(facts(correctionIndex));
+      if(absence.type==='UNSELECTED')throw new Error('Select attendance before saving absence details.');
+      if(absence.supportingEvidence?.includes('OTHER') && !absence.otherEvidenceText)throw new Error('Describe the other supporting absence evidence.');
+      const old=savedStudent(correctionIndex),preview=reviewPolicyCalculate_(model.config,model.evaluation.teamScores,{...old,assessment:{...old.assessment,facts:absence}});
+      if(absence.attended && preview.assessment.individualState!=='RESOLVED')throw new Error('Normal individual marks are missing. Ask the coordinator to reopen the evaluation to enter those marks.');
+    } catch(error) {message(error.message);return;}
+    sendAcademic('recordReviewAbsence',{assessmentId:reviewKey,team:model.roster.team,student:model.roster.students[correctionIndex].register,revision:model.revision,token:model.token,absence});
+  }
   async function saveTarget(submit) {
     if(busy || reading || !targeted)return;
     updateRanges();if(!validateFeedback(submit))return;
@@ -628,7 +678,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     const signature=JSON.stringify({method,input});if(!pending || pending.signature!==signature)pending={signature,id:requestId()};
     input.requestId=pending.id;setBusy(true);message('Saving assessment…');
     rpc(method,[input],result=>{
-      busy=false;dirty=false;pending=null;targeted=null;model.revision=result.revision;model.status=result.status;model.evaluation=result.evaluation;
+      busy=false;dirty=false;pending=null;targeted=null;correctionIndex=null;model.revision=result.revision;model.status=result.status;model.evaluation=result.evaluation;
       render();message('Assessment saved. Changed results require publication.');refreshTable();
     },error=>{setBusy(false);message(error.message+' Your entries are retained.');});
   }
@@ -644,6 +694,12 @@ function reviewEvaluationBrowser_(reviewKey) {
     if(submit) {
       const unselected=model.roster.students.findIndex((s,index)=>facts(index).type==='UNSELECTED');
       if(unselected!==-1){const host=drawer.querySelector('[data-absence="'+unselected+'"]');revealCriterion(host);message('Select attendance for every student before submitting.');focusAttendance(host);return;}
+      for(let index=0;index<model.roster.students.length;index++){
+        const f=facts(index),irrelevant=f.type==='PROLONGED'&&f.verifiedContribution===false&&f.attended===true;
+        if(!['NORMAL','UNSELECTED'].includes(f.type)&&f.approved===true&&!irrelevant&&(f.supportingEvidence||[]).includes('OTHER')&&!String(f.otherEvidenceText||'').trim()){
+          const host=drawer.querySelector('[data-absence="'+index+'"]');revealCriterion(host);message('Describe the other supporting absence evidence.');host.querySelector('[data-other-evidence]').focus();return;
+        }
+      }
       const missing=Array.from(drawer.querySelectorAll('[data-index]')).find(field=>canEdit(field) && field.querySelector('[data-level]').value==='');
       if(missing){revealCriterion(missing);message('Select a proficiency level for every criterion before submitting.');const button=missing.querySelector('[data-pick-level]');if(button)button.focus();return;}
     }
@@ -724,9 +780,11 @@ function getReviewEvaluationStyles_() {
   .review-exception-summary dd, .review-assessment-summary dd { margin:0; overflow-wrap:anywhere; }
   .review-criterion .review-absence-choice { display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:400; }
   .review-criterion .review-absence-choice input { width:auto; margin:0; }
-  .review-criterion :is([data-review-day-fields],[data-contribution-fields]) fieldset { border:0; padding:0; margin:12px 0; }
+  .review-criterion :is([data-review-day-fields],[data-contribution-fields],[data-absence-evidence]) fieldset { border:0; padding:0; margin:12px 0; }
   .review-assessment-summary dd { font-size:12px; font-weight:600; }
   .review-recorded-reason { white-space:pre-wrap; }
+  .review-criterion label.review-absence-evidence-choice { display:flex; align-items:center; gap:8px; margin:6px 0; }
+  .review-absence-evidence-choice input[type="checkbox"] { width:auto; flex:none; }
   .review-drawer:not([open]) { display:none; }
   .review-drawer.open { transform:none; transition:none; }
   .review-drawer [hidden] { display:none !important; }
@@ -947,6 +1005,9 @@ function getReviewEvaluationStyles_() {
   .review-drawer .review-stepper :is(button,input):focus-visible { outline:2px solid var(--color-accent-primary,#6941c6); outline-offset:-2px; }
   .review-drawer [hidden] { display:none !important; }
   .review-footer { flex:0 0 auto; min-width:0; max-height:45dvh; display:flex; flex-direction:column; background:var(--color-paper,#fff); border-top:1px solid var(--color-border,#eaecf0); }
+  .review-message { margin:0; padding:10px 14px; color:var(--color-ink,#344054); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+  .review-message:empty { padding:0; }
+  .review-footer .review-message { min-height:0; overflow-y:auto; }
   .review-actions { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:8px; flex:0 0 auto; width:100%; box-sizing:border-box; z-index:2; isolation:isolate; background:var(--color-paper,#fff); padding:12px 14px; padding-bottom:max(12px,env(safe-area-inset-bottom)); border-top:1px solid var(--color-border,#eaecf0); }
   .review-actions button { padding:10px 12px; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--editorial-radius,8px); background:var(--color-paper,#fff); }
   .review-actions [data-submit] { background:var(--color-accent-primary,#6941c6); color:var(--color-paper,#fff); }

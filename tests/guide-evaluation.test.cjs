@@ -15,10 +15,10 @@ function fixture(){
   LockService:{getScriptLock:()=>({tryLock:()=>{if(!lockAllowed)return false;locked=true;return true;},releaseLock:()=>{locked=false;}})},SpreadsheetApp:{flush(){}},escapeHtml:v=>String(v)
  };
  c=createSheetReadContext(context);for(const file of ['rubric-config.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','review-evaluation.js','guide-evaluation.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
- sheets.AssessmentDefinitions=sheet('AssessmentDefinitions',[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),['guide_eval','INDIVIDUAL_RUBRIC','Guide Evaluation',1,'guide_eval',20,'2019-12-20','2020-01-01','','guide-bands-v3-target-level-2','GuideEvaluations']]);
+ sheets.AssessmentDefinitions=sheet('AssessmentDefinitions',[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),['guide_eval','GUIDE_EVALUATION','Guide Evaluation',1,20,'2019-12-20','2020-01-01','','guide-bands-v3-target-level-2','GuideEvaluations']]);
  vm.runInContext(fs.readFileSync('milestone-config.js','utf8'),c);
  c.getMilestones_=()=>{throw Error('Guide must not read Milestones');};
- const rubric=[['Milestone ID','Order','PI','Criterion','CO','Max Marks','Type',...Array.from({length:6},(_,i)=>'Level '+i)],...[15,30,20,15,20].map((max,i)=>['Example criterion '+(i+1),['CO5','CO3','CO5','CO4','CO6'][i],max,Array.from({length:6},(_,level)=>'Example descriptor '+level)]).map(([name,co,max,levels],i)=>['guide_eval',i+1,'PI'+(i+1),name,co,max,'Individual',...levels])];
+ const rubric=[['Assessment ID','Order','PI','Criterion','CO','Max Marks','Type',...Array.from({length:6},(_,i)=>'Level '+i)],...[15,30,20,15,20].map((max,i)=>['Example criterion '+(i+1),['CO5','CO3','CO5','CO4','CO6'][i],max,Array.from({length:6},(_,level)=>'Example descriptor '+level)]).map(([name,co,max,levels],i)=>['guide_eval',i+1,'PI'+(i+1),name,co,max,'Individual',...levels])];
  sheets.Rubrics=sheet('Rubrics',rubric);sheets.GuideEvaluations=sheet('GuideEvaluations',[...[]]);
  tables.GuideEvaluations.push(...[JSON.parse(vm.runInContext('JSON.stringify(GUIDE_EVAL_HEADERS_)',c))]);
  const load=()=>c.loadGuideEvaluation('T1','S1');
@@ -60,7 +60,7 @@ test('coordinator-only actions cannot be called by guides or students',()=>{
 });
 test('manual storage preserves existing rubric and records, and requires valid configuration',()=>{
  const f=fixture();f.actor('coord@x');const original=JSON.stringify(f.tables.Rubrics);assert.equal(f.c.setupGuideEvaluation,undefined);f.c.guideRecords_();f.c.guideRecords_();assert.equal(JSON.stringify(f.tables.Rubrics),original);assert.equal(f.tables.GuideEvaluations.length,1);
- f.tables.AssessmentDefinitions[1][7]='';assert.equal(f.c.loadCoordinatorGuideEvaluations().ready,false);f.tables.AssessmentDefinitions[1][7]='2020-01-01';f.tables.Rubrics[1][7]='';assert.equal(f.c.loadCoordinatorGuideEvaluations().ready,false);
+ f.tables.AssessmentDefinitions[1][6]='';assert.equal(f.c.loadCoordinatorGuideEvaluations().ready,false);f.tables.AssessmentDefinitions[1][6]='2020-01-01';f.tables.Rubrics[1][7]='';assert.equal(f.c.loadCoordinatorGuideEvaluations().ready,false);
 });
 test('guide completion requires every current student to submit',()=>{
  const f=fixture();f.c.submitGuideEvaluation(f.input());f.actor('coord@x');assert.equal(f.c.guideCompletion_().completed,0);f.students.pop();assert.equal(f.c.guideCompletion_().completed,1);
@@ -94,7 +94,7 @@ test('browser module serializes as valid standalone script',()=>{
 });
 
 test('guide weight and criterion maxima come from sheets and changes reject stale edits',()=>{
- const f=fixture(),input=f.input();f.tables.AssessmentDefinitions[1][5]=30;
+ const f=fixture(),input=f.input();f.tables.AssessmentDefinitions[1][4]=30;
  assert.throws(()=>f.c.saveGuideEvaluationDraft(input),/Roster or rubric/);
  f.tables.Rubrics.splice(2);f.tables.Rubrics[1][5]=50;
  const d=f.load();assert.equal(d.config.maximum,50);assert.equal(d.config.weight,.3);

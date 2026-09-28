@@ -1,6 +1,14 @@
 function buildInternalAssessmentPublishing_(key) {
   const config=internalPublishingConfig_(key);
-  return '<section class="assessment-section internal-publishing" data-publishing="'+key+'" aria-labelledby="'+key+'PublishingHeading"><header class="publishing-heading"><div><span class="publishing-eyebrow">Internal assessment · Publication</span><h3 id="'+key+'PublishingHeading">'+escapeHtml(config.title)+'</h3><p>Publish results using the assessment’s existing publication rules.</p></div><button type="button" data-refresh onclick="InternalAssessmentPublishing.refresh(\''+key+'\')">Refresh evaluations</button></header><div data-notice role="status" aria-live="polite"></div><div data-publishing-content>'+getSkeletonMarkup_('panel','Reading '+config.title+' publication status')+'</div></section>';
+  return `<section class="assessment-section internal-publishing" data-publishing="${key}" aria-labelledby="${key}PublishingHeading">
+    <header class="publishing-heading"><div><span class="publishing-eyebrow">Internal assessment \u00b7 Publication</span><h3 id="${key}PublishingHeading">${escapeHtml(config.title)}</h3></div>
+      <button type="button" class="publishing-toggle" data-publishing-toggle aria-expanded="false" aria-controls="${key}PublishingBody" aria-label="Expand ${escapeHtml(config.title)} publishing" onclick="InternalAssessmentPublishing.toggle('${key}')">${renderLucideIcon_('chevron-down')}</button>
+    </header>
+    <div id="${key}PublishingBody" data-publishing-body hidden>
+      <div class="publishing-controls"><p>Publish results using the assessment's existing publication rules.</p><button type="button" data-refresh onclick="InternalAssessmentPublishing.refresh('${key}')">Refresh evaluations</button></div>
+      <div data-notice role="status" aria-live="polite"></div><div data-publishing-content>${getSkeletonMarkup_('panel','Reading '+config.title+' publication status')}</div>
+    </div>
+  </section>`;
 }
 
 function internalAssessmentPublishingBrowser_() {
@@ -161,7 +169,15 @@ function internalAssessmentPublishingBrowser_() {
     } catch(error){if(section.isConnected)notice(section,error.message,true);}
     finally{s.busy=false;if(section.isConnected)disable(section,false);}
   }
-  return {refresh,runSequence,markup};
+  function toggle(key) {
+    const section=root(key);if(!section)return;
+    const button=section.querySelector('[data-publishing-toggle]'),body=section.querySelector('[data-publishing-body]');
+    const expanded=button.getAttribute('aria-expanded')!=='true';
+    body.hidden=!expanded;
+    button.setAttribute('aria-expanded',String(expanded));
+    button.setAttribute('aria-label',(expanded?'Collapse ':'Expand ')+section.querySelector('h3').textContent+' publishing');
+  }
+  return {refresh,toggle,runSequence,markup};
 }
 function getInternalAssessmentPublishingClientScript_() {
   return 'const InternalAssessmentPublishing = ('+internalAssessmentPublishingBrowser_.toString()+')();';

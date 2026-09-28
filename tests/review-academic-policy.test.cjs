@@ -21,3 +21,22 @@ test('makeup applicability changes without converting evidence or recreating pro
 });
 test('normal evidence never silently becomes makeup; unsupported policy rejected',()=>{const c=context();const s={scores:normal,assessment:{facts:{type:'REVIEW_DAY_ABSENCE',approved:true}}};assert.equal(c.reviewPolicyCalculate_(config,team,s).total,null);assert.throws(()=>c.reviewPolicyCalculate_({...config,academicPolicyVersion:'unknown'},team,s),/policy/);});
 test('required facts are explicit; optional administrative evidence does not affect outcomes',()=>{const c=context();assert.throws(()=>c.reviewPolicyFacts_({type:'PROLONGED',approved:true,attended:true}),/Contribution/);assert.deepEqual(JSON.parse(JSON.stringify(c.reviewPolicyFacts_({type:'REVIEW_DAY_ABSENCE',approved:true}))),{type:'REVIEW_DAY_ABSENCE',approved:true,attended:false});});
+
+
+test('approval is optional only for prolonged absence with no contribution and review attendance',()=>{
+ const c=context();
+ for(const approved of [undefined,null,true,false]){
+  const facts={type:'PROLONGED',verifiedContribution:false,attended:true,approved};
+  const result=c.reviewPolicyCalculate_(config,team,{scores:normal,assessment:{facts}});
+  assert.equal(result.assessment.teamMark,0);assert.equal(result.assessment.individualMark,32);assert.equal(result.assessment.completed,true);assert.equal(result.total,32);
+ }
+ for(const facts of [{type:'PROLONGED',verifiedContribution:true,attended:true},{type:'PROLONGED',verifiedContribution:false,attended:false},{type:'REVIEW_DAY_ABSENCE'}])assert.throws(()=>c.reviewPolicyFacts_(facts),/Absence Approved/);
+});
+
+test('supporting absence evidence is validated and irrelevant evidence is discarded',()=>{
+ const c=context(),facts={type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['APPROVAL_DOCUMENT','OTHER'],otherEvidenceText:' Verified '},before=JSON.stringify(facts);
+ assert.equal(c.reviewPolicyFacts_(facts).otherEvidenceText,'Verified');assert.equal(JSON.stringify(facts),before);
+ for(const supportingEvidence of [['UNKNOWN'],['OTHER','OTHER'],'OTHER'])assert.throws(()=>c.reviewPolicyFacts_({...facts,supportingEvidence}),/Invalid supporting absence evidence/);
+ assert.throws(()=>c.reviewPolicyFacts_({...facts,otherEvidenceText:'x'.repeat(2001)}),/2000/);
+ for(const irrelevant of [{...facts,approved:false},{...facts,type:'NORMAL'},{...facts,type:'PROLONGED',verifiedContribution:false,attended:true}])assert.equal(c.reviewPolicyFacts_(irrelevant).supportingEvidence,undefined);
+});

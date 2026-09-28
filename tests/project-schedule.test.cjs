@@ -30,7 +30,7 @@ function fixture(overrides = {}, runtime = {}) {
   for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
-  const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,'review'+(i+1),10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
+  const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
   const getSheet=c.getSheet;
   c.getSheet=name=>name==='AssessmentDefinitions'?{getDataRange:()=>({getValues:()=>definitionRows})}:getSheet(name);
   const schedule = c.getProjectSchedule_();
@@ -51,7 +51,7 @@ test('guide evaluation button uses configured opening in the schedule timezone',
  c.getColumnMap=()=>({TEAM_ID:0});
  c.buildRepoLine=()=>'';
  const due=c.projectDay_('2026-10-12',schedule.timezone);
- const configured={...schedule,guide_eval:due,assessments:[...schedule.assessments,{key:'guide_eval',type:'INDIVIDUAL_RUBRIC',day:due,opens:due-5}]};
+ const configured={...schedule,guide_eval:due,assessments:[...schedule.assessments,{key:'guide_eval',type:'GUIDE_EVALUATION',day:due,opens:due-5}]};
  const render=(instant,plan=configured)=>c.buildTeamCard(['T1'],'NOT_SUBMITTED','',null,
    {schedule:plan,clock:c.getProjectClock_(plan,new Date(instant))});
  const before=render('2026-10-06T18:29:59Z');
@@ -897,4 +897,17 @@ test('timeline composes lifecycle events and configured assessments without over
  assert.equal(review.sequence,1);
  assert.equal(review.openingDate,c.formatProjectDay_(review.opens));
  assert.throws(()=>c.composeProjectTimeline_([...schedule.milestones,{key:'review1'}],schedule.assessments),/distinct/);
+});
+
+
+test('SEE appears on the shared timeline without extending logging or internal review discovery',()=>{
+ const {c,schedule}=fixture();
+ const end=schedule.end;
+ const see={key:'see',type:'SEE',label:'End Review (SEE)',sequence:4,weight:40,opens:end+7,day:end+7};
+ c.getAssessmentDefinitions_=()=>[...schedule.assessments,see];
+ vm.runInContext('projectScheduleExecution_=null;',c);
+ const updated=c.getProjectSchedule_();
+ assert.equal(updated.end,end);assert.equal(updated.reviews.length,schedule.reviews.length);
+ const timeline=c.getSharedProjectTimelineData_().milestones;
+ assert.equal(timeline.filter(d=>d.key==='see').length,1);assert.equal(timeline.find(d=>d.key==='see').day,end+7);
 });

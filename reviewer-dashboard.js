@@ -98,7 +98,8 @@ function buildReviewerAssignedTeams_(data) {
   return `<section class="team-tracker-section reviewer-assigned-teams" aria-labelledby="reviewerAssignedHeading">
     <div class="tracker-header"><h3 class="assessment-title tracker-title" id="reviewerAssignedHeading">Assigned Teams (${assigned.length} teams)</h3></div>
     <div class="tracker-search"><input type="search" id="reviewerAssignedSearch" aria-label="Search assigned teams" placeholder="Search team, guide, register number, or title…" oninput="DashboardUI.filterReviewerAssignedTeams()"></div>
-    <div class="tracker-table-scroll" role="region" aria-label="Assigned teams table, scroll horizontally for more columns" tabindex="0"><table class="team-tracker-table"><thead><tr><th scope="col">Team</th><th scope="col">Guide</th><th scope="col">Register Numbers</th><th scope="col">Project Title</th><th scope="col">Committee</th><th scope="col">Title Approval</th>${progress.reviews.map(review=>`<th scope="col">${escapeHtml(review.label)}</th>`).join('')}</tr></thead><tbody id="reviewerAssignedBody">${rows}<tr id="reviewerAssignedEmpty" ${assigned.length ? 'hidden' : ''}><td colspan="${6 + progress.reviews.length}">${assigned.length ? 'No teams match your search.' : 'No teams are assigned to you.'}</td></tr></tbody></table></div>
+    <p class="reviewer-scroll-hint" id="reviewerAssignedScrollHint">Scroll horizontally if more review columns are off-screen.</p>
+    <div class="tracker-table-scroll" role="region" aria-label="Assigned teams table, scroll horizontally for more columns" aria-describedby="reviewerAssignedScrollHint" tabindex="0"><table class="team-tracker-table"><thead><tr><th scope="col">Team</th><th scope="col">Guide</th><th scope="col">Register Numbers</th><th scope="col">Project Title</th><th scope="col">Committee</th><th scope="col">Title Approval</th>${progress.reviews.map(review=>`<th scope="col">${escapeHtml(review.label)}</th>`).join('')}</tr></thead><tbody id="reviewerAssignedBody">${rows}<tr id="reviewerAssignedEmpty" ${assigned.length ? 'hidden' : ''}><td colspan="${6 + progress.reviews.length}">${assigned.length ? 'No teams match your search.' : 'No teams are assigned to you.'}</td></tr></tbody></table></div>
     ${buildTeamPagination_('reviewerAssigned', 'reviewer', assigned.length)}
   </section>`;
 }
@@ -143,15 +144,22 @@ body { max-width: 980px; margin: 24px auto; padding: 0 16px; }
 .guide-cell { font-size: 13px; color: #6b7280; }
 .reviewer-assigned-teams { margin-bottom:24px; }
 .reviewer-assigned-teams [hidden] { display:none !important; }
-.reviewer-assigned-teams .reviewer-assigned-title { min-width:200px; max-width:320px; white-space:normal; overflow-wrap:anywhere; }
-.reviewer-title-cell { min-width:230px; }
+.reviewer-assigned-teams .team-tracker-table th,.reviewer-assigned-teams .team-tracker-table td { padding:10px 8px; }
+.reviewer-assigned-teams .reviewer-assigned-title { min-width:150px; max-width:320px; white-space:normal; overflow-wrap:anywhere; }
+.reviewer-assigned-teams .col-team { width:36px; min-width:36px; }
+.reviewer-assigned-teams .col-guide { min-width:120px; }
+.reviewer-assigned-teams .col-registers { min-width:92px; }
+.reviewer-assigned-teams .tracker-registers { display:flex; flex-direction:column; gap:3px; margin:0; }
+.reviewer-assigned-teams .tracker-registers span { display:block; white-space:nowrap; overflow-wrap:normal; }
+.reviewer-scroll-hint { margin:0 0 8px; font-size:12px; color:var(--color-ink-muted,#667085); }
+.reviewer-title-cell { min-width:140px; }
 .reviewer-title-approval summary { cursor:pointer; font-size:12px; }
-.reviewer-title-content { padding:12px 0; min-width:230px; }
+.reviewer-title-content { padding:12px 0; min-width:0; }
 .reviewer-title-content label { display:block; margin-top:12px; }
 .reviewer-title-content textarea { width:100%; }
 .reviewer-title-actions { display:flex; gap:8px; margin-top:8px; }
 .reviewer-previous-notes { white-space:pre-wrap; }
-.reviewer-review-cell { min-width:150px; }
+.reviewer-review-cell { min-width:120px; }
 .reviewer-review-cell small { display:block; margin-top:6px; color:#667085; }
 .reviewer-review-cell button:disabled { opacity:.5; cursor:not-allowed; }
 `;

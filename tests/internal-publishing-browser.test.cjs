@@ -133,3 +133,16 @@ test('student result lines show name, bracketed register and the assessment-spec
     const pending=f.api.refresh(key);f.calls.at(-1).ok(report);await pending;const scores=f.host().querySelectorAll('.publishing-score');assert.equal(scores[0].textContent,'Pending');assert.match(scores[1].textContent,/^0 \/ /);
   }
 });
+
+
+test('publishing cards start collapsed and disclosure survives refresh for every assessment',async()=>{
+ for(const key of ['review1','review2','guide_eval']){
+  const f=fixture(key),body=f.section().querySelector('[data-publishing-body]'),toggle=f.section().querySelector('[data-publishing-toggle]');
+  assert.equal(body.hidden,true);assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(toggle.getAttribute('aria-controls'),body.id);assert(toggle.querySelector('svg'));
+  await f.load();assert.equal(body.hidden,true);
+  f.api.toggle(key);assert.equal(body.hidden,false);assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.match(toggle.getAttribute('aria-label'),/^Collapse /);
+  const loaded=f.host().innerHTML;f.api.toggle(key);assert.equal(body.hidden,true);assert.equal(f.host().innerHTML,loaded);
+  await f.load();assert.equal(body.hidden,true);assert.equal(toggle.getAttribute('aria-expanded'),'false');
+  f.api.toggle(key);assert.equal(body.hidden,false);assert.equal(f.calls.filter(call=>call.method==='loadInternalAssessmentPublishing').length,2);
+ }
+});

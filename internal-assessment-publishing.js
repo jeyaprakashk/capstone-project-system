@@ -49,7 +49,7 @@ function loadInternalAssessmentPublishing(key) {
         ...reopenInfo(record)};
     });
     if(latest&&latest.students.some(s=>!roster.students.some(r=>r.register===s.register)))issues.push('Saved evaluation includes students outside the current roster.');
-    if(definition.type==='INDIVIDUAL_RUBRIC'&&records.some(r=>r.team===team&&!roster.students.some(s=>s.register===r.student)))issues.push('Saved evaluation includes students outside the current roster.');
+    if(definition.type==='GUIDE_EVALUATION'&&records.some(r=>r.team===team&&!roster.students.some(s=>s.register===r.student)))issues.push('Saved evaluation includes students outside the current roster.');
     const result={team,displayTeam:String(row[cols.TEAM_ID]),students,issues:Array.from(new Set(issues)),totalStudents:students.length,
       completedStudents:students.filter(s=>s.assessmentComplete).length,eligibleStudents:students.filter(s=>s.publicationPermission==='ALLOWED').length,publishedStudents:students.filter(s=>s.publicationStatus==='PUBLISHED').length,
       revision:latest?latest.revision:0,canPublishTeam:!issues.length&&students.some(s=>s.publicationPermission==='ALLOWED'&&s.needsPublication),

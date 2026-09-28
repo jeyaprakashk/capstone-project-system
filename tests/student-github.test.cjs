@@ -242,6 +242,7 @@ function browserFixture() {
     return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({key,args,success,failure})});
   }
   const c=createSheetReadContext({
+    GuideEvaluation:{student(){}},
     console,window:{},performance:{now:()=>0},setTimeout:()=>1,clearTimeout(){},
     document:{createElement:()=>({remove(){}}),hidden:false,readyState:'loading',addEventListener(){},getElementById:id=>id==='githubSubmitStatus'?status:id==='githubStatusRefresh'?refreshButton:null,
       querySelector:()=>panel,querySelectorAll:()=>[]},

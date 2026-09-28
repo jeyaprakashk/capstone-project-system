@@ -16,10 +16,10 @@ function publishingFixture(key='review1') {
     LockService:{getScriptLock:()=>({tryLock:()=>{if(locked)return false;locked=true;return true;},releaseLock:()=>locked=false})},SpreadsheetApp:{flush(){}},
     summarizeReviewCompletion_:registers=>({totalStudents:registers.size,markedStudents:0}),escapeHtml:normalize,getSkeletonMarkup_:()=>'<div>Skeleton</div>'
   });
-  for(const file of ['review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','review-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+  for(const file of ['lucide-icons.js','icon-renderer.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','review-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
   c.getMilestones_=()=>[];
   c.guideConfiguration_=()=>({criteria:[criteria[1]],maximum:40,weight:.2,due:20000,timezone:'UTC'});
-  c.getAssessmentDefinitions_=()=>['review1','review2'].map((key,i)=>({key,type:'REVIEW',label:key,sequence:i+1,rubricReference:key,day:20000,opens:19993,weight:25,academicPolicyVersion:'review-attendance-v1',journal:'Review'+(i+1)+'Evaluations',prerequisites:[]})).concat([{key:'guide_eval',type:'INDIVIDUAL_RUBRIC',label:'Guide Evaluation',sequence:3,rubricReference:'guide_eval',day:20000,opens:19990,weight:20,academicPolicyVersion:'guide-bands-v3-target-level-2',journal:'GuideEvaluations',prerequisites:[]}]);
+  c.getAssessmentDefinitions_=()=>['review1','review2'].map((key,i)=>({key,type:'REVIEW',label:key,sequence:i+1,day:20000,opens:19993,weight:25,academicPolicyVersion:'review-attendance-v1',journal:'Review'+(i+1)+'Evaluations',prerequisites:[]})).concat([{key:'guide_eval',type:'GUIDE_EVALUATION',label:'Guide Evaluation',sequence:3,day:20000,opens:19990,weight:20,academicPolicyVersion:'guide-bands-v3-target-level-2',journal:'GuideEvaluations',prerequisites:[]}]);
   c.requireAssessmentDefinitions_=()=>c.getAssessmentDefinitions_();
   c.assessmentRubric_=()=>criteria;
   for(const name of ['Review1Evaluations','Review2Evaluations','GuideEvaluations']){

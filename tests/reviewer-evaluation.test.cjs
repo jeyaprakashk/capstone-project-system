@@ -23,7 +23,7 @@ test('reviewer progress reads only registry journals and isolates a missing jour
  f.c.getSpreadsheet=()=>({getSheets:()=>[],getSpreadsheetTimeZone:()=> 'UTC'});
  const progress=f.c.getReviewerReviewProgress_(f.rows);
  assert.equal(progress.teams.g18.review1.available,true);assert.equal(progress.teams.g18.review2.available,false);
- assert.match(progress.teams.g18.review2.error,/Create missing assessment storage/);
+ assert.match(progress.teams.g18.review2.error,/Error in Initialization/);
 });
 test('numbered endpoints and legacy level-sheet mutation endpoints are absent',()=>{
  const f=setup();

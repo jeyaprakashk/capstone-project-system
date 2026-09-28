@@ -96,7 +96,7 @@ Start in Coordinator System Status. If `AssessmentDefinitions` is missing, use
 **Create assessment definitions tab**. This creates only its validated headers.
 Follow the definitions link to configure academic instances explicitly, then Recheck.
 
-Configure REVIEW instances in `AssessmentDefinitions`, with rubric references into
+Configure REVIEW instances in `AssessmentDefinitions`, with matching `Assessment ID` values in
 `Rubrics`. The Coordinator uses System Status to check readiness and create or
 initialize missing assessment storage. Each instance uses its explicit Journal
 binding or `Assessment_<assessmentId>` in the main spreadsheet.
@@ -107,6 +107,9 @@ are not the marking interface. Committee data describes assignments only.
 
 See [Review evaluation](REVIEW-EVALUATION.md) for configuration, readiness, storage
 and workflow details. Guide Evaluation must also have an explicit
-`INDIVIDUAL_RUBRIC` definition (`guide_eval`) and uses its configured Journal or
+`GUIDE_EVALUATION` definition (`guide_eval`) and uses its configured Journal or
 `Assessment_guide_eval`. `Milestones` contains only non-assessment lifecycle events.
+End Review uses Type `SEE` and Assessment ID `see`. Its rubric and dates are
+displayed, while evaluation remains outside this app. Leave its policy version
+and Journal blank.
 See [Assessment configuration](ASSESSMENT-CONFIGURATION.md) for the full setup contract.

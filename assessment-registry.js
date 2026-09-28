@@ -1,20 +1,22 @@
 /** Instances are spreadsheet data; this file registers types and supported policies only. */
-const ASSESSMENT_DEFINITION_HEADERS_ = ['Assessment ID','Type','Label','Sequence','Rubric Reference','Weight (%)','Opening','Due Date','Prerequisites','Academic Policy Version','Journal'];
+const ASSESSMENT_DEFINITION_HEADERS_ = ['Assessment ID','Type','Label','Sequence','Weight (%)','Opening','Due Date','Prerequisites','Academic Policy Version','Journal'];
 function parseAssessmentDefinitions_(rows,timezone) {
   const headers=(rows[0]||[]).map(normalizeText_);
   const cols=ASSESSMENT_DEFINITION_HEADERS_.map(h=>{const i=headers.indexOf(normalizeText_(h));if(i<0||headers.lastIndexOf(normalizeText_(h))!==i)throw new Error('AssessmentDefinitions requires exactly one '+h+' column.');return i;});
   const definitions=rows.slice(1).filter(r=>r.some(v=>String(v??'').trim())).map((row,index)=>{
-    const [id,type,label,sequence,rubric,weight,opening,due,prerequisites,policy,journal]=cols.map(c=>row[c]);
+    const [id,type,label,sequence,weight,opening,due,prerequisites,policy,journal]=cols.map(c=>row[c]);
     const key=normalizeText_(id),kind=String(type||'').trim().toUpperCase();
     const fail=message=>{throw new Error('AssessmentDefinitions row '+(index+2)+': '+message);};
     if(!/^[a-z][a-z0-9_-]{0,39}$/.test(key))fail('Invalid assessment ID.');
-    if(!['REVIEW','INDIVIDUAL_RUBRIC'].includes(kind))fail('Unsupported assessment type.');
-    if(kind==='INDIVIDUAL_RUBRIC' && key!=='guide_eval')fail('Only the assigned-guide individual strategy is currently supported.');
-    if(!String(label||'').trim() || !normalizeText_(rubric))fail('Label and rubric reference are required.');
+    if(!['REVIEW','GUIDE_EVALUATION','SEE'].includes(kind))fail('Unsupported assessment type.');
+    if(kind==='GUIDE_EVALUATION' && key!=='guide_eval')fail('Only the assigned-guide individual strategy is currently supported.');
+    if((kind==='SEE')!==(key==='see'))fail('Type SEE must use Assessment ID see, which is reserved for SEE.');
+    if(!String(label||'').trim())fail('Label is required.');
     if(!Number.isSafeInteger(Number(sequence)) || Number(sequence)<1)fail('Sequence must be a positive integer.');
     if(!String(weight??'').trim() || !Number.isFinite(Number(weight)) || Number(weight)<=0 || Number(weight)>100)fail('Weight must be greater than zero and at most 100.');
     const expected=kind==='REVIEW'?'review-attendance-v1':'guide-bands-v3-target-level-2';
-    if(policy!==expected)fail('Unsupported academic policy version.');
+    if(kind==='SEE'){if(String(policy??'').trim())fail('SEE Academic Policy Version must be blank; evaluation is outside this app.');}
+    else if(policy!==expected)fail('Unsupported academic policy version.');
     if(String(opening??'').trim()==='' || String(due??'').trim()==='')fail('Opening and due date are required.');
     const opens=projectDay_(opening,timezone),day=projectDay_(due,timezone);
     if(opens>day)fail('Opening must not follow due date.');
@@ -23,15 +25,17 @@ function parseAssessmentDefinitions_(rows,timezone) {
     if(!Array.isArray(required) || required.some(p=>!p || typeof p.assessmentId!=='string'||p.condition!=='RECORDED'))fail('Prerequisites require assessmentId and condition RECORDED.');
     required=required.map(p=>({assessmentId:normalizeText_(p.assessmentId),condition:p.condition}));
     if(new Set(required.map(p=>p.assessmentId)).size!==required.length)fail('Duplicate prerequisite.');
-    const storage=String(journal||'').trim() || 'Assessment_'+key;
+    if(kind==='SEE' && required.length)fail('SEE Prerequisites must be blank or [].');
+    if(kind==='SEE' && String(journal??'').trim())fail('SEE Journal must be blank; no storage is required.');
+    const storage=kind==='SEE'?'':String(journal||'').trim() || 'Assessment_'+key;
     if(storage.length>100 || /[\[\]:*?\/\\]/.test(storage) || ['teamstatus','rubrics','milestones','assessmentdefinitions'].includes(normalizeText_(storage)))fail('Invalid journal name.');
-    return {key,type:kind,label:String(label).trim(),sequence:Number(sequence),rubricReference:normalizeText_(rubric),weight:Number(weight),opens,day,prerequisites:required,academicPolicyVersion:policy,journal:storage,journalConfigured:!!String(journal||'').trim(),gradedBy:kind==='REVIEW'?'Review Committee':'Project Guide'};
+    return {key,type:kind,label:String(label).trim(),sequence:Number(sequence),weight:Number(weight),opens,day,prerequisites:required,academicPolicyVersion:kind==='SEE'?'':policy,journal:storage,journalConfigured:!!String(journal||'').trim(),gradedBy:kind==='SEE'?'SEE Committee (includes external members)':kind==='REVIEW'?'Review Committee':'Project Guide'};
   });
   if(new Set(definitions.map(d=>d.key)).size!==definitions.length)throw new Error('Duplicate assessment ID.');
-  if(new Set(definitions.map(d=>normalizeText_(d.journal))).size!==definitions.length)throw new Error('Assessment journals must be distinct.');
+  if(new Set(definitions.filter(d=>d.type!=='SEE').map(d=>normalizeText_(d.journal))).size!==definitions.filter(d=>d.type!=='SEE').length)throw new Error('Assessment journals must be distinct.');
   if(definitions.reduce((n,d)=>n+d.weight,0)>100.000001)throw new Error('Assessment weights exceed 100%.');
   const visiting=new Set(),done=new Set();
-  const visit=d=>{if(visiting.has(d.key))throw new Error('Cyclic assessment prerequisites.');if(done.has(d.key))return;visiting.add(d.key);d.prerequisites.forEach(p=>{const prior=definitions.find(x=>x.key===p.assessmentId);if(!prior)throw new Error('Unknown prerequisite '+p.assessmentId);visit(prior);});visiting.delete(d.key);done.add(d.key);};
+  const visit=d=>{if(visiting.has(d.key))throw new Error('Cyclic assessment prerequisites.');if(done.has(d.key))return;visiting.add(d.key);d.prerequisites.forEach(p=>{const prior=definitions.find(x=>x.key===p.assessmentId);if(!prior)throw new Error('Unknown prerequisite '+p.assessmentId);if(prior.type==='SEE')throw new Error('SEE cannot be a RECORDED prerequisite; completion is not recorded in this app.');visit(prior);});visiting.delete(d.key);done.add(d.key);};
   definitions.forEach(visit);
   return definitions.sort((a,b)=>a.sequence-b.sequence||a.key.localeCompare(b.key));
 }
@@ -55,9 +59,9 @@ function assessmentDefinition_(id) {
 function isReviewAssessment_(key) {return getAssessmentDefinitions_().some(d=>d.key===key && d.type==='REVIEW');}
 function assessmentRubric_(definition) {
   const sheet=getSheet('Rubrics');if(!sheet)throw new Error('Rubrics tab is required.');
-  const rows=sheet.getDataRange().getValues(),col=(rows[0]||[]).map(normalizeText_).indexOf('milestone id');
-  if(col<0)throw new Error('Rubrics requires Milestone ID column.');
-  const key=definition.rubricReference;
+  const rows=sheet.getDataRange().getValues(),col=(rows[0]||[]).map(normalizeText_).indexOf('assessment id');
+  if(col<0)throw new Error('Rubrics requires Assessment ID column.');
+  const key=definition.key;
   return parseRubricRows_([rows[0],...rows.slice(1).filter(r=>normalizeText_(r[col])===key)],[{key}])[key];
 }
 function assessmentPrerequisiteBlock_(definition,team) {
@@ -73,6 +77,7 @@ function assessmentPrerequisiteBlock_(definition,team) {
 /** Resolve configured storage, recognizing existing journals by assessment identity,
  * never by Review number. Reads do not create, rename, clear or migrate sheets. */
 function assessmentJournal_(definition) {
+  if(definition.type==='SEE')throw new Error('SEE is evaluated outside this app and has no assessment journal.');
   const configured=getSheet(definition.journal);
   const inspect=(sheet,name)=>{
     if(!sheet)return {sheet:null,name,state:'MISSING'};
@@ -102,11 +107,12 @@ function assessmentJournal_(definition) {
   return direct;
 }
 function assessmentStorageMissing_(name) {
-  return name+' is not initialized. Ask the coordinator to use System Status → Create missing assessment storage.';
+  return 'Error in Initialization';
 }
 /** Called only while the coordinator setup lock is held. Preflight before writing. */
 function provisionAssessmentJournals_(definitions) {
-  const plans=definitions.map(d=>{assessmentRubric_(d);return {definition:d,...assessmentJournal_(d)};});
+  definitions.forEach(d=>assessmentRubric_(d));
+  const plans=definitions.filter(d=>d.type!=='SEE').map(d=>({definition:d,...assessmentJournal_(d)}));
   const results=plans.map(plan=>{
     const created=plan.state==='MISSING',initialized=plan.state==='EMPTY';
     const sheet=created?getSpreadsheet().insertSheet(plan.name):plan.sheet;
