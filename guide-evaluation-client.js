@@ -76,7 +76,7 @@ function guideEvaluationBrowser_() {
   let studentBusy=false;
   function student() {
     const host=el('studentGuideEvaluation');if(!host || studentBusy)return;
-    studentBusy=true;const finish=DashboardUI.beginContentLoading(host,'Loading guide evaluation results');
+    studentBusy=true;const finish=DashboardUI.beginContentLoading(host,'Loading guide evaluation results',{compact:true});
     rpc('loadPublishedGuideEvaluation',[],result=>{
       finish();studentBusy=false;if(el('studentGuideEvaluation')!==host)return;
       if(!result){host.textContent='Guide Evaluation: not published.';return;}

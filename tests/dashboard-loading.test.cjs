@@ -10,7 +10,8 @@ function dialogFixture(deferDestroy=false) {
  const window={matchMedia:()=>({matches:true})};
  const c=vm.createContext({document,window,setTimeout,clearTimeout});
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
- const api=c.dashboardDialogsBrowser_(()=>'<div>Skeleton</div>');
+ for(const file of ['lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ const api=c.dashboardDialogsBrowser_(()=>'<div>Skeleton</div>',c.renderLucideIcon_);
  const resolveLibrary=()=>{window.Swal={fire(options){calls.push(options);return new Promise(resolve=>{options.resolve=result=>{resolve(result);if(!deferDestroy)options.didDestroy();};});}};scripts.at(-1).onload();};
  return {api,nodes,scripts,calls,resolveLibrary,focused:()=>focused};
 }
@@ -117,6 +118,7 @@ function fixture(system=false) {
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({key,args,success,failure})}); }
  const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').split('function renderAssessmentHistory_')[1].replace(/^/, 'function renderAssessmentHistory_'):fs.readFileSync(file,'utf8'),c);
+ vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
  vm.runInContext(c.getDashboardClientScript(),c);
  return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);}};
@@ -136,7 +138,9 @@ test('theme follows active tabs immediately, cached content and late responses c
  const count=roleReads();
  f.click('student');assert.equal(theme(),'student');
  f.click('guide');assert.equal(theme(),'editorial');assert.equal(roleReads(),count);
- f.click('student');f.click('announcements');assert.equal(theme(),'editorial');
+ f.click('student');f.click('announcements');assert.equal(theme(),'student');
+ f.click('announcements');assert.equal(theme(),'student');
+ f.click('guide');f.click('announcements');assert.equal(theme(),'editorial');
  f.click('student');f.click('system-status');assert.equal(theme(),'editorial');
  f.click('student');assert.equal(theme(),'student');
 });
@@ -166,7 +170,7 @@ test('editorial rules stay opt-in and text palette pairs meet normal-text contra
   }
  }
  assert(!css.includes('!important'));
- const token=name=>{const match=css.match(new RegExp('--color-'+name+':(#[0-9a-f]{6})','i'));assert(match,name);return match[1];};
+ const token=name=>{const match=(css+c.getBaseStyles()).match(new RegExp('--color-'+name+':(#[0-9a-f]{6})','i'));assert(match,name);return match[1];};
  const luminance=hex=>{
   const rgb=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
   return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;
@@ -380,6 +384,22 @@ test('System Status follow-up reads do not block roles or reset their idle timer
 test('failed role can be retried by selecting it again',()=>{
  const f=fixture();f.click('guide');f.requests[0].failure(new Error('offline'));f.click('guide');
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
+});
+
+test('compact refresh uses the initial skeleton and restores the original content',()=>{
+ const f=fixture(),{document}=require('linkedom').parseHTML('<html><body><section><button>Existing team</button></section></body></html>');
+ f.c.document.createElement=tag=>document.createElement(tag);
+ const host=document.querySelector('section'),button=host.firstElementChild;
+ Object.defineProperty(host,'clientHeight',{value:716});
+ const finish=vm.runInContext('DashboardUI',f.c).beginContentLoading(host,'Refreshing assigned teams',{compact:true});
+ const rows=host.querySelectorAll('.app-skeleton-lines > span');
+ assert.equal(rows.length,3);
+ assert(host.classList.contains('app-content-loading--compact'));
+ assert.equal(host.firstElementChild,button);assert.equal(button.inert,true);
+ finish();finish();
+ assert.equal(host.children.length,1);assert.equal(host.firstElementChild,button);
+ assert.equal(host.getAttribute('aria-busy'),'false');
+ assert(!host.classList.contains('app-content-loading--compact'));
 });
 
 test('shared loading preserves live children and restores interaction on repeated cleanup',()=>{

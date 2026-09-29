@@ -193,6 +193,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     if(f.type==='UNSELECTED')return false;
     if(hiddenStudent(index))return false;
     if(f.type==='NORMAL' || f.type==='PROLONGED' && f.attended===true)return true;
+    if(!model.availability.editable && f.approved===true && !f.attended && savedStudent(index).assessment?.individualSource==='makeup')return true;
     return false;
   }
   function makeupControls(index,student) {
@@ -378,7 +379,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     const navigation=assessment?'<div class="review-assessment-navigation">'+criteriaTabs()+'<div class="review-tab-progress" data-tab-progress aria-live="polite"></div>'+teamPills()+(students.length?studentChips(students):'')+'</div>':'';
     if(assessment && students.length)body=assessmentSummaryCard(students)+body;
     const statusMessage='<p class="review-message" data-message role="status" aria-live="polite"></p>';
-    return '<div class="team-drawer-header"><div class="review-heading-details"><div class="review-header-line"><h2 class="team-drawer-title" id="'+reviewKey+'Heading">'+escape(title)+'</h2><span class="review-header-review">'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review-progress" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="team-drawer-close" data-close aria-label="Close '+escape(reviewLabel)+' drawer">×</button></div>'+navigation+'<div class="team-drawer-content">'+body+(footer?'':statusMessage)+'</div>'+(footer?'<div class="review-footer">'+statusMessage+footer+'</div>':'');
+    return '<div class="team-drawer-header"><div class="review-heading-details"><div class="review-header-line"><h2 class="team-drawer-title" id="'+reviewKey+'Heading">'+escape(title)+'</h2><span class="review-header-review">'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review-progress" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="team-drawer-close" data-close aria-label="Close '+escape(reviewLabel)+' drawer">'+DashboardUI.renderIcon('x')+'</button></div>'+navigation+'<div class="team-drawer-content">'+body+(footer?'':statusMessage)+'</div>'+(footer?'<div class="review-footer">'+statusMessage+footer+'</div>':'');
   }
 
   function open(team,button) {
@@ -405,7 +406,7 @@ function reviewEvaluationBrowser_(reviewKey) {
   }
   function control(c,index,owner,score) {
     score=score||{};
-    return '<fieldset class="guide-eval-criterion review-criterion '+(c.type==='Team'?'review-team-rubric':'review-individual-rubric')+'" data-index="'+index+'" data-owner="'+owner+'"'+(focusedAssessment() && (!targeted || String(owner)!==String(targeted.index) || !targeted.components.includes(c.type==='Team'?'team':'individual'))?' hidden':'')+'><legend class="review-criterion-accessible-title">'+escape(c.name)+'</legend><div class="review-criterion-meta"><span>'+escape(c.pi+' · '+c.co)+'</span><span>Max '+c.maxMarks+' marks</span></div><h3 class="review-card-title">'+escape(c.name)+'</h3><p class="review-control-title">Proficiency level</p><select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select><div class="review-levels" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+'" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div><div class="review-descriptor" data-descriptor aria-live="polite"></div><details><summary>View full rubric descriptors</summary>'+c.descriptors.map((text,i)=>'<p><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><div class="review-award"><div class="review-award-heading"><label for="reviewMarks-'+owner+'-'+index+'">Fine-tune mark</label><span data-range></span></div><div class="review-stepper"><button type="button" data-step="-0.5" aria-label="Decrease marks">−</button><input data-marks id="reviewMarks-'+owner+'-'+index+'" aria-describedby="reviewMarksError-'+owner+'-'+index+'" type="number" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button type="button" data-step="0.5" aria-label="Increase marks">+</button></div><input data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total" data-awarded-total></span><div class="review-slider-values" data-slider-values aria-label="Selectable marks"></div></div><p class="review-marks-error" data-marks-error id="reviewMarksError-'+owner+'-'+index+'" aria-live="polite" hidden></p><div class="review-feedback-heading"><div class="review-feedback-title"><strong>Criterion Feedback</strong><span data-feedback-required></span></div><span data-feedback-status></span></div><div class="review-feedback-options" data-feedback-options aria-label="Feedback suggestions"></div><button type="button" class="review-other-feedback" data-other-feedback aria-pressed="false">Other remarks</button><label class="review-feedback-label" data-custom-feedback-label hidden>Other remarks<textarea data-custom-feedback maxlength="2000" rows="2" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden maxlength="2000">'+escape(score.remark||'')+'</textarea></fieldset>';
+    return '<fieldset class="guide-eval-criterion review-criterion '+(c.type==='Team'?'review-team-rubric':'review-individual-rubric')+'" data-index="'+index+'" data-owner="'+owner+'"'+(focusedAssessment() && (!targeted || String(owner)!==String(targeted.index) || !targeted.components.includes(c.type==='Team'?'team':'individual'))?' hidden':'')+'><legend class="review-criterion-accessible-title">'+escape(c.name)+'</legend><div class="review-criterion-meta"><span>'+escape(c.pi+' · '+c.co)+'</span><span>Max '+c.maxMarks+' marks</span></div><h3 class="review-card-title">'+escape(c.name)+'</h3><p class="review-control-title">Proficiency level</p><select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select><div class="review-levels" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+'" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div><div class="review-descriptor" data-descriptor aria-live="polite"></div><details><summary>View full rubric descriptors</summary>'+c.descriptors.map((text,i)=>'<p><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><div class="review-award"><div class="review-award-heading"><label for="reviewMarks-'+owner+'-'+index+'">Fine-tune mark</label><span data-range></span></div><div class="review-stepper"><button type="button" data-step="-0.5" aria-label="Decrease marks">'+DashboardUI.renderIcon('minus')+'</button><input data-marks id="reviewMarks-'+owner+'-'+index+'" aria-describedby="reviewMarksError-'+owner+'-'+index+'" type="number" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button type="button" data-step="0.5" aria-label="Increase marks">'+DashboardUI.renderIcon('plus')+'</button></div><input data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total" data-awarded-total></span><div class="review-slider-values" data-slider-values aria-label="Selectable marks"></div></div><p class="review-marks-error" data-marks-error id="reviewMarksError-'+owner+'-'+index+'" aria-live="polite" hidden></p><div class="review-feedback-heading"><div class="review-feedback-title"><strong>Criterion Feedback</strong><span data-feedback-required></span></div><span data-feedback-status></span></div><div class="review-feedback-options" data-feedback-options aria-label="Feedback suggestions"></div><button type="button" class="review-other-feedback" data-other-feedback aria-pressed="false">Other remarks</button><label class="review-feedback-label" data-custom-feedback-label hidden>Other remarks<textarea data-custom-feedback maxlength="2000" rows="2" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden maxlength="2000">'+escape(score.remark||'')+'</textarea></fieldset>';
   }
   function accordion(title,description,content) {
     return '<details class="review-accordion" data-criteria-group="'+(title==='Team Criteria'?'team':'individual')+'" name="review-criteria" id="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-panel" role="tabpanel" aria-labelledby="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-tab"'+(focusedAssessment()?(title==='Team Criteria'?' hidden':' open'):'')+'><summary><strong>'+title+'</strong>'+(title==='Team Criteria'?'<span class="review-header-mark" data-team-mark aria-label="Common team score"></span>':'')+(description?'<span>'+description+'</span>':'')+'</summary><div class="review-accordion-content">'+content+'</div></details>';
@@ -452,7 +453,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     const criteria=d.config.criteria;
     const teamFields=criteria.map((c,i)=>c.type==='Team'?control(c,i,'team',team[c.pi]):'').join('');
     const individual=d.roster.students.map((s,index)=>{
-      const student=savedStudents.find(v=>v.register===s.register)||{},a=student.assessment||{},draft=a.makeupDraft||{},scores=targeted && targeted.index===index?(draft.scores||{}):(student.scores||{});
+      const student=savedStudents.find(v=>v.register===s.register)||{},a=student.assessment||{},draft=a.makeupDraft||{},scores=targeted && targeted.index===index?(draft.scores||{}):!d.availability.editable && a.individualSource==='makeup'?(a.makeup?.scores||{}):(student.scores||{});
       return '<details class="review-student-accordion" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary><span class="review-student-heading"><strong>'+escape(s.name)+'</strong><span class="review-header-mark" data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span class="review-student-subheading"><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div class="review-accordion-content">'+absenceControl(index,student)+individualPills(index)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
     }).join('');
     drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div class="review-actions">'+(d.availability.editable?'<button type="button" data-draft>Save Draft</button><button type="button" data-submit>Submit Evaluation</button>':'')+'<button type="button" data-reload>Reload</button><button type="button" data-close>Close</button></div>');
@@ -551,7 +552,7 @@ function reviewEvaluationBrowser_(reviewKey) {
         if(options.dataset.level!==level || options.dataset.pendingMessage!==pendingMessage) {
           options.dataset.level=level;
           options.dataset.pendingMessage=pendingMessage;
-          options.innerHTML=pendingIndividual?'<small>'+escape(pendingMessage)+'</small>':level===''?'<small>Select a level for suggested feedback.</small>':feedbackOptions(c,n).map((suggestion,i)=>'<button type="button" data-feedback="'+i+'" aria-pressed="false" aria-label="'+escape(suggestion)+'" title="Add this feedback">+ '+escape(suggestion)+'</button>').join('');
+          options.innerHTML=pendingIndividual?'<small>'+escape(pendingMessage)+'</small>':level===''?'<small>Select a level for suggested feedback.</small>':feedbackOptions(c,n).map((suggestion,i)=>'<button type="button" data-feedback="'+i+'" aria-pressed="false" aria-label="'+escape(suggestion)+'" title="Add this feedback">'+DashboardUI.renderIcon('plus')+' '+escape(suggestion)+'</button>').join('');
         }
         const suggestions=feedbackOptions(c,n),selected=selectedFeedback(remark.value);
         options.querySelectorAll('button').forEach(button=>{
@@ -559,8 +560,8 @@ function reviewEvaluationBrowser_(reviewKey) {
           button.disabled=busy || !editable;
           button.setAttribute('aria-pressed',String(pressed));
           button.title=pressed?'Remove this feedback':'Add this feedback';
-          const label=(pressed?'✓ ':'+ ')+suggestion;
-          if(button.textContent!==label)button.textContent=label;
+          const label=DashboardUI.renderIcon(pressed?'check':'plus')+' '+escape(suggestion);
+          if(button.innerHTML!==label)button.innerHTML=label;
         });
       }
       if(marks!=='' && valid){
@@ -730,7 +731,7 @@ function reviewEvaluationBrowser_(reviewKey) {
   function refreshTable() {
     const host=document.getElementById('reviewerContent');if(!host)return;
     if(host.getAttribute('aria-busy')==='true')return;
-    const finish=DashboardUI.beginContentLoading(host,'Refreshing assigned teams');
+    const finish=DashboardUI.beginContentLoading(host,'Refreshing assigned teams',{compact:true});
     const search=document.getElementById('reviewerAssignedSearch'),query=search?search.value:'';
     rpc('refreshReviewerContentForCurrentUser',[],html=>{
       finish();
@@ -743,7 +744,7 @@ function reviewEvaluationBrowser_(reviewKey) {
   function student() {
     const host=document.getElementById('studentAssessment-'+reviewKey);if(!host || studentBusy)return;
     studentBusy=true;
-    const finish=DashboardUI.beginContentLoading(host,'Loading '+reviewLabel+' results');
+    const finish=DashboardUI.beginContentLoading(host,'Loading '+reviewLabel+' results',{compact:true});
     rpc('loadPublishedReviewEvaluation',[reviewKey],result=>{
       finish();studentBusy=false;
       if(document.getElementById('studentAssessment-'+reviewKey)!==host)return;
@@ -795,8 +796,8 @@ function getReviewEvaluationStyles_() {
   .review-team-line .team-drawer-title { margin:0; }
   .review-header-line { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-height:36px; padding-right:44px; margin-bottom:0; color:var(--color-ink,#344054); font-size:12px; font-weight:500; line-height:1.5; }
   .review-header-line > span { white-space:nowrap; }
-  .review-header-review { padding:2px 8px; border-radius:999px; background:var(--color-accent-tint,#f4ebff); color:var(--color-accent-primary,#6941c6); font-size:11px; font-weight:500; }
-  .review-header-line .review-header-due { padding:2px 6px; border:1px solid var(--color-control-border,#d0d5dd); border-radius:4px; background:var(--color-canvas,#f9fafb); color:var(--color-ink,#182230); font-size:10px; font-weight:500; }
+  .review-header-review { padding:2px 8px; border-radius:var(--pill-radius); background:var(--color-accent-tint,#f4ebff); color:var(--color-accent-primary,#6941c6); font-size:11px; font-weight:500; }
+  .review-header-line .review-header-due { padding:2px 6px; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--pill-radius); background:var(--color-canvas,#f9fafb); color:var(--color-ink,#182230); font-size:10px; font-weight:500; }
   .review-header-line .review-header-due[data-timing="info"] { background:var(--color-info-tint,#eff8ff); border-color:var(--color-info,#b2ddff); color:var(--color-info,#175cd3); }
   .review-header-line .review-header-due[data-timing="success"] { background:var(--color-success-tint,#ecfdf3); border-color:var(--color-success,#abefc6); color:var(--color-success,#067647); }
   .review-header-line .review-header-due[data-timing="warning"] { background:var(--color-warning-tint,#fffaeb); border-color:var(--color-warning,#fedf89); color:var(--color-warning,#93370d); }
@@ -820,7 +821,7 @@ function getReviewEvaluationStyles_() {
   .review-tab-caption { color:var(--color-ink-muted,#8492a6); font-size:11px; font-weight:400; }
   .review-pi-pills { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:6px; padding:0; margin-top:6px; }
   .review-pi-pills[data-individual-pills] { margin:0 0 6px; }
-  .review-drawer .review-pi-pills button { display:flex; flex:0 0 auto; align-items:center; justify-content:flex-start; gap:5px; width:auto; min-width:0; max-width:100%; min-height:34px; box-sizing:border-box; padding:4px 8px; margin:0; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--editorial-radius,6px); background:var(--color-paper,#fff); color:var(--color-ink-muted,#475467); font-size:11px; text-align:left; }
+  .review-drawer .review-pi-pills button { display:flex; flex:0 0 auto; align-items:center; justify-content:flex-start; gap:5px; width:auto; min-width:0; max-width:100%; min-height:34px; box-sizing:border-box; padding:4px 8px; margin:0; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--pill-radius); background:var(--color-paper,#fff); color:var(--color-ink-muted,#475467); font-size:11px; text-align:left; }
   .review-pi-label { display:flex; flex-direction:column; align-items:flex-start; line-height:1.3; overflow-wrap:anywhere; }
   .review-pi-label strong { font-size:11px; font-weight:600; }
   .review-pi-label small { font-size:9px; font-weight:400; }
@@ -842,9 +843,9 @@ function getReviewEvaluationStyles_() {
   .review-criterion[data-index] .review-control-title { margin-top:10px; color:var(--color-ink-muted,#8492a6); font-size:10px; text-transform:uppercase; letter-spacing:.04em; }
   .review-criterion[data-index] .review-levels button[aria-pressed="true"] { background:var(--color-accent-primary,#6941c6); color:var(--color-paper,#fff); border-color:var(--color-accent-secondary,#b692f6); }
   .review-criterion[data-index] .review-feedback-heading { margin-top:14px; padding-top:12px; border-top:1px solid var(--color-border,#eaecf0); }
-  .review-criterion[data-index] .review-feedback-options button { border-radius:var(--editorial-radius,6px); padding:5px 8px; min-height:28px; }
+  .review-criterion[data-index] .review-feedback-options button { border-radius:var(--pill-radius); padding:5px 8px; min-height:28px; }
   .review-tab-progress { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; color:var(--color-ink-muted,#667085); font-size:11px; }
-  .review-graded-pill { padding:2px 7px; border:1px solid var(--color-border,#e4e7ec); border-radius:5px; background:var(--color-soft,#f2f4f7); color:var(--color-ink-muted,#667085); white-space:nowrap; }
+  .review-graded-pill { padding:2px 7px; border:1px solid var(--color-border,#e4e7ec); border-radius:var(--pill-radius); background:var(--color-soft,#f2f4f7); color:var(--color-ink-muted,#667085); white-space:nowrap; }
   .review-graded-pill[data-completion="partial"] { color:var(--color-accent-primary,#6941c6); border-color:var(--color-accent-secondary,#e9d5ff); background:var(--color-accent-tint,#faf5ff); }
   .review-graded-pill[data-completion="complete"] { color:var(--color-success,#067647); border-color:var(--color-success,#abefc6); background:var(--color-success-tint,#ecfdf3); }
   .review-drawer .review-criteria-tabs [aria-selected="false"]:not(:disabled):hover { background:var(--color-canvas,#f8fafc); }
@@ -897,7 +898,7 @@ function getReviewEvaluationStyles_() {
   .review-drawer button { font:inherit; cursor:pointer; }
   .review-criterion [data-level][hidden] { display:none; }
   .review-criterion-meta { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
-  .review-criterion-meta span { padding:5px 9px; border-radius:var(--editorial-radius,6px); background:var(--color-accent-tint,#f4f3ff); color:var(--color-accent-primary,#6941c6); font-size:11px; font-weight:700; }
+  .review-criterion-meta span { padding:5px 9px; border-radius:var(--pill-radius); background:var(--color-accent-tint,#f4f3ff); color:var(--color-accent-primary,#6941c6); font-size:11px; font-weight:700; }
   .review-criterion-meta span:last-child { background:var(--color-soft,#f2f4f7); color:var(--color-ink-muted,#475467); }
   .review-control-title { color:var(--color-ink-muted,#667085); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
   .review-marks-error { margin:8px 0 12px; padding:9px 11px; border:1px solid var(--color-danger,#fda29b); border-left:3px solid var(--color-danger,#d92d20); border-radius:var(--editorial-radius,6px); background:var(--color-danger-tint,#fef3f2); color:var(--color-danger,#b42318); font-size:12px; font-weight:600; line-height:1.5; }
@@ -934,16 +935,16 @@ function getReviewEvaluationStyles_() {
   .review-assessment-summary dd { color:var(--color-ink,#1e293b); font-variant-numeric:tabular-nums; }
   .review-assessment-summary .review-summary-total { border-left:2px solid var(--color-accent-secondary,#99f6e4); padding-left:8px; }
   .review-assessment-summary .review-summary-total[data-resolved="true"] dd { color:var(--color-accent-primary,#0f766e); font-weight:700; }
-  .review-assessment-summary .review-summary-status dd { padding:2px 7px; border-radius:5px; background:var(--color-soft,#f1f5f9); color:var(--color-ink-muted,#475569); font-size:11px; }
+  .review-assessment-summary .review-summary-status dd { padding:2px 7px; border-radius:var(--pill-radius); background:var(--color-soft,#f1f5f9); color:var(--color-ink-muted,#475569); font-size:11px; }
   .review-assessment-summary .review-summary-status[data-tone="complete"] dd { background:var(--color-success-tint,#ecfdf5); color:var(--color-success,#047857); }
   .review-assessment-summary .review-summary-status[data-tone="pending"] dd { background:var(--color-warning-tint,#fffbeb); color:var(--color-warning,#92400e); }
   .review-assessment-summary .review-summary-status[data-tone="exception"] dd { background:var(--color-danger-tint,#fff1f2); color:var(--color-danger,#9f1239); }
   .review-assessment-summary button, .review-summary-decision { margin-top:8px; }
   .review-summary-decision > summary { cursor:pointer; color:var(--color-accent-primary,#6941c6); font-weight:600; }
   .review-summary-decision label { display:block; margin-top:8px; }
-  .review-assessment-summary [data-summary-unsaved] { display:inline-block; margin-left:6px; padding:1px 5px; border-radius:4px; background:var(--color-warning-tint,#fffbeb); color:var(--color-warning,#92400e); font-size:10px; font-weight:400; }
+  .review-assessment-summary [data-summary-unsaved] { display:inline-block; margin-left:6px; padding:1px 5px; border-radius:var(--pill-radius); background:var(--color-warning-tint,#fffbeb); color:var(--color-warning,#92400e); font-size:10px; font-weight:400; }
   .review-student-accordion > summary span { display:block; margin:3px 0 0 16px; color:var(--color-ink-muted,#475467); font-size:11px; }
-  .review-accordion > summary .review-header-mark, .review-student-accordion > summary .review-header-mark { display:inline-flex; flex-shrink:0; margin:0 0 0 8px; padding:3px 9px; border:1px solid var(--color-accent-secondary,#d6bbfb); border-radius:999px; background:var(--color-accent-tint,#f4f3ff); color:var(--color-accent-primary,#5925dc); font-size:12px; font-weight:600; line-height:1.5; }
+  .review-accordion > summary .review-header-mark, .review-student-accordion > summary .review-header-mark { display:inline-flex; flex-shrink:0; margin:0 0 0 8px; padding:3px 9px; border:1px solid var(--color-accent-secondary,#d6bbfb); border-radius:var(--pill-radius); background:var(--color-accent-tint,#f4f3ff); color:var(--color-accent-primary,#5925dc); font-size:12px; font-weight:600; line-height:1.5; }
   .review-accordion > summary > .review-header-mark { float:right; }
   .review-student-accordion > summary .review-student-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0; color:inherit; font-size:12px; }
   .review-student-heading strong { min-width:0; overflow-wrap:anywhere; }
@@ -973,12 +974,12 @@ function getReviewEvaluationStyles_() {
   .review-feedback-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; }
   .review-feedback-title { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
   .review-feedback-title strong { color:var(--color-ink,#182230); }
-  .review-feedback-heading [data-feedback-required] { padding:2px 5px; border-radius:4px; background:var(--color-warning-tint,#fef0c7); color:var(--color-warning,#b54708); font-size:10px; font-weight:500; line-height:1.4; white-space:nowrap; }
+  .review-feedback-heading [data-feedback-required] { padding:2px 5px; border-radius:var(--pill-radius); background:var(--color-warning-tint,#fef0c7); color:var(--color-warning,#b54708); font-size:10px; font-weight:500; line-height:1.4; white-space:nowrap; }
   .review-feedback-heading [data-feedback-status] { flex-shrink:0; font-size:10px; color:var(--color-ink-muted,#667085); }
-  .review-criterion:is([data-level="3"],[data-level="4"],[data-level="5"]) [data-feedback-status] { color:var(--color-success,#067647); background:var(--color-success-tint,#ecfdf3); border-radius:4px; padding:2px 6px; font-weight:500; line-height:1.4; }
+  .review-criterion:is([data-level="3"],[data-level="4"],[data-level="5"]) [data-feedback-status] { color:var(--color-success,#067647); background:var(--color-success-tint,#ecfdf3); border-radius:var(--pill-radius); padding:2px 6px; font-weight:500; line-height:1.4; }
   .review-feedback-options { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
   .review-feedback-options { --pill-border:var(--color-accent-secondary,#d6bbfb); --pill-bg:var(--color-accent-tint,#faf5ff); --pill-text:var(--color-accent-primary,#6941c6); --pill-active:var(--color-accent-primary,#6941c6); --pill-hover:var(--color-accent-hover,#53389e); }
-  .review-feedback-options button { max-width:100%; min-height:32px; padding:6px 12px; border:1px solid var(--pill-border); border-radius:999px; background:var(--pill-bg); color:var(--pill-text); text-align:left; font-size:11px; line-height:1.5; overflow-wrap:anywhere; transition:background-color .15s ease,color .15s ease,border-color .15s ease; }
+  .review-feedback-options button { max-width:100%; min-height:32px; padding:6px 12px; border:1px solid var(--pill-border); border-radius:var(--pill-radius); background:var(--pill-bg); color:var(--pill-text); text-align:left; font-size:11px; line-height:1.5; overflow-wrap:anywhere; transition:background-color .15s ease,color .15s ease,border-color .15s ease; }
   .review-feedback-options button[aria-pressed="true"] { border-color:var(--pill-active); background:var(--pill-active); color:var(--color-paper,#fff); }
   .review-feedback-options button:is(:hover,:focus-visible):enabled { border-color:var(--pill-hover); background:var(--pill-hover); color:var(--color-paper,#fff); }
   .review-feedback-options button:focus-visible { outline:3px solid var(--color-accent-primary,#9e77ed); outline-offset:3px; }

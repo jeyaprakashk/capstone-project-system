@@ -872,10 +872,10 @@ test('level changes clear saved team and individual marks without assigning repl
 
 test('feedback pills toggle repeatedly without duplicate text and retain stable controls',()=>{
   const f=feedbackFixture(),pill=f.pills()[1];f.toggle(1);const suggestion=f.remark.value;
-  assert.equal(pill.textContent,'✓ '+suggestion);assert.equal(pill.title,'Remove this feedback');
+  assert.match(pill.innerHTML,/lucide-check/);assert(pill.innerHTML.endsWith(' '+suggestion));assert.equal(pill.title,'Remove this feedback');
   for(let i=0;i<10;i++){f.toggle(1);assert.equal(f.remark.value,'');f.toggle(1);assert.equal(f.remark.value,suggestion);}
   assert.equal(f.pills()[1],pill);assert.equal(pill.disabled,false);
-  f.toggle(1);assert.equal(pill.textContent,'+ '+suggestion);assert.equal(pill.title,'Add this feedback');
+  f.toggle(1);assert.match(pill.innerHTML,/lucide-plus/);assert(pill.innerHTML.endsWith(' '+suggestion));assert.equal(pill.title,'Add this feedback');
 });
 test('manual deletion and undo resynchronize pill selection without rebuilding buttons',()=>{
   const f=feedbackFixture();f.toggle(0);f.toggle(1);const both=f.remark.value,first=both.split('\n')[0],pill=f.pills()[1];
@@ -1049,6 +1049,34 @@ test('absence correction enforces authorization, eligibility, concurrency and pa
   assert.equal(f.load().revision,revision);assert.equal(f.locked(),false);
   const draft=absenceFixture();assert.throws(()=>draft.c.recordReviewAbsence(correctionInput(draft,{type:'REVIEW_DAY_ABSENCE',approved:true})),/Submit the evaluation/);
 });
+for(const key of ['review1','review2','review_extra'])test(key+' corrected approved absence shows submitted makeup criteria after reload',async()=>{
+  const server=submittedAbsence(key,{type:'REVIEW_DAY_ABSENCE',approved:false});
+  const before=server.load().evaluation;
+  server.c.recordReviewAbsence(correctionInput(server,{type:'REVIEW_DAY_ABSENCE',approved:true}));
+  const scores={I:{level:3,marks:32,remark:'Makeup viva completed'}};
+  server.c.submitReviewMakeup({...correctionInput(server,{}),absence:undefined,scores});
+  const b=browserFixture(true,key);b.api.open('T1',b.trigger);
+  b.requests[0].success(JSON.parse(JSON.stringify(server.load())));
+  const check=()=>{
+    const field=b.fields().find(f=>f.dataset.owner==='0');
+    assert.equal(field.hidden,false);
+    assert.equal(field.controls['[data-level]'].value,'3');
+    assert.equal(field.controls['[data-marks]'].value,'32');
+    assert.equal(field.controls['[data-remark]'].value,scores.I.remark);
+    assert.equal(field.controls['[data-marks]'].disabled,true);
+    assert.equal(field.controls['[data-level]'].disabled,true);
+    assert.doesNotMatch(b.drawer.innerHTML,/data-target="0"/);
+  };
+  check();await b.click('data-reload');b.requests.at(-1).success(JSON.parse(JSON.stringify(server.load())));check();
+  assert.equal(JSON.stringify(server.student().scores),JSON.stringify(before.students[0].scores));
+  assert.equal(JSON.stringify(server.load().evaluation.teamScores),JSON.stringify(before.teamScores));
+  assert.equal(JSON.stringify(server.load().evaluation.students[1]),JSON.stringify(before.students[1]));
+  server.c.recordReviewAbsence(correctionInput(server,{type:'REVIEW_DAY_ABSENCE',approved:false}));
+  await b.click('data-reload');b.requests.at(-1).success(JSON.parse(JSON.stringify(server.load())));
+  assert.equal(b.fields().find(f=>f.dataset.owner==='0').hidden,true);
+  assert.equal(server.student().assessment.individualMark,0);
+});
+
 test('absence corrections preserve makeup drafts and completed provenance as applicability changes',()=>{
   const f=submittedAbsence(),scores={I:{level:3,marks:32,remark:''}};
   f.c.saveReviewMakeupDraft({...correctionInput(f,{}),absence:undefined,scores});

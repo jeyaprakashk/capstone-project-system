@@ -500,40 +500,44 @@ function buildAnnouncementAudience_(a) {
   return audiences.length ? audiences.join(' • ') : 'No audience selected';
 }
 
+function announcementPresentation_(a) {
+  const message=String(a.message || '').trim();
+  const text=message;
+  const firstLine=text.split(/\r?\n/)[0] || 'Announcement';
+  const step=text.match(/\bstep\s*(\d+)\b/i);
+  const type=/\btemplate\b/i.test(text)?'Template':/\bform\b/i.test(text)?'Form':'Notice';
+  const link=/^https?:\/\//i.test(String(a.fileLink || '').trim())?String(a.fileLink).trim():'';
+  return {message,text,title:firstLine.length>140?firstLine.slice(0,137)+'…':firstLine,step:step?Number(step[1]):null,type,link};
+}
+
 function buildAnnouncementsTabContent_(announcements, isCoordinator) {
-  const formUrl = isCoordinator ? String(getConfig('ANNOUNCEMENTS_FORM_URL') || '').trim() : '';
-  const addButton = isCoordinator && formUrl
-    ? `<a class="announcement-add-btn" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener">${renderLucideIcon_('plus', '', 'icon-leading')}Add Announcement</a>`
-    : '';
-
-  const header = `<div class="announcement-header"><div><div class="announcement-title-row"><h2>Announcements</h2><span class="announcement-count" aria-label="${announcements.length} announcements">${announcements.length > 99 ? '99+' : announcements.length}</span></div><p class="announcement-subtitle" id="announcementsUpdated">${dashboardUpdatedLabel_()}</p></div><div class="announcement-actions"><button type="button" class="announcement-refresh-btn" onclick="refreshAnnouncements()">${renderLucideIcon_('refresh-cw', '', 'icon-leading')}Refresh</button>${addButton}</div></div><p class="announcement-status" role="status" aria-live="polite"></p>`;
-
-  if (!announcements.length) {
-    return `<div class="announcement-tab-surface">${header}<div class="announcement-empty-state"><span class="announcement-empty-icon" aria-hidden="true">${renderLucideIcon_('sparkles')}</span><h3>You're all caught up</h3><p class="announcement-empty">New announcements will appear here when they're posted.</p></div></div>`;
+  const formUrl=isCoordinator?String(getConfig('ANNOUNCEMENTS_FORM_URL') || '').trim():'';
+  const addButton=isCoordinator && /^https?:\/\//i.test(formUrl)?`<a class="announcement-add-btn" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener">${renderLucideIcon_('plus')}New announcement</a>`:'';
+  const records=announcements.map(a=>({a,p:announcementPresentation_(a),date:formatAnnouncementTimestamp_(a.timestamp)}));
+  const year=String(getConfig('ACADEMIC_YEAR') || '').trim();
+  const header=`<div class="announcement-header"><div><p class="announcement-eyebrow">Capstone project${year?' · '+escapeHtml(year):''}</p><h2>Announcements</h2><p class="announcement-subtitle" id="announcementsUpdated">${announcements.length} posts · ${dashboardUpdatedLabel_()}</p></div><div class="announcement-actions"><button type="button" class="announcement-refresh-btn" aria-label="Refresh announcements" title="Refresh announcements" onclick="refreshAnnouncements()">${renderLucideIcon_('refresh-cw')}</button>${addButton}</div></div><p class="announcement-status" role="status" aria-live="polite"></p>`;
+  function item(record,index) {
+    const {a,p,date}=record;
+    const audience=buildAnnouncementAudience_(a);
+    const audiences=[a.studentVisible?'teams':'',a.guideVisible?'guides':'',a.reviewerVisible?'reviewers':''].filter(Boolean).join(' ');
+    const body=p.text!==p.title?`<details class="announcement-full"><summary>Read announcement</summary><p class="announcement-message">${escapeHtml(p.text)}</p></details>`:'';
+    return `<article id="announcement-${index}" class="announcement-item" data-announcement-type="${p.type}" data-announcement-audiences="${audiences}" data-announcement-search="${escapeHtml(p.message+' '+date+' '+audience+' '+p.type)}"><span class="announcement-row-icon" aria-hidden="true">${p.step!==null?'S'+p.step:renderLucideIcon_(p.type==='Form'?'file-text':'megaphone')}</span><div class="announcement-row-copy"><h3>${escapeHtml(p.title)}</h3><div class="announcement-meta">${p.type} · <span class="announcement-date">${escapeHtml(date || 'Date unavailable')}</span> · <span class="announcement-audience">${escapeHtml(audience)}</span></div>${body}</div><div class="announcement-row-actions">${p.link?`<a class="announcement-link" href="${escapeHtml(p.link)}" target="_blank" rel="noopener">${p.type==='Form'?'Open form':'Open'} ${renderLucideIcon_('external-link')}<span class="announcement-sr-only"> (opens in a new tab)</span></a>`:''}</div></article>`;
   }
-
-  const items = announcements.map(a => {
-    const message = String(a.message || '');
-    const date = formatAnnouncementTimestamp_(a.timestamp);
-    const link = a.fileLink
-      ? `<a class="announcement-link" href="${escapeHtml(a.fileLink)}" target="_blank" rel="noopener">Open document ${renderLucideIcon_('external-link')}<span class="announcement-sr-only"> (opens in a new tab)</span></a>`
-      : '';
-    const audience = isCoordinator
-      ? `<div class="announcement-audience"><span class="announcement-audience-label">For</span>${buildAnnouncementAudience_(a).split(' • ').map(label => `<span class="announcement-audience-chip">${escapeHtml(label)}</span>`).join('')}</div>`
-      : '';
-    const body = message.length > 300
-      ? `<details class="announcement-details"><summary><span class="announcement-preview">${escapeHtml(message.slice(0, 300).trim())}&hellip;</span><span class="announcement-expand">Read full announcement</span><span class="announcement-collapse">Show less</span></summary><p>${escapeHtml(message)}</p></details>`
-      : `<p class="announcement-message">${escapeHtml(message)}</p>`;
-    return `<article class="announcement-item">${date || audience ? `<div class="announcement-meta">${date ? `<div class="announcement-date">${escapeHtml(date)}</div>` : ''}${audience}</div>` : ''}${body}${link ? `<div class="announcement-footer">${link}</div>` : ''}</article>`;
-  }).join('');
-
-  return `<div class="announcement-tab-surface">${header}
-    <div class="announcement-search-bar"><label for="announcementSearch">Search announcements</label><input id="announcementSearch" type="search" placeholder="Search updates, dates or audiences…" autocomplete="off" aria-controls="announcementList"><button type="button" class="announcement-refresh-btn" data-announcement-clear>Clear</button></div>
-    <p class="announcement-results" role="status" aria-live="polite"></p>
-    <div id="announcementList" class="announcement-list">${items}</div>
-    <div class="announcement-no-results announcement-empty-state" hidden><h3>No matching announcements</h3><p class="announcement-empty">Try a different search or clear your search to see all updates.</p></div>
-    <nav class="announcement-pagination" aria-label="Announcement pages"><button type="button" class="announcement-refresh-btn" data-announcement-prev>${renderLucideIcon_('arrow-left', '', 'icon-leading')}Previous</button><span data-announcement-page></span><button type="button" class="announcement-refresh-btn" data-announcement-next>Next${renderLucideIcon_('arrow-right', '', 'icon-trailing')}</button></nav>
-  </div>`;
+  const groups=new Map();
+  records.forEach((r,i)=>{
+    const day=r.date.split(',')[0] || 'Earlier';
+    if(!groups.has(day))groups.set(day,[]);
+    groups.get(day).push(item(r,i));
+  });
+  const feed=Array.from(groups,([day,items])=>`<section class="announcement-date-group"><h3 class="announcement-group-heading">${escapeHtml(day)}</h3>${items.join('')}</section>`).join('');
+  const templates=[],seen=new Set();
+  records.filter(r=>r.p.type==='Template' && r.p.step!==null && r.p.link).sort((a,b)=>a.p.step-b.p.step).forEach(r=>{
+    if(seen.has(r.p.link))return;
+    seen.add(r.p.link);templates.push(`<li><a href="${escapeHtml(r.p.link)}" target="_blank" rel="noopener"><span class="announcement-step-number">${r.p.step}</span><span>${escapeHtml(r.p.title)}</span>${renderLucideIcon_('external-link')}</a></li>`);
+  });
+  return `<div class="announcement-tab-surface announcement-hub">${header}
+    <div class="announcement-toolbar"><label class="announcement-search-field"><span class="announcement-sr-only">Search announcements</span>${renderLucideIcon_('search')}<input id="announcementSearch" type="search" placeholder="Search titles, steps or dates" autocomplete="off" aria-controls="announcementList"></label><div class="announcement-audience-filters" role="group" aria-label="Filter by audience">${[['all','All · '+announcements.length],['teams','Project Teams'],['guides','Guides'],['reviewers','Reviewers']].map(([key,label])=>`<button type="button" data-announcement-audience="${key}" aria-pressed="${key==='all'}">${label}</button>`).join('')}</div><label><span class="announcement-sr-only">Announcement type</span><select data-announcement-type-filter><option value="all">All types</option><option value="Template">Template</option><option value="Form">Form</option><option value="Notice">Notice</option></select></label></div>
+    <p class="announcement-results" role="status" aria-live="polite"></p><div class="announcement-columns"><div><div id="announcementList" class="announcement-list">${feed}</div><div class="announcement-no-results announcement-empty-state" hidden><h3>${announcements.length?'No matching announcements':"You're all caught up"}</h3><p>${announcements.length?'Try another search or filter.':'New announcements will appear here when posted.'}</p></div><div class="announcement-load-more"><button type="button" data-announcement-more>Show older announcements</button></div></div><aside class="announcement-templates"><h3>Step templates</h3><p>Every available template, in step order.</p>${templates.length?'<ol>'+templates.join('')+'</ol>':'<p>No step templates have been shared yet.</p>'}</aside></div></div>`;
 }
 
 /**
@@ -761,6 +765,6 @@ function renderAssessmentHistory_(decisions) {
       const when=valid?date.toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
       const reason=String(d.reason||'');
       const note=reason && !automaticReasons.includes(reason) && !reason.startsWith('Absence details recorded: ')?'<p>'+escape(reason)+'</p>':'';
-      return '<li><div class="review-history-heading"><strong>'+escape(actions[d.decision]||'Assessment updated')+'</strong>'+(when?'<time datetime="'+escape(date.toISOString())+'">'+escape(when)+'</time>':'')+'</div><div class="review-history-status">'+escape(statuses[d.previousStatus]||'Not assessed')+' <span aria-label="changed to">→</span> '+escape(statuses[d.resultingStatus]||'Updated')+'</div>'+note+(d.reviewer?'<small>'+escape(d.reviewer)+'</small>':'')+'</li>';
+      return '<li><div class="review-history-heading"><strong>'+escape(actions[d.decision]||'Assessment updated')+'</strong>'+(when?'<time datetime="'+escape(date.toISOString())+'">'+escape(when)+'</time>':'')+'</div><div class="review-history-status">'+escape(statuses[d.previousStatus]||'Not assessed')+' <span>changed to</span> '+escape(statuses[d.resultingStatus]||'Updated')+'</div>'+note+(d.reviewer?'<small>'+escape(d.reviewer)+'</small>':'')+'</li>';
     }).join('')+'</ol></details>';
   }

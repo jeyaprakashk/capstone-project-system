@@ -16,7 +16,7 @@ function renderExpandableText_(value, maxLen = 130) {
 }
 
 /** Lazy-load one pinned bundle; a separate top-layer host also covers marking dialogs. */
-function dashboardDialogsBrowser_(renderSkeleton) {
+function dashboardDialogsBrowser_(renderSkeleton, renderIcon) {
   let library, active=false, settled=Promise.resolve();
   function load() {
     if (window.Swal) return Promise.resolve(window.Swal);
@@ -59,7 +59,7 @@ function dashboardDialogsBrowser_(renderSkeleton) {
       const dialogDestroyed=new Promise(resolve=>{finishDialog=resolve;});
       const result=await swal.fire({
         target:host,titleText:kind==='confirm'?'Please confirm':kind==='prompt'?'Add a remark':icon==='error'?'Unable to complete action':'Message',
-        text:String(text),icon:icon || (kind==='confirm'?'question':'info'),
+        text:String(text),icon:'info',iconHtml:renderIcon(({success:'check',error:'x',warning:'triangle-alert',question:'circle-help',info:'info'})[icon] || (kind==='confirm'?'circle-help':'info')),customClass:{icon:'dashboard-dialog-icon'},
         showCancelButton:kind!=='alert',confirmButtonText:kind==='alert'?'OK':'Continue',
         cancelButtonText:'Cancel',focusCancel:kind==='confirm',allowOutsideClick:false,
         heightAuto:false,returnFocus:false,keydownListenerCapture:true,
@@ -100,7 +100,7 @@ function getDashboardClientScript() {
 const DashboardUI = (function() {
   'use strict';
   const renderSkeleton = ${getSkeletonMarkup_.toString()};
-  const dialogs = (${dashboardDialogsBrowser_.toString()})(renderSkeleton);
+  const dialogs = (${dashboardDialogsBrowser_.toString()})(renderSkeleton, renderLucideIcon_);
   const renderExpandableText = ${renderExpandableText_.toString()};
   const renderAssessmentHistory = ${renderAssessmentHistory_.toString()};
   ${getLucideIconNodes_.toString()}
@@ -111,15 +111,17 @@ const DashboardUI = (function() {
   function byId(id) { return document.getElementById(id); }
   function setLoading(id, label) { const el = byId(id); if (el) el.innerHTML = renderSkeleton('inline', label); }
   // Preserve live DOM, layout and event handlers until a read finishes.
-  function beginContentLoading(target, label) {
+  function beginContentLoading(target, label, options) {
     if (!target) return function() {};
     const overlay = document.createElement('div');
     overlay.className = 'app-loading-overlay';
-    overlay.innerHTML = renderSkeleton(target.clientHeight < 120 ? 'inline' : 'panel', label);
+    const compact = options && options.compact;
+    overlay.innerHTML = renderSkeleton(!compact && target.clientHeight < 120 ? 'inline' : 'panel', label);
     const children = Array.from(target.children).map(function(child) { return {node:child, inert:child.inert}; });
     children.forEach(function(child) { child.node.inert = true; });
     target.setAttribute('aria-busy', 'true');
     target.classList.add('app-content-loading');
+    if (compact) target.classList.add('app-content-loading--compact');
     target.appendChild(overlay);
     let finished = false;
     return function() {
@@ -129,6 +131,7 @@ const DashboardUI = (function() {
       children.forEach(function(child) { child.node.inert = child.inert; });
       target.setAttribute('aria-busy', 'false');
       target.classList.remove('app-content-loading');
+      if (compact) target.classList.remove('app-content-loading--compact');
     };
   }
   function setText(id, text) { const el = byId(id); if (el) el.textContent = text; }
@@ -145,6 +148,7 @@ const DashboardUI = (function() {
   let utilityRequestContext = false;
   let preloadTimer = null;
   let activeRole = null;
+  let announcementRoleTheme = null;
   let tabSelectedAt = 0;
   let roleQueue = null;
   let announcementsSettled = false;
@@ -380,7 +384,7 @@ const DashboardUI = (function() {
       dashboardRun().withSuccessHandler(function(data) {
         try {
           target.innerHTML = '<div class="rubric-assessments">' + data.assessments.map(function(item) {
-            const desktopCard = '<button type="button" class="rubric-assessment" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span class="rubric-header"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-weight">' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span class="rubric-footer"><span class="rubric-metadata">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span class="rubric-action"><span class="rubric-mobile-hidden">View rubric</span> <span aria-hidden="true">→</span></span>' : '') + '</span></button>';
+            const desktopCard = '<button type="button" class="rubric-assessment" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span class="rubric-header"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-weight">' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span class="rubric-footer"><span class="rubric-metadata">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span class="rubric-action"><span class="rubric-mobile-hidden">View rubric</span> '+renderLucideIcon_('arrow-right')+'</span>' : '') + '</span></button>';
             const mobileRow = '<div class="rubric-mobile-row"><div class="rubric-mobile-details"><div class="rubric-mobile-title"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-mobile-weight" aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span class="rubric-mobile-meta">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="rubric-view-button" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
             return desktopCard + mobileRow;
           }).join('') + '</div>' + (data.assessments.length ? '' : '<p>No graded assessments configured.</p>');
@@ -475,7 +479,7 @@ const DashboardUI = (function() {
     }
 
     const hadContent = !!loadedRoleTabs[activeKey];
-    const finishLoading = beginContentLoading(target, 'Loading dashboard');
+    const finishLoading = beginContentLoading(target, 'Loading dashboard', {compact:activeKey === 'reviewer'});
     const refreshButton = byId(activeKey + 'Refresh');
     if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderSkeleton('inline', 'Refreshing'); }
     setText(activeKey + 'RefreshStatus', '');
@@ -514,52 +518,35 @@ const DashboardUI = (function() {
       .loadDashboardRoleContent(activeKey);
   }
 
-  const announcementsState = { loading: false, loaded: false, query: '', page: 1, pageSize: 5 };
+  const announcementsState = { loading:false, loaded:false, query:'', audience:'all', type:'all', page:1, pageSize:5 };
 
   function initializeAnnouncementSearch(target) {
-    const search = target.querySelector('#announcementSearch');
-    if (!search) return;
-    const items = Array.from(target.querySelectorAll('.announcement-list > .announcement-item'));
-    const indexed = items.map(function(item) {
-      const content = item.querySelector('.announcement-message, .announcement-details p');
-      const date = item.querySelector('.announcement-date');
-      const audience = item.querySelector('.announcement-audience');
-      return { item: item, text: [content, date, audience].map(function(el) { return el ? el.textContent : ''; }).join(' ').toLocaleLowerCase() };
-    });
-    const previous = target.querySelector('[data-announcement-prev]');
-    const next = target.querySelector('[data-announcement-next]');
+    const search=target.querySelector('#announcementSearch');
+    if(!search)return;
+    const items=Array.from(target.querySelectorAll('.announcement-list .announcement-item'));
+    const groups=Array.from(target.querySelectorAll('.announcement-date-group'));
+    const audiences=Array.from(target.querySelectorAll('[data-announcement-audience]'));
+    const type=target.querySelector('[data-announcement-type-filter]');
+    const more=target.querySelector('[data-announcement-more]');
     function render() {
-      const query = announcementsState.query.trim().toLocaleLowerCase();
-      const matches = indexed.filter(function(entry) { return entry.text.includes(query); });
-      const pages = Math.max(1, Math.ceil(matches.length / announcementsState.pageSize));
-      announcementsState.page = Math.min(Math.max(1, announcementsState.page), pages);
-      const start = (announcementsState.page - 1) * announcementsState.pageSize;
-      items.forEach(function(item) { item.hidden = true; });
-      matches.slice(start, start + announcementsState.pageSize).forEach(function(entry) { entry.item.hidden = false; });
-      target.querySelector('.announcement-results').textContent = matches.length
-        ? 'Showing ' + (start + 1) + '–' + Math.min(start + announcementsState.pageSize, matches.length) + ' of ' + matches.length + (query ? ' matching announcements' : ' announcements')
-        : '0 matching announcements';
-      target.querySelector('.announcement-no-results').hidden = matches.length > 0;
-      target.querySelector('[data-announcement-page]').textContent = 'Page ' + announcementsState.page + ' of ' + pages;
-      previous.disabled = announcementsState.page <= 1;
-      next.disabled = announcementsState.page >= pages;
-      target.querySelector('.announcement-pagination').hidden = matches.length === 0;
+      const query=announcementsState.query.trim().toLocaleLowerCase();
+      const matches=items.filter(item=>(item.dataset.announcementSearch||'').toLocaleLowerCase().includes(query) && (announcementsState.audience==='all' || item.dataset.announcementAudiences.split(' ').includes(announcementsState.audience)) && (announcementsState.type==='all' || item.dataset.announcementType===announcementsState.type));
+      const visible=new Set(matches.slice(0,announcementsState.page*announcementsState.pageSize));
+      items.forEach(item=>{item.hidden=!visible.has(item);});
+      groups.forEach(group=>{group.hidden=!Array.from(group.querySelectorAll('.announcement-item')).some(item=>!item.hidden);});
+      target.querySelector('.announcement-results').textContent='Showing '+visible.size+' of '+matches.length+' announcements';
+      target.querySelector('.announcement-no-results').hidden=matches.length>0;
+      const remaining=Math.max(0,matches.length-announcementsState.page*announcementsState.pageSize);
+      more.hidden=!remaining;
+      more.textContent='Show '+Math.min(remaining,announcementsState.pageSize)+' older announcements';
+      audiences.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.announcementAudience===announcementsState.audience)));
     }
-    search.value = announcementsState.query;
-    search.addEventListener('input', function() {
-      announcementsState.query = search.value;
-      announcementsState.page = 1;
-      render();
-    });
-    target.querySelector('[data-announcement-clear]').addEventListener('click', function() {
-      announcementsState.query = '';
-      announcementsState.page = 1;
-      search.value = '';
-      render();
-      search.focus();
-    });
-    previous.addEventListener('click', function() { announcementsState.page--; render(); });
-    next.addEventListener('click', function() { announcementsState.page++; render(); });
+    search.value=announcementsState.query;
+    type.value=announcementsState.type;
+    search.addEventListener('input',()=>{announcementsState.query=search.value;announcementsState.page=1;render();});
+    type.addEventListener('change',()=>{announcementsState.type=type.value;announcementsState.page=1;render();});
+    audiences.forEach(button=>button.addEventListener('click',()=>{announcementsState.audience=button.dataset.announcementAudience;announcementsState.page=1;render();}));
+    more.addEventListener('click',()=>{announcementsState.page++;render();});
     render();
   }
 
@@ -717,7 +704,9 @@ const DashboardUI = (function() {
   }
 
   function showRoleTab(activeKey) {
-    document.body.setAttribute('data-dashboard-theme', activeKey === 'student' ? 'student' : 'editorial');
+    if (!announcementRoleTheme) announcementRoleTheme = (document.body.getAttribute && document.body.getAttribute('data-dashboard-theme')) || 'editorial';
+    if (activeKey !== 'announcements' && activeKey !== 'system-status') announcementRoleTheme = activeKey === 'student' ? 'student' : 'editorial';
+    document.body.setAttribute('data-dashboard-theme', activeKey === 'announcements' ? announcementRoleTheme : activeKey === 'student' ? 'student' : 'editorial');
     activeRole = activeKey;
     syncRubricsDisclosure();
     tabSelectedAt = performance.now();

@@ -26,10 +26,10 @@ test('shared history preserves all drawer labels and fallback behavior',()=>{
   const actions={exception:'Absence details updated',targetSubmit:'Assessment completed',targetDraft:'Assessment draft saved',MAKEUP_ALTERNATIVE_ASSESSMENT:'Assessment authorized',DEFERRED_ASSESSMENT:'Assessment deferred',TEAM_MARK_APPLICABLE:'Team mark approved',TEAM_MARK_NOT_APPLICABLE:'Team mark not applicable',OTHER:'Academic decision recorded',unknown:'Assessment updated'};
   for(const [decision,label] of Object.entries(actions))assert(render([{decision}]).includes('<strong>'+label+'</strong>'));
   const statuses={COMPLETED:'Completed',MAKEUP_PENDING:'Awaiting makeup',COMPLETED_AFTER_MAKEUP:'Completed after makeup',ABSENT_UNAPPROVED:'Unapproved absence',ACADEMIC_DECISION_PENDING:'Awaiting academic decision',NON_PARTICIPATION:'Non-participation',INCOMPLETE:'Incomplete'};
-  for(const [status,label] of Object.entries(statuses))assert(render([{previousStatus:status,resultingStatus:status}]).includes(label+' <span aria-label="changed to">→</span> '+label));
-  assert.match(render([{decision:'unknown',at:'bad'}]),/Not assessed <span aria-label="changed to">→<\/span> Updated/);
+  for(const [status,label] of Object.entries(statuses))assert(render([{previousStatus:status,resultingStatus:status}]).includes(label+' <span>changed to</span> '+label));
+  assert.match(render([{decision:'unknown',at:'bad'}]),/Not assessed <span>changed to<\/span> Updated/);
   assert.doesNotMatch(render([{at:'bad'}]),/<time/);
-  assert.equal(render([{decision:'targetSubmit',previousStatus:'INCOMPLETE',resultingStatus:'COMPLETED',reason:'Updated date.',reviewer:'reviewer@example.test'}]),'<details class="review-history"><summary>Assessment history <span>1</span></summary><ol><li><div class="review-history-heading"><strong>Assessment completed</strong></div><div class="review-history-status">Incomplete <span aria-label="changed to">→</span> Completed</div><p>Updated date.</p><small>reviewer@example.test</small></li></ol></details>');
+  assert.equal(render([{decision:'targetSubmit',previousStatus:'INCOMPLETE',resultingStatus:'COMPLETED',reason:'Updated date.',reviewer:'reviewer@example.test'}]),'<details class="review-history"><summary>Assessment history <span>1</span></summary><ol><li><div class="review-history-heading"><strong>Assessment completed</strong></div><div class="review-history-status">Incomplete <span>changed to</span> Completed</div><p>Updated date.</p><small>reviewer@example.test</small></li></ol></details>');
 });
 test('Review publishing uses the exact shared history output and Guide does not gain history',()=>{
   for(const key of ['review1','review2']){

@@ -9,6 +9,18 @@ function icons() {
   return c;
 }
 
+test('all literal icon references are bundled and no alternate icon assets or UI glyphs are used',()=>{
+ const nodes=icons().getLucideIconNodes_();
+ for(const file of fs.readdirSync('.').filter(name=>name.endsWith('.js'))){
+  const source=fs.readFileSync(file,'utf8');
+  for(const match of source.matchAll(/(?:renderLucideIcon_|renderIcon|actionButton)\(\s*['"]([a-z][a-z-]*)['"]/g))
+   assert(Object.hasOwn(nodes,match[1]),file+': missing '+match[1]);
+  assert(!/font-awesome|material-icons|heroicons|bootstrap-icons/i.test(source),file);
+  if(file!=='icon-renderer.js')assert(!/<svg\b/.test(source),file+': inline SVG bypasses shared Lucide renderer');
+  if(/dashboard|evaluation-client|common-helpers/.test(file))assert(!/[✓✔✕✖×▶▼▸▾]/u.test(source),file+': text glyph used as an icon');
+ }
+});
+
 test('Lucide icons are decorative by default and labelled icons escape accessible text', () => {
   const c = icons();
   const decorative = c.renderLucideIcon_('refresh-cw');

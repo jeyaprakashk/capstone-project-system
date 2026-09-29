@@ -26,7 +26,7 @@ function makeGithubRequest(method, path, payload) {
   };
   if (payload) options.payload = JSON.stringify(payload);
   
-  Logger.log(`📡 GitHub API Request:`);
+  Logger.log(`GitHub API Request:`);
   Logger.log(`  Method: ${method}`);
   Logger.log(`  URL: ${url}`);
   if (payload) Logger.log(`  Payload: ${JSON.stringify(payload)}`);
@@ -39,7 +39,7 @@ function makeGithubRequest(method, path, payload) {
   Logger.log(`  Response: ${responseBody.substring(0, 200)}`);
   
   if (statusCode === 403) {
-    Logger.log(`⚠️ 403 FORBIDDEN - Possible causes:`);
+    Logger.log(`403 FORBIDDEN - Possible causes:`);
     Logger.log(`  - Token is expired or invalid`);
     Logger.log(`  - Token doesn't have 'repo' and 'admin:org_hook' scopes`);
     Logger.log(`  - Organization restrictions (SAML, IP whitelist)`);
@@ -102,14 +102,14 @@ function setReadmeHeading(repoSlug, repoName, teamId, title) {
     );
 
     Logger.log(
-      `✓ README.md created for ${repoName}: ${result.status}`
+      `README.md created for ${repoName}: ${result.status}`
     );
 
     return result;
 
   } catch (err) {
     Logger.log(
-      `❌ ERROR creating README for ${repoName}: ${err.message}`
+      `ERROR creating README for ${repoName}: ${err.message}`
     );
     throw err;
   }
@@ -350,7 +350,7 @@ function addMissingGuideCollaborators() {
       });
 
       Logger.log(
-        `❌ Error updating collaborators for Team ${teamId}: ` +
+        `Error updating collaborators for Team ${teamId}: ` +
         `${err.message}`
       );
     }

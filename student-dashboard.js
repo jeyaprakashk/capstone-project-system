@@ -324,7 +324,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
       ${logCard}
     </div>
 
-    ${getAssessmentDefinitions_().filter(d=>d.type==='REVIEW').map(d=>'<section id="studentAssessment-'+escapeHtml(d.key)+'" data-review-result="'+escapeHtml(d.key)+'" class="assessment-section" aria-live="polite"></section>').join('')}
+    ${getAssessmentDefinitions_().filter(d=>d.type==='REVIEW').map(d=>'<section id="studentAssessment-'+escapeHtml(d.key)+'" data-review-result="'+escapeHtml(d.key)+'" class="assessment-section" aria-live="polite">'+getSkeletonMarkup_('panel', 'Loading '+d.label+' results')+'</section>').join('')}
     <section id="studentGuideEvaluation" class="assessment-section" aria-live="polite">${getSkeletonMarkup_('panel', 'Loading guide evaluation')}</section>
 
 

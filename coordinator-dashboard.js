@@ -482,13 +482,18 @@ function buildGithubAccessSection(githubAccess) {
   return `
     <div class="github-section system-status-card">
 
-      <div class="github-header">
-        <div class="github-title">
+      <div class="github-header system-card-header"><div class="system-card-heading">
+        <h3 class="github-title system-card-title">
           GitHub Access for Coordinator
-        </div>
+        </h3>
         <span class="github-status configured">
           Configured
-        </span>
+        </span></div>
+      <button
+        class="run-sync-btn"
+        onclick="runGithubSync()">
+        Run Sync
+      </button>
       </div>
 
       <div class="github-info">
@@ -514,12 +519,6 @@ function buildGithubAccessSection(githubAccess) {
         </div>
 
       </div>
-
-      <button
-        class="run-sync-btn"
-        onclick="runGithubSync()">
-        Run Sync
-      </button>
 
     </div>
   `;
@@ -586,9 +585,8 @@ function buildCommitteeDirectory_(committees) {
 }
 
 function buildCommitteeReadinessCard_() {
-  return `<section id="committeeConfigurationCard" class="assessment-section review-config-card configuration-card" aria-labelledby="committeeConfigurationHeading" aria-busy="true">
-    <div class="review-config-heading"><h4 id="committeeConfigurationHeading">Review Committees</h4><button id="committeeConfigurationRecheck" type="button" onclick="DashboardUI.recheckCommitteeConfiguration()">Recheck</button></div>
-    <span id="committeeConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline','Checking review committees')}</span>
+  return `<section id="committeeConfigurationCard" class="assessment-section system-status-card review-config-card configuration-card" aria-labelledby="committeeConfigurationHeading" aria-busy="true">
+    <div class="review-config-heading system-card-header"><div class="system-card-heading"><h3 class="system-card-title" id="committeeConfigurationHeading">Review Committees</h3><span id="committeeConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline','Checking review committees')}</span></div><button id="committeeConfigurationRecheck" type="button" onclick="DashboardUI.recheckCommitteeConfiguration()">Recheck</button></div>
     <ul id="committeeConfigurationIssues" hidden></ul>
     <p>Select a committee to see reviewers and assigned teams.</p>
     <div id="committeeDirectoryContent"></div>
@@ -619,9 +617,8 @@ function getCoordinatorCommitteeConfiguration() {
 }
 
 function buildReviewConfigurationCard_() {
-  return `<section id="reviewConfigurationCard" class="assessment-section review-config-card configuration-card assessment-setup" aria-labelledby="reviewConfigurationHeading" aria-busy="true">
-    <div class="review-config-heading"><h4 id="reviewConfigurationHeading">Assessment readiness</h4><button id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
-    <span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span>
+  return `<section id="reviewConfigurationCard" class="assessment-section system-status-card review-config-card configuration-card assessment-setup" aria-labelledby="reviewConfigurationHeading" aria-busy="true">
+    <div class="review-config-heading system-card-header"><div class="system-card-heading"><h3 class="system-card-title" id="reviewConfigurationHeading">Assessment readiness</h3><span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span></div><button id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
     <ul id="reviewConfigurationIssues" hidden></ul>
     <button type="button" id="createAssessmentDefinitionsButton" hidden disabled onclick="DashboardUI.bootstrapAssessmentDefinitions()">Create assessment definitions tab</button>
     <p>First create the definitions schema, then use Assessment definitions to enter the academic configuration. Setup never supplies assessment instances or policy choices.</p>
@@ -747,6 +744,20 @@ function getCoordinatorStyles() {
 .guide-eval-criterion textarea { display:block; width:100%; min-height:65px; box-sizing:border-box; }
 .guide-eval-criterion input, .guide-eval-criterion select { padding:8px; max-width:100%; }
 .guide-admin-row { display:flex; flex-wrap:wrap; gap:10px; padding:10px 0; border-bottom:1px solid #eee; }
+.system-status-cards .system-status-card { padding:16px 18px; }
+.system-status-cards .system-status-card .system-card-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:nowrap; gap:12px; margin:0 0 12px; }
+.system-status-cards .system-card-heading { display:flex; align-items:center; flex-wrap:wrap; min-width:0; gap:6px 10px; }
+.system-status-cards .system-status-card .system-card-title { margin:0; font-family:inherit; font-size:14px; font-weight:700; line-height:1.5; letter-spacing:normal; }
+.system-status-cards .system-card-header > button { flex:none; width:auto; margin:0 0 0 auto; min-height:36px; padding:7px 12px; line-height:1.5; }
+.system-status-cards .system-card-header > .publishing-toggle { width:36px; min-height:36px; padding:0; }
+.system-status-cards .system-card-heading > [role="status"] { max-width:100%; }
+.system-status-cards .system-status-card .github-info { margin-bottom:0; }
+.system-status-cards .internal-publishing:has(> [data-publishing-body][hidden]) > .system-card-header { margin-bottom:0; }
+@media(max-width:640px) {
+  .system-status-cards .system-status-card { padding:14px; }
+  .system-status-cards .system-card-header > button { min-height:44px; }
+  .system-status-cards .system-card-header > .publishing-toggle { width:44px; }
+}
 .system-status-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
 .system-status-heading button { padding:9px 18px; border:1px solid #dcdfe4; border-radius:8px; background:#fff; cursor:pointer; }
 .system-status-heading button:disabled { opacity:.6; cursor:wait; }
@@ -783,7 +794,7 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .committee-email { display:block; color:#64748b; font-size:12px; overflow-wrap:anywhere; }
 .committee-teams { font-size:12px; color:#64748b; }
 .committee-teams > div { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
-.committee-team-chip { background:#f1f5f9; color:#334155; border-radius:5px; padding:3px 7px; overflow-wrap:anywhere; }
+.committee-team-chip { background:#f1f5f9; color:#334155; border-radius:var(--pill-radius); padding:3px 7px; overflow-wrap:anywhere; }
 .assessment-setup > .assessment-title { margin-top:0; margin-bottom:8px; }
 .assessment-setup-intro { margin:0 0 16px; color:#64748b; font-size:13px; line-height:1.5; }
 .system-status-primary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:stretch; margin-bottom:16px; }
@@ -793,9 +804,9 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .rubrics-status-title { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px; }
 .rubrics-status-count { color:#64748b; font-size:11px; font-weight:400; }
 .rubrics-status-heading .assessment-title { margin:0; font-size:14px; }
-.rubrics-status-pill { padding:4px 10px; border-radius:999px; font-size:11px; font-weight:600; line-height:1.5; }
-.rubrics-status-pill[data-configured="true"] { color:#166534; background:#dcfce7; }
-.rubrics-status-pill[data-configured="false"] { color:#9a3412; background:#ffedd5; }
+.rubrics-status-pill { padding:4px 10px; border-radius:var(--pill-radius); font-size:11px; font-weight:600; line-height:1.5; }
+.rubrics-status-pill[data-configured="true"] { color:var(--color-success); background:var(--color-success-tint); }
+.rubrics-status-pill[data-configured="false"] { color:var(--color-warning); background:var(--color-warning-tint); }
 .rubrics-status-detail { margin:12px 0 0; color:#64748b; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
 .rubrics-assessment-list { margin:10px 0 0; font-size:12px; }
 .rubrics-assessment-list > div { display:flex; justify-content:space-between; flex-wrap:wrap; gap:3px 12px; padding:6px 0; border-top:1px solid #eef0f5; }
@@ -812,9 +823,9 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .assessment-setup #initializeAssessmentStorageButton { width:auto; max-width:100%; margin:0 0 0 auto; padding:4px 10px; border:1px solid #1f2430; border-radius:6px; font-size:12px; white-space:normal; }
 .assessment-setup [hidden] { display:none !important; }
 #assessmentStorageStatus:empty,#assessmentStorageResults:empty { display:none; }
-.review-config-pill { display:inline-flex; padding:4px 9px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:600; line-height:1.4; }
-.review-config-card[data-state="ready"] .review-config-pill { color:#166534; background:#dcfce7; }
-.review-config-card[data-state="invalid"] .review-config-pill { color:#92400e; background:#fef3c7; }
+.review-config-pill { display:inline-flex; padding:4px 9px; border-radius:var(--pill-radius); background:#f1f5f9; color:#475569; font-size:11px; font-weight:600; line-height:1.4; }
+.review-config-card[data-state="ready"] .review-config-pill { color:var(--color-success); background:var(--color-success-tint); }
+.review-config-card[data-state="invalid"] .review-config-pill { color:var(--color-warning); background:var(--color-warning-tint); }
 .review-config-heading { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 8px; }
 .review-config-heading button { margin-left:auto; border:1px solid #94a3b8; border-radius:6px; padding:4px 10px; background:white; color:#0f172a; cursor:pointer; }
 .review-config-heading h4 { margin:0; font-size:13px; font-weight:600; }
@@ -1190,10 +1201,10 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .col-index { width: 30px; text-align: center; }
 .col-severity { width: 80px; }
 .col-team { font-weight: 600; }
-.severity-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.severity-badge.high { background: #fee2e2; color: #991b1b; }
-.severity-badge.medium { background: #fed7aa; color: #92400e; }
-.severity-badge.low { background: #dbeafe; color: #1e40af; }
+.severity-badge { display: inline-block; padding: 4px 10px; border-radius:var(--pill-radius); font-size: 11px; font-weight: 600; }
+.severity-badge.high { background:var(--color-danger-tint); color:var(--color-danger); }
+.severity-badge.medium { background:var(--color-warning-tint); color:var(--color-warning); }
+.severity-badge.low { background:var(--color-info-tint); color:var(--color-info); }
 .action-link { color: #3b5bdb; font-size: 13px; }
 .two-column-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 @media (max-width: 1024px) { .two-column-layout { grid-template-columns: 1fr; } }
@@ -1209,8 +1220,8 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .github-section { background: #fff; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
 .github-header { display: flex; justify-content: space-between; align-items: center; flex-wrap:wrap; gap:8px; margin-bottom: 8px; }
 .github-title { font-size: 14px; font-weight: 700; }
-.github-status { display: inline-block; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; line-height:1.5; }
-.github-status.configured { background: #dcfce7; color: #15803d; }
+.github-status { display: inline-block; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius:var(--pill-radius); line-height:1.5; }
+.github-status.configured { background:var(--color-success-tint); color:var(--color-success); }
 .github-row { display: flex; justify-content: space-between; flex-wrap:wrap; gap:3px 12px; padding: 6px 0; border-bottom: 1px solid #f2f3f5; font-size: 12px; }
 .github-row > span { overflow-wrap:anywhere; min-width:0; }
 .github-value { font-weight: 600; font-family: 'Courier New', monospace; }
@@ -1220,8 +1231,8 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .system-status-primary > .system-status-card { display:flex; flex-direction:column; align-self:stretch; box-sizing:border-box; margin:0; padding:16px 18px; border:0; border-radius:12px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.05); font-family:inherit; font-size:12px; line-height:1.5; }
 .system-status-card .github-header, .system-status-card .rubrics-status-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin:0 0 10px; }
 .system-status-card .github-title, .system-status-card .assessment-title { margin:0; font-family:inherit; font-size:14px; font-weight:700; line-height:1.5; }
-.system-status-card .github-status, .system-status-card .rubrics-status-pill { display:inline-block; padding:4px 10px; border-radius:999px; font-family:inherit; font-size:11px; font-weight:600; line-height:1.5; }
-.system-status-card .github-status.configured, .system-status-card .rubrics-status-pill[data-configured="true"] { color:#166534; background:#dcfce7; }
+.system-status-card .github-status, .system-status-card .rubrics-status-pill { display:inline-block; padding:4px 10px; border-radius:var(--pill-radius); font-family:inherit; font-size:11px; font-weight:600; line-height:1.5; }
+.system-status-card .github-status.configured, .system-status-card .rubrics-status-pill[data-configured="true"] { color:var(--color-success); background:var(--color-success-tint); }
 .system-status-card .github-info, .system-status-card .rubrics-assessment-list { margin:0; }
 .system-status-card .github-row, .system-status-card .rubrics-assessment-list > div { display:flex; justify-content:space-between; flex-wrap:wrap; gap:3px 12px; padding:6px 0; border:0; border-top:1px solid #eef0f5; font-size:12px; line-height:1.5; }
 .system-status-card .github-label, .system-status-card .rubrics-assessment-list dt { color:#1f2937; font-weight:600; }
@@ -1243,9 +1254,9 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .team-tracker-table .col-guide { min-width:170px; max-width:220px; overflow-wrap:anywhere; }
 .team-tracker-table .col-health { width:36px; text-align:center; }
 .tracker-health { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; }
-.tracker-health.green { background:#dcfce7; color:#166534; }
-.tracker-health.orange { background:#fef3c7; color:#92400e; }
-.tracker-health.red { background:#fee2e2; color:#991b1b; }
+.tracker-health.green { background:var(--color-success-tint); color:var(--color-success); }
+.tracker-health.orange { background:var(--color-warning-tint); color:var(--color-warning); }
+.tracker-health.red { background:var(--color-danger-tint); color:var(--color-danger); }
 .team-tracker-section .pagination { flex-wrap:wrap; gap:12px; }
 .team-tracker-section .pagination-buttons { flex-wrap:wrap; }
 .tracker-search input { min-width:0; width:100%; box-sizing:border-box; }
@@ -1261,10 +1272,10 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .tracker-search #trackerSearch,.tracker-search .reset-btn { height:40px; box-sizing:border-box; margin:0; padding:0 14px; font-size:13px; line-height:normal; }
 .tracker-search #trackerSearch { flex:1; min-width:0; }
 .tracker-search .reset-btn { flex:none; display:inline-flex; align-items:center; justify-content:center; }
-.tracker-tabs .tab[data-filter="attention"] { color:#991b1b; border-color:#fecaca; background:#fff7f7; }
-.tracker-tabs .tab[data-filter="ontrack"] { color:#166534; border-color:#bbf7d0; background:#f0fdf4; }
-.tracker-tabs .deadline-pill { color:#92400e; border-color:#fde68a; background:#fffbeb; }
-.tracker-tabs .deadline-pill.deadline-overdue { color:#991b1b; border-color:#fecaca; background:#fff7f7; }
+.tracker-tabs .tab[data-filter="attention"] { color:var(--color-danger); border-color:var(--color-danger); background:var(--color-danger-tint); }
+.tracker-tabs .tab[data-filter="ontrack"] { color:var(--color-success); border-color:var(--color-success); background:var(--color-success-tint); }
+.tracker-tabs .deadline-pill { color:var(--color-warning); border-color:var(--color-warning); background:var(--color-warning-tint); }
+.tracker-tabs .deadline-pill.deadline-overdue { color:var(--color-danger); border-color:var(--color-danger); background:var(--color-danger-tint); }
 .tracker-tabs .tab.active { background:#1f2430; color:#fff; border-color:#1f2430; }
 .tracker-tabs .tab:focus-visible,.tracker-search .reset-btn:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
 .tracker-tabs .tab:hover:not(.active) { border-color:currentColor; }
@@ -1278,10 +1289,10 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .team-tracker-table th:nth-child(5),.team-tracker-table td.col-activity { width:76px; padding-right:6px; }
 .team-tracker-table th:nth-child(6),.team-tracker-table td.col-activity + td { padding-left:6px; }
 .col-title { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.health-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.health-badge.green { background: #dcfce7; color: #15803d; }
-.health-badge.orange { background: #fed7aa; color: #92400e; }
-.health-badge.red { background: #fee2e2; color: #991b1b; }
+.health-badge { display: inline-block; padding: 4px 10px; border-radius:var(--pill-radius); font-size: 11px; font-weight: 600; }
+.health-badge.green { background:var(--color-success-tint); color:var(--color-success); }
+.health-badge.orange { background:var(--color-warning-tint); color:var(--color-warning); }
+.health-badge.red { background:var(--color-danger-tint); color:var(--color-danger); }
 .view-link { color: #3b5bdb; }
 .team-action-controls { display:flex; align-items:center; gap:8px; }
 .team-action-icon { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border:1px solid #dce3ee; border-radius:9px; background:#fff; color:#3b5bdb; cursor:pointer; text-decoration:none; padding:0; }
@@ -1557,8 +1568,9 @@ function buildRubricsStatusCard_() {
   const status = getRubricsStatus_();
   const count = (status.assessments || []).length;
   return `<section class="assessment-section rubrics-status-card system-status-card" aria-labelledby="rubricsStatusHeading">
-    <div class="rubrics-status-heading"><div class="rubrics-status-title"><h3 class="assessment-title" id="rubricsStatusHeading">Rubrics</h3>${count ? '<span class="rubrics-status-count">'+count+' '+(count===1?'assessment':'assessments')+'</span>' : ''}</div>
-      <span class="rubrics-status-pill" data-configured="${status.configured}" role="status">${status.configured?'Configured':'Not configured'}</span></div>
+    <div class="rubrics-status-heading system-card-header"><div class="system-card-heading"><h3 class="assessment-title system-card-title" id="rubricsStatusHeading">Rubrics</h3>
+      <span class="rubrics-status-pill" data-configured="${status.configured}" role="status">${status.configured?'Configured':'Not configured'}</span></div></div>
+    ${count ? '<p class="rubrics-status-count">'+count+' '+(count===1?'assessment':'assessments')+'</p>' : ''}
     ${status.configured ? '' : '<p class="rubrics-status-detail">'+escapeHtml(status.detail)+'</p>'}
     ${(status.assessments || []).length ? '<dl class="rubrics-assessment-list">'+status.assessments.map(item=>'<div><dt>'+escapeHtml(item.label)+'</dt><dd>'+escapeHtml(item.summary)+'</dd></div>').join('')+'</dl>' : ''}
   </section>`;
@@ -1575,7 +1587,7 @@ function loadCoordinatorSystemStatus() {
     let publishing;
     try {publishing=publicationDefinitions_().map(d=>buildInternalAssessmentPublishing_(d.key)).join('');}
     catch(err){publishing='<p role="status">Assessment configuration needs attention. Use Assessment readiness below.</p>';}
-    return `<div class="coordinator-container">
+    return `<div class="coordinator-container system-status-cards">
       <div class="system-status-primary">${buildGithubAccessSection(access)}</div>
       ${publishing}
       ${buildCommitteeReadinessCard_()}

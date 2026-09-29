@@ -19,6 +19,11 @@ with the shared skeleton, retains the content's height and event handlers, sets
 `aria-busy`, and makes the covered children inert. Short content uses an inline
 skeleton. The returned cleanup function is safe to call more than once.
 
+For reviewer dashboard section refreshes and student assessment reads, pass `{compact:true}` as the third
+argument to use the initial panel skeleton height. This temporarily removes the
+covered children from layout while retaining their DOM and event handlers;
+cleanup restores them on failure or before replacing the content on success.
+
 ```js
 if (busy) return;
 busy = true;

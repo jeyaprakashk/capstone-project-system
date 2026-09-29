@@ -198,7 +198,7 @@ ${getLucideStyles_()}
 .rubric-assessment:disabled { cursor:default; color:#a8b3c7; background:#171e2c; opacity:1; }
 .rubric-assessment:disabled strong { color:#bdc7da; }
 .rubric-assessment span { font-size:14px; line-height:1.5; }
-.rubric-assessment .rubric-weight { flex:0 0 auto; max-width:100%; box-sizing:border-box; padding:3px 9px; border:1px solid #705494; border-radius:6px; background:#332647; color:#e2d9ff; font-size:14px; font-weight:700; }
+.rubric-assessment .rubric-weight { flex:0 0 auto; max-width:100%; box-sizing:border-box; padding:3px 9px; border:1px solid #705494; border-radius:var(--pill-radius); background:#332647; color:#e2d9ff; font-size:14px; font-weight:700; }
 .rubric-assessment .rubric-header, .rubric-assessment .rubric-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; width:100%; min-width:0; text-align:left; }
 .rubric-assessment .rubric-footer { margin-top:auto; }
 .rubric-assessment .rubric-metadata { color:#c5cee0; font-weight:400; }
@@ -212,7 +212,7 @@ ${getLucideStyles_()}
   .rubric-mobile-details { display:contents; }
   .rubric-mobile-title { display:contents; }
   .rubric-mobile-title strong { grid-column:1; grid-row:1; min-width:0; overflow-wrap:anywhere; font-size:14px; line-height:1.4; color:#f5f7fa; }
-  .rubric-mobile-weight { grid-column:2; grid-row:1; justify-self:end; padding:2px 7px; border:1px solid #705494; border-radius:999px; background:#332647; color:#e2d9ff; font-size:12px; font-weight:700; line-height:1.4; white-space:nowrap; }
+  .rubric-mobile-weight { grid-column:2; grid-row:1; justify-self:end; padding:2px 7px; border:1px solid #705494; border-radius:var(--pill-radius); background:#332647; color:#e2d9ff; font-size:12px; font-weight:700; line-height:1.4; white-space:nowrap; }
   .rubric-mobile-meta { grid-column:1; grid-row:2; color:#c5cee0; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
   .shared-rubrics .rubric-view-button { grid-column:2; grid-row:2; justify-self:end; position:relative; isolation:isolate; min-width:44px; min-height:44px; padding:6px 8px; border:0; border-radius:6px; background:transparent; color:#cbd5e1; font-family:inherit; font-size:12px; font-weight:600; line-height:1.4; white-space:nowrap; cursor:pointer; }
   .shared-rubrics .rubric-view-button::before { content:''; position:absolute; inset:6px 0; z-index:-1; border:1px solid #3b4556; border-radius:6px; background:#0b101a; }
