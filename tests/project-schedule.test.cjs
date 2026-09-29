@@ -219,14 +219,31 @@ test('team health requires a log from every rostered student',()=>{
 });
 
 
-test('student card embeds weekly component independently of milestone dates and title Forms',()=>{
+test('student card hides weekly component until title approval and keeps the title action',()=>{
   const {c,schedule,clock}=fixture();
   c.buildTeamIntakeLink=()=> 'https://example.com/title';
   c.getStudentDashboardData=()=>({repoUrl:'https://example.com/repo',githubReady:true,githubState:'done',titleStatus:'NOT_SUBMITTED',title:'',rosterSlots:[],schedule,clock:clock('2026-09-23')});
   c.getAssessmentDefinitions_=()=>[];
   const html=c.buildStudentContent('student@example.com','T1');
-  assert.match(html,/id="studentWeeklyProgress"/);assert.match(html,/data-weekly-form/);assert.match(html,/DashboardUI.loadWeeklyProgress/);
+  assert.doesNotMatch(html,/id="studentWeeklyProgress"|data-weekly-form/);
   assert.match(html,/https:\/\/example.com\/title/);assert.doesNotMatch(html,/forms.gle|buildWeeklyLogLink/);
+});
+
+test('student setup gates weekly UI for every title state and keeps incomplete steps expanded',()=>{
+ const {parseHTML}=require('linkedom');const {c,schedule,clock}=fixture();
+ c.buildTeamIntakeLink=()=> 'https://example.test/title';
+ c.getAssessmentDefinitions_=()=>[];
+ for(const githubReady of [false,true])for(const titleStatus of ['NOT_SUBMITTED','NEEDS_REVIEW','REVISE_AWAITING_STUDENT','AWAITING_REVIEWER','APPROVED','REJECTED_BY_GUIDE']) {
+  c.getStudentDashboardData=()=>({githubReady,titleStatus,githubState:githubReady?'done':'active',githubText:'Team member must accept the invitation.',githubNeedsUsername:!githubReady,githubCanRetry:!githubReady,githubSetup:{},schedule,clock:clock('2026-09-23'),rosterSlots:[],title:titleStatus==='NOT_SUBMITTED'?'':'A title',note:'Existing review feedback'});
+  const {document}=parseHTML(c.buildStudentContent('me@example.test','T1')),setup=document.querySelector('.student-project-setup');
+  const complete=githubReady&&titleStatus==='APPROVED';
+  assert.equal(!!document.getElementById('studentWeeklyProgress'),complete);
+  assert.equal(setup.tagName,complete?'DETAILS':'SECTION');assert.equal(setup.hasAttribute('open'),false);
+  assert.equal(setup.querySelectorAll('.step-row').length,2);
+  if(complete){assert.match(setup.querySelector('summary').textContent,/✓ CompleteViewHide/);setup.setAttribute('open','');assert(setup.hasAttribute('open'));setup.removeAttribute('open');}
+  else {assert(setup.querySelector('.student-setup-pending'));if(!githubReady)assert.match(setup.textContent,/Step 1: Team member must accept/);if(titleStatus!=='APPROVED')assert.match(setup.textContent,/Step 2:/);}
+  assert.equal(document.querySelectorAll('#studentGithubUsername').length,githubReady?0:1);
+ }
 });
 
 test('student locks depend on team readiness while preserving repository and recorded work',()=>{
@@ -237,14 +254,14 @@ test('student locks depend on team readiness while preserving repository and rec
   let html=(c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
   assert(html.includes('https://github.com/org/repo'));
   assert(html.includes('Current title:</strong> Existing title'));
-  assert(html.includes('studentWeeklyProgress'));
+  assert(!html.includes('studentWeeklyProgress'));
   assert(html.includes('Retry GitHub setup'));
   assert(!html.includes('https://example.com/log'));
-  assert(html.includes('1 of 3 milestones complete'));
+  assert(!html.includes('milestones complete'));
   data.githubReady=true;data.githubCanRetry=false;data.githubState='done';
   html=(c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
   assert(html.includes('data-weekly-form'));
-  assert(html.includes('2 of 3 milestones complete'));
+  assert(!html.includes('milestones complete'));
 });
 
 test('coordinator statistics, attention list and tracker share one health result',()=>{
@@ -502,105 +519,70 @@ test('timeline is single-flight and never blocks either role dashboard',async()=
   assert.equal(f.timeline.attributes['aria-busy'],'false');
 });
 
-test('timeline moves the highlight past Today and Tomorrow and handles the final milestone',()=>{
-  for (const offsets of [[-2,0,1,5,9],[-2,1,5],[-2,0],[-2,5,9],[-3,-2]]) {
-    const f=timelineBrowser(); f.initialize();
-    const data=JSON.parse(JSON.stringify(f.c.getSharedProjectTimelineData_()));
-    data.active=true;
-    data.milestones=offsets.map((offset,index)=>({key:'m'+index,label:'Milestone '+index,day:data.today+offset,date:'Date '+index}));
-    f.requests[1].success(data);
-    const items=[...f.timeline.innerHTML.matchAll(/<li class="([^"]+)"[^>]*>(.*?)<\/li>/g)];
-    const imminent=offsets.some(offset=>offset===0||offset===1);
-    const highlighted=offsets.findIndex(offset=>offset>(imminent?1:-1));
-    items.forEach((item,index)=>{
-      const offset=offsets[index];
-      assert.equal(item[1].includes('timeline-current'),index===highlighted);
-      assert.equal(item[1].includes('timeline-upcoming'),imminent&&index===highlighted);
-      assert.equal(item[1].includes('timeline-imminent'),offset===0||offset===1);
-      assert.equal(item[2].includes('timeline-node-core'),index===highlighted);
-      const label=offset===0?'Today':offset===1?'Tomorrow':index===highlighted?'Up Next':null;
-      if(label) assert(item[2].includes('class="timeline-state">'+label+'</span>'));
-      else assert(!item[2].includes('timeline-state'));
-    });
-  }
+function renderedTimeline(offsets,extra=[]) {
+ const {parseHTML}=require('linkedom');
+ const {document}=parseHTML('<section id="timeline"></section>');
+ const target=document.querySelector('section');
+ const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
+ const c=vm.createContext({escapeClientHtml:value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),renderLucideIcon_:()=>'<svg></svg>'});
+ vm.runInContext(source.slice(source.indexOf('  function renderSharedTimeline('),source.indexOf('  function loadSharedTimeline()')),c);
+ const data={today:100,todayLabel:'29 Sep 2026',milestones:offsets.map((offset,i)=>({key:'m'+i,label:'Milestone '+i,day:100+offset,date:'30 Sep 2026',openingDate:'20 Sep 2026'})).concat(extra)};
+ const before=JSON.stringify(data);c.renderSharedTimeline(data,target);assert.equal(JSON.stringify(data),before);
+ return {target,visible:()=>Array.from(target.querySelectorAll('.timeline-stop')).filter(el=>!el.hidden)};
+}
+
+test('compact timeline shows two past dates, nearest due milestone and two upcoming milestones',()=>{
+ const f=renderedTimeline([-9,-6,-3,0,1,5,9]);
+ assert.deepEqual(f.visible().map(el=>el.querySelector('strong').textContent),['Milestone 1','Milestone 2','Milestone 3','Milestone 4','Milestone 5']);
+ const current=f.target.querySelector('[aria-current="step"]');
+ assert.match(current.textContent,/Milestone 3.*CURRENT · Due today/);
+ assert.equal(f.target.querySelectorAll('.timeline-current').length,1);
+ assert.equal(f.target.querySelectorAll('.timeline-past svg').length,3);
+ assert.equal(f.visible()[0].querySelector('.timeline-timing'),null);
+ assert.doesNotMatch(f.target.textContent,/Date passed|Current phase:/);
+ assert(f.target.querySelector('.timeline-heading .timeline-toggle'));
+ assert.doesNotMatch(f.target.innerHTML,/Tomorrow|Up Next|timeline-navigation|timeline-scroll|milestones complete/);
+ assert.match(current.querySelector('.timeline-date').title,/Opens 20 Sep 2026; due 30 Sep 2026/);
 });
 
-test('timeline centers the nearest event once and shows larger short dates with full-date context',()=>{
-  const f=timelineBrowser(); f.initialize();
-  const scroll=f.timeline.querySelector('.timeline-scroll');
-  scroll.querySelector('[aria-current="step"]').getBoundingClientRect=()=>({left:600,width:132});
-  const data=JSON.parse(JSON.stringify(f.c.getSharedProjectTimelineData_()));
-  data.active=true;
-  data.milestones=[{key:'next',label:'Next event',day:data.today+1,date:'30 Sep 2026'}];
-  f.requests[1].success(data);
-  assert.equal(scroll.scrollLeft,466);
-  assert(f.timeline.innerHTML.includes('title="30 Sep 2026" aria-label="30 Sep 2026">30 Sep</span>'));
-  scroll.scrollLeft=100;
-  f.timeline.timelineResizeObserver.callback();
-  assert.equal(scroll.scrollLeft,100,'resizing must not reset manual scrolling');
-  assert(!scroll.focused,'initial positioning must not steal keyboard focus');
+test('mobile timeline selects previous current and next without shrinking desktop context',()=>{
+ for(const [offsets,expected] of [[[-9,-6,-3,0,1,5,9],[2,3,4]],[[1,5,9],[0,1]],[[-9,-6,-3],[1,2]],[[],[]]]) {
+  const f=renderedTimeline(offsets);
+  assert.deepEqual(Array.from(f.target.querySelectorAll('[data-timeline-mobile="true"]')).map(el=>el.querySelector('strong').textContent),expected.map(i=>'Milestone '+i));
+ }
+ const css=fixture().c.getSharedTimelineStyles_();
+ assert.match(css,/\.timeline-track:not\(\.timeline-full\) \.timeline-stop\[data-timeline-mobile="false"\] \{ display:none/);
 });
 
-test('timeline supports captured dragging, clamps at edges, and leaves touch swiping native',()=>{
-  const f=timelineBrowser(); f.initialize();
-  f.requests[1].success(JSON.parse(JSON.stringify(f.c.getSharedProjectTimelineData_())));
-  const scroll=f.timeline.querySelector('.timeline-scroll');
-  let prevented=0;
-  const pointer={pointerId:1,pointerType:'mouse',button:0,clientX:200,preventDefault(){prevented++;}};
-  scroll.scrollLeft=100;
-  scroll.listeners.pointerdown(pointer);
-  assert.equal(scroll.capturedPointer,1);
-  scroll.listeners.pointermove({...pointer,clientX:80});
-  assert.equal(scroll.scrollLeft,220);
-  scroll.listeners.pointermove({...pointer,clientX:-900});
-  assert.equal(scroll.scrollLeft,600);
-  assert.equal(f.timeline.querySelector('.timeline-forward').disabled,true);
-  scroll.listeners.pointercancel(pointer);
-  assert.equal(scroll.capturedPointer,null);
-  assert.equal(scroll.attributes['data-dragging'],'false');
-  scroll.listeners.pointermove({...pointer,clientX:500});
-  assert.equal(scroll.scrollLeft,600);
-  const before=prevented;
-  scroll.listeners.pointerdown({...pointer,pointerType:'touch'});
-  scroll.listeners.pointermove({...pointer,pointerType:'touch',clientX:10});
-  assert.equal(prevented,before,'touch must retain native gesture handling');
-  assert.equal(scroll.capturedPointer,null);
-  scroll.listeners.pointerdown(pointer);
-  scroll.listeners.pointermove({...pointer,clientX:2000});
-  assert.equal(scroll.scrollLeft,0);
-  scroll.listeners.pointerup(pointer);
-  assert.equal(scroll.attributes['data-dragging'],'false');
+test('current timeline handles tomorrow, before start, same-day dates, after end and empty lifecycle',()=>{
+ for(const offsets of [[1,5,9],[0,0,5],[-2,0],[-3,-2],[]]) {
+  const f=renderedTimeline(offsets),next=offsets.findIndex(n=>n>=0),current=f.target.querySelector('[aria-current="step"]');
+  assert.equal(!!current,next>=0);
+  if(current){assert.equal(current.querySelector('strong').textContent,'Milestone '+next);assert.match(current.textContent,offsets[next]===0?/CURRENT · Due today/:/CURRENT · Due tomorrow/);}
+  else if(!offsets.length) assert.match(f.target.textContent,/No project milestones scheduled/);
+ }
 });
 
-test('timeline arrows track overflow, scroll position and reduced motion',()=>{
-  const f=timelineBrowser(); f.initialize();
-  f.requests[1].success(JSON.parse(JSON.stringify(f.c.getSharedProjectTimelineData_())));
-  const scroll=f.timeline.querySelector('.timeline-scroll');
-  const navigation=f.timeline.querySelector('.timeline-navigation');
-  const previous=f.timeline.querySelector('.timeline-prev');
-  const forward=f.timeline.querySelector('.timeline-forward');
-  assert.equal(navigation.hidden,false);
-  assert.equal(previous.disabled,true);
-  assert.equal(forward.disabled,false);
-  forward.listeners.click();
-  assert.equal(scroll.lastScroll.left,300);
-  assert.equal(scroll.lastScroll.behavior,'smooth');
-  scroll.scrollLeft=600;
-  scroll.listeners.scroll();
-  assert.equal(previous.disabled,false);
-  assert.equal(forward.disabled,true);
-  f.browser.window.matchMedia=()=>({matches:true});
-  previous.listeners.click();
-  assert.equal(scroll.lastScroll.left,-300);
-  assert.equal(scroll.lastScroll.behavior,'auto');
-  scroll.scrollLeft=0;
-  scroll.scrollWidth=400;
-  f.timeline.timelineResizeObserver.callback();
-  assert.equal(navigation.hidden,true);
-  scroll.scrollWidth=1000;
-  f.timeline.timelineResizeObserver.callback();
-  assert.equal(navigation.hidden,false);
-  assert.equal(f.requests.filter(r=>r.type==='timeline').length,1);
+test('full timeline disclosure reveals lifecycle without mutating schedule or displaying weekly boundaries',()=>{
+ const f=renderedTimeline([-10,-8,-5,-2,2,5,8,10],[{key:'week1',label:'Weekly logging starts',day:100,date:'29 Sep'},{key:'end',label:'Weekly logging ends',day:120,date:'19 Oct'}]);
+ const button=f.target.querySelector('.timeline-toggle');assert.equal(f.visible().length,5);
+ assert.equal(button.getAttribute('aria-expanded'),'false');assert.equal(button.textContent,'View full timeline');
+ button.click();assert.equal(f.visible().length,8);assert.equal(button.getAttribute('aria-expanded'),'true');
+ assert(f.target.querySelector('.timeline-track').classList.contains('timeline-full'));
+ assert.doesNotMatch(f.target.textContent,/Weekly logging/);
+ button.click();assert.equal(f.visible().length,5);assert.equal(button.getAttribute('aria-expanded'),'false');
+});
+
+test('timeline uses vertical mobile layout and has no carousel or animation styles',()=>{
+ const {c}=fixture();const css=c.getSharedTimelineStyles_();
+ assert.match(css,/@media\(max-width:760px\)/);
+ assert.match(css,/\.timeline-track \{ grid-template-columns:1fr/);
+ assert.match(css,/\.timeline-stop\[hidden\] \{ display:none/);
+ assert.match(css,/repeat\(var\(--timeline-stops\),minmax\(0,1fr\)\)/);
+ assert.match(css,/left:50%; right:-50%; top:11px; height:2px/);
+ assert.match(css,/top:11px; height:100%; width:2px/);
+ assert.doesNotMatch(css,/\.timeline-current \{|1\.5fr/);
+ assert.doesNotMatch(css,/overflow-x|timeline-nav|animation:/);
 });
 
 test('timeline errors are isolated and a subsequent retry succeeds',async()=>{
@@ -860,8 +842,9 @@ test('dashboard headers, rows and repository map share one TeamStatus read',()=>
 test('System Status is coordinator-only and its endpoint avoids marks and dashboard aggregation',()=>{
  const {c}=fixture();
  const view=key=>({key,label:key,contentId:key+'Content'});
- assert(!c.buildDashboardShell('user',[view('guide')]).includes('data-role-tab="system-status"'));
- assert(c.buildDashboardShell('user',[view('coord')]).includes('data-role-tab="system-status"'));
+ const {parseHTML}=require('linkedom');
+ assert(!parseHTML(c.buildDashboardShell('user',[view('guide')])).document.querySelector('button[data-role-tab="system-status"]'));
+ assert(parseHTML(c.buildDashboardShell('user',[view('coord')])).document.querySelector('button[data-role-tab="system-status"]'));
  const shell=c.buildCoordinatorAsyncShell_();
  assert(!shell.includes('coordinatorGithub'));assert(!shell.includes('reviewConfigurationCard'));
  c.Session={getActiveUser:()=>({getEmail:()=> 'coordinator'})};

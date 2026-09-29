@@ -17,9 +17,11 @@ and `timeline` for the shared timeline. Retry states must show a skeleton again.
 Use `DashboardUI.beginContentLoading(element, label)`. It covers the existing DOM
 with the shared skeleton, retains the content's height and event handlers, sets
 `aria-busy`, and makes the covered children inert. Short content uses an inline
-skeleton. The returned cleanup function is safe to call more than once.
+skeleton. A zero-height target (such as a hidden tab being preloaded) uses a panel
+skeleton, so revealing the tab never leaves a single inline bar in a large area.
+The returned cleanup function is safe to call more than once.
 
-For reviewer dashboard section refreshes and student assessment reads, pass `{compact:true}` as the third
+For reviewer and student dashboard refreshes (including the read after GitHub username submission), and student assessment reads, pass `{compact:true}` as the third
 argument to use the initial panel skeleton height. This temporarily removes the
 covered children from layout while retaining their DOM and event handlers;
 cleanup restores them on failure or before replacing the content on success.

@@ -434,7 +434,7 @@ function buildTeamCompletionProgress(stages) {
     ...reviews.map(review => ({label:review.label, stage:stages[review.key]})),
     {label:'Guide Evaluation', untracked:true}, ...getSeeProgressRows_()];
   return `<section class="assessment-section team-progress" aria-labelledby="teamProgressHeading">
-    <h2 id="teamProgressHeading" class="assessment-title">Team Progress</h2>
+    <h3 id="teamProgressHeading" class="assessment-title">Team Progress</h3>
     ${configurationUnavailable ? '<p role="status">Review configuration unavailable. Check System Status.</p>' : ''}
     ${rows.map(({label, stage, untracked, external}) => {
       const name = escapeHtml(label);
@@ -468,7 +468,7 @@ function buildAssessmentProgress(assessmentProgress) {
   try { configuredReviews = getInternalReviews_(); } catch (err) { /* See configuration card. */ }
   const bar = (c, p) => { const pct = c + p > 0 ? Math.round((c / (c + p)) * 100) : 0; return `<div class="assessment-bar"><div class="assessment-bar-inner"><div class="assessment-fill" style="width:${pct}%"></div></div><span class="assessment-pct">${pct}%</span></div>`; };
 
-  return `<div class="assessment-section"><div class="assessment-title">Assessment Progress</div>
+  return `<div class="assessment-section"><h3 class="assessment-title">Assessment Progress</h3>
     ${configuredReviews.map(review => {
       const progress = assessmentProgress[review.key];
       return `<div class="assessment-row"><div class="assessment-label">${escapeHtml(review.label)}</div>${progress.unavailable ? "<span>Partial data: " + progress.unavailable + " unavailable</span>" : bar(progress.completed, progress.pending)}<div class="assessment-stat">${progress.completed} / ${progress.completed + progress.pending + (progress.unavailable || 0)}</div></div>`;

@@ -145,6 +145,33 @@ test('common theme applies to all tabs immediately, cached content and late resp
  f.click('student');assert.equal(theme(),'editorial');
 });
 
+test('project timeline appears only in Timeline and Rubrics across tab switches',()=>{
+ const f=fixture(),timeline={hidden:false},original=f.c.document.getElementById;
+ f.c.document.getElementById=id=>id==='sharedProjectTimeline'?timeline:original(id);
+ for(const role of ['student','guide','reviewer','coord']) {
+  f.click(role);assert.equal(timeline.hidden,true);
+  for(const utility of ['rubrics','announcements','system-status']) {
+   f.click(utility);assert.equal(timeline.hidden,utility !== 'rubrics');
+   f.click(role);assert.equal(timeline.hidden,true);
+  }
+ }
+});
+
+test('student rubric tab reuses shared content and switching back restores My Team',()=>{
+ const f=fixture(),{document}=require('linkedom').parseHTML('<html><body><button data-role-tab="student">My Team</button><button data-role-tab="rubrics">Rubrics &amp; Guidelines</button><section data-role-panel="student"></section><section id="sharedRubrics"><button id="sharedRubricsToggle"></button><div id="sharedRubricsContent"></div></section></body></html>');
+ const original=f.c.document.getElementById;
+ f.c.document.getElementById=id=>document.getElementById(id)||original(id);
+ f.c.document.querySelector=selector=>document.querySelector(selector);
+ f.c.document.querySelectorAll=selector=>document.querySelectorAll(selector);
+ f.click('student');assert.equal(document.getElementById('sharedRubrics').hidden,true);
+ f.click('rubrics');assert.equal(document.getElementById('sharedRubrics').hidden,false);
+ assert.equal(document.querySelector('[data-role-panel="student"]').classList.contains('active'),false);
+ assert.equal(document.querySelector('[data-role-tab="rubrics"]').getAttribute('aria-current'),'page');
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,0);
+ f.click('student');assert.equal(document.getElementById('sharedRubrics').hidden,true);
+ assert(document.querySelector('[data-role-panel="student"]').classList.contains('active'));
+});
+
 test('shell selects the common theme before scripts or fonts load',()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})}});
  for(const file of ['common-styles.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
@@ -152,11 +179,29 @@ test('shell selects the common theme before scripts or fonts load',()=>{
  for(const key of ['student','guide','reviewer','coord']) {
   const html=c.buildDashboardShell('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
   assert.match(html,/<body data-dashboard-theme="editorial">/);
+  const {document}=require('linkedom').parseHTML(html);
+  assert.equal(document.querySelectorAll('h1').length,1);
+  assert.equal(document.querySelector('h1').textContent,'Dashboard');
+  assert.equal(document.querySelector('#sharedRubricsHeading').tagName,'H2');
+  assert.equal(document.querySelector('.timeline-heading h2').textContent,'Project timeline');
   assert(html.indexOf(c.getEditorialStyles_())<html.indexOf('</style>'));
   assert.match(html,/Source\+Serif\+4/);assert.match(html,/Source\+Sans\+3/);
  }
  const html=c.buildDashboardShell('preview@example.test',[{key:'student',label:'My Team',contentId:'studentContent'},{key:'guide',label:'Guide',contentId:'guideContent'}]);
  assert.match(html,/<body data-dashboard-theme="editorial">/);
+ assert.match(html,/data-role-tab="rubrics"/);
+ assert.match(html,/id="sharedRubrics" hidden/);
+ assert.match(html,/data-role-panel="student"/);
+ assert.match(html,/id="sharedProjectTimeline"/);
+});
+
+test('shared heading scale keeps content larger than cards and subsections',()=>{
+ const c=vm.createContext({});vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
+ const css=c.getEditorialStyles_();
+ const size=level=>Number(css.match(new RegExp('--heading-'+level+':(\\d+)px'))[1]);
+ assert(size('content')>size('card'));
+ assert(size('card')>size('subsection'));
+ for(const selector of ['.student-dashboard .dash-hero h2','.dashboard-body-surface .dashboard-container-header h2','.utility-body .utility-header :is(h1,h2)']) assert(css.includes(selector));
 });
 
 test('editorial rules stay opt-in and text palette pairs meet normal-text contrast',()=>{
@@ -175,7 +220,7 @@ test('editorial rules stay opt-in and text palette pairs meet normal-text contra
   const rgb=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
   return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;
  };
- for(const [foreground,background] of [['ink','canvas'],['ink-muted','paper'],['accent-primary','accent-tint'],['accent-primary','paper'],['success','success-tint'],['warning','warning-tint'],['danger','danger-tint'],['info','info-tint']]) {
+ for(const [foreground,background] of [['ink','canvas'],['ink','paper'],['ink-muted','canvas'],['ink-muted','paper'],['accent-primary','accent-tint'],['accent-primary','paper'],['on-accent','accent-fill'],['on-accent','accent-fill-hover'],['success','success-tint'],['warning','warning-tint'],['danger','danger-tint'],['info','info-tint']]) {
   const values=[luminance(token(foreground)),luminance(token(background))].sort((a,b)=>a-b);
   assert((values[1]+.05)/(values[0]+.05)>=4.5,foreground+' on '+background);
  }
@@ -221,34 +266,29 @@ test('rubrics start alongside pending role and timeline, deduplicate and survive
  assert.match(f.nodes.sharedRubricsContent.innerHTML,/disabled/);
 });
 
-test('rubrics collapse on staff tabs, survive async loading and always expand for students',async()=>{
- const f=rubricClientFixture(),button=f.nodes.sharedRubricsToggle,content=f.nodes.sharedRubricsContent;
- f.click('guide');assert.equal(button.hidden,false);assert.equal(content.hidden,true);
- assert.equal(button.attrs['aria-expanded'],'false');
- assert.equal(button.attrs['aria-label'],'Expand assessment rubrics');
+test('rubrics appear only in their dedicated tab for every role and after async loading',async()=>{
+ const f=rubricClientFixture(),section=f.nodes.sharedRubrics,content=f.nodes.sharedRubricsContent;
+ f.click('guide');assert.equal(section.hidden,true);
  const pending=f.ui.loadSharedRubrics();
  f.done('loadSharedRubrics',f.data);await pending;
- assert.equal(content.hidden,true);assert.match(content.innerHTML,/rubric-assessments/);
- for(const role of ['reviewer','coord']) {f.click(role);assert.equal(button.hidden,false);assert.equal(content.hidden,true);}
- f.click('student');assert.equal(button.hidden,true);assert.equal(content.hidden,false);assert.equal(button.attrs['aria-expanded'],'true');
- f.ui.toggleSharedRubrics();assert.equal(content.hidden,false);
- f.click('guide');assert.equal(content.hidden,true);
- f.ui.toggleSharedRubrics();assert.equal(content.hidden,false);
- assert.equal(button.attrs['aria-expanded'],'true');assert.equal(button.attrs['aria-label'],'Collapse assessment rubrics');
+ assert.equal(section.hidden,true);assert.match(content.innerHTML,/rubric-assessments/);
+ for(const role of ['student','guide','reviewer','coord','announcements','system-status']) {
+  f.click('rubrics');assert.equal(section.hidden,false);
+  f.click(role);assert.equal(section.hidden,true);
+ }
  assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
 });
 
-test('collapsed rubrics retain the disclosure control through failure and retry',async()=>{
+test('rubrics remain hidden on role dashboards through failure and retry',async()=>{
  const f=rubricClientFixture();f.click('reviewer');
  const pending=f.ui.loadSharedRubrics();
  const request=f.requests.find(r=>r.key==='loadSharedRubrics');request.done=true;request.failure(new Error('offline'));
  await assert.rejects(pending,/offline/);
- assert.equal(f.nodes.sharedRubricsContent.hidden,true);
- assert.equal(f.nodes.sharedRubricsToggle.hidden,false);
- f.ui.toggleSharedRubrics();assert.match(f.nodes.sharedRubricsContent.innerHTML,/Retry/);
- f.retry.click();const retried=f.ui.loadSharedRubrics();f.ui.toggleSharedRubrics();
+ assert.equal(f.nodes.sharedRubrics.hidden,true);
+ assert.match(f.nodes.sharedRubricsContent.innerHTML,/Retry/);
+ f.retry.click();const retried=f.ui.loadSharedRubrics();
  f.done('loadSharedRubrics',f.data);await retried;
- assert.equal(f.nodes.sharedRubricsContent.hidden,true);
+ assert.equal(f.nodes.sharedRubrics.hidden,true);
  assert.equal(f.nodes.sharedRubrics.attrs['aria-busy'],'false');
 });
 
@@ -386,6 +426,24 @@ test('failed role can be retried by selecting it again',()=>{
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
 });
 
+test('hidden preloaded panels use full skeletons while visible short controls stay inline',()=>{
+ const f=fixture(),{document}=require('linkedom').parseHTML('<html><body><section><button>Existing content</button></section></body></html>');
+ f.c.document.createElement=tag=>document.createElement(tag);
+ const host=document.querySelector('section'),button=host.firstElementChild;
+ let height=0;Object.defineProperty(host,'clientHeight',{get:()=>height});
+ const ui=vm.runInContext('DashboardUI',f.c);
+ for(const [initialHeight,compact,variant] of [[0,false,'panel'],[60,false,'inline'],[180,false,'panel'],[60,true,'panel']]) {
+  height=initialHeight;
+  const finish=ui.beginContentLoading(host,'Loading tab',{compact});
+  const overlay=host.querySelector('.app-loading-overlay');
+  assert(overlay.querySelector('.app-skeleton--'+variant));
+  assert.equal(button.inert,true);
+  if(initialHeight===0){height=180;assert.equal(overlay.querySelectorAll('.app-skeleton-lines > span').length,3);}
+  finish();finish();assert.equal(host.children.length,1);assert.equal(host.firstElementChild,button);
+  assert.equal(button.inert,undefined);assert.equal(host.getAttribute('aria-busy'),'false');
+ }
+});
+
 test('compact refresh uses the initial skeleton and restores the original content',()=>{
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body><section><button>Existing team</button></section></body></html>');
  f.c.document.createElement=tag=>document.createElement(tag);
@@ -400,6 +458,28 @@ test('compact refresh uses the initial skeleton and restores the original conten
  assert.equal(host.children.length,1);assert.equal(host.firstElementChild,button);
  assert.equal(host.getAttribute('aria-busy'),'false');
  assert(!host.classList.contains('app-content-loading--compact'));
+});
+
+test('GitHub status refresh uses compact student loading and restores content after failure',()=>{
+ const f=fixture(),{document}=require('linkedom').parseHTML('<html><body><section><button>Saved GitHub username</button></section></body></html>');
+ const host=document.querySelector('section'),button=host.firstElementChild;
+ Object.defineProperty(host,'clientHeight',{value:900});
+ f.c.document.createElement=tag=>document.createElement(tag);
+ const original=f.c.document.querySelector;
+ f.c.document.querySelector=selector=>selector==='[data-role-content="student"]'?host:original(selector);
+ const ui=vm.runInContext('DashboardUI',f.c);
+ ui.refreshGithubStatus();ui.refreshGithubStatus();
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
+ assert(host.classList.contains('app-content-loading--compact'));
+ assert.equal(host.querySelectorAll('.app-skeleton-lines > span').length,3);
+ assert.equal(button.inert,true);
+ const request=f.requests.at(-1);request.done=true;request.failure(new Error('offline'));
+ assert.equal(host.firstElementChild,button);assert(!button.inert);
+ assert.equal(host.getAttribute('aria-busy'),'false');
+ assert(!host.classList.contains('app-content-loading--compact'));
+ ui.refreshGithubStatus();f.done('loadDashboardRoleContent','Updated student');
+ assert.equal(host.innerHTML,'Updated student');
+ assert.equal(host.getAttribute('aria-busy'),'false');
 });
 
 test('shared loading preserves live children and restores interaction on repeated cleanup',()=>{

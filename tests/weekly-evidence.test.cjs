@@ -30,6 +30,17 @@ test('evidence requires team, verified roster mapping, repository and username; 
  f.setup.members[0].label='002';assert.equal(f.read().state,'unmapped');
 });
 
+test('students on the same team only receive their own GitHub commit details',()=>{
+ const f=fixture();
+ const other={regNo:'002',teamId:'T1',email:'two@example.com'};
+ f.setup.members.push({email:other.email,label:other.regNo,username:'bob',status:'valid'});
+ f.commit('2026-01-02T00:00:00Z',{message:'Alice work'});
+ f.commit('2026-01-02T01:00:00Z',{username:'bob',message:'Bob work'});
+ const mine=f.read(),theirs=f.c.readWeeklyProgressEvidence_(other,'W1');
+ assert.equal(mine.count,1);assert.equal(mine.commits[0].message,'Alice work');
+ assert.equal(theirs.count,1);assert.equal(theirs.commits[0].message,'Bob work');
+});
+
 test('shared reader returns effective log and safe commit details; scopes reads by Team ID once across weeks',()=>{
  const f=fixture();f.c.submitWeeklyProgress(f.input());f.c.submitWeeklyProgress(f.input({workCompleted:'Revised work'}));
  const row=f.commit('2026-01-02T00:00:00Z',{message:'<img src=x onerror=bad()>',sha:'A'.repeat(40)});

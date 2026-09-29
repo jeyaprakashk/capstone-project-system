@@ -116,7 +116,9 @@ const DashboardUI = (function() {
     const overlay = document.createElement('div');
     overlay.className = 'app-loading-overlay';
     const compact = options && options.compact;
-    overlay.innerHTML = renderSkeleton(!compact && target.clientHeight < 120 ? 'inline' : 'panel', label);
+    // Hidden tabs measure zero during preloading; that is not a small control.
+    const height = target.clientHeight;
+    overlay.innerHTML = renderSkeleton(!compact && height > 0 && height < 120 ? 'inline' : 'panel', label);
     const children = Array.from(target.children).map(function(child) { return {node:child, inert:child.inert}; });
     children.forEach(function(child) { child.node.inert = true; });
     target.setAttribute('aria-busy', 'true');
@@ -244,90 +246,45 @@ const DashboardUI = (function() {
   let timelineRequest = null;
 
   function renderSharedTimeline(data, target) {
-    const phase = data.active ? 'Week ' + data.week + ' of ' + data.totalWeeks
-      : data.today < data.schedule.week1 ? 'Weekly logging starts ' + data.milestones.find(function(m) { return m.key === 'week1'; }).date
-      : 'Weekly logging ended';
-    const next = data.milestones.findIndex(function(m) { return m.day >= data.today; });
-    const imminent = next >= 0 && data.milestones[next].day <= data.today + 1;
-    const highlighted = imminent ? data.milestones.findIndex(function(m) { return m.day > data.today + 1; }) : next;
+    // Presentation only: retain the authoritative snapshot, including weekly scheduling.
+    const milestones = data.milestones.filter(m => !['week1','end'].includes(m.key));
+    const next = milestones.findIndex(m => m.day >= data.today);
+    const start = Math.max(0, (next < 0 ? milestones.length : next) - 2);
+    const finish = next < 0 ? milestones.length : Math.min(milestones.length, next + 3);
     target.innerHTML = '<div class="timeline-heading"><h2>Project timeline</h2>' +
-      '<div class="timeline-meta"><span class="timeline-today">Today · ' + escapeClientHtml(data.todayLabel) + '</span><span class="timeline-week">' + escapeClientHtml(phase) + '</span></div></div>' +
-      '<div class="timeline-body"><div class="timeline-navigation" hidden><button type="button" class="timeline-nav timeline-prev" aria-label="Scroll to earlier milestones">' + renderLucideIcon_('chevron-left') + '</button><button type="button" class="timeline-nav timeline-forward" aria-label="Scroll to later milestones">' + renderLucideIcon_('chevron-right') + '</button></div>' +
-      '<div class="timeline-scroll" role="region" aria-label="Project milestones, scroll horizontally to see all dates" tabindex="0"><ol class="timeline-track" style="--timeline-stops:' + data.milestones.length + '">' + data.milestones.map(function(m, index) {
-        const state = m.day < data.today ? 'past' : m.day <= data.today + 1 ? 'imminent' : index === highlighted ? 'next' : 'future';
-        const dateDescription=m.openingDate?'Opens '+m.openingDate+'; due '+m.date:m.date;
-        const label = m.day === data.today ? 'Today' : m.day === data.today + 1 ? 'Tomorrow' : index === highlighted ? 'Up Next' : '';
-        return '<li class="timeline-stop timeline-' + state + (index === highlighted ? ' timeline-current' + (imminent ? ' timeline-upcoming' : '') : '') + (index === highlighted - 1 ? ' timeline-approaching' : '') + '"' + (index === next ? ' aria-current="step"' : '') + '><span class="timeline-dot" aria-hidden="true">' + (index === highlighted ? '<span class="timeline-node-core"></span>' : '') + '</span><strong>' + escapeClientHtml(m.label) + '</strong><span class="timeline-date" title="' + escapeClientHtml(dateDescription) + '" aria-label="' + escapeClientHtml(dateDescription) + '">' + escapeClientHtml(String(m.date).replace(/ [0-9]{4}$/, '')) + '</span>' + (label ? '<span class="timeline-state">' + label + '</span>' : '') + '</li>';
-      }).join('') + '</ol></div></div>';
-    const scroll = target.querySelector('.timeline-scroll');
-    const navigation = target.querySelector('.timeline-navigation');
-    const previous = target.querySelector('.timeline-prev');
-    const forward = target.querySelector('.timeline-forward');
-    function updateScrollControls() {
-      const maximum = Math.max(0, scroll.scrollWidth - scroll.clientWidth);
-      navigation.hidden = maximum <= 1;
-      previous.disabled = scroll.scrollLeft <= 1;
-      forward.disabled = scroll.scrollLeft >= maximum - 1;
-    }
-    function scrollMilestones(direction) {
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      scroll.scrollBy({left:direction * Math.max(132, scroll.clientWidth * 0.75), behavior:reducedMotion ? 'auto' : 'smooth'});
-    }
-    previous.addEventListener('click', function() { scrollMilestones(-1); });
-    forward.addEventListener('click', function() { scrollMilestones(1); });
-    scroll.addEventListener('scroll', updateScrollControls, {passive:true});
-    let drag = null;
-    scroll.addEventListener('pointerdown', function(event) {
-      // Touch uses the browser's native swipe inertia and vertical page scrolling.
-      if (event.pointerType === 'touch' || event.button !== 0 || event.isPrimary === false || scroll.scrollWidth <= scroll.clientWidth) return;
-      drag = {pointerId:event.pointerId, x:event.clientX, left:scroll.scrollLeft};
-      scroll.setPointerCapture(event.pointerId);
-      scroll.setAttribute('data-dragging', 'true');
-      event.preventDefault();
+      (milestones.length ? '<button type="button" class="timeline-toggle" aria-expanded="false" aria-controls="projectTimelineMilestones">View full timeline</button>' : '') + '</div>' +
+      (!milestones.length ? '<p class="timeline-empty">No project milestones scheduled</p>' : '') +
+      '<ol id="projectTimelineMilestones" class="timeline-track" style="--timeline-stops:' + (finish-start) + '">' + milestones.map(function(m,index) {
+        const past = m.day < data.today, current = index === next;
+        const mobileContext = next < 0 ? index >= Math.max(0, milestones.length - 2) : Math.abs(index - next) <= 1;
+        const description = m.openingDate ? 'Opens ' + m.openingDate + '; due ' + m.date : m.date;
+        const days = m.day - data.today;
+        const timing = current ? 'CURRENT · ' + (days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : 'Due in ' + days + ' days')
+          : !past ? (days === 0 ? 'Due today' : 'In ' + days + (days === 1 ? ' day' : ' days')) : '';
+        return '<li class="timeline-stop timeline-' + (past ? 'past' : current ? 'current' : 'future') + '" data-timeline-mobile="' + mobileContext + '" data-timeline-context="' + (index >= start && index < finish) + '"' + (index < start || index >= finish ? ' hidden' : '') + (current ? ' aria-current="step"' : '') + '>' +
+          '<span class="timeline-dot" aria-hidden="true">' + (past ? renderLucideIcon_('check') : current ? '<span class="timeline-node-core"></span>' : '') + '</span>' +
+          '<strong>' + escapeClientHtml(m.label) + '</strong>' +
+          '<span class="timeline-date" title="' + escapeClientHtml(description) + '" aria-label="' + escapeClientHtml(description) + '">' + escapeClientHtml(m.date) + '</span>' +
+          (timing ? '<span class="timeline-timing">' + timing + '</span>' : '') + '</li>';
+      }).join('') + '</ol>';
+    const toggle = target.querySelector('.timeline-toggle');
+    if (toggle) toggle.addEventListener('click', function() {
+      const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(expanded));
+      toggle.textContent = expanded ? 'Show less' : 'View full timeline';
+      target.querySelector('.timeline-track').classList.toggle('timeline-full', expanded);
+      target.querySelectorAll('.timeline-stop').forEach(item => { item.hidden = !expanded && item.dataset.timelineContext !== 'true'; });
     });
-    scroll.addEventListener('pointermove', function(event) {
-      if (!drag || event.pointerId !== drag.pointerId) return;
-      scroll.scrollLeft = Math.max(0, Math.min(drag.left + drag.x - event.clientX, scroll.scrollWidth - scroll.clientWidth));
-      updateScrollControls();
-      event.preventDefault();
-    });
-    function endTimelineDrag(event) {
-      if (!drag || event.pointerId !== drag.pointerId) return;
-      const pointerId = drag.pointerId;
-      drag = null;
-      scroll.setAttribute('data-dragging', 'false');
-      if (scroll.hasPointerCapture(pointerId)) scroll.releasePointerCapture(pointerId);
-    }
-    scroll.addEventListener('pointerup', endTimelineDrag);
-    scroll.addEventListener('pointercancel', endTimelineDrag);
-    scroll.addEventListener('lostpointercapture', endTimelineDrag);
-    let initialViewSet = false;
-    function updateTimelineLayout() {
-      updateScrollControls();
-      if (!initialViewSet && scroll.clientWidth > 0) {
-        initialViewSet = true;
-        const milestone = scroll.querySelector(next >= 0 ? '[aria-current="step"]' : '.timeline-stop:last-child');
-        if (milestone) {
-          const bounds = milestone.getBoundingClientRect();
-          const viewport = scroll.getBoundingClientRect();
-          const centered = scroll.scrollLeft + bounds.left - viewport.left + bounds.width / 2 - scroll.clientWidth / 2;
-          scroll.scrollLeft = Math.max(0, Math.min(centered, scroll.scrollWidth - scroll.clientWidth));
-          updateScrollControls();
-        }
-      }
-    }
-    if (target.timelineResizeObserver) target.timelineResizeObserver.disconnect();
-    target.timelineResizeObserver = new ResizeObserver(updateTimelineLayout);
-    target.timelineResizeObserver.observe(scroll);
-    target.timelineResizeObserver.observe(scroll.querySelector('.timeline-track'));
-    updateTimelineLayout();
   }
 
   function loadSharedTimeline() {
     if (sharedSchedule) return Promise.resolve(sharedSchedule);
     if (timelineRequest) return timelineRequest;
     const target = byId('sharedProjectTimeline');
-    if (target) target.setAttribute('aria-busy', 'true');
+    if (target) {
+      target.setAttribute('aria-busy', 'true');
+      target.innerHTML = renderSkeleton('timeline', 'Loading project timeline');
+    }
     timelineRequest = new Promise(function(resolve, reject) {
       dashboardRun()
         .withSuccessHandler(function(data) {
@@ -361,21 +318,9 @@ const DashboardUI = (function() {
   let sharedRubrics = null;
   let rubricsRequest = null;
   let rubricTrigger = null;
-  let rubricsCollapsed = true;
   function syncRubricsDisclosure() {
-    const button = byId('sharedRubricsToggle'), content = byId('sharedRubricsContent');
-    if (!button || !content) return;
-    const collapsible = ['guide','reviewer','coord'].includes(activeRole);
-    const collapsed = collapsible && rubricsCollapsed;
-    button.hidden = !collapsible;
-    button.setAttribute('aria-expanded', String(!collapsed));
-    button.setAttribute('aria-label', collapsed ? 'Expand assessment rubrics' : 'Collapse assessment rubrics');
-    content.hidden = collapsed;
-  }
-  function toggleSharedRubrics() {
-    if (!['guide','reviewer','coord'].includes(activeRole)) return;
-    rubricsCollapsed = !rubricsCollapsed;
-    syncRubricsDisclosure();
+    const section = byId('sharedRubrics');
+    if (section) section.hidden = activeRole !== 'rubrics';
   }
   function loadSharedRubrics() {
     if (rubricsRequest) return rubricsRequest;
@@ -482,7 +427,7 @@ const DashboardUI = (function() {
     }
 
     const hadContent = !!loadedRoleTabs[activeKey];
-    const finishLoading = beginContentLoading(target, 'Loading dashboard', {compact:activeKey === 'reviewer'});
+    const finishLoading = beginContentLoading(target, 'Loading dashboard', {compact:activeKey === 'reviewer' || activeKey === 'student'});
     const refreshButton = byId(activeKey + 'Refresh');
     if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderSkeleton('inline', 'Refreshing'); }
     setText(activeKey + 'RefreshStatus', '');
@@ -694,7 +639,7 @@ const DashboardUI = (function() {
     nav.addEventListener('focusout', function(event) {
       if (event.relatedTarget && !nav.contains(event.relatedTarget)) setRoleMenuOpen(false, false);
     });
-    const media = window.matchMedia('(max-width: 760px)');
+    const media = window.matchMedia('(max-width: 1200px)');
     if (media.addEventListener) media.addEventListener('change', function(event) {
       const toggle = byId('roleMenuToggle');
       const focusInNav = nav.contains(document.activeElement);
@@ -709,6 +654,8 @@ const DashboardUI = (function() {
   function showRoleTab(activeKey) {
     document.body.setAttribute('data-dashboard-theme', 'editorial');
     activeRole = activeKey;
+    const timeline = byId('sharedProjectTimeline');
+    if (timeline) timeline.hidden = activeKey !== 'rubrics';
     syncRubricsDisclosure();
     tabSelectedAt = performance.now();
     recordPerformance({event:'tab_selected', role:activeKey, cached:!!loadedRoleTabs[activeKey], prefetched:!!preloadedRoles[activeKey]});
@@ -728,7 +675,9 @@ const DashboardUI = (function() {
     });
     const menuToggle = byId('roleMenuToggle');
     if (menuToggle) setRoleMenuOpen(false, menuToggle.getAttribute('aria-expanded') === 'true');
-    if (activeKey === 'system-status') {
+    if (activeKey === 'rubrics') {
+      loadSharedRubrics();
+    } else if (activeKey === 'system-status') {
       ensureSystemStatusLoaded();
     } else if (activeKey === 'announcements') {
       // Click-to-load path. This may win the race against background preload.
@@ -1690,6 +1639,8 @@ const DashboardUI = (function() {
       panel = document.createElement('section'); panel.setAttribute('data-weekly-github','');
       panel.className = 'weekly-github-activity'; host.appendChild(panel);
     }
+    const form = host.querySelector('form');
+    if (form) form.insertBefore(panel, form.querySelector('[type="submit"]'));
     const data = host.weeklyData, evidence = (data.evidence || []).find(item=>item.weekId === weekId), esc = escapeClientHtml;
     if (!weekId) { panel.hidden = true; return; }
     panel.hidden = false;
@@ -1699,7 +1650,7 @@ const DashboardUI = (function() {
       body = '<p>' + evidence.count + ' commits this week</p>' + (evidence.count ? '<ul>' + evidence.commits.map(commit=>
         '<li><time datetime="' + esc(commit.timestamp) + '">' + esc(weeklyDate(commit.timestamp,data.timezone)) + '</time><span>' + esc(commit.message) + '</span><a href="' + esc(commit.url) + '" target="_blank" rel="noopener noreferrer">' + esc(commit.shortSha) + '</a></li>').join('') + '</ul>' : '<p>No GitHub activity recorded for you this week</p>');
     }
-    panel.innerHTML = '<h3>GitHub Activity' + weeklySeparator + esc(weeklyWeekLabel(weekId)) + '</h3><p class="weekly-helper">GitHub Supporting Evidence · System-observed project artifacts</p>' + body;
+    panel.innerHTML = '<h4>Your GitHub activity this week' + weeklySeparator + esc(weeklyWeekLabel(weekId)) + '</h4><p class="weekly-helper">GitHub Supporting Evidence · System-observed project artifacts</p>' + body;
   }
   function loadWeeklyProgress() {
     const host = byId('studentWeeklyProgress');
@@ -1727,20 +1678,20 @@ const DashboardUI = (function() {
               return '<p><strong>' + esc(field[1]) + '</strong></p><p style="white-space:pre-wrap">' + esc(entry[field[0]] || '') + '</p>';
             }).join('') + '</details>';
         }).join('') + '</details>';
+      const formContainer = host.querySelector('[data-weekly-form]');
+      formContainer.hidden = !data.ready;
       const form = host.querySelector('form');
       if (form) {
-        const stillAllowed = data.actions.some(a=>a.weekId === form.dataset.week && String(a.overdue) === form.dataset.overdue);
+        const stillAllowed = data.ready && data.actions.some(a=>a.weekId === form.dataset.week && String(a.overdue) === form.dataset.overdue);
         Array.from(form.elements).forEach(el=>{el.disabled = !stillAllowed;});
         const action = data.actions.find(a=>a.weekId === form.dataset.week);
         if (action) updateWeeklyFormPresentation(host,form,action);
         if (!stillAllowed) status.textContent = 'This action is no longer available. Your unsaved text is retained. Choose an available week to continue.';
       } else {
         const normal = data.actions.find(a=>!a.overdue);
-        if (normal) renderWeeklyForm(host,normal);
+        if (data.ready && normal) renderWeeklyForm(host,normal);
       }
       renderWeeklyGithub(host,(host.querySelector('form') || {}).dataset?.week || (data.evidence || []).slice(-1)[0]?.weekId);
-      const count = byId('studentMilestoneCount');
-      if (count) count.textContent = (Number(count.dataset.base) + (data.complete ? 1 : 0)) + ' of 3 milestones complete';
     }).withFailureHandler(function(error) {
       settle();
       if (host.isConnected && byId('studentWeeklyProgress') === host) {
@@ -1750,10 +1701,11 @@ const DashboardUI = (function() {
     }).loadStudentWeeklyProgress();
   }
   function renderWeeklyForm(host, action) {
+    if (!host.weeklyData.ready) return;
     const data = host.weeklyData, esc = escapeClientHtml;
     const latest = data.history.filter(r=>r.weekId === action.weekId && r.entryStatus !== 'MISSED').slice(-1)[0] || {};
     host.querySelector('[data-weekly-form]').innerHTML = '<form class="weekly-progress-form" data-week="' + esc(action.weekId) + '" data-overdue="' + action.overdue + '" onsubmit="DashboardUI.submitWeeklyProgress(event,this)">' +
-      '<header class="weekly-form-header"><h3 data-weekly-heading></h3><div class="weekly-status-strip" data-weekly-state role="status" aria-label="Submission status"></div><p class="weekly-dates" data-weekly-dates></p></header>' +
+      '<header class="weekly-form-header"><h4 data-weekly-heading></h4><div class="weekly-status-strip" data-weekly-state role="status" aria-label="Submission status"></div><p class="weekly-dates" data-weekly-dates></p></header>' +
       weeklyFields.map(function(field) { return '<div class="weekly-field"><label for="weekly-' + field[0] + '">' + esc(field[1]) + '</label><p class="weekly-helper" id="weekly-help-' + field[0] + '">' + esc(field[2]) + '</p><textarea id="weekly-' + field[0] + '" name="' + field[0] + '" rows="3" required maxlength="10000" aria-describedby="weekly-help-' + field[0] + '" placeholder="' + esc(field[3]) + '">' + esc(latest[field[0]] || '') + '</textarea></div>'; }).join('') +
       '<button type="submit" class="workflow-btn"></button></form>';
     updateWeeklyFormPresentation(host,host.querySelector('form'),action);
@@ -1891,7 +1843,6 @@ const DashboardUI = (function() {
     loadCoordinatorSectionAsync,
     loadSharedTimeline,
     loadSharedRubrics,
-    toggleSharedRubrics,
     openRubricDrawer,
     closeRubricDrawer,
     getSharedSchedule: function() { return sharedSchedule; },

@@ -513,8 +513,7 @@ function buildAnnouncementsTabContent_(announcements, isCoordinator) {
   const formUrl=isCoordinator?String(getConfig('ANNOUNCEMENTS_FORM_URL') || '').trim():'';
   const addButton=isCoordinator && /^https?:\/\//i.test(formUrl)?`<a class="announcement-add-btn" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener">${renderLucideIcon_('plus')}New announcement</a>`:'';
   const records=announcements.map(a=>({a,p:announcementPresentation_(a),date:formatAnnouncementTimestamp_(a.timestamp)}));
-  const year=String(getConfig('ACADEMIC_YEAR') || '').trim();
-  const header=`<div class="announcement-header"><div><p class="announcement-eyebrow">Capstone project${year?' · '+escapeHtml(year):''}</p><h2>Announcements</h2><p class="announcement-subtitle" id="announcementsUpdated">${announcements.length} posts · ${dashboardUpdatedLabel_()}</p></div><div class="announcement-actions"><button type="button" class="announcement-refresh-btn" aria-label="Refresh announcements" title="Refresh announcements" onclick="refreshAnnouncements()">${renderLucideIcon_('refresh-cw')}</button>${addButton}</div></div><p class="announcement-status" role="status" aria-live="polite"></p>`;
+  const header=`<div class="announcement-header utility-header"><div><h2>Announcements</h2><p class="announcement-subtitle" id="announcementsUpdated">${announcements.length} posts · ${dashboardUpdatedLabel_()}</p></div><div class="announcement-actions"><button type="button" class="announcement-refresh-btn" aria-label="Refresh announcements" title="Refresh announcements" onclick="refreshAnnouncements()">${renderLucideIcon_('refresh-cw')}</button>${addButton}</div></div><p class="announcement-status" role="status" aria-live="polite"></p>`;
   function item(record,index) {
     const {a,p,date}=record;
     const audience=buildAnnouncementAudience_(a);
@@ -528,13 +527,13 @@ function buildAnnouncementsTabContent_(announcements, isCoordinator) {
     if(!groups.has(day))groups.set(day,[]);
     groups.get(day).push(item(r,i));
   });
-  const feed=Array.from(groups,([day,items])=>`<section class="announcement-date-group"><h3 class="announcement-group-heading">${escapeHtml(day)}</h3>${items.join('')}</section>`).join('');
+  const feed=Array.from(groups,([day,items])=>`<section class="announcement-date-group"><p class="announcement-group-heading">${escapeHtml(day)}</p>${items.join('')}</section>`).join('');
   const templates=[],seen=new Set();
   records.filter(r=>r.p.type==='Template' && r.p.step!==null && r.p.link).sort((a,b)=>a.p.step-b.p.step).forEach(r=>{
     if(seen.has(r.p.link))return;
     seen.add(r.p.link);templates.push(`<li><a href="${escapeHtml(r.p.link)}" target="_blank" rel="noopener"><span class="announcement-step-number">${r.p.step}</span><span>${escapeHtml(r.p.title)}</span>${renderLucideIcon_('external-link')}</a></li>`);
   });
-  return `<div class="announcement-tab-surface announcement-hub">${header}
+  return `<div class="announcement-tab-surface announcement-hub utility-body">${header}
     <div class="announcement-toolbar"><label class="announcement-search-field"><span class="announcement-sr-only">Search announcements</span>${renderLucideIcon_('search')}<input id="announcementSearch" type="search" placeholder="Search titles, steps or dates" autocomplete="off" aria-controls="announcementList"></label><div class="announcement-audience-filters" role="group" aria-label="Filter by audience">${[['all','All · '+announcements.length],['teams','Project Teams'],['guides','Guides'],['reviewers','Reviewers']].map(([key,label])=>`<button type="button" data-announcement-audience="${key}" aria-pressed="${key==='all'}">${label}</button>`).join('')}</div><label><span class="announcement-sr-only">Announcement type</span><select data-announcement-type-filter><option value="all">All types</option><option value="Template">Template</option><option value="Form">Form</option><option value="Notice">Notice</option></select></label></div>
     <p class="announcement-results" role="status" aria-live="polite"></p><div class="announcement-columns"><div><div id="announcementList" class="announcement-list">${feed}</div><div class="announcement-no-results announcement-empty-state" hidden><h3>${announcements.length?'No matching announcements':"You're all caught up"}</h3><p>${announcements.length?'Try another search or filter.':'New announcements will appear here when posted.'}</p></div><div class="announcement-load-more"><button type="button" data-announcement-more>Show older announcements</button></div></div><aside class="announcement-templates"><h3>Step templates</h3><p>Every available template, in step order.</p>${templates.length?'<ol>'+templates.join('')+'</ol>':'<p>No step templates have been shared yet.</p>'}</aside></div></div>`;
 }
@@ -739,7 +738,7 @@ function dashboardUpdatedLabel_() {
 
 function buildDashboardContainerHeader_(title, key) {
   const action = key === 'systemStatus' ? 'DashboardUI.refreshSystemStatus()' : "DashboardUI.refreshRoleDashboard('" + key + "')";
-  return `<div class="announcement-header dashboard-container-header"><div><h1>${escapeHtml(title)}</h1><p class="announcement-subtitle" id="${key}Updated">${key === 'coord' || key === 'systemStatus' ? 'Waiting for data…' : dashboardUpdatedLabel_()}</p></div><button type="button" class="announcement-refresh-btn" id="${key}Refresh" onclick="${escapeHtml(action)}">${renderLucideIcon_('refresh-cw', '', 'icon-leading')}Refresh</button></div><p id="${key}RefreshStatus" class="announcement-status" role="status" aria-live="polite"></p>`;
+  return `<div class="announcement-header dashboard-container-header${key === 'systemStatus' ? ' utility-header' : ''}"><div><h2>${escapeHtml(title)}</h2><p class="announcement-subtitle" id="${key}Updated">${key === 'coord' || key === 'systemStatus' ? 'Waiting for data…' : dashboardUpdatedLabel_()}</p></div><button type="button" class="announcement-refresh-btn" id="${key}Refresh" onclick="${escapeHtml(action)}">${renderLucideIcon_('refresh-cw', '', 'icon-leading')}Refresh</button></div><p id="${key}RefreshStatus" class="announcement-status" role="status" aria-live="polite"></p>`;
 }
 
 /** Shared controls for team tables; page state remains local to each table. */

@@ -124,7 +124,7 @@ function buildStepCard(stepNum, title, state, bodyHtml, ctaHtml, isLast) {
     </div>
     <div class="step-card step-card-${state}">
       <div class="step-header">
-        <h3>${escapeHtml(title)}</h3>
+        <h4>${escapeHtml(title)}</h4>
         ${badge}
       </div>
       <div class="step-body">${bodyHtml}</div>
@@ -148,12 +148,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   const githubDone = d.githubReady;
   const githubTiming = githubSubmissionTiming_(d.githubSetup, d.schedule, d.clock);
   const titleApproved = d.titleStatus === 'APPROVED';
-
-  const doneCount = [
-    githubDone,
-    titleApproved,
-    false // Weekly completion is loaded independently from configured windows.
-  ].filter(Boolean).length;
+  const setupComplete = githubDone && titleApproved;
 
 
   // ===============================================================
@@ -253,12 +248,25 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   let weeklyDisplayWindows = [];
   try { weeklyDisplayWindows = getWeeklySubmissionWindows_().map(window => ({weekId:window.weekId,opens:window.opens_at,closes:window.closes_at})); }
   catch (error) { /* The existing asynchronous weekly reader reports configuration errors. */ }
-  const logCard = buildStepCard(3, 'Weekly progress log', 'waiting',
+  const logCard = setupComplete ? '<section class="student-weekly-card"><h3>Weekly progress</h3>' +
     '<section id="studentWeeklyProgress" aria-label="Weekly progress" data-weekly-windows="' + escapeHtml(JSON.stringify(weeklyDisplayWindows)) + '">' +
     '<div data-weekly-read>' + getSkeletonMarkup_('panel','Loading weekly progress') + '</div>' +
     '<p data-weekly-status role="status" aria-live="polite"></p>' +
     '<button type="button" class="workflow-btn secondary" data-weekly-refresh onclick="DashboardUI.loadWeeklyProgress()">Refresh weekly progress</button>' +
-    '<div data-weekly-form></div></section>', '', true);
+    '<div data-weekly-form></div></section></section>' : '';
+
+  const pendingSteps = [];
+  if (!githubDone) pendingSteps.push('Step 1: ' + d.githubText);
+  if (!titleApproved) {
+    const label = STUDENT_TITLE_LABEL[d.titleStatus];
+    pendingSteps.push('Step 2: ' + label.text + '. ' + (!githubDone ? 'Finish GitHub setup first. ' : '') +
+      (label.state === 'active' ? (d.title ? 'Your team must address the feedback below and resubmit the title.' : 'Your team must submit a project title for approval.') : 'Your team is waiting for approval; check the review status below.'));
+  }
+  const setupHeader = '<h3 class="student-setup-title">Project Setup</h3><span class="step-badge ' + (setupComplete ? 'done' : 'active') + '">' + (setupComplete ? '&#10003; Complete' : 'Action needed') + '</span>';
+  const setupBody = '<div class="student-setup-steps">' + githubCard + titleCard + '</div>';
+  const setupCard = setupComplete
+    ? '<details class="student-project-setup"><summary>' + setupHeader + '<span class="setup-view">View</span><span class="setup-hide">Hide</span></summary>' + setupBody + '</details>'
+    : '<section class="student-project-setup" aria-label="Project Setup"><header>' + setupHeader + '</header><div class="student-setup-pending">' + pendingSteps.map(text=>'<p>' + escapeHtml(text) + '</p>').join('') + '</div>' + setupBody + '</section>';
 
   // ===============================================================
   // REVIEW MARKS — ASYNCHRONOUS
@@ -272,28 +280,24 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   // ===============================================================
 
   return `
-  <div class="dashboard-body-surface">
+  <div class="dashboard-body-surface student-dashboard">
 
     <div class="dash-hero">
-      <h1>
+      <h2>
         Team
         <span class="mono-tag">
           ${escapeHtml(teamId)}
         </span>
-      </h1>
+      </h2>
 
-      <p class="hero-sub">
-        <span id="studentMilestoneCount" data-base="${doneCount}">${doneCount} of 3 milestones complete</span>
-      </p>
     </div>
 
+    <div class="student-team-overview">
     ${buildTeamRoster(d.rosterSlots, email)}
 
-    <div class="stepper">
-      ${githubCard}
-      ${titleCard}
-      ${logCard}
+    ${setupCard}
     </div>
+    ${logCard}
 
     ${getAssessmentDefinitions_().filter(d=>d.type==='REVIEW').map(d=>'<section id="studentAssessment-'+escapeHtml(d.key)+'" data-review-result="'+escapeHtml(d.key)+'" class="assessment-section" aria-live="polite">'+getSkeletonMarkup_('panel', 'Loading '+d.label+' results')+'</section>').join('')}
     <section id="studentGuideEvaluation" class="assessment-section" aria-live="polite">${getSkeletonMarkup_('panel', 'Loading guide evaluation')}</section>

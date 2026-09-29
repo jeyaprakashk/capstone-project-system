@@ -21,6 +21,28 @@ function fixture() {
  return {c:context,document,host,requests,data,form,counts:()=>[starts,finishes],load:()=>context.loadWeeklyProgress(),reply:(d=data)=>requests.at(-1).success(d)};
 }
 
+test('backend readiness hides the weekly form and preserves drafts through a readiness change',()=>{
+ const f=fixture();f.data.ready=false;f.load();f.reply();
+ assert.equal(f.host.querySelector('form'),null);
+ assert.equal(f.host.querySelector('[data-weekly-form]').hidden,true);
+ f.data.ready=true;f.load();f.reply();const form=f.form();form.elements.workCompleted.value='Draft';
+ f.data.ready=false;f.load();f.reply();
+ assert.equal(f.host.querySelector('[data-weekly-form]').hidden,true);
+ assert.equal(form.elements.workCompleted.value,'Draft');assert.equal(form.elements.workCompleted.disabled,true);
+ f.data.ready=true;f.load();f.reply();assert.equal(f.host.querySelector('[data-weekly-form]').hidden,false);
+ assert.equal(form.elements.workCompleted.value,'Draft');
+});
+
+test('personal GitHub activity follows all four fields and precedes submit across week changes',async()=>{
+ const f=fixture();f.load();f.reply();
+ const check=()=>{const form=f.form(),panel=form.querySelector('[data-weekly-github]');
+  assert(panel);assert.equal(panel.previousElementSibling.querySelector('textarea').name,'nextAction');
+  assert.equal(panel.nextElementSibling.type,'submit');assert.match(panel.textContent,/Your GitHub activity this week/);
+  assert.equal(f.host.querySelectorAll('[data-weekly-github]').length,1);};
+ check();f.data.actions.push({...f.data.actions[0],weekId:'W0',overdue:true});f.load();f.reply();
+ await f.c.chooseWeeklyAction(f.host.querySelector('[data-week="W0"]'));check();
+});
+
 test('weekly read deduplicates, preserves unsaved form and history on failed refresh, and retries',()=>{
  const f=fixture();f.load();f.load();assert.equal(f.requests.length,1);f.reply();
  const form=f.form();form.elements.workCompleted.value='Unsaved';form.weeklyDirty=true;
@@ -70,7 +92,7 @@ test('superseded weekly responses cannot render into a replacement dashboard',()
 test('GitHub evidence renders safe details, neutral mapping, zero and failure states independently',()=>{
  const f=fixture();f.data.evidence=[{weekId:'W1',state:'available',count:1,commits:[{timestamp:'2026-01-02T12:00:00Z',message:'<script>bad()</script>',shortSha:'abcdef0',url:'https://github.com/org/team/commit/'+'a'.repeat(40)}]}];
  f.load();f.reply();f.form();const panel=f.host.querySelector('[data-weekly-github]');
- assert.match(panel.textContent,/GitHub Activity · Week 01/);assert.match(panel.textContent,/1 commits this week/);
+ assert.match(panel.textContent,/Your GitHub activity this week · Week 01/);assert.match(panel.textContent,/1 commits this week/);
  assert.equal(panel.querySelector('script'),null);assert.equal(panel.querySelector('a').textContent,'abcdef0');
  assert.equal(panel.querySelector('a').getAttribute('rel'),'noopener noreferrer');
  assert.match(panel.querySelector('time').textContent,/2 Jan/);
@@ -95,7 +117,7 @@ test('weekly form shows configured range, concise deadlines, accessible guidance
  f.host.dataset.weeklyWindows=JSON.stringify([{weekId:'W1',opens:Date.parse('2026-09-28T00:00:00+05:30'),closes:Date.parse('2026-10-02T23:59:59+05:30')}]);
  f.data.actions[0].deadline='2026-10-02T18:00:00+05:30';f.data.actions[0].cutoff='2026-10-05T18:00:00+05:30';
  f.load();f.reply();const form=f.form();
- assert.equal(form.querySelector('h3').textContent,'Week 01 '+String.fromCharCode(183)+' 28 Sep '+String.fromCharCode(8211)+' 2 Oct');
+ assert.equal(form.querySelector('h4[data-weekly-heading]').textContent,'Week 01 '+String.fromCharCode(183)+' 28 Sep '+String.fromCharCode(8211)+' 2 Oct');
  assert.match(form.querySelector('[data-weekly-dates]').textContent,/Due: 2 Oct.*Late submission until: 5 Oct/);
  assert.equal(form.querySelector('[data-weekly-state]').textContent,'OPEN');
  assert.equal(form.querySelector('[type="submit"]').textContent,'Submit Week 01 Progress');

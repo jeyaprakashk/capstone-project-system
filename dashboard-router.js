@@ -128,16 +128,16 @@ function buildSingleRoleDashboardPage(email, key, label, contentId, html) {
 
 function buildDashboardShell(email, views) {
   const multiRole = views.length > 1;
-  const rubricsCollapsible = ['guide','reviewer','coord'].includes(views[0].key);
 
   // Role tabs are followed by one common utility tab. Announcements is not a role.
   const roleIcons = { student:'graduation-cap', guide:'book-open', reviewer:'clipboard-check', coord:'network' };
   const roleButtons = views.map((view, index) =>
     `<button type="button" class="role-tab-btn${index === 0 ? ' active' : ''}" data-role-tab="${escapeHtml(view.key)}" onclick="showRoleTab('${escapeHtml(view.key)}')">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml(view.label)}</button>`
   ).join('');
+  const rubricsButton = `<button type="button" class="role-tab-btn" data-role-tab="rubrics" onclick="showRoleTab('rubrics')">${renderLucideIcon_('book-open')}Timeline &amp; Rubrics</button>`;
   const hasCoordinator = views.some(view => view.key === 'coord');
   const systemButton = hasCoordinator ? `<button type="button" class="role-tab-btn" data-role-tab="system-status" onclick="showRoleTab(&quot;system-status&quot;)">${renderLucideIcon_('activity')}System Status</button>` : '';
-  const systemPanel = hasCoordinator ? `<section class="role-panel dashboard-body-surface" data-role-panel="system-status">${buildDashboardContainerHeader_('System Status', 'systemStatus')}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
+  const systemPanel = hasCoordinator ? `<section class="role-panel dashboard-body-surface utility-body" data-role-panel="system-status">${buildDashboardContainerHeader_('System Status', 'systemStatus')}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
   const announcementsButton = `<button type="button" class="role-tab-btn" data-role-tab="announcements" onclick="showRoleTab('announcements')">${renderLucideIcon_('megaphone')}Announcements</button>`;
 
   const rolePanels = views.map((view, index) =>
@@ -167,7 +167,7 @@ ${getLucideStyles_()}
 .role-tabs { display:flex; gap:8px; flex-wrap:wrap; }
 .role-menu-toggle { display:none; }
 .dashboard-navigation button:focus-visible { outline:3px solid #9e77ed; outline-offset:3px; }
-@media(max-width:760px) {
+@media(max-width:1200px) {
   .dashboard-navigation { padding:8px; border:1px solid #e4e7ec; border-radius:14px; background:#fff; }
   .role-menu-toggle { display:flex; align-items:center; gap:10px; width:100%; min-height:44px; padding:10px 12px; border:0; border-radius:9px; background:#f8fafc; color:#182230; font:600 14px 'Inter','Segoe UI',sans-serif; cursor:pointer; text-align:left; }
   .role-menu-toggle .role-menu-label { flex:1; }
@@ -178,9 +178,9 @@ ${getLucideStyles_()}
 }
 .role-tab-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding: 10px 20px; border-radius: 999px; font-size: 14px; font-weight: 600; border: 1px solid #dcdfe4; background: #fff; color: #6b7280; cursor: pointer; }
 .role-tab-btn.active { background: #1f2430; color: #fff; border-color: #1f2430; }
-@media(min-width:761px) {
+@media(min-width:1201px) {
   .dashboard-navigation { background:#fff; border:1px solid #e4e7ec; border-radius:12px; padding:0; }
-  .dashboard-navigation .role-tabs { gap:0; flex-wrap:nowrap; overflow-x:auto; border-radius:11px; }
+  .dashboard-navigation .role-tabs { gap:0; flex-wrap:wrap; border-radius:11px; }
   .dashboard-navigation .role-tab-btn { flex:1 0 auto; min-height:48px; padding:12px 14px; border:0; border-radius:0; background:transparent; color:#667085; white-space:nowrap; }
   .dashboard-navigation .role-tab-btn:hover { background:#f8fafc; color:#344054; }
   .dashboard-navigation .role-tab-btn.active { background:#f5f3ff; color:#6941c6; box-shadow:inset 0 -3px #6941c6; }
@@ -226,7 +226,7 @@ ${getLucideStyles_()}
 .shared-rubrics-heading > button, #sharedRubricsContent > button { padding:8px 14px; border:1px solid #655192; border-radius:8px; background:#34274f; color:#e2d9ff; font:inherit; cursor:pointer; }
 .shared-rubrics-heading > button:hover, #sharedRubricsContent > button:hover { background:#473568; }
 .shared-rubrics-heading > button:focus-visible, #sharedRubricsContent > button:focus-visible { outline:3px solid #c4b5fd; outline-offset:3px; }
-#sharedRubricsToggle[hidden], #sharedRubricsContent[hidden] { display:none; }
+#sharedRubrics[hidden] { display:none; }
 .shared-rubrics .app-skeleton { --skeleton-base:#242e42; --skeleton-highlight:#39425c; --skeleton-edge:#303b51; }
 .rubric-assessment:focus-visible, #rubricDrawer button:focus-visible { outline:3px solid #9e77ed; outline-offset:3px; }
 .rubric-levels { margin:12px 0 0; }
@@ -238,14 +238,16 @@ ${getEditorialStyles_()}
 </style>
 </head>
 <body data-dashboard-theme="editorial">
-${multiRole ? '<h1>Dashboard</h1>' : ''}
+<header class="dashboard-app-header">
+<h1>Dashboard</h1>
 <p class="signed-in-as">Signed in as ${escapeHtml(email)}</p>
 <nav class="dashboard-navigation" id="dashboardNavigation" aria-label="Dashboard sections">
 <button type="button" class="role-menu-toggle" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems" onclick="DashboardUI.toggleRoleMenu()"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span class="role-menu-label" id="roleMenuLabel">${escapeHtml(views[0].label)}</span><span class="role-menu-caption">Menu</span></button>
-<div class="role-tabs" id="roleMenuItems">${roleButtons}${announcementsButton}${systemButton}</div>
+<div class="role-tabs" id="roleMenuItems">${roleButtons}${rubricsButton}${announcementsButton}${systemButton}</div>
 </nav>
-<section id="sharedProjectTimeline" class="shared-timeline" aria-label="Project timeline" aria-busy="true"><div class="timeline-heading"><h2>Project timeline</h2></div>${getSkeletonMarkup_('timeline', 'Loading project timeline')}</section>
-<section id="sharedRubrics" class="shared-rubrics" aria-labelledby="sharedRubricsHeading" aria-busy="true"><div class="shared-rubrics-heading"><h2 id="sharedRubricsHeading">Assessment rubrics</h2><button type="button" id="sharedRubricsToggle" aria-expanded="${!rubricsCollapsible}" aria-label="${rubricsCollapsible ? 'Expand' : 'Collapse'} assessment rubrics" aria-controls="sharedRubricsContent" onclick="DashboardUI.toggleSharedRubrics()"${rubricsCollapsible ? '' : ' hidden'}>${renderLucideIcon_('chevron-down')}</button></div><div id="sharedRubricsContent"${rubricsCollapsible ? ' hidden' : ''}>${getSkeletonMarkup_('panel', 'Loading assessment rubrics')}</div></section>
+</header>
+<section id="sharedProjectTimeline" hidden class="shared-timeline" aria-label="Project timeline" aria-busy="true"><div class="timeline-heading"><h2>Project timeline</h2></div>${getSkeletonMarkup_('timeline', 'Loading project timeline')}</section>
+<section id="sharedRubrics" hidden class="shared-rubrics utility-body" aria-labelledby="sharedRubricsHeading" aria-busy="true"><div class="shared-rubrics-heading utility-header"><h2 id="sharedRubricsHeading">Rubrics &amp; Guidelines</h2></div><div id="sharedRubricsContent">${getSkeletonMarkup_('panel', 'Loading assessment rubrics')}</div></section>
 ${rolePanels}
 ${announcementsPanel}
 ${systemPanel}
