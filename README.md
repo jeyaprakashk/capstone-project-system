@@ -124,9 +124,9 @@ See [Assessment configuration](ASSESSMENT-CONFIGURATION.md) for the full setup c
 `GITHUB_TOKEN` property is no longer read and may be removed after deployment.
 Repository URLs, collaborators, permissions and provisioning are not changed.
 
-The `Commits` layout is fixed: `Date | Team ID | Commit Message | GitHub Username | Repository URL | (blank) | Commit SHA`.
-Only the stale headers are corrected; historical rows and the reserved blank F
-column remain untouched. Date, team and username retain indexes 0, 1 and 3.
+The `Commits` layout is exactly six columns: `Date | Team ID | Commit Message | GitHub Username | Repository URL | Commit SHA`.
+Commit SHA is index 5 (column F); date, team and username retain indexes 0, 1
+and 3. The reader and collector never modify headers or migrate historical rows.
 Repository URLs for new rows come from the authoritative TeamStatus record.
 
 Collection follows all pages in the existing four-week lookback. A script lock

@@ -33,7 +33,9 @@ function aggregateWeeklyActivity_(teamIds, logs, commits, context, student) {
   });
   commits.forEach(row => {
     const value = teams[normalizeText_(row.teamId)];
-    if (value && (!student || (student.username && textEquals_(row.username, student.username))) && isCurrentProjectWeek_(row.timestamp, context.schedule, context.clock)) value.commits++;
+    const at = row.timestamp === '' || row.timestamp == null ? NaN : new Date(row.timestamp).getTime();
+    if (value && normalizeText_(row.username) !== '(unknown)' && (!student || (student.username && textEquals_(row.username, student.username))) &&
+        at >= context.window.opens_at && at <= context.window.closes_at) value.commits++;
   });
   return teams;
 }
@@ -112,5 +114,69 @@ function loadStudentWeeklyActivity(studentEmail) {
     }
     return {...activityResponse_(context, aggregateWeeklyActivity_([teamId], logs, commits, context, {email:studentEmail, username,regNo:row[columns['S'+[1,2,3,4].find(n=>emailsMatch(row[columns['S'+n+'_EMAIL']],studentEmail))+'_REGNO']]})),
       studentEmail, commitAttribution:username ? 'mapped' : 'unavailable'};
+  });
+}
+
+/** Collection health only, never a cache of commits or combined weekly data. */
+function commitCollectionKey_(teamId) {
+  return 'commit-collection:' + encodeURIComponent(normalizeText_(teamId));
+}
+
+function weeklyEvidenceRepo_(url) {
+  const match = String(url || '').trim().match(/^https:\/\/github\.com\/([a-z0-9-]+)\/([a-z0-9_.-]+?)(?:\.git)?\/?$/i);
+  return match ? 'https://github.com/' + match[1] + '/' + match[2] : null;
+}
+
+/** Private reader: callers authorize the roster-derived student before using it.
+ * Optional source is request-local only, so multiple weeks reuse one team read.
+ */
+function readWeeklyProgressEvidence_(student, weekId, source) {
+  source = source || weeklyEvidenceSource_(student);
+  const window = getWeeklySubmissionWindows_().find(w=>w.weekId === weekId);
+  if (!window) throw new Error('Unknown evidence Week ID.');
+  const log = getEffectiveLogEntries_(source.logs.filter(r=>textEquals_(r.regNo,student.regNo) && textEquals_(r.teamId,student.teamId) && r.weekId === weekId))[0] || null;
+  const result = {weekId,log,state:source.state,count:null,commits:[]};
+  if (source.state !== 'available') return result;
+  const seen = new Set();
+  result.commits = source.commits.filter(row=>{
+    const at = row.timestamp ? new Date(row.timestamp).getTime() : NaN;
+    return textEquals_(row.teamId,student.teamId) && normalizeText_(row.username) !== '(unknown)' &&
+      textEquals_(row.username,source.username) && weeklyEvidenceRepo_(row.repositoryUrl)?.toLowerCase() === source.repositoryUrl.toLowerCase() &&
+      at >= window.opens_at && at <= window.closes_at;
+  }).map(row=>{
+    const sha = commitIdentity_(row.sha), timestamp = new Date(row.timestamp).toISOString();
+    if (!sha) throw new Error('Commit identity is unavailable.');
+    return {timestamp,message:String(row.message || ''),sha,shortSha:sha.slice(0,7),url:source.repositoryUrl + '/commit/' + sha};
+  }).filter(row=>{if(seen.has(row.sha)) return false;seen.add(row.sha);return true;}).sort((a,b)=>b.timestamp.localeCompare(a.timestamp));
+  result.count = result.commits.length;
+  return result;
+}
+
+function weeklyEvidenceSource_(student, options) {
+  options = options || {};
+  const source = {logs:options.logs || readLogEntries_(student.teamId,student.regNo),state:'unmapped',commits:[]};
+  try {
+    const setup = options.setup || getTeamGithubSetup_(student.teamId,{inspectAccess:false});
+    const members = setup.members || [], mine = members.filter(m=>emailsMatch(m.email,student.email) && textEquals_(m.label,student.regNo));
+    if (mine.length !== 1 || mine[0].status !== 'valid' || !mine[0].username ||
+        members.filter(m=>textEquals_(m.username,mine[0].username)).length !== 1) return source;
+    source.username = mine[0].username;
+    source.repositoryUrl = weeklyEvidenceRepo_(setup.repoUrl);
+    source.state = 'unavailable';
+    if (!source.repositoryUrl || PropertiesService.getScriptProperties().getProperty(commitCollectionKey_(student.teamId)) !== 'ok') return source;
+    source.commits = readCollectedCommits_(student.teamId);
+    source.state = 'available';
+  } catch (error) { source.state = 'unavailable'; }
+  return source;
+}
+
+function readStudentWeeklyEvidence_(student, windows, options) {
+  const source = weeklyEvidenceSource_(student,options);
+  return windows.map(window=>{
+    try {
+      const result = readWeeklyProgressEvidence_(student,window.weekId,source);
+      // Logs are returned separately in the dashboard history; never duplicate them in storage.
+      return {weekId:result.weekId,state:result.state,count:result.count,commits:result.commits};
+    } catch (error) { return {weekId:window.weekId,state:'unavailable',count:null,commits:[]}; }
   });
 }

@@ -1,6 +1,6 @@
 /**
  * STUDENT DASHBOARD
- * Dark-themed web app for students to track progress through capstone workflow
+ * Shared-theme web app for students to track progress through capstone workflow
  * Step 1: GitHub Setup → Step 2: Project Title → Step 3: Weekly Logging
  * Shared deployment with Guide, Reviewer, and Coordinator views via doGet() in guide-dashboard.gs
  */
@@ -90,12 +90,11 @@ function initialsOf(name) {
 }
 
 function buildTeamRoster(rosterSlots, myEmail) {
-  const chips = rosterSlots.map((s, i) => {
+  const chips = rosterSlots.map(s => {
     const isMe = emailsMatch(s.email, myEmail);
-    const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
     return `
       <div class="member-chip">
-        <span class="avatar" style="background:${color}">${escapeHtml(initialsOf(s.name))}</span>
+        <span class="avatar">${escapeHtml(initialsOf(s.name))}</span>
         <div class="member-info">
           <div class="member-name">${escapeHtml(s.name)}${isMe ? ' <span class="you-tag">you</span>' : ''}</div>
           <div class="member-reg">${escapeHtml(s.regno)}</div>
@@ -173,9 +172,9 @@ function buildStudentContent(email, teamId, teamStatusRow) {
                 autocomplete="off" autocapitalize="none" spellcheck="false"
                 value="${escapeHtml(d.githubUsername || '')}" aria-describedby="githubSubmitStatus"
                 placeholder="e.g. octocat">
-         <button class="student-btn" type="submit">Submit GitHub username</button>
+         <button class="workflow-btn" type="submit">Submit GitHub username</button>
        </form>`
-    : '') + (d.githubCanRetry ? '<button class="student-btn" type="button" onclick="DashboardUI.retryGithubSetup(this)">Retry GitHub setup</button>' : '') + '<p id="githubSubmitStatus" role="status" aria-live="polite"></p><button id="githubStatusRefresh" class="student-btn secondary" type="button" hidden onclick="DashboardUI.refreshGithubStatus(this)">Refresh GitHub status</button>';
+    : '') + (d.githubCanRetry ? '<button class="workflow-btn" type="button" onclick="DashboardUI.retryGithubSetup(this)">Retry GitHub setup</button>' : '') + '<p id="githubSubmitStatus" role="status" aria-live="polite"></p><button id="githubStatusRefresh" class="workflow-btn secondary" type="button" hidden onclick="DashboardUI.refreshGithubStatus(this)">Refresh GitHub status</button>';
 
   const githubCard = buildStepCard(
     1,
@@ -228,7 +227,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
 
     const titleCta =
       label.state === 'active'
-        ? `<a class="student-btn"
+        ? `<a class="workflow-btn"
               href="${escapeHtml(buildTeamIntakeLink(teamId))}"
               target="_blank"
               rel="noopener">
@@ -258,7 +257,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
     '<section id="studentWeeklyProgress" aria-label="Weekly progress" data-weekly-windows="' + escapeHtml(JSON.stringify(weeklyDisplayWindows)) + '">' +
     '<div data-weekly-read>' + getSkeletonMarkup_('panel','Loading weekly progress') + '</div>' +
     '<p data-weekly-status role="status" aria-live="polite"></p>' +
-    '<button type="button" class="student-btn secondary" data-weekly-refresh onclick="DashboardUI.loadWeeklyProgress()">Refresh weekly progress</button>' +
+    '<button type="button" class="workflow-btn secondary" data-weekly-refresh onclick="DashboardUI.loadWeeklyProgress()">Refresh weekly progress</button>' +
     '<div data-weekly-form></div></section>', '', true);
 
   // ===============================================================
@@ -273,7 +272,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   // ===============================================================
 
   return `
-  <div class="student-dashboard-surface">
+  <div class="dashboard-body-surface">
 
     <div class="dash-hero">
       <h1>

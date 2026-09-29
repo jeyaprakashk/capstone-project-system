@@ -139,7 +139,11 @@ const DashboardUI = (function() {
     if (!container) return;
     container.querySelectorAll('button').forEach(function(btn) { btn.disabled = disabled; });
   }
-  function errorMessage(err) { return err && err.message ? err.message : 'Unknown error'; }
+  function errorMessage(err) {
+    if (typeof err === 'string' && err.trim()) return err.trim();
+    if (err && typeof err.message === 'string' && err.message.trim()) return err.message.trim();
+    return 'The server did not provide error details';
+  }
 
   // Session-only diagnostics: no user records or extra telemetry requests.
   const performanceEvents = [];
@@ -148,7 +152,6 @@ const DashboardUI = (function() {
   let utilityRequestContext = false;
   let preloadTimer = null;
   let activeRole = null;
-  let announcementRoleTheme = null;
   let tabSelectedAt = 0;
   let roleQueue = null;
   let announcementsSettled = false;
@@ -704,9 +707,7 @@ const DashboardUI = (function() {
   }
 
   function showRoleTab(activeKey) {
-    if (!announcementRoleTheme) announcementRoleTheme = (document.body.getAttribute && document.body.getAttribute('data-dashboard-theme')) || 'editorial';
-    if (activeKey !== 'announcements' && activeKey !== 'system-status') announcementRoleTheme = activeKey === 'student' ? 'student' : 'editorial';
-    document.body.setAttribute('data-dashboard-theme', activeKey === 'announcements' ? announcementRoleTheme : activeKey === 'student' ? 'student' : 'editorial');
+    document.body.setAttribute('data-dashboard-theme', 'editorial');
     activeRole = activeKey;
     syncRubricsDisclosure();
     tabSelectedAt = performance.now();
@@ -1656,12 +1657,11 @@ const DashboardUI = (function() {
     ['workCompleted','Work Completed','Summarize what you finished and the outcome.','E.g. Built the sensor prototype and tested its readings.'],
     ['guideDiscussion','Guide Discussion/Decision','Note your guide discussion and any agreed decisions.','E.g. Agreed to compare two designs before choosing one.'],
     ['blockers','Problems/Blockers','Describe what is blocking progress or where you need help.','E.g. Waiting for a component; write None if there are no blockers.'],
-    ['nextAction','Next Week Action','List the concrete tasks you plan to complete next.','E.g. Run three trials, compare results and update the design.'],
-    ['evidenceLinks','Evidence','At least one supporting HTTP(S) URL is required. Enter one URL per line.','https://example.com/supporting-evidence']
+    ['nextAction','Next Week Plan','List the concrete tasks you plan to complete next.','E.g. Run three trials, compare results and update the design.'],
   ];
   const weeklySeparator = ' ' + String.fromCharCode(183) + ' ';
   function weeklyDate(value, timezone) {
-    return value ? new Date(value).toLocaleString('en-IN',{timeZone:timezone,day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true,timeZoneName:'short'}).replace('Sept','Sep') : 'Not submitted';
+    return value ? new Date(value).toLocaleString('en-IN',{timeZone:timezone,day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true,timeZoneName:'short'}).replace('Sept','Sep').replace('am','AM').replace('pm','PM') : 'Not submitted';
   }
   function weeklyWeekLabel(weekId) {
     const match = String(weekId).match(/[0-9]+$/);
@@ -1680,9 +1680,26 @@ const DashboardUI = (function() {
     const labels = latest ? [latest.entryStatus] : [action.overdue || Date.now() > Date.parse(action.deadline) ? 'LATE' : 'OPEN'];
     if (latest && latest.timeliness === 'LATE') labels.push('LATE');
     form.querySelector('[data-weekly-heading]').textContent = weeklyHeading(host,action);
-    form.querySelector('[data-weekly-dates]').textContent = 'Due ' + weeklyDate(action.deadline,data.timezone) + weeklySeparator + 'Late cutoff ' + weeklyDate(action.cutoff,data.timezone);
+    form.querySelector('[data-weekly-dates]').textContent = 'Due: ' + weeklyDate(action.deadline,data.timezone) + weeklySeparator + 'Late submission until: ' + weeklyDate(action.cutoff,data.timezone);
     form.querySelector('[data-weekly-state]').innerHTML = labels.map(label=>'<span class="weekly-state" data-state="' + esc(label) + '">' + esc(label) + '</span>').join('');
     form.querySelector('[type="submit"]').textContent = (latest ? 'Update ' : 'Submit ') + weeklyWeekLabel(action.weekId) + ' Progress';
+  }
+  function renderWeeklyGithub(host, weekId) {
+    let panel = host.querySelector('[data-weekly-github]');
+    if (!panel) {
+      panel = document.createElement('section'); panel.setAttribute('data-weekly-github','');
+      panel.className = 'weekly-github-activity'; host.appendChild(panel);
+    }
+    const data = host.weeklyData, evidence = (data.evidence || []).find(item=>item.weekId === weekId), esc = escapeClientHtml;
+    if (!weekId) { panel.hidden = true; return; }
+    panel.hidden = false;
+    let body = '<p>GitHub activity is unavailable. Use Refresh weekly progress to retry.</p>';
+    if (evidence && evidence.state === 'unmapped') body = '<p>Your GitHub username mapping is unavailable or unverified.</p>';
+    if (evidence && evidence.state === 'available') {
+      body = '<p>' + evidence.count + ' commits this week</p>' + (evidence.count ? '<ul>' + evidence.commits.map(commit=>
+        '<li><time datetime="' + esc(commit.timestamp) + '">' + esc(weeklyDate(commit.timestamp,data.timezone)) + '</time><span>' + esc(commit.message) + '</span><a href="' + esc(commit.url) + '" target="_blank" rel="noopener noreferrer">' + esc(commit.shortSha) + '</a></li>').join('') + '</ul>' : '<p>No GitHub activity recorded for you this week</p>');
+    }
+    panel.innerHTML = '<h3>GitHub Activity' + weeklySeparator + esc(weeklyWeekLabel(weekId)) + '</h3><p class="weekly-helper">GitHub Supporting Evidence · System-observed project artifacts</p>' + body;
   }
   function loadWeeklyProgress() {
     const host = byId('studentWeeklyProgress');
@@ -1690,15 +1707,19 @@ const DashboardUI = (function() {
     const target = host.querySelector('[data-weekly-read]'), status = host.querySelector('[data-weekly-status]');
     const button = host.querySelector('[data-weekly-refresh]');
     host.weeklyBusy = true; button.disabled = true;
-    const finish = beginContentLoading(target,'Refreshing weekly progress');
+    const finish = beginContentLoading(host,'Refreshing weekly progress',{compact:true});
     function settle() { finish(); host.weeklyBusy = false; button.disabled = false; }
     dashboardRun().withSuccessHandler(function(data) {
       settle();
       if (!host.isConnected || byId('studentWeeklyProgress') !== host) return;
+      if (host.weeklyRefreshError) {
+        if (status.textContent === host.weeklyRefreshError) status.textContent = '';
+        host.weeklyRefreshError = null;
+      }
       host.weeklyData = data;
       const esc = escapeClientHtml;
       target.innerHTML = '<p>' + esc(data.message) + '</p><p>Expected weeks: ' + data.summary.expectedWeeks + ' &middot; Missing: ' + data.summary.missing + '</p>' +
-        data.actions.map(function(action) { return '<button type="button" class="student-btn secondary" data-week="' + esc(action.weekId) + '" onclick="DashboardUI.chooseWeeklyAction(this)">' +
+        data.actions.map(function(action) { return '<button type="button" class="workflow-btn secondary" data-week="' + esc(action.weekId) + '" onclick="DashboardUI.chooseWeeklyAction(this)">' +
           (action.overdue ? 'Overdue: ' : '') + esc(weeklyHeading(host,action)) + '</button>'; }).join(' ') +
         '<details><summary>Submission history (' + data.history.length + ')</summary>' + data.history.slice().reverse().map(function(entry) {
           return '<details><summary>' + esc(weeklyWeekLabel(entry.weekId) + weeklySeparator + entry.entryStatus + weeklySeparator + entry.timeliness + weeklySeparator + weeklyDate(entry.recordedAt,data.timezone)) + '</summary>' +
@@ -1717,11 +1738,15 @@ const DashboardUI = (function() {
         const normal = data.actions.find(a=>!a.overdue);
         if (normal) renderWeeklyForm(host,normal);
       }
+      renderWeeklyGithub(host,(host.querySelector('form') || {}).dataset?.week || (data.evidence || []).slice(-1)[0]?.weekId);
       const count = byId('studentMilestoneCount');
       if (count) count.textContent = (Number(count.dataset.base) + (data.complete ? 1 : 0)) + ' of 3 milestones complete';
     }).withFailureHandler(function(error) {
       settle();
-      if (host.isConnected) status.textContent = 'Could not refresh weekly progress: ' + errorMessage(error) + '. Use Refresh weekly progress to retry.';
+      if (host.isConnected && byId('studentWeeklyProgress') === host) {
+        host.weeklyRefreshError = 'Could not refresh weekly progress: ' + errorMessage(error) + '. Use Refresh weekly progress to retry.';
+        status.textContent = host.weeklyRefreshError;
+      }
     }).loadStudentWeeklyProgress();
   }
   function renderWeeklyForm(host, action) {
@@ -1730,8 +1755,9 @@ const DashboardUI = (function() {
     host.querySelector('[data-weekly-form]').innerHTML = '<form class="weekly-progress-form" data-week="' + esc(action.weekId) + '" data-overdue="' + action.overdue + '" onsubmit="DashboardUI.submitWeeklyProgress(event,this)">' +
       '<header class="weekly-form-header"><h3 data-weekly-heading></h3><div class="weekly-status-strip" data-weekly-state role="status" aria-label="Submission status"></div><p class="weekly-dates" data-weekly-dates></p></header>' +
       weeklyFields.map(function(field) { return '<div class="weekly-field"><label for="weekly-' + field[0] + '">' + esc(field[1]) + '</label><p class="weekly-helper" id="weekly-help-' + field[0] + '">' + esc(field[2]) + '</p><textarea id="weekly-' + field[0] + '" name="' + field[0] + '" rows="3" required maxlength="10000" aria-describedby="weekly-help-' + field[0] + '" placeholder="' + esc(field[3]) + '">' + esc(latest[field[0]] || '') + '</textarea></div>'; }).join('') +
-      '<button type="submit" class="student-btn"></button></form>';
+      '<button type="submit" class="workflow-btn"></button></form>';
     updateWeeklyFormPresentation(host,host.querySelector('form'),action);
+    renderWeeklyGithub(host,action.weekId);
     host.querySelector('form').addEventListener('input',function() { this.weeklyDirty = true; });
   }
   async function chooseWeeklyAction(button) {

@@ -156,7 +156,7 @@ function buildDashboardShell(email, views) {
 <style>
 ${getGuideStyles()}
 ${getCoordinatorStyles()}
-${getStudentPageStyles()}
+${getWorkflowStyles_()}
 ${getReviewerStyles()}
 ${getReviewEvaluationStyles_()}
 ${getSharedTimelineStyles_()}
@@ -237,7 +237,7 @@ ${getLucideStyles_()}
 ${getEditorialStyles_()}
 </style>
 </head>
-<body data-dashboard-theme="${views[0].key === 'student' ? 'student' : 'editorial'}">
+<body data-dashboard-theme="editorial">
 ${multiRole ? '<h1>Dashboard</h1>' : ''}
 <p class="signed-in-as">Signed in as ${escapeHtml(email)}</p>
 <nav class="dashboard-navigation" id="dashboardNavigation" aria-label="Dashboard sections">

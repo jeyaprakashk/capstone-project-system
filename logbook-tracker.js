@@ -52,15 +52,15 @@ function fetchCommitsForTeam(repoOwner, repoName, weeks) {
   }
 }
 
-/** Fixed seven-column layout preserves the historical date/team/username positions. */
+/** Final six-column layout; validation never rewrites historical rows. */
 function commitColumns_(sheet) {
   if (!sheet) throw new Error('Commits sheet is missing.');
   const headers = readSheetRows_(sheet,1,1)[0] || [];
-  const columns = {DATE:0,TEAM_ID:1,MESSAGE:2,USERNAME:3,REPO_URL:4,SHA:6};
+  const columns = Object.fromEntries(Object.keys(FIELD_DEFINITIONS.COMMITS).map((key,index)=>[key,index]));
   Object.entries(columns).forEach(([key,index])=>{
     if (headers[index] !== FIELD_DEFINITIONS.COMMITS[key]) throw new Error('Commits header mismatch at column ' + (index+1) + '. Correct headers without moving historical data.');
   });
-  if (headers[5]) throw new Error('Commits column F must remain blank. Existing data was not changed.');
+  if (headers.slice(6).some(header=>String(header || '').trim())) throw new Error('Commits requires exactly six columns. Existing data was not changed.');
   return columns;
 }
 
@@ -72,7 +72,7 @@ function readCollectedCommits_(teamId) {
   const sheet = getSheet(SHEET_NAMES.COMMITS), columns = commitColumns_(sheet);
   const rows = teamId ? readActivityRows_(SHEET_NAMES.COMMITS,columns.TEAM_ID+1,teamId) : readSheetRows_(sheet,2);
   return rows.filter(row=>row[columns.TEAM_ID]).map(row=>({teamId:row[columns.TEAM_ID],timestamp:row[columns.DATE],
-    username:row[columns.USERNAME],sha:row[columns.SHA]}));
+    username:row[columns.USERNAME],sha:row[columns.SHA],message:row[columns.MESSAGE],repositoryUrl:row[columns.REPO_URL]}));
 }
 
 function appendCollectedCommits_(sheet, teamId, commits, repoUrl) {
@@ -82,7 +82,7 @@ function appendCollectedCommits_(sheet, teamId, commits, repoUrl) {
     const key = commitIdentity_(commit.sha);
     const timestamp = new Date(commit.commit && commit.commit.committer && commit.commit.committer.date);
     if (!key || !Number.isFinite(timestamp.getTime()) || typeof commit.commit.message !== 'string') throw new Error('Invalid commit SHA, timestamp or message for ' + teamId);
-    const values = [timestamp,teamId,commit.commit.message.split('\n')[0],commit.author ? commit.author.login : '(unknown)',repoUrl,'',key];
+    const values = [timestamp,teamId,commit.commit.message.split('\n')[0],commit.author ? commit.author.login : '(unknown)',repoUrl,key];
     return {key,values:values.map(value=>typeof value === 'string' && /^[=+@-]/.test(value) ? "'"+value : value)};
   });
   const lock = LockService.getScriptLock();
@@ -94,7 +94,7 @@ function appendCollectedCommits_(sheet, teamId, commits, repoUrl) {
     if (pending.length) {
       const first = sheet.getLastRow()+1, last = first+pending.length-1;
       if (last > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(),last-sheet.getMaxRows());
-      sheet.getRange(first,1,pending.length,7).setValues(pending.map(commit=>commit.values));
+      sheet.getRange(first,1,pending.length,Object.keys(FIELD_DEFINITIONS.COMMITS).length).setValues(pending.map(commit=>commit.values));
     }
     SpreadsheetApp.flush();
     return {count:pending.length,fetched:commits.length,skipped:commits.length-pending.length};
@@ -136,7 +136,9 @@ function fetchAllCommits() {
       if (!repo) throw new Error('Invalid recorded GitHub repository URL for ' + teamId + '; URL was not changed.');
       const commits = fetchCommitsForTeam(repo.owner,repo.repo,4);
       processed.push({teamId,...appendCollectedCommits_(commitSheet,teamId,commits,repoUrl)});
+      PropertiesService.getScriptProperties().setProperty(commitCollectionKey_(teamId), 'ok');
     } catch (error) {
+      PropertiesService.getScriptProperties().setProperty(commitCollectionKey_(teamId), 'error');
       Logger.log('Commit collection failed for ' + teamId + ': ' + error.message);
       processed.push({teamId,count:0,error:error.message,code:error.code || 'COLLECTION_FAILED'});
     }
@@ -311,7 +313,7 @@ function appendWeeklyEntry_(record) {
 
 function weeklyContent_(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid weekly submission.');
-  const permitted = ['requestId','overdueWeekId','workCompleted','guideDiscussion','blockers','nextAction','evidenceLinks'];
+  const permitted = ['requestId','overdueWeekId','workCompleted','guideDiscussion','blockers','nextAction'];
   if (Object.keys(input).some(key=>!permitted.includes(key))) throw new Error('Unexpected submission field. Identity and timing are server-derived.');
   if (typeof input.requestId !== 'string' || !/^[A-Za-z0-9_-]{12,100}$/.test(input.requestId)) throw new Error('Invalid request ID.');
   if (input.overdueWeekId !== undefined && typeof input.overdueWeekId !== 'string') throw new Error('Invalid overdue action.');
@@ -320,10 +322,6 @@ function weeklyContent_(input) {
     if (typeof input[key] !== 'string' || !input[key].trim() || input[key].length > 10000) throw new Error('Each narrative field is required and must be at most 10000 characters.');
     content[key] = input[key].trim();
   });
-  if (typeof input.evidenceLinks !== 'string' || input.evidenceLinks.length > 10000) throw new Error('Evidence links are required (at most 10000 characters).');
-  const links = input.evidenceLinks.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-  if (!links.length || links.some(link=>!/^https?:\/\/[^\s/?#:@]+(?::\d{1,5})?(?:[/?#][^\s]*)?$/i.test(link))) throw new Error('Provide at least one HTTP(S) evidence link, one per line.');
-  content.evidenceLinks = links.join('\n');
   return content;
 }
 
@@ -378,6 +376,7 @@ function loadStudentWeeklyProgress() {
     submittedAt:r.submittedAt ? new Date(r.submittedAt).toISOString() : '',
     firstSubmittedAt:r.firstSubmittedAt ? new Date(r.firstSubmittedAt).toISOString() : ''}));
   return {eligibleFrom,ready,complete:!!eligibleFrom && now.getTime() > windows[windows.length-1].closes_at && getLogWeekSummary_(records,eligibleFrom,student.regNo,now).missing === 0,actions:ready ? actions : [],history:serial,timezone:getSpreadsheet().getSpreadsheetTimeZone(),
+    evidence:readStudentWeeklyEvidence_(student,windows.filter(w=>now.getTime() >= w.opens_at),{setup,logs:records}),
     summary:getLogWeekSummary_(records,eligibleFrom,student.regNo,now),
     message:ready ? (actions.length ? '' : 'No submission window is open.') : 'An approved title and ready GitHub repository are required to submit.'};
 }
@@ -417,7 +416,7 @@ function processWeeklySubmissionSchedule() {
         if (properties.getProperty(key)) return;
         const due = Utilities.formatDate(new Date(window.deadline_at),getSpreadsheet().getSpreadsheetTimeZone(),'dd MMM yyyy HH:mm z');
         try {
-          MailApp.sendEmail(student.email,'Weekly progress reminder — ' + window.weekId,
+          MailApp.sendEmail(student.email,'Weekly progress reminder â€” ' + window.weekId,
             'Submit your weekly progress by ' + due + '.\n\nOpen your Student Dashboard:\n' + getDashboardUrl());
           properties.setProperty(key,new Date().toISOString());
         } catch (error) { console.error('Weekly reminder failed for ' + student.regNo + ': ' + error.message); }

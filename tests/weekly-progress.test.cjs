@@ -61,13 +61,16 @@ test('normal and explicit overdue boundary semantics and timezone offsets',()=>{
  const late=weeklyFixture();late.time('2026-01-05T18:00:00.001Z');assert.equal(late.c.submitWeeklyProgress(late.input()).timeliness,'LATE');
 });
 
-test('required HTTP(S) evidence accepts different evidence categories and rejects unsafe/empty inputs on revisions',()=>{
+test('four narratives only; removed evidence is rejected and formula text remains literal',()=>{
  const f=weeklyFixture();
- for(const evidenceLinks of ['', 'javascript:alert(1)','https://','file:///tmp/photo','https://example.com/a b']) assert.throws(()=>f.c.submitWeeklyProgress(f.input({evidenceLinks})),/HTTP\(S\)/);
- const evidence=['https://github.com/org/repo/tree/main/hardware','https://github.com/org/repo/issues/1','http://lab.example/results','https://docs.example/design'].join('\n');
- f.c.submitWeeklyProgress(f.input({evidenceLinks:evidence,workCompleted:'=SUM(1,2)'}));
- assert.equal(f.entries()[0].workCompleted,'=SUM(1,2)');assert.equal(f.entries()[0].evidenceLinks,evidence);
- assert.throws(()=>f.c.submitWeeklyProgress(f.input({evidenceLinks:''})),/HTTP\(S\)/);assert.equal(f.entries().length,1);
+ f.c.submitWeeklyProgress(f.input({workCompleted:'=SUM(1,2)'}));
+ assert.equal(f.entries()[0].workCompleted,'=SUM(1,2)');
+ assert.equal(f.sheets.get('LOG_ENTRIES').rows[0].length,15);
+ assert(!f.sheets.get('LOG_ENTRIES').rows[0].includes('Evidence Links'));
+ assert(f.sheets.get('LOG_ENTRIES').rows[0].includes('Next Week Plan'));
+ assert.throws(()=>f.c.submitWeeklyProgress(f.input({evidenceLinks:'https://example.com'})),/Unexpected/);
+ for(const key of ['workCompleted','guideDiscussion','blockers','nextAction']) assert.throws(()=>f.c.submitWeeklyProgress(f.input({[key]:''})),/required/);
+ assert.equal(f.entries().length,1);
 });
 
 test('one pre-deadline reminder only; actual submissions suppress it; no other weekly emails',()=>{

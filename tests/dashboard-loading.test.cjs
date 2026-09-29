@@ -124,39 +124,39 @@ function fixture(system=false) {
  return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);}};
 }
 
-test('theme follows active tabs immediately, cached content and late responses cannot change it',()=>{
+test('common theme applies to all tabs immediately, cached content and late responses cannot change it',()=>{
  const f=fixture(true), doc=f.c.document;
  const student={...doc.body,innerHTML:'',getAttribute:()=> 'student'};
  const query=doc.querySelector;
  doc.querySelector=selector=>selector.includes('data-role-content="student"')?student:query(selector);
  const theme=()=>doc.body.attrs['data-dashboard-theme'];
- f.click('student');assert.equal(theme(),'student');
+ f.click('student');assert.equal(theme(),'editorial');
  f.click('guide');assert.equal(theme(),'editorial');
  f.done('loadDashboardRoleContent','student content');assert.equal(theme(),'editorial');
  f.done('loadDashboardRoleContent','guide content');
  const roleReads=()=>f.requests.filter(r=>r.key==='loadDashboardRoleContent').length;
  const count=roleReads();
- f.click('student');assert.equal(theme(),'student');
+ f.click('student');assert.equal(theme(),'editorial');
  f.click('guide');assert.equal(theme(),'editorial');assert.equal(roleReads(),count);
- f.click('student');f.click('announcements');assert.equal(theme(),'student');
- f.click('announcements');assert.equal(theme(),'student');
+ f.click('student');f.click('announcements');assert.equal(theme(),'editorial');
+ f.click('announcements');assert.equal(theme(),'editorial');
  f.click('guide');f.click('announcements');assert.equal(theme(),'editorial');
  f.click('student');f.click('system-status');assert.equal(theme(),'editorial');
- f.click('student');assert.equal(theme(),'student');
+ f.click('student');assert.equal(theme(),'editorial');
 });
 
-test('shell selects the first role theme before scripts or fonts load',()=>{
+test('shell selects the common theme before scripts or fonts load',()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})}});
  for(const file of ['common-styles.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
  for(const name of ['getInternalAssessmentPublishingClientScript_','getDashboardClientScript','getGuideEvaluationClientScript','getReviewEvaluationClientScript_']) c[name]=()=>'';
  for(const key of ['student','guide','reviewer','coord']) {
   const html=c.buildDashboardShell('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
-  assert.match(html,new RegExp('<body data-dashboard-theme="'+(key==='student'?'student':'editorial')+'">'));
+  assert.match(html,/<body data-dashboard-theme="editorial">/);
   assert(html.indexOf(c.getEditorialStyles_())<html.indexOf('</style>'));
   assert.match(html,/Source\+Serif\+4/);assert.match(html,/Source\+Sans\+3/);
  }
  const html=c.buildDashboardShell('preview@example.test',[{key:'student',label:'My Team',contentId:'studentContent'},{key:'guide',label:'Guide',contentId:'guideContent'}]);
- assert.match(html,/<body data-dashboard-theme="student">/);
+ assert.match(html,/<body data-dashboard-theme="editorial">/);
 });
 
 test('editorial rules stay opt-in and text palette pairs meet normal-text contrast',()=>{

@@ -81,7 +81,7 @@ New sheet: **LOG_ENTRIES**, with these headers:
 ```text
 Entry ID | Request ID | Reg No | Team ID | Week ID | Actor | Recorded At |
 Submitted At | First Submitted At | Timeliness | Entry Status | Work Completed |
-Guide Discussion/Decision | Problems/Blockers | Next Week Action | Evidence Links
+Guide Discussion/Decision | Problems/Blockers | Next Week Plan
 ```
 
 New TeamStatus header: **Progress Eligible From Week ID**.
@@ -104,10 +104,26 @@ are REVISED. First Submitted At and ON_TIME/LATE never change across revisions.
 A system MISSED row has blank submission timestamps and timeliness MISSED; a
 later actual entry becomes SUBMITTED/LATE and preserves the system row.
 
-All four narrative fields and at least one HTTP(S) evidence link are required on
-every actual submission. Use one URL per line. Evidence can reference files,
-folders, commits, PRs/issues, documentation, simulations, experiments or hardware.
-Phase 1 validates references only; it does not fetch evidence or assess it.
+All four narrative fields are required on every actual submission. GitHub commits
+are system-observed supporting evidence: code, documents, CAD/design files,
+simulation/experimental results, datasets, hardware/testing photographs and other
+relevant project artifacts can be committed to the team repository.
+
+LOG_ENTRIES and Commits remain independent authorities. The private
+`readWeeklyProgressEvidence_(student, weekId)` reader returns the effective log
+and attributable commit details for an authorized, roster-derived student.
+Dashboard multi-week reads reuse one request-local Team ID-scoped commit read.
+Attribution requires Reg No/email, a unique verified username, Team ID, the team
+repository and the configured normal window: `opens_at <= Date <= closes_at`.
+`late_until` never extends the work week. Unknown authors remain in raw history
+but are excluded from evidence. Links use a validated HTTPS repository URL and
+full SHA. Commits has no Week ID; there is no combined sheet or evidence cache.
+
+Collection health is recorded per team in Script Properties (ok/error only).
+Run normal `fetchAllCommits` collection after deploying this reader to establish
+health. Before that, or after a collection/read failure, activity is unavailable,
+never assumed zero. Missing, unverified or ambiguous mappings show a neutral
+message. No semantic comparison, scoring, sign-off, flags or new emails are added.
 
 Retry Request IDs deduplicate identical saves under the same script lock used by
 MISSED generation. Different content with a reused ID is rejected. Identity,

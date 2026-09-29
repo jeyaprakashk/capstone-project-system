@@ -8,7 +8,7 @@ function fixture() {
  const columns={TEAM_ID:0,GUIDE_EMAIL:1,COMMITTEE_NUMBER:2,S1_EMAIL:3,S2_EMAIL:4,S1_REGNO:5,S2_REGNO:6};
  const rows={teams:[['T1','guide@x','C1','a@x','b@x','R1','R2'],['T2','other@x','C2','c@x','','R3']],
  logs:[{regNo:'R1',teamId:'T1',weekId:'W1',entryStatus:'SUBMITTED'},{regNo:'R2',teamId:'T1',weekId:'W1',entryStatus:'SUBMITTED'},{regNo:'R1',teamId:'T1',weekId:'W0',entryStatus:'SUBMITTED'},{regNo:'R3',teamId:'T2',weekId:'W1',entryStatus:'SUBMITTED'}],
- commits:[{timestamp:10,teamId:'T1',username:'alice'},{timestamp:10,teamId:'T1',username:'unknown'},{timestamp:10,teamId:'T2',username:'carol'}],
+ commits:[{timestamp:10,teamId:'T1',username:'alice'},{timestamp:10,teamId:'T1',username:'(unknown)'},{timestamp:10,teamId:'T2',username:'carol'}],
  usernames:[[1,'a@x','T1','Alice'],[1,'b@x','T1','Bob']]};
  let user='coord@x', active=true;
  const norm=value=>String(value??'').trim().toLowerCase();
@@ -26,14 +26,14 @@ function fixture() {
 }
 test('team and all-team scopes agree without calling each other; batch reads each activity sheet once',()=>{
  const f=fixture();const all=f.c.loadAllTeamsWeeklyActivity();
- assert.equal(all.teams.t1.logs,2);assert.equal(all.teams.t1.commits,2);assert.equal(all.activeTeams,2);
+ assert.equal(all.teams.t1.logs,2);assert.equal(all.teams.t1.commits,1);assert.equal(all.activeTeams,2);
  assert.equal(f.calls.filter(call=>call[0]==='logs').length,1);assert.equal(f.calls.filter(call=>call[0]==='commits').length,1);
  f.c.loadAllTeamsWeeklyActivity=()=>{throw Error('must not call all');};f.calls.length=0;
  const team=f.c.loadTeamWeeklyActivity(' T1 ');
  assert.equal(JSON.stringify(team.teams.t1),JSON.stringify(all.teams.t1));
  assert(!f.calls.some(call=>call[0]==='all'));assert(f.calls.filter(call=>['logs','commits'].includes(call[0])).every(call=>call[1]!==null));
 });
-test('student scope counts own logs and mapped commits, leaving unknown authors at team level',()=>{
+test('student scope counts own logs and mapped commits, excluding unknown authors',()=>{
  const f=fixture();f.user('a@x');
  f.c.loadAllTeamsWeeklyActivity=f.c.loadTeamWeeklyActivity=()=>{throw Error('must not call another scope');};
  const result=f.c.loadStudentWeeklyActivity();

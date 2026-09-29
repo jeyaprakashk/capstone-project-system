@@ -37,7 +37,7 @@ function weeklyFixture() {
     activityIsCoordinator_:email=>email==='coord@example.com',getDashboardUrl:()=> 'https://script.google.com/dashboard',
     getTeamGithubSetup_:()=>({ready,message:ready?'Ready':'Unavailable'}),requireTeamGithubReady_:()=>{if(!ready)throw Error('GitHub unavailable');return {ready};}});
   const set=(header,value)=>status.rows[1][ts.indexOf(header)]=value;
-  const input=(extra={})=>({requestId:crypto.randomUUID(),workCompleted:'Work',guideDiscussion:'Decision',blockers:'None',nextAction:'Next',evidenceLinks:'https://example.com/hardware/photo',...extra});
+  const input=(extra={})=>({requestId:crypto.randomUUID(),workCompleted:'Work',guideDiscussion:'Decision',blockers:'None',nextAction:'Next',...extra});
   return {c,config,sheets,status,roster,ts,tr,mails,properties,errors,triggers,sheet,input,set,
     time:value=>{now=Date.parse(value);},user:value=>{user=value;},ready:value=>{ready=value;},mailFails:value=>{mailFails=value;},locked:()=>locked,
     entries:()=>c.readLogEntries_(),eligible:()=>status.rows[1][ts.indexOf('Progress Eligible From Week ID')]};

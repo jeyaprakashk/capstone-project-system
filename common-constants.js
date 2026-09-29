@@ -24,12 +24,13 @@ const SHEET_NAMES = {
 // ===================================================================
 const WEEKLY_ELIGIBILITY_HEADER_ = 'Progress Eligible From Week ID';
 const FIELD_DEFINITIONS = {
+  // Authoritative six-column order: A:F, with Commit SHA at index 5.
   COMMITS: { DATE:'Date', TEAM_ID:'Team ID', MESSAGE:'Commit Message', USERNAME:'GitHub Username', REPO_URL:'Repository URL', SHA:'Commit SHA' },
   LOG_ENTRIES: {
     id:'Entry ID', requestId:'Request ID', regNo:'Reg No', teamId:'Team ID', weekId:'Week ID',
     actor:'Actor', recordedAt:'Recorded At', submittedAt:'Submitted At', firstSubmittedAt:'First Submitted At',
     timeliness:'Timeliness', entryStatus:'Entry Status', workCompleted:'Work Completed',
-    guideDiscussion:'Guide Discussion/Decision', blockers:'Problems/Blockers', nextAction:'Next Week Action', evidenceLinks:'Evidence Links'
+    guideDiscussion:'Guide Discussion/Decision', blockers:'Problems/Blockers', nextAction:'Next Week Plan'
   },
   TEAM_ROSTER: {
     TEAM_ID: 'Team ID',
@@ -117,7 +118,6 @@ const STUDENT_TITLE_LABEL = {
 // ===================================================================
 // UI CONSTANTS
 // ===================================================================
-const AVATAR_COLORS = ['#7C5CFC', '#34D399', '#F5A623', '#FB7185', '#38BDF8'];
 
 // Internal review definitions are provided lazily by getInternalReviews_().
 
