@@ -26,6 +26,7 @@ function setup(guideDecision = '', reviewerDecision = 'Revise') {
     getDataRange:() => ({ getValues:() => [[], row.slice()] })
   };
   const c = createSheetReadContext({
+    recordWeeklyEligibilityIfConfigured_:()=>{},
     getCoordinatorEmail:() => 'coordinator@example.com', getAcademicYear:() => '2026', getConfig:() => '',
     SHEET_NAMES:{ TEAM_INTAKE_RAW:'TeamIntakeRaw', TEAM_STATUS:'TeamStatus' },
     FIELD_DEFINITIONS:{ TEAM_STATUS:{} }, getColumnMap:() => TS,

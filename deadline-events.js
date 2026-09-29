@@ -16,9 +16,9 @@ function getTeamDeadlineEvents_(row, columns, repoUrl, logs, reviews, schedule, 
     events.push({key, label:label + ' Pending', due:day, complete:!!(reviews && reviews[key] && reviews[key].completed)});
   }
   const weeks = logSummary || getTeamLogWeekSummary_(row, columns, logs, schedule, clock);
-  events.push({key:'weekly-logs', label:weeks.missing ? 'Weekly Logs Overdue' : 'Weekly Logs Pending',
-    due:weeks.firstMissingDue !== null ? weeks.firstMissingDue : clock.today < schedule.week1 ? Math.min(schedule.week1 + 6, schedule.end) : clock.end,
-    complete:!weeks.missing && (clock.today > schedule.end || weeks.currentLogged)});
+  if (weeks.missing || weeks.active) events.push({key:'weekly-logs', label:weeks.missing ? 'Weekly Logs Overdue' : 'Weekly Logs Pending',
+    due:weeks.firstMissingDue !== null ? weeks.firstMissingDue : weeks.due,
+    complete:!weeks.missing && weeks.currentLogged});
   return events;
 }
 

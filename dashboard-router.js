@@ -277,10 +277,12 @@ function loadSharedProjectTimeline() {
 function getSharedProjectTimelineData_() {
   const schedule = getProjectSchedule_();
   const clock = getProjectClock_(schedule);
-  const definitions = [...composeProjectTimeline_(schedule.milestones,schedule.assessments), {key:'week1',label:'Weekly logging starts',day:schedule.week1}];
+  const windows = getWeeklySubmissionWindows_();
+  const current = windows.find(w=>clock.now.getTime() >= w.opens_at && clock.now.getTime() <= w.closes_at);
+  const definitions = [...composeProjectTimeline_(schedule.milestones,schedule.assessments), {key:'week1',label:'Weekly logging starts',day:projectDay_(new Date(windows[0].opens_at),schedule.timezone)}];
   return {
     schedule, today:clock.today, todayLabel:formatProjectDay_(clock.today),
-    week:clock.week, active:clock.active, totalWeeks:Math.ceil((schedule.end - schedule.week1 + 1) / 7),
+    week:current ? current.weekId : null, active:!!current, totalWeeks:windows.length,
     milestones:definitions.map(({key,label,day,opens,sequence}) => ({key,label,day,opens,sequence,date:formatProjectDay_(day),openingDate:Number.isFinite(opens)?formatProjectDay_(opens):null})).sort((a,b) => a.day - b.day)
   };
 }

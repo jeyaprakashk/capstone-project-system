@@ -71,26 +71,8 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
   const github = getStudentGithubState_(email, teamId, rosterSlots, repoUrl);
   const { githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup } = github;
 
-  // Targeted log lookup: search the Email column instead of transferring RawLog.
-  const studentLogs = [];
   const schedule = getProjectSchedule_();
   const clock = getProjectClock_(schedule);
-  const logSheet = getSheet(SHEET_NAMES.RAW_LOG);
-  if (logSheet && logSheet.getLastRow() >= 2) {
-    const matches = logSheet
-      .getRange(2, 2, logSheet.getLastRow() - 1, 1)
-      .createTextFinder(normalizedTextPattern_(String(email).trim())).useRegularExpression(true)
-      .matchEntireCell(true)
-      .matchCase(false)
-      .findAll();
-
-    readMatchedRows_(logSheet, matches).forEach(log => {
-      if (!textEquals_(log[2], teamId)) return;
-      studentLogs.push(log);
-    });
-  }
-
-  perfLap = studentPerfLog_('RawLog latest-entry lookup', perfLap);
 
   studentPerfLog_('getStudentDashboardData TOTAL', perfStart);
 
@@ -98,7 +80,7 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
     teamId, title: r[TS.TITLE], problem: r[TS.PROBLEM],
     titleStatus, note,
     githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup, repoUrl,
-    rosterSlots, schedule, clock, logWeeks: getLogWeekSummary_(studentLogs, schedule, clock)
+    rosterSlots, schedule, clock
   };
 }
 
@@ -171,7 +153,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   const doneCount = [
     githubDone,
     titleApproved,
-    d.clock.today > d.schedule.end && d.logWeeks.missing === 0
+    false // Weekly completion is loaded independently from configured windows.
   ].filter(Boolean).length;
 
 
@@ -269,25 +251,15 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   // WEEKLY PROGRESS LOG
   // ===============================================================
 
-  let logCard;
-  const weekLabel = d.clock.active ? `Weekly progress log · Week ${d.clock.week}` : 'Weekly progress log';
-  const missingNote = d.logWeeks.missing
-    ? `<p class="step-detail note">${d.logWeeks.missing} completed week(s) have no log recorded.</p>` : '';
-  if (d.clock.today < d.schedule.week1) {
-    logCard = buildStepCard(3, weekLabel, 'locked',
-      `<p>Week 1 starts on ${formatProjectDay_(d.schedule.week1)}. Each logging week runs Monday–Sunday.</p>`, '', true);
-  } else if (d.clock.today > d.schedule.end) {
-    logCard = buildStepCard(3, weekLabel, d.logWeeks.missing ? 'waiting' : 'done',
-      `<p>The logging period ended on ${formatProjectDay_(d.schedule.end)}.</p>${missingNote}`, '', true);
-  } else if (!githubDone || !titleApproved) {
-    logCard = buildStepCard(3, weekLabel, 'locked', buildLockedBody(!githubDone
-      ? 'Finish GitHub setup first.' : 'Your project title must be approved before weekly logging.') + missingNote + (d.logWeeks.currentLogged ? '<p>Your existing log for this week is recorded.</p>' : ''), '', true);
-  } else {
-    const logBody = `<p>${formatProjectDay_(d.clock.start)} – ${formatProjectDay_(d.clock.end)}</p>
-      <p>${d.logWeeks.currentLogged ? 'Your log for this week is recorded.' : 'Submit your weekly log by ' + formatProjectDay_(d.clock.end) + '.'}</p>${missingNote}`;
-    const logCta = `<a class="student-btn" href="${escapeHtml(buildWeeklyLogLink(teamId))}" target="_blank" rel="noopener">${d.logWeeks.currentLogged ? 'Add another update' : "Log this week's work"}</a>`;
-    logCard = buildStepCard(3, weekLabel, d.logWeeks.currentLogged ? 'waiting' : 'active', logBody, logCta, true);
-  }
+  let weeklyDisplayWindows = [];
+  try { weeklyDisplayWindows = getWeeklySubmissionWindows_().map(window => ({weekId:window.weekId,opens:window.opens_at,closes:window.closes_at})); }
+  catch (error) { /* The existing asynchronous weekly reader reports configuration errors. */ }
+  const logCard = buildStepCard(3, 'Weekly progress log', 'waiting',
+    '<section id="studentWeeklyProgress" aria-label="Weekly progress" data-weekly-windows="' + escapeHtml(JSON.stringify(weeklyDisplayWindows)) + '">' +
+    '<div data-weekly-read>' + getSkeletonMarkup_('panel','Loading weekly progress') + '</div>' +
+    '<p data-weekly-status role="status" aria-live="polite"></p>' +
+    '<button type="button" class="student-btn secondary" data-weekly-refresh onclick="DashboardUI.loadWeeklyProgress()">Refresh weekly progress</button>' +
+    '<div data-weekly-form></div></section>', '', true);
 
   // ===============================================================
   // REVIEW MARKS — ASYNCHRONOUS
@@ -312,7 +284,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
       </h1>
 
       <p class="hero-sub">
-        ${doneCount} of 3 milestones complete
+        <span id="studentMilestoneCount" data-base="${doneCount}">${doneCount} of 3 milestones complete</span>
       </p>
     </div>
 

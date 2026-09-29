@@ -50,15 +50,17 @@ or a pending invitation with sufficient permission counts as ready; read-only
 invitations are upgraded without replacing them. Existing contents and stronger
 permissions are preserved. API failures keep setup pending and do not undo saves.
 
-Title submission and new weekly logs remain locked until this shared readiness
-check succeeds. Both form handlers enforce the prerequisite, so bookmarked
-forms cannot bypass the lock. Rejected responses stay in their original form
-tabs, but are not applied to TeamStatus or appended to RawLog; the submitter is
-notified to complete setup and submit again. Previous titles, approvals, logs,
-and marks are preserved. The dashboard retains repository links and existing
-title/log information while locked. Retry GitHub setup runs repair without
-resubmitting usernames. Batch provisioning and student collaborator repair use
-the same team-level logic and no longer skip teams merely because a URL exists.
+Title submission retains its existing Google Form and server-side GitHub readiness
+checks. Rejected intake responses remain in the original form tab and do not
+change TeamStatus. Weekly progress uses the embedded Student Dashboard HTML form
+and authenticated `google.script.run` endpoints; it never uses Google Forms.
+Weekly submission requires both an approved title and ready GitHub repository.
+Existing titles, approvals, logs, marks and repository links are preserved.
+Retry GitHub setup repairs access without resubmitting usernames. Batch provisioning
+and student collaborator repair use the same team-level readiness checks.
+
+See [Phase 1 weekly progress setup](WEEKLY-PROGRESS.md) for Config, schema,
+eligibility, cutover, triggers and the single permitted student-reminder email.
 
 Submission timing uses the latest valid timestamp among current members and the
 configured formation deadline in the spreadsheet timezone. Missing usernames
@@ -113,3 +115,35 @@ End Review uses Type `SEE` and Assessment ID `see`. Its rubric and dates are
 displayed, while evaluation remains outside this app. Leave its policy version
 and Journal blank.
 See [Assessment configuration](ASSESSMENT-CONFIGURATION.md) for the full setup contract.
+
+
+## Existing GitHub commit collection
+
+`fetchAllCommits()` uses `makeGithubRequest()` and its authoritative
+`GITHUB_ADMIN_TOKEN` Script Property, just like provisioning/readiness. The old
+`GITHUB_TOKEN` property is no longer read and may be removed after deployment.
+Repository URLs, collaborators, permissions and provisioning are not changed.
+
+The `Commits` layout is fixed: `Date | Team ID | Commit Message | GitHub Username | Repository URL | (blank) | Commit SHA`.
+Only the stale headers are corrected; historical rows and the reserved blank F
+column remain untouched. Date, team and username retain indexes 0, 1 and 3.
+Repository URLs for new rows come from the authoritative TeamStatus record.
+
+Collection follows all pages in the existing four-week lookback. A script lock
+protects fresh history reads and append-only writes; the stable identity is the
+full GitHub SHA (case insensitive, across the entire sheet). Each run reports
+fetched, newly appended and skipped counts, with explicit errors rather than
+treating failed API calls as zero commits. No trigger changes are required.
+
+Run `auditCommitHistory()` for a read-only report of row count, unique SHA count,
+team count, duplicate SHA row numbers and unidentified rows. It never deletes
+rows or guesses missing SHAs. Collection rejects misaligned headers without
+rewriting or migrating history.
+
+Diagnostics separate HTTP 401 authentication rejection, 403 access restrictions,
+rate limiting, and an empty repository. On a commits 404, a repository metadata
+probe can confirm the repository exists; otherwise a credential probe helps
+identify rejected credentials. If metadata also returns 404, the result remains
+`REPOSITORY_MISSING_OR_INACCESSIBLE`: GitHub intentionally hides private resources
+from callers without access, so a 404 alone cannot prove deletion. Diagnostics do
+not log token values or change access settings.

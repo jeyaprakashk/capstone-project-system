@@ -191,24 +191,21 @@ test('timeliness uses all valid member timestamps, local deadline date, and repo
   f.outage('/users/');assert.equal(timing(),'unknown');
 });
 
-test('bookmarked title/log forms are rejected while locked and do not mutate earlier records',()=>{
+test('bookmarked title form remains guarded; weekly Form ingestion is retired',()=>{
   const f=fixture();f.usernames.pop();f.team[2]='Existing title';f.team[13]='Approved';
   const old=JSON.stringify(f.team);
   f.c.onTeamIntakeSubmit({range:{getSheet:()=>({getName:()=> 'intake'})},namedValues:{'Email Address':['one@example.com'],'Team ID':['T1'],'Project Title':['Replacement']}});
-  f.c.onFormSubmit({range:{getSheet:()=>({getName:()=> 'Form Responses 1'})},values:[new Date(),'one@example.com','T1','notes',1,0,'']});
+  assert.equal(f.c.onFormSubmit,undefined);
   assert.equal(JSON.stringify(f.team),old);assert.equal(f.writes.length,0);assert.equal(f.logs.length,0);
-  assert.equal(f.mails.length,2);assert(f.mails.every(mail=>mail[2].includes('Complete the GitHub step')));
+  assert.equal(f.mails.length,1);assert(f.mails.every(mail=>mail[2].includes('Complete the GitHub step')));
 });
 
-test('ready teams can submit title and log; nonmembers cannot bypass the form guards',()=>{
+test('ready teams retain title Form submission without weekly Form ingestion',()=>{
   const f=fixture();
   const intake={range:{getSheet:()=>({getName:()=> 'intake'})},namedValues:{'Email Address':['one@example.com'],'Team ID':['T1'],'Project Title':['New project']}};
   f.c.onTeamIntakeSubmit(intake);
   assert.equal(f.writes[0].TITLE,'NEW PROJECT');
-  const log={range:{getSheet:()=>({getName:()=> 'Form Responses 1'})},values:[new Date(),'one@example.com','T1','notes',1,0,'']};
-  f.c.onFormSubmit(log);assert.equal(f.logs.length,1);
-  log.values[1]='outsider@example.com';f.c.onFormSubmit(log);assert.equal(f.logs.length,1);
-  assert.match(f.mails.at(-1)[2],/not a current member/);
+  assert.equal(f.c.onFormSubmit,undefined);assert.equal(f.logs.length,0);
 });
 
 test('strict intake emails the team for each prerequisite failure without modifying records',()=>{

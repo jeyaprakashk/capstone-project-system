@@ -911,6 +911,23 @@ function getStudentPageStyles() {
   .student-btn[hidden] { display: none; }
   .student-btn[hidden] { display: none; }
 
+  .weekly-progress-form { margin-top: 18px; }
+  .weekly-form-header { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+  .weekly-form-header h3 { margin:0; color:var(--sd-text); font-size:17px; line-height:1.4; }
+  .weekly-status-strip { display:flex; flex-wrap:wrap; gap:6px; }
+  .weekly-state { padding:3px 8px; border:1px solid var(--sd-border); border-radius:6px; font-size:11px; font-weight:700; letter-spacing:.04em; color:var(--sd-accent); background:var(--sd-surface); }
+  .weekly-state[data-state="LATE"] { color:var(--color-warning,#92400e); background:var(--color-warning-tint,#fffbeb); }
+  #studentWeeklyProgress .weekly-dates { flex-basis:100%; margin:0; font-size:12px; line-height:1.6; }
+  #studentWeeklyProgress .weekly-helper { margin:0 0 7px; font-size:12px; line-height:1.5; }
+  .weekly-field { min-width:0; }
+  .weekly-progress-form textarea::placeholder { color:var(--sd-text-muted,var(--sd-text)); opacity:.65; }
+
+  .weekly-progress-form label { display:block; margin:14px 0 6px; color:var(--sd-text); }
+  .weekly-progress-form textarea { display:block; box-sizing:border-box; width:100%; padding:10px 12px; border:1px solid var(--sd-border); border-radius:8px; background:var(--sd-surface); color:var(--sd-text); font:inherit; resize:vertical; }
+  .weekly-progress-form textarea:focus-visible { outline:2px solid var(--sd-accent); outline-offset:2px; }
+  .weekly-progress-form :disabled { opacity:.65; }
+  #studentWeeklyProgress details { margin-top:12px; overflow-wrap:anywhere; }
+  #studentWeeklyProgress .student-btn { margin:8px 8px 0 0; }
   .github-username-form { margin-top: 14px; }
   .github-username-form[hidden] { display: none; }
   .github-username-form label { display: block; margin-bottom: 6px; }

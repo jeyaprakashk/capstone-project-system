@@ -5,21 +5,23 @@ const vm=require('node:vm');
 const path=require('node:path');
 function fixture() {
  const calls=[];
- const columns={TEAM_ID:0,GUIDE_EMAIL:1,COMMITTEE_NUMBER:2,S1_EMAIL:3,S2_EMAIL:4};
- const rows={teams:[['T1','guide@x','C1','a@x','b@x'],['T2','other@x','C2','c@x']],
- logs:[[10,'a@x','T1'],[10,'b@x','T1'],[9,'a@x','T1'],[10,'c@x','T2']],
- commits:[[10,'T1','message','alice'],[10,'T1','message','unknown'],[10,'T2','message','carol']],
+ const columns={TEAM_ID:0,GUIDE_EMAIL:1,COMMITTEE_NUMBER:2,S1_EMAIL:3,S2_EMAIL:4,S1_REGNO:5,S2_REGNO:6};
+ const rows={teams:[['T1','guide@x','C1','a@x','b@x','R1','R2'],['T2','other@x','C2','c@x','','R3']],
+ logs:[{regNo:'R1',teamId:'T1',weekId:'W1',entryStatus:'SUBMITTED'},{regNo:'R2',teamId:'T1',weekId:'W1',entryStatus:'SUBMITTED'},{regNo:'R1',teamId:'T1',weekId:'W0',entryStatus:'SUBMITTED'},{regNo:'R3',teamId:'T2',weekId:'W1',entryStatus:'SUBMITTED'}],
+ commits:[{timestamp:10,teamId:'T1',username:'alice'},{timestamp:10,teamId:'T1',username:'unknown'},{timestamp:10,teamId:'T2',username:'carol'}],
  usernames:[[1,'a@x','T1','Alice'],[1,'b@x','T1','Bob']]};
  let user='coord@x', active=true;
  const norm=value=>String(value??'').trim().toLowerCase();
  const c=vm.createContext({Date,normalizeText_:norm,normalizeEmail:norm,emailsMatch:(a,b)=>norm(a)===norm(b),textEquals_:(a,b)=>norm(a)===norm(b),
-  SHEET_NAMES:{TEAM_STATUS:'teams',RAW_LOG:'logs',COMMITS:'commits',GITHUB_USERNAME_RAW:'usernames'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},
+  SHEET_NAMES:{TEAM_STATUS:'teams',LOG_ENTRIES:'logs',COMMITS:'commits',GITHUB_USERNAME_RAW:'usernames'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},
   getColumnMap:()=>columns,getSheet:()=>({getLastColumn:()=>5}),getSheetRows:name=>{calls.push(['all',name]);return rows[name];},
   withDashboardRead_:fn=>fn(),Session:{getActiveUser:()=>({getEmail:()=>user})},getCoordinatorEmail:()=> 'coord@x',getConfig:()=> 'pd@x',getCommitteeNumbersForReviewer:()=>[],
-  getProjectSchedule_:()=>({week1:10}),getProjectClock_:()=>({active,today:active?10:9,week:active?1:0}),isCurrentProjectWeek_:date=>date===10
+  getWeeklySubmissionWindows_:()=>[{weekId:'W1',opens_at:10,closes_at:11}],getEffectiveLogEntries_:records=>[...new Map(records.map(r=>[r.regNo+':'+r.weekId,r])).values()],getProjectSchedule_:()=>({week1:10}),getProjectClock_:()=>({active,today:active?10:9,week:active?1:0,now:new Date(active?10:9)}),isCurrentProjectWeek_:date=>date===10
  });
  vm.runInContext(fs.readFileSync(path.join(__dirname,'..','weekly-activity.js'),'utf8'),c);
  c.readActivityRows_=(name,column,value,width)=>{calls.push([name,column,value,width]);return column===null?rows[name]:rows[name].filter(row=>norm(row[column-1])===norm(value));};
+ c.readLogEntries_=(team,reg)=>{calls.push(['logs',team||reg?1:null]);return rows.logs.filter(r=>(!team||norm(r.teamId)===norm(team))&&(!reg||norm(r.regNo)===norm(reg)));};
+ c.readCollectedCommits_=team=>{calls.push(['commits',team?1:null]);return rows.commits.filter(r=>!team||norm(r.teamId)===norm(team));};
  return {c,rows,calls,user:value=>user=value,inactive:()=>active=false};
 }
 test('team and all-team scopes agree without calling each other; batch reads each activity sheet once',()=>{

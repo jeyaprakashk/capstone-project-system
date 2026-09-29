@@ -37,6 +37,14 @@ function fixture(overrides = {}, runtime = {}) {
   c.getTeamGithubSetup_=(id, options)=>({ready:!!options.repoUrl,usernamesComplete:!!options.repoUrl,message:'GitHub setup pending',verificationUnavailable:false});
   c.getTeamsGithubSetup_=(rows, columns, repos)=>Object.fromEntries(rows.map(row=>[c.normalizeText_(row[columns.TEAM_ID]),c.getTeamGithubSetup_(row[columns.TEAM_ID],{repoUrl:repos[c.normalizeText_(row[columns.TEAM_ID])]} )]));
   c.githubSubmissionTiming_=(setup, schedule, clock)=>({state:setup && !setup.usernamesComplete && clock.today>schedule.formation?'overdue':'on-time',text:'Submission timing'});
+  // Explicit Phase 1 windows in this project/timeline fixture; backend validation has dedicated tests.
+  c.getWeeklySubmissionWindows_=()=>Array.from({length:9},(_,i)=>{
+    const opens=Date.parse('2026-09-21T00:00:00+05:30')+i*7*86400000;
+    return {weekId:'W'+(i+1),opens_at:opens,deadline_at:opens+7*86400000-1,closes_at:opens+7*86400000-1,late_until:opens+14*86400000-1};
+  });
+  const optionalHeader=c.getOptionalHeaderIndex_;
+  c.getOptionalHeaderIndex_=(sheet,name)=>name==='Progress Eligible From Week ID'?40:optionalHeader(sheet,name);
+  c.readLogEntries_=()=>[];
   const clock = day => c.getProjectClock_(schedule,new Date(day+'T12:00:00+05:30'));
   return {c,schedule,clock,entries,milestoneRows,properties,sheet,reads:()=>reads};
 }
@@ -156,20 +164,20 @@ test('timezone boundaries and future/invalid timestamps do not count',()=>{
   assert(!c.isCurrentProjectWeek_('2026-09-20T18:30:01Z',s,after));
 });
 
-test('missing logs use completed weeks, with duplicate logs counted once',()=>{
-  const {c,schedule:s,clock}=fixture();
-  assert.equal(c.getLogWeekSummary_([],s,clock('2026-09-27')).missing,0);
-  assert.equal(c.getLogWeekSummary_([],s,clock('2026-09-28')).missing,1);
-  const logs=[['2026-09-21'],['2026-09-21'],['2026-09-28'],['invalid'],['2026-10-20']];
-  const result=c.getLogWeekSummary_(logs,s,clock('2026-10-05'));
-  assert.equal(result.missing,0); assert.equal(result.currentLogged,false);
+test('missing logs use configured closed windows and effective student revisions',()=>{
+  const {c,clock}=fixture();
+  assert.equal(c.getLogWeekSummary_([],'W1','R1',clock('2026-09-27').now).missing,0);
+  assert.equal(c.getLogWeekSummary_([],'W1','R1',clock('2026-09-28').now).missing,1);
+  const logs=[{regNo:'R1',weekId:'W1',entryStatus:'SUBMITTED'},{regNo:'R1',weekId:'W1',entryStatus:'REVISED'},{regNo:'R1',weekId:'W2',entryStatus:'SUBMITTED'}];
+  const result=c.getLogWeekSummary_(logs,'W1','R1',clock('2026-10-05').now);
+  assert.equal(result.missing,0);assert.equal(result.currentLogged,false);
 });
 
 test('attention waits until the day after each configured deadline',()=>{
   const {c,schedule:s,clock}=fixture();
-  const columns={S1_EMAIL:0,REVIEWER_DECISION:1};
+  const columns={S1_EMAIL:0,REVIEWER_DECISION:1,S1_REGNO:2};
   const review={review1:{completed:true},review2:{completed:true}};
-  const health=(day,row=['student','Approved'],repo='url',r=review)=>c.assessProjectTeam_(row,columns,repo,[],r,s,clock(day));
+  const health=(day,row=['student','Approved'],repo='url',r=review)=>{row[2]='R1';row[40]='W1';return c.assessProjectTeam_(row,columns,repo,[],r,s,clock(day));};
   assert.equal(health('2026-09-11',['student',''],'').health,'monitor');
   assert(health('2026-09-12',['student',''],'').issue.includes('GitHub username submissions overdue'));
   assert(!health('2026-09-16',['student','']).issue.includes('Title'));
@@ -201,9 +209,9 @@ test('shared timeline uses Milestones dates while coordinator keeps completion c
 
 test('team health requires a log from every rostered student',()=>{
   const {c,schedule:s,clock}=fixture();
-  const columns={S1_EMAIL:0,S2_EMAIL:1};
-  const row=['ONE@example.com','two@example.com'];
-  const logs=[['2026-09-21','one@example.com'],['2026-09-22','one@example.com']];
+  const columns={S1_EMAIL:0,S2_EMAIL:1,S1_REGNO:2,S2_REGNO:3};
+  const row=['ONE@example.com','two@example.com','R1','R2'];row[40]='W1';
+  const logs=[{regNo:'R1',weekId:'W1',entryStatus:'SUBMITTED'},{regNo:'R1',weekId:'W1',entryStatus:'REVISED'}];
   const during=c.getTeamLogWeekSummary_(row,columns,logs,s,clock('2026-09-23'));
   assert.equal(during.loggedStudents,1); assert.equal(during.currentLogged,false); assert.equal(during.missing,0);
   const closed=c.getTeamLogWeekSummary_(row,columns,logs,s,clock('2026-09-28'));
@@ -211,21 +219,14 @@ test('team health requires a log from every rostered student',()=>{
 });
 
 
-test('student cards follow scheduled weeks and approval, not rolling inactivity',()=>{
-  const {c,schedule:s,clock}=fixture();
-
+test('student card embeds weekly component independently of milestone dates and title Forms',()=>{
+  const {c,schedule,clock}=fixture();
   c.buildTeamIntakeLink=()=> 'https://example.com/title';
-  c.buildWeeklyLogLink=()=> 'https://example.com/log';
-  function render(day,approved=true,logs=[]) {
-    const current=clock(day);
-    c.getStudentDashboardData=()=>({repoUrl:'https://example.com/repo',githubReady:true,githubState:'done',titleStatus:approved?'APPROVED':'AWAITING_REVIEWER',title:'Project',rosterSlots:[],schedule:s,clock:current,logWeeks:c.getLogWeekSummary_(logs,s,current)});
-    return (c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
-  }
-  assert(render('2026-09-20').includes('Week 1 starts on 21 Sept 2026'));
-  assert(render('2026-09-21').includes('Weekly progress log · Week 1'));
-  assert(render('2026-09-21',false).includes('must be approved'));
-  assert(render('2026-09-23',true,[['2026-09-22']]).includes('Your log for this week is recorded'));
-  assert(render('2026-11-23').includes('logging period ended'));
+  c.getStudentDashboardData=()=>({repoUrl:'https://example.com/repo',githubReady:true,githubState:'done',titleStatus:'NOT_SUBMITTED',title:'',rosterSlots:[],schedule,clock:clock('2026-09-23')});
+  c.getAssessmentDefinitions_=()=>[];
+  const html=c.buildStudentContent('student@example.com','T1');
+  assert.match(html,/id="studentWeeklyProgress"/);assert.match(html,/data-weekly-form/);assert.match(html,/DashboardUI.loadWeeklyProgress/);
+  assert.match(html,/https:\/\/example.com\/title/);assert.doesNotMatch(html,/forms.gle|buildWeeklyLogLink/);
 });
 
 test('student locks depend on team readiness while preserving repository and recorded work',()=>{
@@ -233,17 +234,16 @@ test('student locks depend on team readiness while preserving repository and rec
   const data={repoUrl:'https://github.com/org/repo',githubReady:false,githubCanRetry:true,githubState:'waiting',githubText:'Waiting for teammate R2',
     titleStatus:'APPROVED',title:'Existing title',rosterSlots:[],schedule,clock:clock('2026-09-23'),logWeeks:{missing:0,currentLogged:true}};
   c.getStudentDashboardData=()=>data;
-  c.buildWeeklyLogLink=()=> 'https://example.com/log';
   let html=(c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
   assert(html.includes('https://github.com/org/repo'));
   assert(html.includes('Current title:</strong> Existing title'));
-  assert(html.includes('Your existing log for this week is recorded.'));
+  assert(html.includes('studentWeeklyProgress'));
   assert(html.includes('Retry GitHub setup'));
   assert(!html.includes('https://example.com/log'));
   assert(html.includes('1 of 3 milestones complete'));
   data.githubReady=true;data.githubCanRetry=false;data.githubState='done';
   html=(c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
-  assert(html.includes('https://example.com/log'));
+  assert(html.includes('data-weekly-form'));
   assert(html.includes('2 of 3 milestones complete'));
 });
 
@@ -254,7 +254,9 @@ test('coordinator statistics, attention list and tracker share one health result
   c.getColumnMap=(name,fields)=> Object.fromEntries(Object.keys(fields).map((key,i)=>[key,i]));
   const ts=maps.TEAM_STATUS;
   const row=[];
-  for(const [key,value] of Object.entries({TEAM_ID:'T1',TITLE:'Project',REVIEWER_DECISION:'Approved',S1_EMAIL:'one@example.com',S2_EMAIL:'two@example.com'})) row[ts[key]]=value;
+  for(const [key,value] of Object.entries({TEAM_ID:'T1',TITLE:'Project',REVIEWER_DECISION:'Approved',S1_EMAIL:'one@example.com',S2_EMAIL:'two@example.com',S1_REGNO:'R1',S2_REGNO:'R2'})) row[ts[key]]=value;
+  row[40]='W1';
+  c.readLogEntries_=()=>[{regNo:'R1',teamId:'T1',weekId:'W1',entryStatus:'SUBMITTED'},{regNo:'R1',teamId:'T1',weekId:'W2',entryStatus:'SUBMITTED'}];
   const sheetRows={TeamStatus:[row],TeamRoster:[],ReviewCommittee:[],Commits:[],RawLog:[['2026-09-21','one@example.com','T1'],['2026-09-28','one@example.com','T1']]};
   c.getSheetRows=name=>sheetRows[name]||[];
   c.readActivityRows_=name=>sheetRows[name]||[];
@@ -805,7 +807,7 @@ test('drawer basic and activity avoid marks; progress avoids roster and commit r
   assert(!reads.includes('TeamRoster'));
   c.getTeamWeeklyActivity_=()=>{throw Error('progress must not read commits');};
   c.getTeamReviewCompletionStatus_=()=>({review1:{available:true,completed:true},review2:{available:false,completed:false}});
-  let logReads=0;c.readActivityRows_=()=>{logReads++;return [];};
+  let logReads=0;c.readLogEntries_=()=>{logReads++;return [];};
   reads.length=0;
   const progress=c.getCoordinatorTeamDetails_('T1','progress');
   assert.equal(progress.reviews[1].available,false);

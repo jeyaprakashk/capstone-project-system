@@ -229,6 +229,7 @@ function provisionTeamRepos_(onlyTeamId) {
         (setup.verificationUnavailable || setup.usernamesComplete ? results.failed : results.waiting).push({ teamId, reason: setup.message });
         return;
       }
+      recordWeeklyEligibilityIfConfigured_(teamId, setup);
       // Preserve the existing guide/coordinator provisioning behavior without changing student membership.
       const team = roster.find(item => textEquals_(item[TR.TEAM_ID], teamId));
       const guide = String(team && team[TR.GUIDE_GITHUB_USERNAME] || '').trim();

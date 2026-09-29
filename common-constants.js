@@ -13,7 +13,7 @@ const SHEET_NAMES = {
   GITHUB_USERNAME_RAW: 'GithubUsernameRaw',
   TEAM_INTAKE_RAW: 'TeamIntakeRaw',
   MASTER_REGISTRY: 'MasterRegistry',
-  RAW_LOG: 'RawLog',
+  LOG_ENTRIES: 'LOG_ENTRIES',
   COMMITS: 'Commits',
   FLAGS: 'Flags',
   ANNOUNCEMENTS: 'Announcements'
@@ -22,7 +22,15 @@ const SHEET_NAMES = {
 // ===================================================================
 // COLUMN DEFINITIONS — header-based lookup, case-insensitive
 // ===================================================================
+const WEEKLY_ELIGIBILITY_HEADER_ = 'Progress Eligible From Week ID';
 const FIELD_DEFINITIONS = {
+  COMMITS: { DATE:'Date', TEAM_ID:'Team ID', MESSAGE:'Commit Message', USERNAME:'GitHub Username', REPO_URL:'Repository URL', SHA:'Commit SHA' },
+  LOG_ENTRIES: {
+    id:'Entry ID', requestId:'Request ID', regNo:'Reg No', teamId:'Team ID', weekId:'Week ID',
+    actor:'Actor', recordedAt:'Recorded At', submittedAt:'Submitted At', firstSubmittedAt:'First Submitted At',
+    timeliness:'Timeliness', entryStatus:'Entry Status', workCompleted:'Work Completed',
+    guideDiscussion:'Guide Discussion/Decision', blockers:'Problems/Blockers', nextAction:'Next Week Action', evidenceLinks:'Evidence Links'
+  },
   TEAM_ROSTER: {
     TEAM_ID: 'Team ID',
     SEMESTER: 'Semester',

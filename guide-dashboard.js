@@ -11,7 +11,7 @@ function getGuideDashboardData(email) {
   const myRows = rows.filter(r => emailsMatch(r[TS.GUIDE_EMAIL], email));
   const repoUrlMap = getRepoUrlMap();
   const schedule = getProjectSchedule_(), clock = getProjectClock_(schedule);
-  const logsByTeam = groupBy(getSheetRows(SHEET_NAMES.RAW_LOG), row => String(row[2]).trim());
+  const logsByTeam = groupBy(readLogEntries_(), row => row.teamId);
 
   const STATUS_PRIORITY = {
     NEEDS_REVIEW: 0, NOT_SUBMITTED: 1, REJECTED_BY_GUIDE: 2,
@@ -85,7 +85,7 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
       </div>
       <h3 class="card-title">${title}</h3>
       <p class="card-sub">${renderLucideIcon_('users', '', 'icon-leading')}${names}</p>
-      ${logWeeks && clock.active ? `<p class="card-sub">Week ${clock.week}: ${logWeeks.loggedStudents}/${logWeeks.totalStudents} students logged</p>` : ''}
+      ${logWeeks && logWeeks.active ? `<p class="card-sub">Week ${escapeHtml(logWeeks.week)}: ${logWeeks.loggedStudents}/${logWeeks.totalStudents} students logged</p>` : ''}
       ${logWeeks && logWeeks.missing ? `<p class="flag">${logWeeks.missing} student weekly log(s) overdue</p>` : ''}
       ${status !== 'APPROVED' ? `<p class="card-sub">Title approval due ${formatProjectDay_(schedule.title)}${clock.today > schedule.title ? ' · Overdue' : ''}</p>` : ''}`;
 

@@ -233,6 +233,7 @@ function applyReviewerDecision(teamId, decision, notes, submitterEmail) {
 
   if (decision === 'Approved') {
     setStatusFields(statusSheet, statusRow, { TITLE_APPROVED_BY: submitterEmail }, TS);
+    recordWeeklyEligibilityIfConfigured_(teamId);
     getHubRegistrySheet().appendRow([ACADEMIC_YEAR, semester, teamId, guideEmail, title, repoUrl, buildTeamMembersField(rowData, TS), new Date(), submitterEmail]);
     MailApp.sendEmail([guideEmail, ...studentEmails].join(','), `Project Title Approved — Team ${teamId}`,
       `Your project title "${title}" has final approval. Begin weekly logging.`);
@@ -350,21 +351,6 @@ function sendGuideReminderDigest() {
   });
 }
 
-function sendWeeklyLogReminders() {
-  const TR = getColumnMap(SHEET_NAMES.TEAM_ROSTER, FIELD_DEFINITIONS.TEAM_ROSTER);
-  const roster = getSheetRows(SHEET_NAMES.TEAM_ROSTER);
-
-  roster.forEach(r => {
-    const teamId = r[TR.TEAM_ID];
-    if (!teamId) return;
-    const emails = [r[TR.S1_EMAIL], r[TR.S2_EMAIL], r[TR.S3_EMAIL], r[TR.S4_EMAIL]].filter(Boolean);
-    emails.forEach(email => {
-      MailApp.sendEmail(email, `Weekly Progress Log Reminder — Team ${teamId}`,
-        `Don't forget to log your work for this week. Visit your team dashboard:\n\n${getDashboardUrl()}`);
-    });
-  });
-}
-
 function sendPersonalizedIntakeLinks() {
   const TR = getColumnMap(SHEET_NAMES.TEAM_ROSTER, FIELD_DEFINITIONS.TEAM_ROSTER);
   const roster = getSheetRows(SHEET_NAMES.TEAM_ROSTER);
@@ -388,5 +374,4 @@ function sendPersonalizedIntakeLinks() {
 function setupIntakeTriggers() {
   ScriptApp.newTrigger('sendReviewerApprovalDigest').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).create();
   ScriptApp.newTrigger('sendGuideReminderDigest').timeBased().everyDays(2).create();
-  ScriptApp.newTrigger('sendWeeklyLogReminders').timeBased().onWeekDay(ScriptApp.WeekDay.THURSDAY).atHour(8).create();
 }

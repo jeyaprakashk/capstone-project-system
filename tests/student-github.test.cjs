@@ -168,6 +168,7 @@ test('batch and student collaborator repair share team readiness without skippin
     SHEET_NAMES:{TEAM_STATUS:'teams',TEAM_ROSTER:'roster'},
     getSheetRows:name=>name==='teams'?[['T1'],['T2']]:[],
     getColumnMap:()=>({TEAM_ID:0}),
+    recordWeeklyEligibilityIfConfigured_:()=>{},
     repairTeamGithubSetup_:id=>{visited.push(id);return {ready:id==='T2',usernamesComplete:id==='T2',message:'Waiting',repoUrl:'https://github.com/org/repo',members:[]};},
     getConfig:()=>'', Logger:{log(){}}
   });

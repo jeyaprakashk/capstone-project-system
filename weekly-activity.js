@@ -6,14 +6,16 @@ function readActivityRows_(sheetName, column, value) {
   if (column === null) return readSheetRows_(sheet, 2, last - 1);
   const matches = sheet.getRange(2, column, last - 1, 1)
     .createTextFinder(normalizedTextPattern_(String(value))).useRegularExpression(true)
-    .matchEntireCell(true).matchCase(false).findAll();
+    .matchEntireCell(true).matchCase(false).findAll().sort((a,b)=>a.getRow()-b.getRow());
   return readMatchedRows_(sheet, matches);
 }
 
 function weeklyActivityContext_() {
   try {
     const schedule = getProjectSchedule_(), clock = getProjectClock_(schedule);
-    return {schedule, clock, state:clock.active ? 'active' : clock.today < schedule.week1 ? 'not-started' : 'ended'};
+    const windows = getWeeklySubmissionWindows_(), now = clock.now || new Date();
+    const window = windows.find(w=>now.getTime() >= w.opens_at && now.getTime() <= w.closes_at);
+    return {schedule, clock, window, state:window ? 'active' : now.getTime() < windows[0].opens_at ? 'not-started' : 'ended'};
   } catch (err) { return {state:'unavailable'}; }
 }
 
@@ -24,19 +26,20 @@ function aggregateWeeklyActivity_(teamIds, logs, commits, context, student) {
     Object.values(teams).forEach(value => { value.logs = null; value.commits = null; });
     return teams;
   }
-  logs.forEach(row => {
-    const value = teams[normalizeText_(row[2])];
-    if (value && (!student || emailsMatch(row[1], student.email)) && isCurrentProjectWeek_(row[0], context.schedule, context.clock)) value.logs++;
+  getEffectiveLogEntries_(logs).forEach(row => {
+    const value = teams[normalizeText_(row.teamId)];
+    if (value && row.entryStatus !== 'MISSED' && row.weekId === context.window.weekId &&
+        (!student || textEquals_(row.regNo,student.regNo))) value.logs++;
   });
   commits.forEach(row => {
-    const value = teams[normalizeText_(row[1])];
-    if (value && (!student || (student.username && textEquals_(row[3], student.username))) && isCurrentProjectWeek_(row[0], context.schedule, context.clock)) value.commits++;
+    const value = teams[normalizeText_(row.teamId)];
+    if (value && (!student || (student.username && textEquals_(row.username, student.username))) && isCurrentProjectWeek_(row.timestamp, context.schedule, context.clock)) value.commits++;
   });
   return teams;
 }
 
 function activityResponse_(context, teams) {
-  return {state:context.state, week:context.clock ? context.clock.week : null, checkedAt:new Date().toISOString(), teams};
+  return {state:context.state, week:context.window ? context.window.weekId : null, checkedAt:new Date().toISOString(), teams};
 }
 
 function activityIsCoordinator_(email) {
@@ -60,8 +63,8 @@ function loadAllTeamsWeeklyActivity() {
     const context = weeklyActivityContext_();
     const active = context.state === 'active';
     const teams = aggregateWeeklyActivity_(ids,
-      active ? readActivityRows_(SHEET_NAMES.RAW_LOG, null, null) : [],
-      active ? readActivityRows_(SHEET_NAMES.COMMITS, null, null) : [], context);
+      active ? readLogEntries_() : [],
+      active ? readCollectedCommits_() : [], context);
     return {...activityResponse_(context, teams), totalTeams:Object.keys(teams).length,
       activeTeams:active ? Object.values(teams).filter(value => value.logs > 0 || value.commits > 0).length : null};
   });
@@ -81,8 +84,8 @@ function loadTeamWeeklyActivity(teamId) {
 function getTeamWeeklyActivity_(teamId, context, logs) {
   const active = context.state === 'active';
   return aggregateWeeklyActivity_([teamId],
-    active ? (logs || readActivityRows_(SHEET_NAMES.RAW_LOG, 3, teamId)) : [],
-    active ? readActivityRows_(SHEET_NAMES.COMMITS, 2, teamId) : [], context);
+    active ? (logs || readLogEntries_(teamId)) : [],
+    active ? readCollectedCommits_(teamId) : [], context);
 }
 
 function loadStudentWeeklyActivity(studentEmail) {
@@ -103,10 +106,11 @@ function loadStudentWeeklyActivity(studentEmail) {
       readActivityRows_(SHEET_NAMES.GITHUB_USERNAME_RAW, 3, teamId).forEach(item => mappings.set(normalizeEmail(item[1]), normalizeText_(item[3])));
       const candidate = mappings.get(studentEmail);
       if (candidate && /^[a-z\d](?:[a-z\d-]{0,38})$/.test(candidate) && [...mappings.values()].filter(value => value === candidate).length === 1) username = candidate;
-      logs = readActivityRows_(SHEET_NAMES.RAW_LOG, 2, studentEmail);
-      if (username) commits = readActivityRows_(SHEET_NAMES.COMMITS, 2, teamId);
+      const slot = [1,2,3,4].find(n=>emailsMatch(row[columns['S'+n+'_EMAIL']],studentEmail));
+      logs = readLogEntries_(teamId,row[columns['S'+slot+'_REGNO']]);
+      if (username) commits = readCollectedCommits_(teamId);
     }
-    return {...activityResponse_(context, aggregateWeeklyActivity_([teamId], logs, commits, context, {email:studentEmail, username})),
+    return {...activityResponse_(context, aggregateWeeklyActivity_([teamId], logs, commits, context, {email:studentEmail, username,regNo:row[columns['S'+[1,2,3,4].find(n=>emailsMatch(row[columns['S'+n+'_EMAIL']],studentEmail))+'_REGNO']]})),
       studentEmail, commitAttribution:username ? 'mapped' : 'unavailable'};
   });
 }

@@ -53,10 +53,10 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
     const id = normalizeText_(row[TS.TEAM_ID]);
     return [id, getCoordinatorRepositoryStatus_(repoUrlMap[id])];
   }));
-  const logRows = deferAssessments ? [] : measure('historical_logs', () => readActivityRows_(SHEET_NAMES.RAW_LOG, null, null, 3));
+  const logRows = deferAssessments ? [] : measure('historical_logs', () => readLogEntries_());
 
   const rosterByTeamId = groupBy(rosterRows, r => r[TR.TEAM_ID]);
-  const logsByTeam = groupBy(logRows, r => r[2]);
+  const logsByTeam = groupBy(logRows, r => r.teamId);
 
   // Stats
   const total = statusRows.length;
@@ -221,7 +221,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
   if (section === 'progress') {
     const reviews = getTeamReviewCompletionStatus_(teamId) || {};
     const context = weeklyActivityContext_();
-    const logs = readActivityRows_(SHEET_NAMES.RAW_LOG, 3, teamId, 3);
+    const logs = readLogEntries_(teamId);
     const progressRepoUrl = getRepoUrlForTeam(teamId);
     const progressSetup = getCoordinatorRepositoryStatus_(progressRepoUrl);
     return {
@@ -303,7 +303,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
   // -----------------------------
   // Weekly activity
   // -----------------------------
-  const logs = section === 'basic' ? [] : readActivityRows_(SHEET_NAMES.RAW_LOG, 3, teamId, 3);
+  const logs = section === 'basic' ? [] : readLogEntries_(teamId);
   const context = section === 'basic' ? {} : weeklyActivityContext_();
   const schedule = context.schedule, clock = context.clock;
   const activity = section === 'basic' ? {logs:null, commits:null} : getTeamWeeklyActivity_(teamId, context, logs)[normalizeText_(teamId)];
@@ -377,7 +377,7 @@ function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock
   if (issues.length) return { health:'attention', severity:issues[0].daysOverdue >= 14 ? 'high' : issues[0].daysOverdue >= 7 ? 'medium' : 'low',
     issue:issues.map(item => item.issue).join('; '), daysOverdue:issues[0].daysOverdue };
   const unavailable = schedule.reviews.some(({key}) => !review || !review[key] || review[key].available === false);
-  const pending = unavailable || !githubSetup.ready || timing.state === 'unknown' || !textEquals_(row[columns.REVIEWER_DECISION], 'Approved') || (clock.active && !weeks.currentLogged);
+  const pending = unavailable || !githubSetup.ready || timing.state === 'unknown' || !textEquals_(row[columns.REVIEWER_DECISION], 'Approved') || (weeks.active && !weeks.currentLogged);
   return { health:pending ? 'monitor' : 'ontrack', severity:'low', issue:!githubSetup.ready ? githubSetup.message : timing.state === 'late' || timing.state === 'unknown' ? timing.text : '', daysOverdue:0 };
 }
 

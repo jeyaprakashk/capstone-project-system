@@ -7,7 +7,6 @@
 // CONFIGURATION
 // ===================================================================
 const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-const GITHUB_TOKEN = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
 
 let configExecutionValues_ = null;
 /** Reviews are registry instances, ordered by configured sequence. */
@@ -592,12 +591,6 @@ function buildTeamIntakeLink(teamId) {
   return `${base}?usp=pp_url&${entry}=${encodeURIComponent(teamId)}`;
 }
 
-function buildWeeklyLogLink(teamId) {
-  const base = getConfig('WEEKLY_LOG_FORM_URL_BASE');
-  const entry = getConfig('WEEKLY_LOG_TEAMID_ENTRY');
-  return `${base}?usp=pp_url&${entry}=${encodeURIComponent(teamId)}`;
-}
-
 function getDashboardUrl() {
   return getConfig('GUIDE_DASHBOARD_URL');
 }
@@ -706,36 +699,37 @@ function isCurrentProjectWeek_(value, schedule, clock) {
     && !isFutureProjectTimestamp_(value, clock.now);
 }
 
-function getLogWeekSummary_(rows, schedule, clock) {
-  const recorded = new Set();
-  rows.forEach(row => {
-    const day = activityProjectDay_(row[0], schedule);
-    if (day !== null && day >= schedule.week1 && day <= Math.min(clock.today, schedule.end)
-        && !isFutureProjectTimestamp_(row[0], clock.now)) {
-      recorded.add(Math.floor((day - schedule.week1) / 7) + 1);
-    }
-  });
-  let missing = 0, firstMissingDue = null;
-  for (let week = 1; week <= clock.completedWeeks; week++) {
-    if (!recorded.has(week)) {
-      missing++;
-      if (firstMissingDue === null) firstMissingDue = Math.min(schedule.week1 + week * 7 - 1, schedule.end);
-    }
-  }
-  return { missing, firstMissingDue, currentLogged:clock.active && recorded.has(clock.week) };
+function getLogWeekSummary_(records, eligibleFrom, regNo, now) {
+  now = now || new Date();
+  const windows = eligibleWeeklyWindows_(eligibleFrom,getWeeklySubmissionWindows_());
+  const expected = windows.filter(w=>w.opens_at <= now.getTime());
+  const effective = getEffectiveLogEntries_(records).filter(r=>!regNo || textEquals_(r.regNo,regNo));
+  const submitted = new Set(effective.filter(r=>r.entryStatus !== 'MISSED').map(r=>r.weekId));
+  const missing = expected.filter(w=>now.getTime() > w.closes_at && !submitted.has(w.weekId));
+  const current = expected.find(w=>now.getTime() <= w.closes_at);
+  const timezone = getSpreadsheet().getSpreadsheetTimeZone();
+  return {expectedWeeks:expected.length, missing:missing.length,
+    firstMissingDue:missing.length ? projectDay_(new Date(missing[0].deadline_at),timezone) : null,
+    currentLogged:!!current && submitted.has(current.weekId), active:!!current, week:current ? current.weekId : null,
+    due:current ? projectDay_(new Date(current.deadline_at),timezone) : null};
 }
 
-/** Roll individual logging obligations up to the team without hiding missing members. */
+/** Roll up effective individual obligations, bounded by the durable team eligibility. */
 function getTeamLogWeekSummary_(row, columns, logs, schedule, clock) {
-  const emails = [...new Set(['S1_EMAIL','S2_EMAIL','S3_EMAIL','S4_EMAIL']
-    .map(key => String(row[columns[key]] || '').trim().toLowerCase()).filter(Boolean))];
-  const byEmail = groupBy(logs, log => String(log[1] || '').trim().toLowerCase());
-  const summaries = emails.map(email => getLogWeekSummary_(byEmail[email] || [], schedule, clock));
-  const missing = summaries.reduce((total, summary) => total + summary.missing, 0);
-  const dueDates = summaries.filter(summary => summary.firstMissingDue !== null).map(summary => summary.firstMissingDue);
-  return { missing, firstMissingDue:dueDates.length ? Math.min(...dueDates) : null,
-    currentLogged:emails.length > 0 && summaries.every(summary => summary.currentLogged),
-    loggedStudents:summaries.filter(summary => summary.currentLogged).length, totalStudents:emails.length };
+  const index = getOptionalHeaderIndex_(getSheet(SHEET_NAMES.TEAM_STATUS),WEEKLY_ELIGIBILITY_HEADER_);
+  if (index < 0) throw new Error('Initialize weekly progress storage first.');
+  const eligibleFrom = String(row[index] || '');
+  const registers = [1,2,3,4].filter(n=>row[columns['S'+n+'_EMAIL']]).map(n=>row[columns['S'+n+'_REGNO']]);
+  if (!eligibleFrom) return {missing:0,expectedWeeks:0,firstMissingDue:null,currentLogged:false,loggedStudents:0,totalStudents:registers.length,active:false,week:null,due:null};
+  if (registers.some(r=>!r) || new Set(registers.map(normalizeText_)).size !== registers.length) throw new Error('Student register numbers are missing or ambiguous.');
+  const summaries = registers.map(regNo=>getLogWeekSummary_(logs,eligibleFrom,regNo,clock && clock.now));
+  const dueDates = summaries.filter(s=>s.firstMissingDue !== null).map(s=>s.firstMissingDue);
+  const current = summaries[0];
+  return {missing:summaries.reduce((n,s)=>n+s.missing,0), expectedWeeks:summaries.reduce((n,s)=>n+s.expectedWeeks,0),
+    firstMissingDue:dueDates.length ? Math.min(...dueDates) : null,
+    currentLogged:summaries.length > 0 && summaries.every(s=>s.currentLogged),
+    loggedStudents:summaries.filter(s=>s.currentLogged).length,totalStudents:registers.length,
+    active:!!current && current.active,week:current ? current.week : null,due:current ? current.due : null};
 }
 
 /** Shared headers for refreshable, non-student dashboard containers. */
