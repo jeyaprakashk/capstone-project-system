@@ -57,9 +57,14 @@ test('details use shared loading, escape logs, expose ratings and commit date/me
   button.onclick();button.onclick();assert.equal(f.requests.length,2);assert.equal(f.requests[1].method,'loadGuideWeeklyProgressDetails');
   f.requests[1].failure(Error('offline'));assert.equal(f.host.busy,false);assert.match(f.host.textContent,/reopen View Details/);
   button.onclick();button.onclick();assert.equal(f.requests.length,3);
-  f.requests[2].success({workCompleted:'<img src=x>',guideDiscussion:'Decision',blockers:'None',nextAction:'Measure',analysis:{score:7,comment:'Concrete work',technical_substance:'HIGH',specificity:'HIGH',outcome:'MEDIUM',next_action:'HIGH',github_support:'LOW'},timezone:'Asia/Kolkata',evidence:{state:'available',commits:[{timestamp:'2026-01-02T12:00:00Z',message:'Added plots',sha:'abc123'}]}});
+  const sha='4fa79515b076b1fc2ca764338761bb347e4f547c',url='https://github.com/org/team/commit/'+sha;
+  f.requests[2].success({workCompleted:'<img src=x>',guideDiscussion:'Decision',blockers:'None',nextAction:'Measure',analysis:{score:7,comment:'Concrete work',technical_substance:'HIGH',specificity:'HIGH',outcome:'MEDIUM',next_action:'HIGH',github_support:'LOW'},timezone:'Asia/Kolkata',evidence:{state:'available',commits:[{timestamp:'2026-01-02T12:00:00Z',message:'Added plots',sha,shortSha:sha.slice(0,7),url}]}});
   assert.equal(f.host.querySelector('img'),null);assert.match(f.host.textContent,/7\/10/);assert.match(f.host.textContent,/Technical substance/);
-  assert.match(f.host.textContent,/Added plots \| abc123/);assert.match(f.host.textContent,/2026/);assert.deepEqual(f.counts(),[3,3]);
+  assert.match(f.host.textContent,/Added plots \| 4fa7951/);assert.match(f.host.textContent,/2026/);assert.deepEqual(f.counts(),[3,3]);
+  const link=f.host.querySelector('[data-detail-row] a');
+  assert.equal(link.textContent,'4fa7951');assert.equal(link.getAttribute('href'),url);
+  assert.equal(link.getAttribute('target'),'_blank');assert.equal(link.getAttribute('rel'),'noopener noreferrer');
+  assert(!f.host.textContent.includes(sha));
   button.onclick();button.onclick();assert.equal(f.requests.length,3);
 });
 

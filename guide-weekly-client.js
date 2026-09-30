@@ -64,7 +64,7 @@ function guideWeeklyBrowser_() {
       const fields=[['workCompleted','Work Completed'],['guideDiscussion','Guide Discussion/Decision'],['blockers','Problems/Blockers'],['nextAction','Next Week Plan']];
       target.innerHTML=fields.map(([key,label])=>'<h4>'+label+'</h4><p class="weekly-log-answer">'+esc(data[key])+'</p>').join('')+
         '<h4>AI Quality</h4>'+(data.analysis?'<p>'+esc(data.analysis.score)+'/10 — '+esc(data.analysis.comment)+'</p><dl>'+[['technical_substance','Technical substance'],['specificity','Specificity'],['outcome','Outcome'],['next_action','Next action'],['github_support','GitHub support']].map(([key,label])=>'<dt>'+label+'</dt><dd>'+esc(data.analysis[key])+'</dd>').join('')+'</dl>':'<p>—</p>')+
-        '<h4>GitHub evidence</h4>'+(data.evidence.state==='available'?'<ul>'+data.evidence.commits.map(commit=>'<li>'+esc(new Date(commit.timestamp).toLocaleString('en-IN',{timeZone:data.timezone,hour12:true}))+' | '+esc(commit.message)+' | '+esc(commit.sha)+'</li>').join('')+'</ul>':'<p>'+esc(data.evidence.message||'GitHub evidence unavailable.')+'</p>');
+        '<h4>GitHub evidence</h4>'+(data.evidence.state==='available'?'<ul>'+data.evidence.commits.map(commit=>'<li>'+esc(new Date(commit.timestamp).toLocaleString('en-IN',{timeZone:data.timezone,hour12:true}))+' | '+esc(commit.message)+' | <a href="'+esc(commit.url)+'" target="_blank" rel="noopener noreferrer">'+esc(commit.shortSha)+'</a></li>').join('')+'</ul>':'<p>'+esc(data.evidence.message||'GitHub evidence unavailable.')+'</p>');
       target.dataset.loaded='true';
     },error=>{
       settle();if(!current(node)||!target.isConnected)return;

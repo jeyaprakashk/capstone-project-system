@@ -13,7 +13,7 @@ function fixture() {
   const row={date,team:'T1',message:'CAD and experimental results',username:'alice',repo:setup.repoUrl,sha:(++seq).toString(16).padStart(40,'0'),...extra};
   sheet.rows.push([row.date,row.team,row.message,row.username,row.repo,row.sha,extra.authorId === undefined ? row.username === 'bob' ? '102' : row.username === '(unknown)' ? '999' : '101' : extra.authorId]);return row;
  }
- return {...f,student,setup,commit,commitSheet:sheet,read:week=>f.c.readWeeklyProgressEvidence_(student,week||'W1')};
+ return {...f,student,setup,commit,commitSheet:sheet,read:week=>f.c.readWeeklyProgressEvidence_(student,week||'W1',f.c.weeklyEvidenceSource_(student,{setup}))};
 }
 
 test('evidence uses inclusive configured normal boundaries, offsets and not late cutoff',()=>{

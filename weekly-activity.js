@@ -165,11 +165,24 @@ function readWeeklyProgressEvidence_(student, weekId, source) {
   return result;
 }
 
+/** Stored, previously verified identities only. Live profile checks belong to setup. */
+function weeklyStoredGithubMapping_(teamId) {
+  const sheet = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS), columns = githubAccountColumns_(sheet);
+  const rows = readSheetRows_(sheet,2), students = weeklyStudents_();
+  const members = students.filter(student=>textEquals_(student.teamId,teamId)).map(student=>{
+    const identity = githubStudentIdentity_(student,rows,columns,students);
+    const submission = rows.filter(row=>emailsMatch(row[1],student.email) && textEquals_(row[2],teamId)).slice(-1)[0];
+    return {email:student.email,label:student.regNo,username:String(submission && submission[3] || '').trim(),
+      githubId:githubId_(submission && submission[columns.ID]),status:identity.state === 'available' ? 'valid' : 'unavailable'};
+  });
+  return {members,repoUrl:getRepoUrlForTeam(teamId)};
+}
+
 function weeklyEvidenceSource_(student, options) {
   options = options || {};
   const source = {logs:options.logs || readLogEntries_(student.teamId,student.regNo),state:'unmapped',commits:[]};
   try {
-    const setup = options.setup || getTeamGithubSetup_(student.teamId,{inspectAccess:false});
+    const setup = options.setup || weeklyStoredGithubMapping_(student.teamId);
     const members = setup.members || [], mine = members.filter(m=>emailsMatch(m.email,student.email) && textEquals_(m.label,student.regNo));
     if (mine.length !== 1 || mine[0].status !== 'valid' || !String(mine[0].username || '').trim() || !githubId_(mine[0].githubId) ||
         members.filter(m=>githubAuthorMatches_(mine[0].githubId,m.githubId)).length !== 1) {

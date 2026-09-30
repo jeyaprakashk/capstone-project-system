@@ -4,6 +4,7 @@ tests/**
 scripts/**
 tmp/**
 releases/**
+workers/**
 
 *.md
 *.log

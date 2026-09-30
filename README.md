@@ -138,7 +138,12 @@ Commit SHA is index 5 (column F); date, team and username retain indexes 0, 1
 and 3. The reader and collector never modify headers or migrate historical rows.
 Repository URLs for new rows come from the authoritative TeamStatus record.
 
-Collection follows all pages in the existing four-week lookback. A script lock
+The hourly collection follows all pages in a rolling two-hour lookback, with no
+last-run cursor. A single `COMMITS_COLLECTION_LEASE` Script Property stores only
+the active run's acquisition timestamp. Acquisition uses `tryLock(0)` on the
+script lock; a busy lock or unexpired lease skips the run immediately. The lease
+expires after 15 minutes (longer than the [Apps Script execution limit](https://developers.google.com/apps-script/guides/services/quotas))
+and is cleared by its owner in `finally`. No user lock is used. A script lock
 protects fresh history reads and append-only writes; the stable identity is the
 full GitHub SHA (case insensitive, across the entire sheet). Each run reports
 fetched, newly appended and skipped counts, with explicit errors rather than

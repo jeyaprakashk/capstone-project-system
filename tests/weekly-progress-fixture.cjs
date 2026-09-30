@@ -16,9 +16,9 @@ function weeklyFixture() {
       })};
     sheets.set(name,value);return value;
   }
-  const props={getProperty:k=>properties.get(k)||null,setProperty:(k,v)=>properties.set(k,v)};
+  const props={getProperty:k=>properties.get(k)||null,setProperty:(k,v)=>properties.set(k,v),deleteProperty:k=>properties.delete(k)};
   const book={getSpreadsheetTimeZone:()=> 'Asia/Kolkata',getSheetByName:n=>sheets.get(n)||null,getSheets:()=>[...sheets.values()],insertSheet:n=>sheet(n,[])};
-  const lock={hasLock:()=>locked,waitLock:()=>{locked=true;},releaseLock:()=>{locked=false;}};
+  const lock={hasLock:()=>locked,tryLock:()=>{if(locked)return false;locked=true;return true;},waitLock:()=>{locked=true;},releaseLock:()=>{locked=false;}};
   const c=vm.createContext({Date:Clock,console:{log(){},error:m=>errors.push(m)},PropertiesService:{getScriptProperties:()=>props},
     SpreadsheetApp:{openById:()=>book,flush(){}},LockService:{getScriptLock:()=>lock},Session:{getActiveUser:()=>({getEmail:()=>user})},
     Utilities:{getUuid:()=>crypto.randomUUID(),formatDate:(date,tz,pattern)=>pattern==='yyyy-MM-dd'?new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(date):date.toISOString()},
@@ -38,6 +38,8 @@ function weeklyFixture() {
   const githubSetup={repoUrl:'https://github.com/org/team',members:[
     {email:'one@example.com',label:'001',username:'alice',githubId:'101',status:'valid'},
     {email:'two@example.com',label:'002',username:'bob',githubId:'102',status:'valid'}]};
+  sheet('GitHubAccounts',[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL'],
+    ...githubSetup.members.map(member=>['',member.email,'T1',member.username,member.githubId,'','https://github.com/'+member.username])]);
   sheet('Commits',[['Date','Team ID','Commit Message','GitHub Username','Repository URL','Commit SHA','GitHub Author ID'],
     ...['2026-01-01T00:00:00Z','2026-01-08T00:00:00Z'].flatMap((date,i)=>githubSetup.members.map((member,j)=>
       [new Clock(date),'T1','Project work',member.username,githubSetup.repoUrl,String(i*2+j+1).padStart(40,'0'),member.githubId]))]);

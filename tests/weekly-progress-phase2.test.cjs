@@ -1,5 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
 const {weeklyFixture}=require('./weekly-progress-fixture.cjs');
 const ratings={technical_substance:'HIGH',specificity:'MEDIUM',outcome:'LOW',next_action:'HIGH',github_support:'MEDIUM',comment:'Specific engineering work with a clear next step.'};
 function fixture() {
@@ -100,6 +102,44 @@ test('guide reads show only assigned effective submissions and details preserve 
   assert.equal(data.entries[0].status,'PENDING');assert.equal(data.entries[0].score,null);
   const details=f.c.loadGuideWeeklyProgressDetails(latest.entryId);assert.equal(details.guideDiscussion,'Measured noise');assert.equal(details.evidence.commits.length,1);
   f.user('outsider@example.com');assert.equal(f.c.loadGuideWeeklyProgress().entries.length,0);assert.throws(()=>f.c.loadGuideWeeklyProgressDetails(latest.entryId),/assigned guide/);
+});
+
+test('guide details use stored mapping and commits with zero GitHub requests and unchanged payload',()=>{
+  const f=fixture(),entry=f.c.submitWeeklyProgress(f.input({guideDiscussion:'Measured noise'}));
+  f.c.appendWeeklyPhase2_('AIProgressAnalysis',{...ratings,score:6,id:'analysis',entryId:entry.entryId,analyzedAt:new Date('2026-01-06T00:00:00Z')});
+  f.user('guide@example.com');
+  // Exercise the real readiness/identity chain, not the fixture's readiness stub.
+  vm.runInContext(fs.readFileSync('team-github-setup.js','utf8'),f.c);
+  const requests=[];
+  f.c.makeGithubRequest=(...args)=>{requests.push(args);throw Error('GitHub unavailable');};
+  f.c.UrlFetchApp={fetch:(...args)=>{requests.push(args);throw Error('Unexpected network read');},
+    fetchAll:(...args)=>{requests.push(args);throw Error('Unexpected batch read');}};
+  const before=JSON.stringify([...f.sheets].map(([name,sheet])=>[name,sheet.rows]));
+  const expected={entryId:entry.entryId,workCompleted:'Work',guideDiscussion:'Measured noise',blockers:'None',nextAction:'Next',
+    analysis:{...JSON.parse(JSON.stringify(f.analyses()[0])),analyzedAt:'2026-01-06T00:00:00.000Z'},
+    evidence:{state:'available',message:'',commits:[{timestamp:'2026-01-01T00:00:00.000Z',message:'Project work',
+      sha:'1'.padStart(40,'0'),shortSha:'0000000',url:'https://github.com/org/team/commit/'+'1'.padStart(40,'0')}]},timezone:'Asia/Kolkata'};
+  for(let i=0;i<2;i++) assert.deepEqual(JSON.parse(JSON.stringify(f.c.loadGuideWeeklyProgressDetails(entry.entryId))),expected);
+  assert.deepEqual(requests,[]);
+  assert.equal(JSON.stringify([...f.sheets].map(([name,sheet])=>[name,sheet.rows])),before);
+});
+
+test('stored guide evidence retains mapping conflicts and collection failures as unavailable',()=>{
+  const cases=[
+    f=>{f.sheets.get('GitHubAccounts').rows[1][4]='';},
+    f=>{f.sheets.get('GitHubAccounts').rows[1][4]='invalid';},
+    f=>{f.sheets.get('GitHubAccounts').rows[1][3]='';},
+    f=>{f.sheets.get('GitHubAccounts').rows[2][4]='101';},
+    f=>{f.sheets.get('GitHubAccounts').rows.push(['','one@example.com','T1','other','103','','']);},
+    f=>{f.sheets.get('GitHubAccounts').rows.push(['','outsider@example.com','T2','alice','101','','']);},
+    f=>{f.collectionStatus('error');}
+  ];
+  for(const mutate of cases) {
+    const f=fixture(),entry=f.c.submitWeeklyProgress(f.input());f.user('guide@example.com');mutate(f);
+    const requests=[];f.c.makeGithubRequest=(...args)=>{requests.push(args);throw Error('Unexpected GitHub request');};
+    const details=f.c.loadGuideWeeklyProgressDetails(entry.entryId);
+    assert.equal(details.evidence.state,'unavailable');assert.equal(details.evidence.commits.length,0);assert.deepEqual(requests,[]);
+  }
 });
 
 test('AI waits past Deadline even with early signoff; saves once without dashboard API calls',()=>{

@@ -17,6 +17,95 @@ function fixture() {
  return {...f,calls,logs,response:fn=>{response=fn;},commits:()=>f.sheets.get('Commits').rows};
 }
 
+test('collection uses an exact rolling two-hour lookback across midnight without saved cursor state',()=>{
+ const f=fixture();f.time('2026-01-03T00:30:45Z');
+ const properties=Array.from(f.properties.entries()),triggers=f.triggers.slice();
+ f.c.fetchAllCommits();
+ assert.equal(new URL(f.calls[0].url).searchParams.get('since'),'2026-01-02T22:30:45.000Z');
+ assert.deepEqual(Array.from(f.properties.entries()),properties);
+ assert.deepEqual(f.triggers,triggers);
+});
+
+test('successive hourly windows overlap, skip existing SHA and append newly visible SHA',()=>{
+ const f=fixture();
+ const at=(n,date)=>commit(n,{commit:{...commit(n).commit,committer:{date}}});
+ const first=at(1,'2026-01-02T11:30:00Z'),second=at(2,'2026-01-02T12:30:00Z');
+ f.time('2026-01-02T12:00:00Z');f.response(()=>({status:200,body:[first]}));
+ assert.equal(f.c.fetchAllCommits()[0].count,1);
+ f.time('2026-01-02T13:00:00Z');f.response(()=>({status:200,body:[first,second]}));
+ const result=f.c.fetchAllCommits()[0];
+ assert.equal(result.count,1);assert.equal(result.skipped,1);assert.equal(result.fetched,2);
+ assert.deepEqual(f.calls.map(call=>new URL(call.url).searchParams.get('since')),
+  ['2026-01-02T10:00:00.000Z','2026-01-02T11:00:00.000Z']);
+ assert.deepEqual(f.commits().slice(1).map(row=>row[5]),[sha(1),sha(2)]);
+});
+
+test('second collector exits immediately while first lease remains active across appender locks',()=>{
+ const f=fixture(),key='COMMITS_COLLECTION_LEASE',props=f.c.PropertiesService.getScriptProperties();
+ const set=props.setProperty;
+ props.setProperty=(name,value)=>{if(name===key)assert.equal(f.locked(),true);return set(name,value);};
+ const lock=f.c.LockService.getScriptLock(),tryLock=lock.tryLock;
+ lock.tryLock=timeout=>{assert.equal(timeout,0);return tryLock();};
+ f.c.LockService.getUserLock=()=>{throw Error('Must not touch Phase 2 lock');};
+ const nested=()=>{
+  assert.equal(f.locked(),false);
+  assert.equal(f.properties.get(key),String(f.c.Date.now()));
+  assert.equal(f.c.fetchAllCommits().length,0);
+  assert.equal(f.properties.get(key),String(f.c.Date.now()));
+ };
+ f.response(()=>{nested();return {status:200,body:[commit(1)]};});
+ const audit=f.c.auditCommitHistory;
+ f.c.auditCommitHistory=()=>{nested();return audit();};
+ assert.equal(f.c.fetchAllCommits()[0].count,1);
+ assert.equal(f.calls.length,1);assert.equal(f.commits().length,2);
+ assert.equal(f.logs.filter(log=>log.includes('already running')).length,2);
+ assert.equal(f.properties.has(key),false);assert.equal(f.locked(),false);
+});
+
+test('busy acquisition lock skips without waiting, releasing another lock, or accessing collection data',()=>{
+ const f=fixture(),lock=f.c.LockService.getScriptLock();lock.waitLock();
+ f.c.getSheetRows=()=>{throw Error('Must skip before collection');};
+ assert.equal(f.c.fetchAllCommits().length,0);
+ assert.equal(f.locked(),true);assert.equal(f.calls.length,0);
+ assert.equal(f.properties.has('COMMITS_COLLECTION_LEASE'),false);
+ assert(f.logs.some(log=>log.includes('lock busy')));lock.releaseLock();
+});
+
+test('unexpired lease skips and expired lease is reclaimed after fifteen minutes',()=>{
+ const key='COMMITS_COLLECTION_LEASE';
+ const f=fixture(),now=f.c.Date.now();
+ f.properties.set(key,String(now-15*60*1000+1));
+ assert.equal(f.c.fetchAllCommits().length,0);assert.equal(f.calls.length,0);
+ assert.equal(f.properties.get(key),String(now-15*60*1000+1));assert.equal(f.locked(),false);
+ f.properties.set(key,String(now-15*60*1000));
+ f.response(()=>{assert.equal(f.properties.get(key),String(now));return {status:200,body:[commit(1)]};});
+ assert.equal(f.c.fetchAllCommits()[0].count,1);assert.equal(f.properties.has(key),false);
+});
+
+test('collection lease clears after handled API failure and uncaught setup, audit, or status failure',()=>{
+ for(const failure of ['api','setup','audit','status']) {
+  const f=fixture();
+  if(failure==='api')f.response(()=>({status:500,body:{message:'failed'}}));
+  if(failure==='setup')f.c.getRepoUrlMap=()=>{throw Error('setup failed');};
+  if(failure==='audit')f.c.auditCommitHistory=()=>{throw Error('audit failed');};
+  if(failure==='status')f.c.writeCommitCollectionStatus_=()=>{throw Error('status failed');};
+  if(failure==='api')assert.equal(f.c.fetchAllCommits()[0].code,'GITHUB_API_ERROR');
+  else assert.throws(()=>f.c.fetchAllCommits(),/failed/);
+  assert.equal(f.properties.has('COMMITS_COLLECTION_LEASE'),false);assert.equal(f.locked(),false);
+ }
+});
+
+test('failed lease acquisition releases its short script lock; cleanup does not delete a replacement lease',()=>{
+ const f=fixture(),props=f.c.PropertiesService.getScriptProperties();
+ props.setProperty=()=>{throw Error('property write failed');};
+ assert.throws(()=>f.c.fetchAllCommits(),/property write failed/);
+ assert.equal(f.locked(),false);assert.equal(f.calls.length,0);
+ const g=fixture(),replacement=String(g.c.Date.now()+1);
+ g.c.auditCommitHistory=()=>g.properties.set('COMMITS_COLLECTION_LEASE',replacement);
+ g.c.fetchAllCommits();
+ assert.equal(g.properties.get('COMMITS_COLLECTION_LEASE'),replacement);
+});
+
 test('schema preserves A:F and requires a unique appended author ID without moving history',()=>{
  const f=fixture(),sheet=f.sheets.get('Commits');
  assert.equal(f.c.commitColumns_(sheet).SHA,5);

@@ -36,10 +36,9 @@ function commitApiError_(slug, response) {
   return error;
 }
 
-function fetchCommitsForTeam(repoOwner, repoName, weeks) {
-  weeks = weeks || 4;
-  const sinceDate = new Date();
-  sinceDate.setDate(sinceDate.getDate() - 7 * weeks);
+function fetchCommitsForTeam(repoOwner, repoName, hours) {
+  hours = hours || 2;
+  const sinceDate = new Date(Date.now() - hours * 60 * 60 * 1000);
   const slug = encodeURIComponent(repoOwner) + '/' + encodeURIComponent(repoName);
   const commits = [];
   for (let page = 1; ; page++) {
@@ -182,6 +181,33 @@ function writeCommitCollectionStatus_(teamId, status) {
 }
 
 function fetchAllCommits() {
+  const leaseKey = 'COMMITS_COLLECTION_LEASE';
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(0)) {
+    Logger.log('Commit collection lock busy; skipping collection.');
+    return [];
+  }
+  let properties, acquiredAt;
+  try {
+    properties = PropertiesService.getScriptProperties();
+    acquiredAt = String(Date.now());
+    const previous = Number(properties.getProperty(leaseKey));
+    // Longer than Apps Script's six-minute execution limit; crashed runs expire.
+    if (previous > 0 && Number(acquiredAt) - previous < 15 * 60 * 1000) {
+      Logger.log('Commit collection already running; skipping collection.');
+      return [];
+    }
+    properties.setProperty(leaseKey, acquiredAt);
+  } finally { lock.releaseLock(); }
+  try {
+    return collectAllCommits_();
+  } finally {
+    // Clear only this run's lease. No lock is held during API work or appends.
+    if (properties.getProperty(leaseKey) === acquiredAt) properties.deleteProperty(leaseKey);
+  }
+}
+
+function collectAllCommits_() {
   const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const statusRows = getSheetRows(SHEET_NAMES.TEAM_STATUS);
   const commitSheet = getSheet(SHEET_NAMES.COMMITS);
@@ -193,7 +219,7 @@ function fetchAllCommits() {
     try {
       const repo = parseGithubRepoUrl_(repoUrl);
       if (!repo) throw new Error('Invalid recorded GitHub repository URL for ' + teamId + '; URL was not changed.');
-      const commits = fetchCommitsForTeam(repo.owner,repo.repo,4);
+      const commits = fetchCommitsForTeam(repo.owner,repo.repo,2);
       processed.push({teamId,...appendCollectedCommits_(commitSheet,teamId,commits,repoUrl)});
       writeCommitCollectionStatus_(teamId, 'ok');
     } catch (error) {
