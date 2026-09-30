@@ -96,6 +96,10 @@ test('production value reads use the shared reader or the complete data range', 
       if (entry.isDirectory()) { audit(file); continue; }
       if (!/\.(js|gs|cjs|html)$/.test(entry.name) || file === path.join(root, 'sheet-reads.js')) continue;
       const source = fs.readFileSync(file, 'utf8');
+      if (entry.name === 'sheet-reads.js' && /^tmp[\\/]github-identity-release-[12][\\/]/.test(path.relative(root,file))) {
+        assert.equal(source,fs.readFileSync(path.join(root,'sheet-reads.js'),'utf8'),'Generated release must use the unchanged shared reader');
+        continue;
+      }
       // Full data-range reads already include all headers. All other value reads
       // must go through the shared full-width reader, including range variables.
       const remaining = source.replace(/\.getDataRange\(\)\s*\.getValues\(\)/g, '');

@@ -1,27 +1,16 @@
-/** Inline GitHub registration. Sheet columns: timestamp, email, team, username. */
-function validateStudentGithubUsername_(value, request) {
-  const username = String(value || '').trim();
-  if (!/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(username)) {
-    return { valid: false, message: 'Enter a GitHub username, not a profile URL. Use letters, numbers, and single hyphens.' };
-  }
-  const response = (request || makeGithubRequest)('GET', '/users/' + encodeURIComponent(username));
-  if (response.status === 404) return { valid: false, message: 'That GitHub username was not found. Check it and try again.' };
-  if (response.status !== 200 || !response.body || !response.body.login) {
-    throw new Error('GitHub could not verify usernames right now. Please try again shortly.');
-  }
-  if (response.body.type !== 'User') return { valid: false, message: 'Enter your personal GitHub username, not an organization or bot account.' };
-  return { valid: true, username: response.body.login };
-}
-
+/** Student GitHub account connection and separate repository setup. */
 function getStudentGithubState_(email, teamId, roster, repoUrl) {
   const setup = getTeamGithubSetup_(teamId, { repoUrl });
   const mine = setup.members.find(member => emailsMatch(member.email, email));
-  const githubNeedsUsername = !!mine && ['missing', 'invalid'].includes(mine.status);
-  return { githubSetup: setup, githubReady: setup.ready,
+  const githubNeedsUsername = !!mine && !mine.githubId && !mine.username;
+  const githubAccount = mine ? {githubId:mine.githubId || '',username:mine.username || '',displayName:mine.displayName || '',profileUrl:mine.profileUrl || ''} : null;
+  return { githubAccount, githubCaptureReady:githubCaptureReady_(), githubSetup: setup, githubReady: setup.ready,
     githubCanRetry: !setup.ready && (setup.usernamesComplete || setup.verificationUnavailable),
     githubUsername: mine ? mine.username : '', githubNeedsUsername,
     githubState: setup.ready ? 'done' : githubNeedsUsername ? 'active' : 'waiting',
-    githubText: githubNeedsUsername ? (mine.status === 'invalid' ? 'Your saved GitHub username is invalid. Enter a valid personal GitHub username. ' : 'Enter your GitHub username. ') + setup.message : setup.message };
+    githubText: githubNeedsUsername && mine.status === 'missing'
+      ? 'Waiting for GitHub account connection. Connect your GitHub account using your profile link.'
+      : setup.message };
 }
 
 function authorizeStudentGithub_() {
@@ -34,32 +23,57 @@ function authorizeStudentGithub_() {
   return { email, teamId: row[columns.TEAM_ID], row };
 }
 
-function submitStudentGithubUsername(username) {
-  // Never accept a student email or team ID from the browser.
+/** Old RPC cannot bypass account preview/confirmation after cutover. */
+function submitStudentGithubUsername() {
+  throw new Error('Open Connect GitHub Account and confirm the resolved profile before saving.');
+}
+
+function previewStudentGithubAccount(profileUrl) {
   const student = authorizeStudentGithub_();
-  const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
-  try {
-    const sheet = getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW);
-    if (!sheet) throw new Error('GitHub username storage is unavailable. Please contact your coordinator.');
-    const rows = readSheetRows_(sheet, 2);
-    let matchingRow = -1;
-    rows.forEach((row, index) => {
-      if (emailsMatch(row[1], student.email) && textEquals_(row[2], student.teamId)) matchingRow = index + 2;
+  githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), true);
+  const username = githubProfileUsername_(profileUrl);
+  const account = githubAccountResponse_(makeGithubRequest('GET','/users/' + encodeURIComponent(username)));
+  const token = Utilities.getUuid();
+  CacheService.getScriptCache().put('github-confirm:' + token, JSON.stringify({
+    email:normalizeEmail(student.email),teamId:String(student.teamId),account,expires:Date.now()+600000
+  }),600);
+  return {ok:true,token,account};
+}
+
+function confirmStudentGithubAccount(token) {
+  const student = authorizeStudentGithub_();
+  if (!/^[a-z0-9-]{20,80}$/i.test(String(token || ''))) throw new Error('Account confirmation expired. Preview your profile again.');
+  return githubIdentityLock_(()=>{
+    const cache = CacheService.getScriptCache(), key = 'github-confirm:' + token, raw = cache.get(key);
+    if (!raw) throw new Error('Account confirmation expired. Preview your profile again.');
+    const preview = JSON.parse(raw);
+    if (preview.expires < Date.now() || preview.email !== normalizeEmail(student.email) || !textEquals_(preview.teamId,student.teamId)) throw new Error('Account confirmation expired or belongs to another student.');
+    const current = authorizeStudentGithub_();
+    if (!emailsMatch(current.email,student.email) || !textEquals_(current.teamId,student.teamId)) throw new Error('Student membership changed. Reload the dashboard.');
+    const sheet = getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), columns = githubAccountColumns_(sheet,true);
+    const rows = readSheetRows_(sheet,2), students = weeklyStudents_();
+    const owners = students.filter(s=>emailsMatch(s.email,student.email) && textEquals_(s.teamId,student.teamId));
+    if (owners.length !== 1) throw new Error('Student membership is ambiguous.');
+    const account = preview.account;
+    if (!githubId_(account.githubId)) throw new Error('Invalid account confirmation.');
+    const mine = rows.flatMap((row,i)=>emailsMatch(row[1],student.email) && textEquals_(row[2],student.teamId) ? [{row,index:i+2}] : []);
+    if (mine.some(item=>item.row[columns.ID] !== '' && item.row[columns.ID] != null && githubId_(item.row[columns.ID]) !== account.githubId)) throw new Error('Your GitHub account cannot be replaced. Contact the coordinator.');
+    const duplicate = rows.some(row=>{
+      if (githubId_(row[columns.ID]) !== account.githubId) return false;
+      const matches = students.filter(s=>emailsMatch(s.email,row[1]) && textEquals_(s.teamId,row[2]));
+      return matches.length !== 1 || !textEquals_(matches[0].regNo,owners[0].regNo);
     });
-    // Check under the same lock as the write, including requests from stale tabs.
-    if (matchingRow >= 2 && validateStudentGithubUsername_(rows[matchingRow - 2][3]).valid) {
-      return { ok: false, alreadySubmitted: true, message: 'You have already submitted a valid GitHub username. Resubmission is not allowed.' };
-    }
-    const validation = validateStudentGithubUsername_(username);
-    if (!validation.valid) return { ok: false, message: validation.message };
-    if (!sheet.getLastRow()) sheet.appendRow(['Timestamp', 'Email address', 'Team ID', 'GitHub Username']);
-    const values = [new Date(), student.email, student.teamId, validation.username];
-    if (matchingRow >= 2) sheet.getRange(matchingRow, 1, 1, 4).setValues([values]);
-    else sheet.appendRow(values);
+    if (duplicate) throw new Error('This GitHub account is assigned to another student. Contact the coordinator.');
+    // A legacy registration must be migrated, not silently relinked by a student.
+    if (mine.some(item=>item.row[3] && !githubId_(item.row[columns.ID]))) throw new Error('Migration required for your existing registration. Contact the coordinator.');
+    if (mine.length > 1) throw new Error('Conflicting registration rows. Contact the coordinator.');
+    let rowNumber = mine.length ? mine[0].index : sheet.getLastRow()+1;
+    if (!mine.length) sheet.getRange(rowNumber,1,1,3).setValues([[new Date(),student.email,student.teamId]]);
+    writeGithubAccount_(sheet,rowNumber,columns,account);
     SpreadsheetApp.flush();
-  } finally { lock.releaseLock(); }
-  return { ok: true, message: 'GitHub username verified and saved.' };
+    cache.remove(key);
+    return {ok:true,account,message:'GitHub account connected. Repository access is checked separately.'};
+  });
 }
 
 /** Separate request keeps a successful save independent of provisioning failures. */

@@ -58,9 +58,12 @@ function commitColumns_(sheet) {
   const headers = readSheetRows_(sheet,1,1)[0] || [];
   const columns = Object.fromEntries(Object.keys(FIELD_DEFINITIONS.COMMITS).map((key,index)=>[key,index]));
   Object.entries(columns).forEach(([key,index])=>{
-    if (headers[index] !== FIELD_DEFINITIONS.COMMITS[key]) throw new Error('Commits header mismatch at column ' + (index+1) + '. Correct headers without moving historical data.');
+    if (!githubBaseHeaderEquals_(headers[index],FIELD_DEFINITIONS.COMMITS[key])) throw new Error('Commits header mismatch at column ' + (index+1) + '. Correct headers without moving historical data.');
   });
-  if (headers.slice(6).some(header=>String(header || '').trim())) throw new Error('Commits requires exactly six columns. Existing data was not changed.');
+  const ids = headers.flatMap((h,i)=>String(h).trim().toLowerCase() === 'github author id' ? [i] : []);
+  if (ids.length > 1) throw new Error('Duplicate GitHub Author ID header.');
+  columns.AUTHOR_ID = ids.length ? ids[0] : -1;
+  if (columns.AUTHOR_ID < 0 && githubIdentityRequiresSchema_()) throw new Error('Migration required: GitHub Author ID column missing.');
   return columns;
 }
 
@@ -71,8 +74,15 @@ function commitIdentity_(sha) {
 function readCollectedCommits_(teamId) {
   const sheet = getSheet(SHEET_NAMES.COMMITS), columns = commitColumns_(sheet);
   const rows = teamId ? readActivityRows_(SHEET_NAMES.COMMITS,columns.TEAM_ID+1,teamId) : readSheetRows_(sheet,2);
-  return rows.filter(row=>row[columns.TEAM_ID]).map(row=>({teamId:row[columns.TEAM_ID],timestamp:row[columns.DATE],
-    username:row[columns.USERNAME],sha:row[columns.SHA],message:row[columns.MESSAGE],repositoryUrl:row[columns.REPO_URL]}));
+  const resolutions = githubCommitResolutionMap_();
+  return rows.filter(row=>row[columns.TEAM_ID]).map(row=>{
+    const authorId = columns.AUTHOR_ID >= 0 ? githubId_(row[columns.AUTHOR_ID]) : '';
+    const journal = resolutions.get(githubCommitKey_(row[columns.REPO_URL],row[columns.SHA]));
+    const authorResolution = journal && journal[3] === 'conflict' ? 'unavailable' : authorId ? 'resolved' :
+      journal && journal[3] === 'unlinked' && !row[columns.AUTHOR_ID] ? 'unlinked' : 'unavailable';
+    return {teamId:row[columns.TEAM_ID],timestamp:row[columns.DATE],username:row[columns.USERNAME],
+      sha:row[columns.SHA],message:row[columns.MESSAGE],repositoryUrl:row[columns.REPO_URL],authorId,authorResolution};
+  });
 }
 
 function appendCollectedCommits_(sheet, teamId, commits, repoUrl) {
@@ -83,7 +93,8 @@ function appendCollectedCommits_(sheet, teamId, commits, repoUrl) {
     const timestamp = new Date(commit.commit && commit.commit.committer && commit.commit.committer.date);
     if (!key || !Number.isFinite(timestamp.getTime()) || typeof commit.commit.message !== 'string') throw new Error('Invalid commit SHA, timestamp or message for ' + teamId);
     const values = [timestamp,teamId,commit.commit.message.split('\n')[0],commit.author ? commit.author.login : '(unknown)',repoUrl,key];
-    return {key,values:values.map(value=>typeof value === 'string' && /^[=+@-]/.test(value) ? "'"+value : value)};
+    return {key,authorId:githubId_(commit.author && commit.author.id),authorUnlinked:!commit.author || commit.author.id == null,
+      values:values.map(value=>typeof value === 'string' && /^[=+@-]/.test(value) ? "'"+value : value)};
   });
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -94,7 +105,14 @@ function appendCollectedCommits_(sheet, teamId, commits, repoUrl) {
     if (pending.length) {
       const first = sheet.getLastRow()+1, last = first+pending.length-1;
       if (last > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(),last-sheet.getMaxRows());
-      sheet.getRange(first,1,pending.length,Object.keys(FIELD_DEFINITIONS.COMMITS).length).setValues(pending.map(commit=>commit.values));
+      sheet.getRange(first,1,pending.length,6).setValues(pending.map(commit=>commit.values));
+      if (columns.AUTHOR_ID >= 0) {
+        sheet.getRange(first,columns.AUTHOR_ID+1,pending.length).setNumberFormat('@').setValues(pending.map(commit=>[commit.authorId]));
+        pending.filter(commit=>!commit.authorId).forEach(commit=>{
+          try { githubJournalWrite_('commit',githubCommitKey_(repoUrl,commit.key),'',commit.authorUnlinked?'unlinked':'api-failure','',null,'Collected without a valid linked GitHub author ID.'); }
+          catch(error) { Logger.log('Author resolution journal pending: '+commit.key); }
+        });
+      }
     }
     SpreadsheetApp.flush();
     return {count:pending.length,fetched:commits.length,skipped:commits.length-pending.length};

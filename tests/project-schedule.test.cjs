@@ -234,7 +234,7 @@ test('student setup gates weekly UI for every title state and keeps incomplete s
  c.buildTeamIntakeLink=()=> 'https://example.test/title';
  c.getAssessmentDefinitions_=()=>[];
  for(const githubReady of [false,true])for(const titleStatus of ['NOT_SUBMITTED','NEEDS_REVIEW','REVISE_AWAITING_STUDENT','AWAITING_REVIEWER','APPROVED','REJECTED_BY_GUIDE']) {
-  c.getStudentDashboardData=()=>({githubReady,titleStatus,githubState:githubReady?'done':'active',githubText:'Team member must accept the invitation.',githubNeedsUsername:!githubReady,githubCanRetry:!githubReady,githubSetup:{},schedule,clock:clock('2026-09-23'),rosterSlots:[],title:titleStatus==='NOT_SUBMITTED'?'':'A title',note:'Existing review feedback'});
+  c.getStudentDashboardData=()=>({githubReady,githubCaptureReady:true,titleStatus,githubState:githubReady?'done':'active',githubText:'Team member must accept the invitation.',githubNeedsUsername:!githubReady,githubCanRetry:!githubReady,githubSetup:{},schedule,clock:clock('2026-09-23'),rosterSlots:[],title:titleStatus==='NOT_SUBMITTED'?'':'A title',note:'Existing review feedback'});
   const {document}=parseHTML(c.buildStudentContent('me@example.test','T1')),setup=document.querySelector('.student-project-setup');
   const complete=githubReady&&titleStatus==='APPROVED';
   assert.equal(!!document.getElementById('studentWeeklyProgress'),complete);
@@ -242,20 +242,77 @@ test('student setup gates weekly UI for every title state and keeps incomplete s
   assert.equal(setup.querySelectorAll('.step-row').length,2);
   if(complete){assert.match(setup.querySelector('summary').textContent,/✓ CompleteViewHide/);setup.setAttribute('open','');assert(setup.hasAttribute('open'));setup.removeAttribute('open');}
   else {assert(setup.querySelector('.student-setup-pending'));if(!githubReady)assert.match(setup.textContent,/Step 1: Team member must accept/);if(titleStatus!=='APPROVED')assert.match(setup.textContent,/Step 2:/);}
-  assert.equal(document.querySelectorAll('#studentGithubUsername').length,githubReady?0:1);
+  assert.equal(document.querySelectorAll('#studentGithubProfile').length,1); // No student ID in this fixture, independent of team readiness.
  }
+});
+
+test('unregistered student card offers only account connection and hides repository retry',()=>{
+  const {parseHTML}=require('linkedom');const {c,schedule,clock}=fixture();
+  c.getAssessmentDefinitions_=()=>[];
+  const data={githubReady:false,githubCaptureReady:true,githubNeedsUsername:true,githubCanRetry:true,githubAccount:{},
+    githubState:'active',githubText:'Waiting for GitHub account connection.',githubSetup:{},
+    titleStatus:'NOT_SUBMITTED',title:'',rosterSlots:[],schedule,clock:clock('2026-09-23')};
+  c.getStudentDashboardData=()=>data;
+  const {document}=parseHTML(c.buildStudentContent('student@example.com','T1'));
+  const card=document.querySelector('.step-row');
+  assert.match(card.textContent,/Waiting for GitHub account connection/);
+  assert.doesNotMatch(card.textContent,/valid username|Retry GitHub setup|could not verify/i);
+  assert.match(card.textContent,/Connect your GitHub Account/);
+  assert.equal(card.querySelector('button[type="submit"]').textContent,'Continue');
+  assert.equal(card.querySelectorAll('button.workflow-btn:not(.secondary)').length,1);
+  data.githubNeedsUsername=false;data.githubAccount={githubId:'101',username:'student'};
+  data.githubText='GitHub could not verify all teammates right now. Please try again shortly.';
+  const connected=c.buildStudentContent('student@example.com','T1');
+  assert.doesNotMatch(connected,/Retry GitHub setup/);
+});
+
+test('GitHub table lists all actual students; pending and joined students have no secondary action section',()=>{
+  const {parseHTML}=require('linkedom');const {c,schedule,clock}=fixture();
+  c.getAssessmentDefinitions_=()=>[];
+  const mine={email:'student@example.com',githubId:'101',status:'valid',access:'invited'};
+  const other={email:'other@example.com',githubId:'102',status:'valid',access:'active'};
+  const missing={email:'missing@example.com',githubId:'',status:'missing',access:'unchecked'};
+  const data={repoUrl:'https://github.com/org/repo',githubReady:false,githubCaptureReady:true,githubNeedsUsername:false,
+    githubCanRetry:true,githubAccount:{githubId:'101',username:'student'},githubSetup:{members:[other,mine,missing,{email:'staff@example.com',githubId:'999'}]},
+    githubState:'waiting',githubText:'Team setup pending.',titleStatus:'NOT_SUBMITTED',title:'',
+    rosterSlots:[{email:mine.email,regno:'R1'},{email:other.email,regno:'R2'},{email:missing.email,regno:'R3'},{email:'',regno:''}],schedule,clock:clock('2026-09-23')};
+  c.getStudentDashboardData=()=>data;
+  const card=()=>parseHTML(c.buildStudentContent('student@example.com','T1')).document.querySelector('.step-row');
+  let rendered=card();
+  assert.deepEqual([...rendered.querySelectorAll('th')].map(cell=>cell.textContent),['Student Register Number','GitHub Status']);
+  assert.deepEqual([...rendered.querySelectorAll('tbody tr')].map(row=>[...row.children].map(cell=>cell.textContent)),[
+    ['R1','Action required: Accept the GitHub repository invitation'],['R2','No action required: Repository joined'],['R3','Action required: Connect your GitHub account']]);
+  const noActions=card=>{
+    assert.equal(card.querySelectorAll('form,button,input,[data-github-confirmation],#githubSubmitStatus').length,0);
+    assert.equal(card.querySelectorAll('a').length,1);
+    assert.deepEqual([...card.querySelector('.step-card').children].map(node=>node.className),['step-header','step-body']);
+    assert.doesNotMatch(card.innerHTML,/retryGithubSetup|\/invitations|Your GitHub setup is complete/);
+  };
+  noActions(rendered);
+  assert.match(rendered.querySelector('table').nextElementSibling.textContent,/Team Repository: https:\/\/github.com\/org\/repo/);
+  mine.access='active';other.access='invited';rendered=card();
+  assert.equal(rendered.querySelector('tbody tr').textContent,'R1No action required: Repository joined');
+  noActions(rendered);
+  assert.equal(rendered.querySelector('a.workflow-btn'),null);assert.equal(rendered.querySelector('form'),null);
+  assert.doesNotMatch(rendered.textContent,/Retry GitHub setup/);
+  // A teammate joining cannot supply this student's personal access status.
+  mine.access='unchecked';other.access='active';rendered=card();
+  assert.equal(rendered.querySelector('tbody tr').textContent,'R1Action required: Accept the GitHub repository invitation');
+  noActions(rendered);
+  data.repoUrl='';rendered=card();assert.match(rendered.textContent,/Team Repository: Not available yet/);
+  assert.equal(rendered.querySelectorAll('table').length,1);
 });
 
 test('student locks depend on team readiness while preserving repository and recorded work',()=>{
   const {c,schedule,clock}=fixture();
-  const data={repoUrl:'https://github.com/org/repo',githubReady:false,githubCanRetry:true,githubState:'waiting',githubText:'Waiting for teammate R2',
+  const data={repoUrl:'https://github.com/org/repo',githubAccount:{githubId:'101',username:'student'},githubReady:false,githubCanRetry:true,githubState:'waiting',githubText:'Waiting for teammate R2',
     titleStatus:'APPROVED',title:'Existing title',rosterSlots:[],schedule,clock:clock('2026-09-23'),logWeeks:{missing:0,currentLogged:true}};
   c.getStudentDashboardData=()=>data;
   let html=(c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
   assert(html.includes('https://github.com/org/repo'));
   assert(html.includes('Current title:</strong> Existing title'));
   assert(!html.includes('studentWeeklyProgress'));
-  assert(html.includes('Retry GitHub setup'));
+  assert(!html.includes('Retry GitHub setup'));
   assert(!html.includes('https://example.com/log'));
   assert(!html.includes('milestones complete'));
   data.githubReady=true;data.githubCanRetry=false;data.githubState='done';

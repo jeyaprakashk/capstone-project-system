@@ -19,13 +19,15 @@ function getTeamsGithubSetup_(rows, columns, repoUrlMap, usernameRows) {
       } catch (err) { /* Keep failed checks unavailable; never retry the whole batch serially. */ }
     }
   }
+  const accountColumns = githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), false);
   const latest = new Map();
   usernameRows.forEach(row => latest.set(normalizeText_(row[2]) + ':' + normalizeEmail(row[1]), row));
   const names = [];
   rows.forEach(row => [1,2,3,4].forEach(n => {
     const saved = latest.get(normalizeText_(row[columns.TEAM_ID]) + ':' + normalizeEmail(row[columns['S' + n + '_EMAIL']]));
     const name = String(saved && saved[3] || '').trim();
-    if (/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(name)) names.push('/users/' + encodeURIComponent(name));
+    const id = githubId_(saved && saved[accountColumns.ID]);
+    if (id) names.push('/user/' + id);
   }));
   prefetch(names);
   const request = (method, path) => {
@@ -54,24 +56,46 @@ function getTeamGithubSetup_(teamId, options) {
   const row = options.row || getSheetRows(SHEET_NAMES.TEAM_STATUS).find(row => textEquals_(row[columns.TEAM_ID], teamId));
   if (!row) throw new Error('Team not found: ' + teamId);
   const repoUrl = options.repoUrl !== undefined ? options.repoUrl : getRepoUrlForTeam(teamId);
+  const accountColumns = githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), false);
   const latest = new Map();
   (options.usernameRows || getSheetRows(SHEET_NAMES.GITHUB_USERNAME_RAW)).forEach(item => {
     if (textEquals_(item[2], teamId)) latest.set(normalizeEmail(item[1]), item);
   });
   const validationCache = options.validationCache || new Map();
+  const identityRows = options.usernameRows || getSheetRows(SHEET_NAMES.GITHUB_USERNAME_RAW);
   const members = [1, 2, 3, 4].filter(n => String(row[columns['S' + n + '_EMAIL']] || '').trim()).map(n => {
     const email = String(row[columns['S' + n + '_EMAIL']]).trim();
     const submission = latest.get(normalizeEmail(email));
     const username = String(submission && submission[3] || '').trim();
     const member = { email, label: String(row[columns['S' + n + '_REGNO']] || row[columns['S' + n + '_NAME']] || email), username,
       status: 'missing', submittedAt: null, access: 'unchecked' };
-    if (!username) return member;
+    member.githubId = githubId_(submission && submission[accountColumns.ID]);
+    if (!submission) return member;
     try {
-      if (!validationCache.has(username.toLowerCase())) validationCache.set(username.toLowerCase(), validateStudentGithubUsername_(username, request));
-      const check = validationCache.get(username.toLowerCase());
+      if (member.githubId) {
+        if (!validationCache.has('academic-students')) {
+          try { validationCache.set('academic-students',weeklyStudents_()); }
+          catch (error) { validationCache.set('academic-students',error); }
+        }
+        const students = validationCache.get('academic-students');
+        if (students instanceof Error) throw students;
+        const identity = githubStudentIdentity_({email,teamId},identityRows,accountColumns,students);
+        if (identity.state !== 'available') throw new Error(identity.reason);
+      }
+      const check = githubResolveSubmission_(submission,accountColumns,request,validationCache);
       member.status = check.valid ? 'valid' : 'invalid';
       if (check.valid) {
         member.username = check.username;
+        member.githubId = check.githubId || '';
+        member.displayName = check.displayName || '';
+        member.profileUrl = check.profileUrl || '';
+        if (check.githubId) {
+          const metadataKey = 'metadata:' + normalizeText_(teamId) + ':' + normalizeEmail(email) + ':' + check.githubId;
+          if (!validationCache.has(metadataKey)) {
+            refreshGithubAccountMetadata_(submission,check);
+            validationCache.set(metadataKey,true);
+          }
+        }
         const timestamp = submission[0];
         const ms = timestamp ? new Date(timestamp).getTime() : NaN;
         if (Number.isFinite(ms)) member.submittedAt = ms;
@@ -97,15 +121,17 @@ function getTeamGithubSetup_(teamId, options) {
         const permission = options.request
           ? request('GET', '/repos/' + slug + '/collaborators/' + encodeURIComponent(member.username) + '/permission')
           : getCollaboratorPermission_(slug, member.username);
+        if (permission.status === 200 && !githubPermissionIdentityMatches_(permission.body,member.githubId)) { member.access = 'unavailable'; return; }
         if (permission.status === 200 && githubPermissionSufficient_(permission.body)) member.access = 'active';
         else if (permission.status === 200 || permission.status === 404) {
-          const invitation = invitations.find(invite => !invite.expired && textEquals_(invite.invitee && invite.invitee.login, member.username));
+          const invitation = invitations.find(invite => !invite.expired && githubAuthorMatches_(member.githubId,invite.invitee && invite.invitee.id));
           member.access = invitation && githubPermissionSufficient_({ permission: invitation.permissions }) ? 'invited' : 'missing';
         } else { member.access = 'unavailable'; }
       });
       result.ready = members.every(member => member.access === 'active' || member.access === 'invited');
     } catch (err) { result.accessError = err.message; }
   }
+  result.accountsComplete = result.usernamesComplete;
   result.message = githubSetupMessage_(result);
   return result;
 }
@@ -119,16 +145,18 @@ function githubPermissionSufficient_(body, required) {
   return Math.max(rank, ranks[body.permission] || 0) >= ranks[required];
 }
 
-function ensureGithubPermission_(slug, username, required, invitations) {
+function ensureGithubPermission_(slug, username, required, invitations, expectedId) {
   const permission = getCollaboratorPermission_(slug, username);
+  if (permission.status === 200 && !githubPermissionIdentityMatches_(permission.body,expectedId)) throw new Error('Collaborator account ID conflict.');
   if (permission.status === 200 && githubPermissionSufficient_(permission.body, required)) return;
   if (permission.status !== 200 && permission.status !== 404) throw new Error('Could not verify access for ' + username + '. Retry GitHub setup.');
-  const invitation = invitations.find(invite => !invite.expired && textEquals_(invite.invitee && invite.invitee.login, username));
+  const invitation = invitations.find(invite => !invite.expired && (expectedId ? githubAuthorMatches_(expectedId,invite.invitee && invite.invitee.id) : textEquals_(invite.invitee && invite.invitee.login, username)));
   if (invitation && githubPermissionSufficient_({ permission: invitation.permissions }, required)) return;
   const permissions = required === 'push' ? 'write' : required === 'pull' ? 'read' : required;
   const response = invitation
     ? makeGithubRequest('PATCH', '/repos/' + slug + '/invitations/' + invitation.id, { permissions })
     : addCollaborator(slug, username, required);
+  if (expectedId && response.body && response.body.invitee && !githubAuthorMatches_(expectedId,response.body.invitee.id)) throw new Error('Invitation account ID conflict.');
   if (!(invitation ? response.status === 200 : [201, 204].includes(response.status))) throw new Error('Could not grant access to ' + username + '. Retry GitHub setup.');
 }
 
@@ -174,7 +202,7 @@ function repairTeamGithubSetup_(teamId) {
   updateTeamStatusRepoUrl_(teamId, repo.body.html_url);
   if (created) setReadmeHeading(slug, name, teamId, row[columns.TITLE] || 'Team ' + teamId + ' Capstone');
   const invitations = getGithubInvitations_(slug);
-  setup.members.forEach(member => ensureGithubPermission_(slug, member.username, 'push', invitations));
+  setup.members.forEach(member => ensureGithubPermission_(slug, member.username, 'push', invitations, member.githubId));
   return getTeamGithubSetup_(teamId, { repoUrl: repo.body.html_url });
 }
 
@@ -224,4 +252,8 @@ function notifyGithubIntakeRejection_(teamId, submitterEmail, error) {
     : [submitterEmail];
   MailApp.sendEmail(recipients.join(','), `Title submission not applied — Team ${teamId}`,
     error.message + '\n\nThe raw response was retained, but no title or approval records were changed. After resolving the issue, submit the title again.\n\nDashboard: ' + getDashboardUrl());
+}
+
+function githubPermissionIdentityMatches_(body, expectedId) {
+  return !expectedId || !(body && body.user && body.user.id != null) || githubAuthorMatches_(expectedId,body.user.id);
 }

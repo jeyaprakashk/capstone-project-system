@@ -12,7 +12,7 @@ function weeklyFixture() {
     const value={rows,getName:()=>name,getLastRow:()=>rows.length,getLastColumn:()=>Math.max(0,...rows.map(r=>r.length)),getMaxRows:()=>1000,insertRowsAfter(){},
       getDataRange:()=>({getValues:()=>rows.map(r=>r.slice())}),
       getRange:(r,c,n=1,w=1)=>({getValues:()=>Array.from({length:n},(_,i)=>Array.from({length:w},(_,j)=>rows[r+i-1]?.[c+j-1]??'')),
-        setValue(v){return this.setValues([[v]]);},setValues(values){values.forEach((row,i)=>row.forEach((cell,j)=>{rows[r+i-1] ||= [];rows[r+i-1][c+j-1]=typeof cell==='string' && cell.startsWith("'")?cell.slice(1):cell;}));},
+        setNumberFormat(){return this;},setValue(v){return this.setValues([[v]]);},setValues(values){values.forEach((row,i)=>row.forEach((cell,j)=>{rows[r+i-1] ||= [];rows[r+i-1][c+j-1]=typeof cell==='string' && cell.startsWith("'")?cell.slice(1):cell;}));},
         createTextFinder(pattern){const finder={useRegularExpression(){return this;},matchEntireCell(){return this;},matchCase(){return this;},
           findAll:()=>rows.slice(r-1,r-1+n).flatMap((row,i)=>new RegExp(pattern,'i').test(String(row[c-1]??''))?[{getRow:()=>r+i}]:[]),findNext(){return this.findAll()[0]||null;}};return finder;}
       })};
@@ -27,7 +27,8 @@ function weeklyFixture() {
     MailApp:{sendEmail:(...args)=>{if(mailFails)throw Error('Mail unavailable');mails.push(args);}},
     ScriptApp:{getProjectTriggers:()=>triggers.slice(),deleteTrigger:t=>triggers.splice(triggers.indexOf(t),1),newTrigger:name=>({timeBased(){return this;},everyHours(n){this.hours=n;return this;},create(){triggers.push({getHandlerFunction:()=>name,hours:this.hours});}})}
   });
-  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','weekly-activity.js','logbook-tracker.js','guide-dashboard.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','github-identity-migration.js','weekly-activity.js','logbook-tracker.js','guide-dashboard.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+  c.parseGithubRepoUrl_=url=>{const m=String(url).match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+?)(?:\.git)?\/?$/i);return m?{owner:m[1],repo:m[2]}:null;};
   const definitions=vm.runInContext('FIELD_DEFINITIONS',c);
   const ts=Object.values(definitions.TEAM_STATUS).concat('Repo URL','Progress Eligible From Week ID'),tr=Object.values(definitions.TEAM_ROSTER);
   const member={'Team ID':'T1','Student 1 Name':'One','Student 1 Register No':'001','Student 1 Email':'one@example.com','Student 2 Name':'Two','Student 2 Register No':'002','Student 2 Email':'two@example.com','Title':'Project','Reviewer Decision':'Approved','Repo URL':'https://github.com/org/team'};

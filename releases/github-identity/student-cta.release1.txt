@@ -1,0 +1,10 @@
+  const githubCta = (d.githubNeedsUsername
+    ? `<form class="github-username-form" onsubmit="DashboardUI.submitGithubUsername(event, this)">
+         <label for="studentGithubUsername">Your GitHub username</label>
+         <input id="studentGithubUsername" name="username" type="text" required maxlength="39"
+                autocomplete="off" autocapitalize="none" spellcheck="false"
+                value="${escapeHtml(d.githubUsername || '')}" aria-describedby="githubSubmitStatus"
+                placeholder="e.g. octocat">
+         <button class="workflow-btn" type="submit">Submit GitHub username</button>
+       </form>`
+    : '') + (d.githubCanRetry ? '<button class="workflow-btn" type="button" onclick="DashboardUI.retryGithubSetup(this)">Retry GitHub setup</button>' : '') + '<p id="githubSubmitStatus" role="status" aria-live="polite"></p><button id="githubStatusRefresh" class="workflow-btn secondary" type="button" hidden onclick="DashboardUI.refreshGithubStatus(this)">Refresh GitHub status</button>';

@@ -3,9 +3,9 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const {weeklyFixture}=require('./weekly-progress-fixture.cjs');
-const headers=['Date','Team ID','Commit Message','GitHub Username','Repository URL','Commit SHA'];
+const headers=['Date','Team ID','Commit Message','GitHub Username','Repository URL','Commit SHA','GitHub Author ID'];
 const sha=n=>n.toString(16).padStart(40,'0');
-const commit=(n,extra={})=>({sha:sha(n),author:{login:'github-user'},commit:{author:{name:'Student Name',email:'github@example.com'},committer:{date:'2026-01-01T12:00:00Z'},message:'Commit '+n+'\nMore details'},...extra});
+const commit=(n,extra={})=>({sha:sha(n),author:{login:'github-user',id:123},commit:{author:{name:'Student Name',email:'github@example.com'},committer:{date:'2026-01-01T12:00:00Z'},message:'Commit '+n+'\nMore details'},...extra});
 function fixture() {
  const f=weeklyFixture(),calls=[],logs=[];
  f.sheet('Commits',[headers.slice()]);f.set('Repo URL','https://github.com/org/team.repo.git');
@@ -17,15 +17,15 @@ function fixture() {
  return {...f,calls,logs,response:fn=>{response=fn;},commits:()=>f.sheets.get('Commits').rows};
 }
 
-test('schema uses exactly six ordered columns with SHA in F and never migrates seven-column history',()=>{
+test('schema preserves A:F and requires a unique appended author ID without moving history',()=>{
  const f=fixture(),sheet=f.sheets.get('Commits');
  assert.equal(f.c.commitColumns_(sheet).SHA,5);
- assert.equal(Object.keys(f.c.commitColumns_(sheet)).length,6);
- for(const invalid of [headers.slice(0,5).concat('',headers[5]),headers.concat('Extra')]) {
+ assert.equal(Object.keys(f.c.commitColumns_(sheet)).length,7);
+ for(const invalid of [headers.slice(0,5).concat('',headers[5]),headers.concat('GitHub Author ID')]) {
   sheet.rows[0]=invalid;
   const before=JSON.stringify(sheet.rows);
-  assert.throws(()=>f.c.auditCommitHistory(),/header mismatch|exactly six/);
-  assert.throws(()=>f.c.appendCollectedCommits_(sheet,'T1',[commit(1)],'https://github.com/org/team'),/header mismatch|exactly six/);
+  assert.throws(()=>f.c.auditCommitHistory(),/header mismatch|Duplicate|Migration required/);
+  assert.throws(()=>f.c.appendCollectedCommits_(sheet,'T1',[commit(1)],'https://github.com/org/team'),/header mismatch|Duplicate|Migration required/);
   assert.equal(JSON.stringify(sheet.rows),before);
  }
 });
@@ -76,7 +76,7 @@ test('later page failure and malformed response never write partial collection',
  const f=fixture();f.response(url=>url.includes('&page=1')?{status:200,body:Array.from({length:100},(_,i)=>commit(i+1))}:{status:500,body:{message:'Server error'}});
  assert.equal(f.c.fetchAllCommits()[0].code,'GITHUB_API_ERROR');assert.equal(f.commits().length,1);
  f.response(()=>({status:200,body:{unexpected:true}}));assert.match(f.c.fetchAllCommits()[0].error,/expected an array/);
- f.response(()=>({status:200,body:[commit(1),commit(2,{sha:'bad'})]}));assert.match(f.c.fetchAllCommits()[0].error,/Invalid commit/);assert.equal(f.commits()[0].length,6);
+ f.response(()=>({status:200,body:[commit(1),commit(2,{sha:'bad'})]}));assert.match(f.c.fetchAllCommits()[0].error,/Invalid commit/);assert.equal(f.commits()[0].length,7);
 });
 
 test('76 historical rows across 61 teams are preserved; SHA is global and readers retain date/team/username',()=>{
@@ -115,7 +115,7 @@ test('read-only audit reports duplicate SHA row numbers and unidentified rows wi
 
 test('dedup reads history after acquiring lock, including a competing run append',()=>{
  const f=fixture(),sheet=f.sheets.get('Commits');let held=false;
- f.c.LockService={getScriptLock:()=>({waitLock:()=>{held=true;sheet.rows.push([new Date('2026-01-01'),'T9','Concurrent','user','https://github.com/org/repo',sha(1)]);},releaseLock:()=>{held=false;}})};
+ f.c.LockService={getScriptLock:()=>({hasLock:()=>held,waitLock:()=>{held=true;sheet.rows.push([new Date('2026-01-01'),'T9','Concurrent','user','https://github.com/org/repo',sha(1)]);},releaseLock:()=>{held=false;}})};
  assert.equal(f.c.fetchAllCommits()[0].count,0);assert.equal(sheet.rows.length,2);assert.equal(held,false);
 });
 

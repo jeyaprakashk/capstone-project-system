@@ -1,3 +1,5 @@
+// Transitional behavior is tested against Release 1; dedicated tests cover ID-only Release 2.
+const {releaseSource}=require('../scripts/build-github-identity-release.cjs');
 const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -49,8 +51,10 @@ function fixture() {
     getGithubRepoSlug_: () => 'org/repo',
     addCollaborator: (slug, username) => { calls.push({slug, username}); return {status:201}; }
   });
-  vm.runInContext(fs.readFileSync('student-github.js','utf8'),c);
-  vm.runInContext(fs.readFileSync('team-github-setup.js','utf8'),c);
+  vm.runInContext(releaseSource('github-identity.js',1),c);
+  c.weeklyStudents_=()=>[]; // pre-ID fixtures have no ID claims
+  vm.runInContext(releaseSource('student-github.js',1),c);
+  vm.runInContext(releaseSource('team-github-setup.js',1),c);
   const roster = [{email:team[1],regno:'R1'}, {email:team[2],regno:'R2'}];
   return { c, rows, team, calls, roster, response: value => {response=value;}, user: value => {user=value;},
     state: repo => c.getStudentGithubState_(user,'T1',roster,repo || ''), writes: () => writes, locked: () => locked };
@@ -249,7 +253,7 @@ function browserFixture() {
       querySelector:()=>panel,querySelectorAll:()=>[]},
     google:{script:{run:runner()}},getSkeletonMarkup_:()=>''
   });
-  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js','dashboard-client-scripts.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):fs.readFileSync(file,'utf8'),c);
+  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js','dashboard-client-scripts.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):releaseSource(file,1),c);
   vm.runInContext(c.getDashboardClientScript(),c);
   c.form=form;
   return {requests,status,panel,button,input,form,summary,badge,detail,refreshButton,

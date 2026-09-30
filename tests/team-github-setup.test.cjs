@@ -1,3 +1,5 @@
+// Transitional behavior is tested against Release 1; dedicated tests cover ID-only Release 2.
+const {releaseSource}=require('../scripts/build-github-identity-release.cjs');
 const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
@@ -32,7 +34,10 @@ function fixture() {
       return Date.parse(`${parts.year}-${parts.month}-${parts.day}T00:00:00Z`)/86400000;
     }
   });
-  for(const file of ['student-github.js','team-github-setup.js','github-provisioning.js','intake-approval-workflow.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+  c.weeklyStudents_=()=>[]; // pre-ID fixtures have no ID claims
+  const originalSheet=c.getSheet;
+  c.getSheet=name=>name==='users'?{getLastColumn:()=>4,getLastRow:()=>usernames.length+1,getRange:(r,c,n)=>({getValues:()=>r===1?[['Timestamp','Email address','Team ID','GitHub Username']]:usernames})}:originalSheet(name);
+  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-provisioning.js','intake-approval-workflow.js','logbook-tracker.js']) vm.runInContext(releaseSource(file,1),c);
   c.updateTeamStatusRepoUrl_=(id,url)=>{if(failWrite)throw Error('Sheet write failed');team[7]=url;writes.push({id,url});};
   c.setReadmeHeading=()=>calls.push({method:'README'});
   c.makeGithubRequest=(method,path,payload)=>{

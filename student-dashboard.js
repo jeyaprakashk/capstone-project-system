@@ -69,7 +69,7 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
   ].filter(s => s.email);
 
   const github = getStudentGithubState_(email, teamId, rosterSlots, repoUrl);
-  const { githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup } = github;
+  const { githubAccount, githubCaptureReady, githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup } = github;
 
   const schedule = getProjectSchedule_();
   const clock = getProjectClock_(schedule);
@@ -79,7 +79,7 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
   return {
     teamId, title: r[TS.TITLE], problem: r[TS.PROBLEM],
     titleStatus, note,
-    githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup, repoUrl,
+    githubAccount, githubCaptureReady, githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup, repoUrl,
     rosterSlots, schedule, clock
   };
 }
@@ -155,27 +155,36 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   // GITHUB SETUP
   // ===============================================================
 
-  const githubBody = (d.repoUrl
-    ? `<p>Your repository is live:</p>
-       <a class="mono-detail link" href="${escapeHtml(d.repoUrl)}" target="_blank" rel="noopener">${escapeHtml(d.repoUrl)}</a>`
-    : '') + `<p>${escapeHtml(d.githubText || '')}</p>`;
-
-  const githubCta = (d.githubNeedsUsername
-    ? `<form class="github-username-form" onsubmit="DashboardUI.submitGithubUsername(event, this)">
-         <label for="studentGithubUsername">Your GitHub username</label>
-         <input id="studentGithubUsername" name="username" type="text" required maxlength="39"
-                autocomplete="off" autocapitalize="none" spellcheck="false"
-                value="${escapeHtml(d.githubUsername || '')}" aria-describedby="githubSubmitStatus"
-                placeholder="e.g. octocat">
-         <button class="workflow-btn" type="submit">Submit GitHub username</button>
-       </form>`
-    : '') + (d.githubCanRetry ? '<button class="workflow-btn" type="button" onclick="DashboardUI.retryGithubSetup(this)">Retry GitHub setup</button>' : '') + '<p id="githubSubmitStatus" role="status" aria-live="polite"></p><button id="githubStatusRefresh" class="workflow-btn secondary" type="button" hidden onclick="DashboardUI.refreshGithubStatus(this)">Refresh GitHub status</button>';
+  const account = d.githubAccount || {};
+  const connected = !!account.githubId;
+  const githubMembers = (d.githubSetup || {}).members || [];
+  const githubRows = d.rosterSlots.filter(student => String(student.email || '').trim()).map(student => {
+    const member = githubMembers.find(item => emailsMatch(item.email, student.email));
+    const status = !member || !member.githubId ? 'Action required: Connect your GitHub account'
+      : member.status === 'valid' && member.access === 'active' ? 'No action required: Repository joined'
+      : 'Action required: Accept the GitHub repository invitation';
+    return `<tr><td>${escapeHtml(student.regno || '')}</td><td>${escapeHtml(status)}</td></tr>`;
+  }).join('');
+  const githubBody = `<p class="step-detail">Team & GitHub setup due ${formatProjectDay_(d.schedule.formation)} · ${escapeHtml(d.githubNeedsUsername && !connected ? 'Waiting for GitHub account connection.' : githubTiming.text)}</p>
+    <table class="github-team-status"><thead><tr><th scope="col">Student Register Number</th><th scope="col">GitHub Status</th></tr></thead><tbody>${githubRows}</tbody></table>
+    <p>Team Repository: ${d.repoUrl ? `<a class="mono-detail link" href="${escapeHtml(d.repoUrl)}" target="_blank" rel="noopener">${escapeHtml(d.repoUrl)}</a>` : 'Not available yet'}</p>`;
+  const githubCta = !connected
+    ? `<form class="github-username-form" onsubmit="DashboardUI.previewGithubAccount(event, this)">
+        <label for="studentGithubProfile">Connect your GitHub Account</label>
+        <p>Sign in to GitHub. Open <strong>Your profile</strong>, copy the browser/profile URL, and paste it below.</p>
+        <input id="studentGithubProfile" name="profileUrl" type="url" required maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://github.com/student123" aria-describedby="githubSubmitStatus"${d.githubCaptureReady ? '' : ' disabled'}>
+        <button class="workflow-btn" type="submit"${d.githubCaptureReady ? '' : ' disabled'}>Continue</button>
+        <div data-github-confirmation hidden></div>
+        <p id="githubSubmitStatus" role="status" aria-live="polite"></p>
+        <button id="githubStatusRefresh" class="workflow-btn secondary" type="button" hidden onclick="DashboardUI.refreshGithubStatus(this)">Refresh GitHub status</button>
+      </form>`
+    : '';
 
   const githubCard = buildStepCard(
     1,
     'GitHub setup',
     d.githubState,
-    githubBody + `<p class="step-detail">Team & GitHub setup due ${formatProjectDay_(d.schedule.formation)} · ${escapeHtml(githubTiming.text)}</p>`,
+    githubBody + `<p class="step-detail">Team & GitHub setup due ${formatProjectDay_(d.schedule.formation)} · ${escapeHtml(d.githubNeedsUsername && !connected ? 'Waiting for GitHub account connection.' : githubTiming.text)}</p>`,
     githubCta,
     false
   );

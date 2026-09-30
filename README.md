@@ -29,6 +29,20 @@ that rejects value reads outside the helper or a complete data-range read.
 
 ## Student GitHub registration
 
+**GitHub ID migration:** the current source is Release 2 (ID-only). Deploy the
+separate Release 1 package before migrating existing data. Follow
+[GitHub identity migration](GITHUB-IDENTITY-MIGRATION.md) for the exact schema,
+build commands, administrator batches, verification, and cutover order.
+
+Students connect using a GitHub profile link, preview the resolved account, and
+confirm before it is saved. Numeric GitHub ID is the student identity anchor;
+username, display name, and profile URL are mutable metadata. Provisioning
+remains a separate retryable operation. Student commit evidence requires an
+exact positive ID match; incomplete attribution is unavailable rather than zero.
+
+The username-only description below documents the **Release 1 transition before
+schema preparation**, not an attribution fallback in Release 2.
+
 Students enter their GitHub username on the dashboard. The server checks that
 GitHub returns a personal user account before saving it to `GithubUsernameRaw`
 (timestamp, institutional email, team ID, GitHub username). The email and team

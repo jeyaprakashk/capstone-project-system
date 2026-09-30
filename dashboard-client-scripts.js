@@ -1764,24 +1764,6 @@ const DashboardUI = (function() {
     });
   }
 
-  function markGithubUsernameSaved(form) {
-    form.hidden = true;
-    const card = form.closest('.step-card');
-    if (!card) return;
-    const body = card.querySelector('.step-body');
-    const badge = card.querySelector('.step-badge');
-    if (body) {
-      const text = body.querySelector('p');
-      if (text) text.innerHTML = 'Your valid GitHub username is saved. ' + renderSkeleton('inline', 'Checking the latest team status');
-      body.querySelectorAll('.step-detail').forEach(function(detail) { detail.hidden = true; });
-    }
-    if (badge) { badge.textContent = 'Waiting'; badge.classList.remove('active', 'done'); badge.classList.add('waiting'); }
-    card.classList.remove('step-card-active', 'step-card-done');
-    card.classList.add('step-card-waiting');
-    const statusButton = byId('githubStatusRefresh');
-    if (statusButton) statusButton.hidden = false;
-  }
-
   function retryGithubSetup(button) {
     if (button.disabled) return;
     button.disabled = true;
@@ -1794,37 +1776,54 @@ const DashboardUI = (function() {
       .withFailureHandler(function(err) { finish(errorMessage(err)); }).completeStudentGithubSetup();
   }
 
-  function submitGithubUsername(event, form) {
+  function previewGithubAccount(event, form) {
     event.preventDefault();
-    const input = form.elements.username;
-    if (input.disabled || !form.reportValidity()) return;
-    input.disabled = true;
-    setButtonsDisabled(form, true);
-    setLoading('githubSubmitStatus', 'Checking your GitHub username');
-    function retry(message) {
-      input.disabled = false;
-      setButtonsDisabled(form, false);
-      setText('githubSubmitStatus', message);
-      input.focus();
-    }
-    function refresh(message) {
-      refreshGithubStatus(null, message);
-    }
+    if (form.githubBusy || !form.reportValidity()) return;
+    const input = form.elements.profileUrl, panel = form.querySelector('[data-github-confirmation]');
+    const request = (form.githubRequest || 0) + 1;
+    form.githubRequest = request; form.githubBusy = true; form.githubToken = null;
+    setButtonsDisabled(form,true); input.disabled = true;
+    panel.hidden = false;
+    const finish = beginContentLoading(panel,'Resolving GitHub account');
+    function settle() { finish(); form.githubBusy = false; input.disabled = false; setButtonsDisabled(form,false); }
     dashboardRun().withSuccessHandler(function(result) {
-      if (result.alreadySubmitted) {
-        markGithubUsernameSaved(form);
-        refresh(result.message);
-        return;
-      }
-      if (!result.ok) { retry(result.message); return; }
-      markGithubUsernameSaved(form);
-      setLoading('githubSubmitStatus', result.message + ' Checking repository setup');
-      dashboardRun().withSuccessHandler(function(setup) {
-        refresh(setup.message || '');
-      }).withFailureHandler(function(err) {
-        refresh('Your valid username is saved. Repository setup failed: ' + errorMessage(err));
-      }).completeStudentGithubSetup();
-    }).withFailureHandler(function(err) { retry(errorMessage(err)); }).submitStudentGithubUsername(input.value);
+      settle();
+      if (!form.isConnected || form.githubRequest !== request) return;
+      form.githubToken = result.token;
+      const account = result.account, esc = escapeClientHtml;
+      panel.innerHTML = (account.avatarUrl ? '<img width="48" height="48" alt="" src="' + esc(account.avatarUrl) + '">' : '') +
+        '<p><strong>' + esc(account.displayName || '') + '</strong> <a target="_blank" rel="noopener" href="' + esc(account.profileUrl) + '">@' + esc(account.username) + '</a></p>' +
+        '<p>Is this your GitHub account?</p><button type="button" class="workflow-btn" data-confirm-account>Yes, this is my account</button> <button type="button" class="workflow-btn secondary" data-change-account>No, change profile link</button>';
+      input.disabled = true;
+      form.querySelector('button[type="submit"]').hidden = true;
+      panel.querySelector('[data-confirm-account]').onclick = function() { confirmGithubAccount(form); };
+      panel.querySelector('[data-change-account]').onclick = function() {
+        form.githubRequest++; form.githubToken = null; panel.hidden = true; panel.innerHTML = '';
+        input.disabled = false; form.querySelector('button[type="submit"]').hidden = false; input.focus();
+      };
+      panel.querySelector('[data-confirm-account]').focus();
+    }).withFailureHandler(function(error) {
+      settle();
+      if (!form.isConnected || form.githubRequest !== request) return;
+      setText('githubSubmitStatus',errorMessage(error)); input.focus();
+    }).previewStudentGithubAccount(input.value);
+  }
+
+  function confirmGithubAccount(form) {
+    if (form.githubBusy || !form.githubToken) return;
+    form.githubBusy = true; setButtonsDisabled(form,true);
+    setText('githubSubmitStatus','Connecting GitHub account...');
+    dashboardRun().withSuccessHandler(function(result) {
+      form.githubBusy = false;
+      if (!form.isConnected) return;
+      form.hidden = true; form.githubToken = null;
+      setText('githubSubmitStatus',result.message);
+      dashboardRun().withSuccessHandler(function(setup) { refreshGithubStatus(null,result.message + ' ' + (setup.message || '')); })
+        .withFailureHandler(function(error) { refreshGithubStatus(null,'GitHub account connected. Repository access is pending: ' + errorMessage(error)); }).completeStudentGithubSetup();
+    }).withFailureHandler(function(error) {
+      form.githubBusy = false; setButtonsDisabled(form,false);
+      if (form.isConnected) setText('githubSubmitStatus',errorMessage(error));
+    }).confirmStudentGithubAccount(form.githubToken);
   }
 
   return {
@@ -1832,7 +1831,7 @@ const DashboardUI = (function() {
     loadWeeklyProgress, chooseWeeklyAction, submitWeeklyProgress,
     refreshGithubStatus,
     retryGithubSetup,
-    submitGithubUsername,
+    previewGithubAccount,
     renderAssessmentHistory: renderAssessmentHistory,
     renderSkeleton: renderSkeleton,
     beginContentLoading: beginContentLoading,

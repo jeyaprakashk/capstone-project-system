@@ -20,3 +20,6 @@ Desktop.ini
 
 # Editor history
 .history/
+
+# Generated, separately deployable GitHub identity releases
+tmp/github-identity-release-*/
