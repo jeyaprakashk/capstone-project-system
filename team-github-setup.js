@@ -19,7 +19,7 @@ function getTeamsGithubSetup_(rows, columns, repoUrlMap, usernameRows) {
       } catch (err) { /* Keep failed checks unavailable; never retry the whole batch serially. */ }
     }
   }
-  const accountColumns = githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), false);
+  const accountColumns = githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_ACCOUNTS));
   const latest = new Map();
   usernameRows.forEach(row => latest.set(normalizeText_(row[2]) + ':' + normalizeEmail(row[1]), row));
   const names = [];
@@ -56,13 +56,13 @@ function getTeamGithubSetup_(teamId, options) {
   const row = options.row || getSheetRows(SHEET_NAMES.TEAM_STATUS).find(row => textEquals_(row[columns.TEAM_ID], teamId));
   if (!row) throw new Error('Team not found: ' + teamId);
   const repoUrl = options.repoUrl !== undefined ? options.repoUrl : getRepoUrlForTeam(teamId);
-  const accountColumns = githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), false);
+  const accountColumns = githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_ACCOUNTS));
   const latest = new Map();
-  (options.usernameRows || getSheetRows(SHEET_NAMES.GITHUB_USERNAME_RAW)).forEach(item => {
+  (options.usernameRows || getSheetRows(SHEET_NAMES.GITHUB_ACCOUNTS)).forEach(item => {
     if (textEquals_(item[2], teamId)) latest.set(normalizeEmail(item[1]), item);
   });
   const validationCache = options.validationCache || new Map();
-  const identityRows = options.usernameRows || getSheetRows(SHEET_NAMES.GITHUB_USERNAME_RAW);
+  const identityRows = options.usernameRows || getSheetRows(SHEET_NAMES.GITHUB_ACCOUNTS);
   const members = [1, 2, 3, 4].filter(n => String(row[columns['S' + n + '_EMAIL']] || '').trim()).map(n => {
     const email = String(row[columns['S' + n + '_EMAIL']]).trim();
     const submission = latest.get(normalizeEmail(email));

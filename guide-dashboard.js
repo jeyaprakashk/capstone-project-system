@@ -72,12 +72,12 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
   const emails = [r[TS.S1_EMAIL], r[TS.S2_EMAIL], r[TS.S3_EMAIL], r[TS.S4_EMAIL]].filter(Boolean).join(',');
   const emailSubject = `Team ${r[TS.TEAM_ID]} — Capstone Project`;
   const title = r[TS.TITLE] ? escapeHtml(r[TS.TITLE]) : '<em>No title submitted yet</em>';
-  const emailBtn = `<a class="btn-outline" href="mailto:${escapeHtml(emails)}?subject=${encodeURIComponent(emailSubject)}">${renderLucideIcon_('mail', '', 'icon-leading')}Email Team</a>`;
+  const emailBtn = `<a class="btn-outline app-btn btn-sm btn-secondary" href="mailto:${escapeHtml(emails)}?subject=${encodeURIComponent(emailSubject)}">${renderLucideIcon_('mail', '', 'icon-leading')}Email Team</a>`;
 
   const top = `
     <div class="card-accent ${badge.cls}"></div>
     <div class="card-body">
-      <button type="button" class="btn-outline" data-team="${teamId}" ${evaluationEnabled ? 'onclick="GuideEvaluation.open(this.dataset.team)"' : 'disabled title="' + escapeHtml(evaluationNotice) + '"'}>Guide Evaluation</button>
+      <button type="button" class="btn-outline app-btn btn-md btn-secondary" data-team="${teamId}" ${evaluationEnabled ? 'onclick="GuideEvaluation.open(this.dataset.team)"' : 'disabled title="' + escapeHtml(evaluationNotice) + '"'}>Guide Evaluation</button>
       ${evaluationEnabled ? '' : '<p class="card-sub">' + escapeHtml(evaluationNotice) + '</p>'}
       <div class="card-top-row">
         <span class="tag ${badge.cls}">${renderLucideIcon_('tag', '', 'icon-leading')}${badge.text}</span>
@@ -117,8 +117,8 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
       <div class="card-footer-row">
         ${footerCount}
         <div class="footer-actions">
-          <button class="mini revise" onclick="decide('${teamId}', 'Rejected')">Reject</button>
-          <button class="mini approve" onclick="decide('${teamId}', 'Approved')">Approve</button>
+          <button class="mini revise app-btn btn-sm btn-danger" onclick="decide('${teamId}', 'Rejected')">Reject</button>
+          <button class="mini approve app-btn btn-sm btn-success" onclick="decide('${teamId}', 'Approved')">Approve</button>
         </div>
       </div>
     </div></div>`;
@@ -224,6 +224,11 @@ function buildDashboardContent(email, data) {
   return `
   ${buildDashboardContainerHeader_('Guide Dashboard', 'guide')}
   ${stats ? `<div class="stats">${stats}</div>` : ''}
+  <section id="guideWeeklyProgress" class="assessment-section" aria-label="Weekly progress confirmation">
+    ${buildTabHeader_('Weekly Progress', 'guide-weekly', 'GuideWeekly.load()', '')}
+    <p data-guide-weekly-status role="status"></p>
+    <div data-guide-weekly-read>${getSkeletonMarkup_('panel','Reading weekly progress')}</div>
+  </section>
   ${teamCards}
   <section id="guideEvaluationEditor" class="assessment-section" hidden aria-label="Guide evaluation editor"></section>
   `;

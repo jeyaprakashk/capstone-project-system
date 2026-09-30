@@ -27,7 +27,7 @@ function fixture(overrides = {}, runtime = {}) {
       return new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'short',year:'numeric'}).format(date);
     }}
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
+  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
   const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
@@ -40,7 +40,7 @@ function fixture(overrides = {}, runtime = {}) {
   // Explicit Phase 1 windows in this project/timeline fixture; backend validation has dedicated tests.
   c.getWeeklySubmissionWindows_=()=>Array.from({length:9},(_,i)=>{
     const opens=Date.parse('2026-09-21T00:00:00+05:30')+i*7*86400000;
-    return {weekId:'W'+(i+1),opens_at:opens,deadline_at:opens+7*86400000-1,closes_at:opens+7*86400000-1,late_until:opens+14*86400000-1};
+    return {weekId:'W'+(i+1),opens_at:opens,deadline_at:opens+7*86400000-1,late_until:opens+14*86400000-1};
   });
   const optionalHeader=c.getOptionalHeaderIndex_;
   c.getOptionalHeaderIndex_=(sheet,name)=>name==='Progress Eligible From Week ID'?40:optionalHeader(sheet,name);
@@ -167,7 +167,8 @@ test('timezone boundaries and future/invalid timestamps do not count',()=>{
 test('missing logs use configured closed windows and effective student revisions',()=>{
   const {c,clock}=fixture();
   assert.equal(c.getLogWeekSummary_([],'W1','R1',clock('2026-09-27').now).missing,0);
-  assert.equal(c.getLogWeekSummary_([],'W1','R1',clock('2026-09-28').now).missing,1);
+  assert.equal(c.getLogWeekSummary_([],'W1','R1',clock('2026-09-28').now).missing,0);
+  assert.equal(c.getLogWeekSummary_([],'W1','R1',clock('2026-10-05').now).missing,1);
   const logs=[{regNo:'R1',weekId:'W1',entryStatus:'SUBMITTED'},{regNo:'R1',weekId:'W1',entryStatus:'REVISED'},{regNo:'R1',weekId:'W2',entryStatus:'SUBMITTED'}];
   const result=c.getLogWeekSummary_(logs,'W1','R1',clock('2026-10-05').now);
   assert.equal(result.missing,0);assert.equal(result.currentLogged,false);
@@ -183,7 +184,8 @@ test('attention waits until the day after each configured deadline',()=>{
   assert(!health('2026-09-16',['student','']).issue.includes('Title'));
   assert(health('2026-09-17',['student','']).issue.includes('Title'));
   assert.equal(health('2026-09-27').health,'monitor');
-  assert(health('2026-09-28').issue.includes('weekly log(s) overdue'));
+  assert(!health('2026-09-28').issue.includes('weekly log(s) overdue'));
+  assert(health('2026-10-05').issue.includes('weekly log(s) overdue'));
   const pending={review1:{completed:false},review2:{completed:false}};
   assert(!health('2026-10-12',undefined,undefined,pending).issue.includes('Review 1'));
   assert(health('2026-10-13',undefined,undefined,pending).issue.includes('Review 1'));
@@ -214,7 +216,7 @@ test('team health requires a log from every rostered student',()=>{
   const logs=[{regNo:'R1',weekId:'W1',entryStatus:'SUBMITTED'},{regNo:'R1',weekId:'W1',entryStatus:'REVISED'}];
   const during=c.getTeamLogWeekSummary_(row,columns,logs,s,clock('2026-09-23'));
   assert.equal(during.loggedStudents,1); assert.equal(during.currentLogged,false); assert.equal(during.missing,0);
-  const closed=c.getTeamLogWeekSummary_(row,columns,logs,s,clock('2026-09-28'));
+  const closed=c.getTeamLogWeekSummary_(row,columns,logs,s,clock('2026-10-05'));
   assert.equal(closed.missing,1);
 });
 
@@ -257,7 +259,7 @@ test('unregistered student card offers only account connection and hides reposit
   const card=document.querySelector('.step-row');
   assert.match(card.textContent,/Waiting for GitHub account connection/);
   assert.doesNotMatch(card.textContent,/valid username|Retry GitHub setup|could not verify/i);
-  assert.match(card.textContent,/Connect your GitHub Account/);
+  assert.match(card.textContent,/Submit GitHub Account/);
   assert.equal(card.querySelector('button[type="submit"]').textContent,'Continue');
   assert.equal(card.querySelectorAll('button.workflow-btn:not(.secondary)').length,1);
   data.githubNeedsUsername=false;data.githubAccount={githubId:'101',username:'student'};
@@ -266,7 +268,7 @@ test('unregistered student card offers only account connection and hides reposit
   assert.doesNotMatch(connected,/Retry GitHub setup/);
 });
 
-test('GitHub table lists all actual students; pending and joined students have no secondary action section',()=>{
+test('GitHub status rows use existing icons without a table; connected students have no secondary actions',()=>{
   const {parseHTML}=require('linkedom');const {c,schedule,clock}=fixture();
   c.getAssessmentDefinitions_=()=>[];
   const mine={email:'student@example.com',githubId:'101',status:'valid',access:'invited'};
@@ -279,9 +281,14 @@ test('GitHub table lists all actual students; pending and joined students have n
   c.getStudentDashboardData=()=>data;
   const card=()=>parseHTML(c.buildStudentContent('student@example.com','T1')).document.querySelector('.step-row');
   let rendered=card();
-  assert.deepEqual([...rendered.querySelectorAll('th')].map(cell=>cell.textContent),['Student Register Number','GitHub Status']);
-  assert.deepEqual([...rendered.querySelectorAll('tbody tr')].map(row=>[...row.children].map(cell=>cell.textContent)),[
-    ['R1','Action required: Accept the GitHub repository invitation'],['R2','No action required: Repository joined'],['R3','Action required: Connect your GitHub account']]);
+  assert.equal(rendered.querySelector('table'),null);
+  assert.deepEqual([...rendered.querySelectorAll('.github-member-status')].map(row=>[row.querySelector('.github-member-register').textContent,row.querySelector('.github-member-state').textContent]),[
+    ['R1','Accept Invitation Email'],['R2','Repository joined'],['R3','Submit GitHub Account']]);
+  assert(rendered.querySelector('.github-member-status .lucide-clock'));
+  assert(rendered.querySelector('.is-joined .lucide-check'));
+  assert(rendered.querySelector('.is-missing .lucide-triangle-alert'));
+  assert.doesNotMatch(rendered.textContent,/Action required:|No action required:/);
+  assert.equal((rendered.textContent.match(/Team & GitHub setup due/g)||[]).length,1);
   const noActions=card=>{
     assert.equal(card.querySelectorAll('form,button,input,[data-github-confirmation],#githubSubmitStatus').length,0);
     assert.equal(card.querySelectorAll('a').length,1);
@@ -289,18 +296,26 @@ test('GitHub table lists all actual students; pending and joined students have n
     assert.doesNotMatch(card.innerHTML,/retryGithubSetup|\/invitations|Your GitHub setup is complete/);
   };
   noActions(rendered);
-  assert.match(rendered.querySelector('table').nextElementSibling.textContent,/Team Repository: https:\/\/github.com\/org\/repo/);
+  assert.equal(rendered.querySelector('.github-team-repository a').getAttribute('href'),'https://github.com/org/repo');
   mine.access='active';other.access='invited';rendered=card();
-  assert.equal(rendered.querySelector('tbody tr').textContent,'R1No action required: Repository joined');
+  assert.equal(rendered.querySelector('.github-member-state').textContent,'Repository joined');
   noActions(rendered);
   assert.equal(rendered.querySelector('a.workflow-btn'),null);assert.equal(rendered.querySelector('form'),null);
   assert.doesNotMatch(rendered.textContent,/Retry GitHub setup/);
   // A teammate joining cannot supply this student's personal access status.
   mine.access='unchecked';other.access='active';rendered=card();
-  assert.equal(rendered.querySelector('tbody tr').textContent,'R1Action required: Accept the GitHub repository invitation');
+  assert.equal(rendered.querySelector('.github-member-state').textContent,'Accept Invitation Email');
   noActions(rendered);
-  data.repoUrl='';rendered=card();assert.match(rendered.textContent,/Team Repository: Not available yet/);
-  assert.equal(rendered.querySelectorAll('table').length,1);
+  data.repoUrl='';rendered=card();assert.match(rendered.querySelector('.github-team-repository').textContent,/Not available yet/);
+  assert.equal(rendered.querySelectorAll('.github-member-status').length,3);
+  data.githubAccount={};mine.githubId='';rendered=card();
+  const jump=rendered.querySelector('.github-form-jump');
+  assert.equal(jump.textContent,'Submit GitHub Account');
+  assert.equal(jump.getAttribute('type'),'button');
+  assert.equal(jump.getAttribute('onclick'),'DashboardUI.focusGithubAccountForm(this)');
+  assert.equal(jump.hasAttribute('href'),false);
+  assert(rendered.querySelector('#studentGithubProfile'));
+  assert.equal(rendered.querySelectorAll('.github-form-jump').length,1);
 });
 
 test('student locks depend on team readiness while preserving repository and recorded work',()=>{
@@ -336,7 +351,7 @@ test('coordinator statistics, attention list and tracker share one health result
   c.readActivityRows_=name=>sheetRows[name]||[];
   c.getRepoUrlMap=()=>({t1:'https://example.com/repo'});
   c.getAllReviewCompletionStatus_=()=>({t1:{review1:{completed:false},review2:{completed:false}}});
-  const now=clock('2026-09-28');
+  const now=clock('2026-10-05');
   c.getProjectClock_=()=>now;
   const data=c.getCoordinatorDashboardData_();
   assert.equal(data.stats.activeThisWeek,null);
@@ -344,7 +359,7 @@ test('coordinator statistics, attention list and tracker share one health result
   assert.equal(data.needsAttentionTeams.length,1);
   assert.equal(data.teamTrackerData[0].health,'attention');
   assert.equal(data.teamTrackerData[0].weeklyActivity,null);
-  assert.equal(data.needsAttentionTeams[0].daysOverdue,1);
+  assert.equal(data.needsAttentionTeams[0].daysOverdue,8);
   assert(data.needsAttentionTeams[0].issue.includes('1 student weekly log(s) overdue'));
   const originalGithub=c.getTeamGithubSetup_;
   c.getTeamGithubSetup_=()=>{throw Error('Coordinator must not inspect GitHub details');};
@@ -784,7 +799,7 @@ test('coordinator callbacks from a replaced shell are ignored',()=>{
 test('tracker only attaches its current page and activity updates detached rows',()=>{
   const f=coordinatorAsyncBrowser();
   const rows=Array.from({length:25},(_,i)=>({attributes:{'data-search':'team '+i,'data-team-id':'T'+i},cell:{},getAttribute(key){return this.attributes[key];},querySelector(){return this.cell;}}));
-  const body={children:rows.slice(),querySelectorAll:()=>rows,replaceChildren(...children){this.children=children;}};
+  const body={children:rows.slice(),closest:()=>null,querySelectorAll:()=>rows,replaceChildren(...children){this.children=children;}};
   f.elements.trackerBody=body;
   f.elements.trackerSearch={value:''};
   vm.runInContext('DashboardUI.initializeCoordinatorTracker()',f.browser);

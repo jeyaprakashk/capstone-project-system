@@ -14,7 +14,7 @@ function weeklyActivityContext_() {
   try {
     const schedule = getProjectSchedule_(), clock = getProjectClock_(schedule);
     const windows = getWeeklySubmissionWindows_(), now = clock.now || new Date();
-    const window = windows.find(w=>now.getTime() >= w.opens_at && now.getTime() <= w.closes_at);
+    const window = windows.find(w=>now.getTime() >= w.opens_at && now.getTime() <= w.deadline_at);
     return {schedule, clock, window, state:window ? 'active' : now.getTime() < windows[0].opens_at ? 'not-started' : 'ended'};
   } catch (err) { return {state:'unavailable'}; }
 }
@@ -34,9 +34,9 @@ function aggregateWeeklyActivity_(teamIds, logs, commits, context, student) {
   commits.forEach(row => {
     const value = teams[normalizeText_(row.teamId)];
     const at = row.timestamp === '' || row.timestamp == null ? NaN : new Date(row.timestamp).getTime();
-    if (student && value && at >= context.window.opens_at && at <= context.window.closes_at && row.authorResolution === 'unavailable') value.commits = null;
+    if (student && value && at >= context.window.opens_at && at <= context.window.deadline_at && row.authorResolution === 'unavailable') value.commits = null;
     if (value && value.commits !== null && (student ? githubAuthorMatches_(student.githubId,row.authorId) : normalizeText_(row.username) !== '(unknown)') &&
-        at >= context.window.opens_at && at <= context.window.closes_at) value.commits++;
+        at >= context.window.opens_at && at <= context.window.deadline_at) value.commits++;
   });
   return teams;
 }
@@ -108,10 +108,10 @@ function loadStudentWeeklyActivity(studentEmail) {
     if (context.state === 'active') {
       logs = readLogEntries_(teamId,regNo);
       try {
-        const sheet = getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), accountColumns = githubAccountColumns_(sheet,true);
+        const sheet = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS), accountColumns = githubAccountColumns_(sheet,true);
         identity = githubStudentIdentity_({email:studentEmail,teamId},readSheetRows_(sheet,2),accountColumns);
         if (identity.state === 'available') {
-          if (PropertiesService.getScriptProperties().getProperty(commitCollectionKey_(teamId)) !== 'ok') identity = {state:'unavailable'};
+          if (readCommitCollectionStatus_(teamId) !== 'ok') identity = {state:'unavailable'};
           else commits = readCollectedCommits_(teamId);
         }
       } catch(error) { identity = {state:'unavailable',reason:error.message}; }
@@ -123,13 +123,17 @@ function loadStudentWeeklyActivity(studentEmail) {
 }
 
 /** Collection health only, never a cache of commits or combined weekly data. */
-function commitCollectionKey_(teamId) {
-  return 'commit-collection:' + encodeURIComponent(normalizeText_(teamId));
-}
 
 function weeklyEvidenceRepo_(url) {
   const match = String(url || '').trim().match(/^https:\/\/github\.com\/([a-z0-9-]+)\/([a-z0-9_.-]+?)(?:\.git)?\/?$/i);
   return match ? 'https://github.com/' + match[1] + '/' + match[2] : null;
+}
+
+/** Ignore unlinked/system authors and the repository bootstrap written by this app. */
+function weeklyStudentCommit_(row) {
+  const username = normalizeText_(row.username);
+  return !!username && !['(unknown)','system'].includes(username) && !username.endsWith('[bot]') &&
+    !/^Initial commit: Capstone project for Team\s/i.test(String(row.message || '').trim());
 }
 
 /** Private reader: callers authorize the roster-derived student before using it.
@@ -140,17 +144,18 @@ function readWeeklyProgressEvidence_(student, weekId, source) {
   const window = getWeeklySubmissionWindows_().find(w=>w.weekId === weekId);
   if (!window) throw new Error('Unknown evidence Week ID.');
   const log = getEffectiveLogEntries_(source.logs.filter(r=>textEquals_(r.regNo,student.regNo) && textEquals_(r.teamId,student.teamId) && r.weekId === weekId))[0] || null;
-  const result = {weekId,log,state:source.state,count:null,commits:[]};
+  const result = {weekId,log,state:source.state,message:source.message || '',count:null,commits:[]};
   if (source.state !== 'available') return result;
-  if (!githubId_(source.githubId) || source.commits.some(row=>textEquals_(row.teamId,student.teamId) &&
-      new Date(row.timestamp).getTime() >= window.opens_at && new Date(row.timestamp).getTime() <= window.closes_at && row.authorResolution === 'unavailable')) {
+  if (!githubId_(source.githubId) || source.commits.some(row=>weeklyStudentCommit_(row) && textEquals_(row.teamId,student.teamId) &&
+      weeklyEvidenceRepo_(row.repositoryUrl)?.toLowerCase() === source.repositoryUrl.toLowerCase() &&
+      new Date(row.timestamp).getTime() >= window.opens_at && new Date(row.timestamp).getTime() <= window.deadline_at && row.authorResolution === 'unavailable')) {
     result.state = 'unavailable'; return result;
   }
   const seen = new Set();
   result.commits = source.commits.filter(row=>{
     const at = row.timestamp ? new Date(row.timestamp).getTime() : NaN;
-    return textEquals_(row.teamId,student.teamId) && githubAuthorMatches_(source.githubId,row.authorId) && weeklyEvidenceRepo_(row.repositoryUrl)?.toLowerCase() === source.repositoryUrl.toLowerCase() &&
-      at >= window.opens_at && at <= window.closes_at;
+    return weeklyStudentCommit_(row) && textEquals_(row.teamId,student.teamId) && githubAuthorMatches_(source.githubId,row.authorId) && weeklyEvidenceRepo_(row.repositoryUrl)?.toLowerCase() === source.repositoryUrl.toLowerCase() &&
+      at >= window.opens_at && at <= window.deadline_at;
   }).map(row=>{
     const sha = commitIdentity_(row.sha), timestamp = new Date(row.timestamp).toISOString();
     if (!sha) throw new Error('Commit identity is unavailable.');
@@ -166,12 +171,14 @@ function weeklyEvidenceSource_(student, options) {
   try {
     const setup = options.setup || getTeamGithubSetup_(student.teamId,{inspectAccess:false});
     const members = setup.members || [], mine = members.filter(m=>emailsMatch(m.email,student.email) && textEquals_(m.label,student.regNo));
-    if (mine.length !== 1 || mine[0].status !== 'valid' || !githubId_(mine[0].githubId) ||
-        members.filter(m=>githubAuthorMatches_(mine[0].githubId,m.githubId)).length !== 1) { source.state='unavailable'; return source; }
+    if (mine.length !== 1 || mine[0].status !== 'valid' || !String(mine[0].username || '').trim() || !githubId_(mine[0].githubId) ||
+        members.filter(m=>githubAuthorMatches_(mine[0].githubId,m.githubId)).length !== 1) {
+      source.state='unavailable'; source.message='Your GitHub username mapping is unavailable or unverified. Complete GitHub setup, then refresh.'; return source;
+    }
     source.githubId = mine[0].githubId;
     source.repositoryUrl = weeklyEvidenceRepo_(setup.repoUrl);
     source.state = 'unavailable';
-    if (!source.repositoryUrl || PropertiesService.getScriptProperties().getProperty(commitCollectionKey_(student.teamId)) !== 'ok') return source;
+    if (!source.repositoryUrl || readCommitCollectionStatus_(student.teamId) !== 'ok') return source;
     source.commits = readCollectedCommits_(student.teamId);
     source.state = 'available';
   } catch (error) { source.state = 'unavailable'; }
@@ -184,7 +191,7 @@ function readStudentWeeklyEvidence_(student, windows, options) {
     try {
       const result = readWeeklyProgressEvidence_(student,window.weekId,source);
       // Logs are returned separately in the dashboard history; never duplicate them in storage.
-      return {weekId:result.weekId,state:result.state,count:result.count,commits:result.commits};
+      return {weekId:result.weekId,state:result.state,message:result.message,count:result.count,commits:result.commits};
     } catch (error) { return {weekId:window.weekId,state:'unavailable',count:null,commits:[]}; }
   });
 }

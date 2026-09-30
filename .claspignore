@@ -1,0 +1,16 @@
+.git/**
+node_modules/**
+tests/**
+scripts/**
+tmp/**
+releases/**
+
+*.md
+*.log
+package.json
+package-lock.json
+.gitignore
+.clasp.json
+.claspignore
+AGENTS.md
+LICENSE

@@ -62,7 +62,7 @@ function buildReviewerTitleApproval_(r, TS, status) {
     ${r[TS.SIMILARITY_FLAG] ? `<p class="flag-text">${renderLucideIcon_('triangle-alert','Similarity warning')} ${escapeHtml(r[TS.SIMILARITY_FLAG])}</p>` : ''}
     ${buildDocumentLinksCompact(r)}
     ${r[TS.REVIEWER_NOTES] ? `<p class="reviewer-previous-notes">${escapeHtml(r[TS.REVIEWER_NOTES])}</p>` : ''}
-    ${editable ? `<label for="reviewer-notes-${teamId}">Reviewer notes</label><textarea id="reviewer-notes-${teamId}" rows="3" placeholder="Notes (required for Revise)"></textarea><div class="reviewer-title-actions"><button type="button" class="mini approve" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Approved')">Approve</button><button type="button" class="mini revise" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Revise')">Revise</button></div>` : ''}
+    ${editable ? `<label for="reviewer-notes-${teamId}">Reviewer notes</label><textarea id="reviewer-notes-${teamId}" rows="3" placeholder="Notes (required for Revise)"></textarea><div class="reviewer-title-actions"><button type="button" class="mini approve app-btn btn-sm btn-success" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Approved')">Approve</button><button type="button" class="mini revise app-btn btn-sm btn-warning" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Revise')">Revise</button></div>` : ''}
     <p id="reviewer-status-${teamId}" role="status"></p></div></details>`;
 }
 
@@ -75,7 +75,7 @@ function buildReviewerReviewCells_(r, TS, progress) {
     const enabled=available && state.readable && ready;
     const hint=!available ? (state && state.error || 'Marks unavailable.') : state.reason || state.status;
     const label=state && ['Submitted','Published'].includes(state.status) ? 'View marks' : state && state.completed ? 'Edit marks' : 'Enter marks';
-    const cell=`<td class="reviewer-review-cell"><button type="button" class="btn-outline" ${enabled ? '' : 'disabled'} data-team="${escapeHtml(r[TS.TEAM_ID])}" data-review="${escapeHtml(review.key)}" onclick="DashboardUI.openReviewerMarks(this.dataset.team, this.dataset.review, this)">${renderLucideIcon_(enabled ? 'clipboard-check' : 'lock-keyhole')} ${label}</button><small>${hint ? escapeHtml(hint) : state.completed ? 'Completed' : state.markedStudents + '/' + state.totalStudents + ' students marked'}</small></td>`;
+    const cell=`<td class="reviewer-review-cell"><button type="button" class="btn-outline app-btn btn-md btn-secondary" ${enabled ? '' : 'disabled'} data-team="${escapeHtml(r[TS.TEAM_ID])}" data-review="${escapeHtml(review.key)}" onclick="DashboardUI.openReviewerMarks(this.dataset.team, this.dataset.review, this)">${renderLucideIcon_(enabled ? 'clipboard-check' : 'lock-keyhole')} ${label}</button><small>${hint ? escapeHtml(hint) : state.completed ? 'Completed' : state.markedStudents + '/' + state.totalStudents + ' students marked'}</small></td>`;
     return cell;
   }).join('');
 }

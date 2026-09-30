@@ -1,5 +1,3 @@
-// Transitional behavior is tested against Release 1; dedicated tests cover ID-only Release 2.
-const {releaseSource}=require('../scripts/build-github-identity-release.cjs');
 const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -26,7 +24,7 @@ function fixture() {
   };
   const c = createSheetReadContext({
     console,
-    SHEET_NAMES: { TEAM_STATUS: 'teams', GITHUB_USERNAME_RAW: 'usernames' },
+    SHEET_NAMES: { TEAM_STATUS: 'teams', GITHUB_ACCOUNTS: 'usernames' },
     FIELD_DEFINITIONS: { TEAM_STATUS: {} },
     Session: { getActiveUser: () => ({ getEmail: () => user }) },
     LockService: { getScriptLock: () => ({ waitLock: () => { locked = true; }, releaseLock: () => { locked = false; } }) },
@@ -51,105 +49,14 @@ function fixture() {
     getGithubRepoSlug_: () => 'org/repo',
     addCollaborator: (slug, username) => { calls.push({slug, username}); return {status:201}; }
   });
-  vm.runInContext(releaseSource('github-identity.js',1),c);
-  c.weeklyStudents_=()=>[]; // pre-ID fixtures have no ID claims
-  vm.runInContext(releaseSource('student-github.js',1),c);
-  vm.runInContext(releaseSource('team-github-setup.js',1),c);
+  vm.runInContext(fs.readFileSync('github-identity.js','utf8'),c);
+  c.weeklyStudents_=()=>[];
+  vm.runInContext(fs.readFileSync('student-github.js','utf8'),c);
+  vm.runInContext(fs.readFileSync('team-github-setup.js','utf8'),c);
   const roster = [{email:team[1],regno:'R1'}, {email:team[2],regno:'R2'}];
   return { c, rows, team, calls, roster, response: value => {response=value;}, user: value => {user=value;},
     state: repo => c.getStudentGithubState_(user,'T1',roster,repo || ''), writes: () => writes, locked: () => locked };
 }
-
-test('invalid syntax, missing users, organizations and API failures never write', () => {
-  const f=fixture();
-  for (const username of ['', 'https://github.com/name', '-name', 'name-', 'a--b', '=formula', 'a'.repeat(40)]) {
-    assert.equal(f.c.submitStudentGithubUsername(username).ok,false);
-  }
-  assert.equal(f.calls.length,0);
-  assert.equal(f.c.submitStudentGithubUsername('missing').ok,false);
-  f.response({status:200,body:{login:'org',type:'Organization'}});
-  assert.equal(f.c.submitStudentGithubUsername('org').ok,false);
-  for (const status of [401,403,429,500]) {
-    f.response({status});
-    assert.throws(()=>f.c.submitStudentGithubUsername('valid'),/try again shortly/);
-  }
-  assert.equal(f.writes(),0);
-});
-
-test('save uses server identity and rejects resubmissions without changing the timestamp', () => {
-  const f=fixture();
-  f.rows.push(['old','other@example.com','T2','other']);
-  f.response({status:200,body:{login:'OctoCat',type:'User'}});
-  assert.equal(f.c.submitStudentGithubUsername(' octocat ', 'forged@example.com', 'T2').ok,true);
-  assert.deepEqual(Array.from(f.rows[2].slice(1)),['one@example.com','T1','OctoCat']);
-  const originalTimestamp=f.rows[2][0];
-  for (const name of ['octocat','different']) {
-    const result=f.c.submitStudentGithubUsername(name);
-    assert.equal(result.ok,false);
-    assert.equal(result.alreadySubmitted,true);
-    assert.equal(f.rows[2][0],originalTimestamp);
-    assert.equal(f.rows[2][3],'OctoCat');
-  }
-  assert.equal(f.rows.length,3);
-  assert.equal(f.rows[1][3],'other');
-  assert.equal(f.locked(),false);
-  f.user('outsider@example.com');
-  assert.throws(()=>f.c.submitStudentGithubUsername('valid'),/Student team/);
-  f.user('');
-  assert.throws(()=>f.c.submitStudentGithubUsername('valid'),/sign in/);
-  assert.equal(f.writes(),1);
-});
-
-test('saved submissions cannot be overwritten during GitHub outages; invalid entries can be corrected', () => {
-  const f=fixture();
-  f.rows.push(['original timestamp','one@example.com','T1','valid']);
-  f.response({status:503});
-  assert.throws(()=>f.c.submitStudentGithubUsername('different'),/try again shortly/);
-  assert.equal(f.rows[1][0],'original timestamp');
-  assert.equal(f.rows[1][3],'valid');
-  assert.equal(f.writes(),0);
-  assert.equal(f.locked(),false);
-  f.response(null);
-  f.rows[1][3]='missing';
-  assert.equal(f.c.submitStudentGithubUsername('corrected').ok,true);
-  assert.equal(f.rows[1][3],'corrected');
-  assert.equal(f.writes(),1);
-});
-
-test('textbox stays available for absent or invalid usernames with and without a repo', () => {
-  const f=fixture();
-  for (const repo of ['', 'https://github.com/org/repo']) {
-    assert.equal(f.state(repo).githubNeedsUsername,true);
-    assert.equal(f.state(repo).githubState,'active');
-  }
-  f.rows.push(['','one@example.com','T1','missing']);
-  assert.match(f.state().githubText,/invalid/);
-  assert.equal(f.state('https://github.com/org/repo').githubNeedsUsername,true);
-});
-
-test('valid submission distinguishes missing, invalid and ready teammates', () => {
-  const f=fixture();
-  f.rows.push(['','one@example.com','T1','valid']);
-  assert.equal(f.state().githubNeedsUsername,false);
-  assert.match(f.state().githubText,/Waiting.*R2/);
-  f.rows.push(['','two@example.com','T1','missing']);
-  assert.match(f.state().githubText,/Waiting.*R2/);
-  f.rows.push(['','two@example.com','T1','teammate']);
-  assert.match(f.state().githubText,/All teammates.*awaiting creation/);
-  assert.equal(f.state('https://github.com/org/repo').githubState,'done');
-  assert.equal(f.state('https://github.com/org/repo').githubNeedsUsername,false);
-});
-
-test('API unavailability is not reported as an invalid saved username', () => {
-  const f=fixture();
-  f.rows.push(['','one@example.com','T1','valid']);
-  f.response({status:503});
-  const state=f.state();
-  assert.equal(state.githubState,'waiting');
-  assert.equal(state.githubNeedsUsername,false);
-  assert.match(state.githubText,/could not verify/);
-  assert.doesNotMatch(state.githubText,/invalid/);
-});
 
 test('setup uses the shared team workflow even for existing repositories', () => {
   const f=fixture();
@@ -229,93 +136,4 @@ test('coordinator access sync reads and deduplicates TeamStatus repository URLs'
   f.c.syncCoordinatorGithubAccess();
   assert.deepEqual(checked,['org/one','org/two']);
   assert.equal(f.locked(),false);
-});
-
-function browserFixture() {
-  const requests=[];
-  const status={textContent:''};
-  const panel={innerHTML:'',children:[],appendChild(){},setAttribute(){},classList:{add(){},remove(){}}};
-  const button={disabled:false};
-  const input={value:'octocat',disabled:false,focus(){this.focused=true;}};
-  const summary={textContent:'Enter your GitHub username.'};
-  const detail={hidden:false};
-  const badge={textContent:'Action needed',classList:{add(){},remove(){}}};
-  const refreshButton={hidden:true,disabled:false};
-  const card={classList:{add(){},remove(){}},querySelector:selector=>selector==='.step-body'?{querySelector:()=>summary,querySelectorAll:()=>[detail]}:badge};
-  const form={hidden:false,elements:{username:input},reportValidity:()=>true,querySelectorAll:()=>[button],closest:()=>card};
-  function runner(success,failure) {
-    return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({key,args,success,failure})});
-  }
-  const c=createSheetReadContext({
-    GuideEvaluation:{student(){}},
-    console,window:{},performance:{now:()=>0},setTimeout:()=>1,clearTimeout(){},
-    document:{createElement:()=>({remove(){}}),hidden:false,readyState:'loading',addEventListener(){},getElementById:id=>id==='githubSubmitStatus'?status:id==='githubStatusRefresh'?refreshButton:null,
-      querySelector:()=>panel,querySelectorAll:()=>[]},
-    google:{script:{run:runner()}},getSkeletonMarkup_:()=>''
-  });
-  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js','dashboard-client-scripts.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):releaseSource(file,1),c);
-  vm.runInContext(c.getDashboardClientScript(),c);
-  c.form=form;
-  return {requests,status,panel,button,input,form,summary,badge,detail,refreshButton,
-    refresh:()=>vm.runInContext('DashboardUI.refreshGithubStatus()',c),
-    submit:()=>vm.runInContext('DashboardUI.submitGithubUsername({preventDefault(){}},form)',c)};
-}
-
-test('browser prevents duplicate submissions and restores textbox after validation or network errors', () => {
-  const f=browserFixture();
-  f.submit();f.submit();
-  assert.equal(f.requests.length,1);
-  assert.equal(f.button.disabled,true);
-  f.requests[0].success({ok:false,message:'Username not found'});
-  assert.equal(f.form.hidden,false);
-  assert.equal(f.input.disabled,false);
-  assert.equal(f.input.focused,true);
-  assert.equal(f.status.textContent,'Username not found');
-  f.submit();f.requests[1].failure(new Error('GitHub unavailable'));
-  assert.equal(f.button.disabled,false);
-  assert.equal(f.status.textContent,'GitHub unavailable');
-});
-
-test('a stale browser hides the textbox when the server reports an existing valid submission', () => {
-  const f=browserFixture();
-  f.submit();
-  f.requests[0].success({ok:false,alreadySubmitted:true,message:'Resubmission is not allowed.'});
-  assert.equal(f.form.hidden,true);
-  assert.equal(f.requests[1].key,'loadDashboardRoleContent');
-  assert.equal(f.requests.some(r=>r.key==='completeStudentGithubSetup'),false);
-  f.requests[1].success('Saved username');
-  assert.equal(f.status.textContent,'Resubmission is not allowed.');
-});
-
-test('browser hides textbox only after saving and refreshes after provisioning without resaving', () => {
-  const f=browserFixture();
-  f.submit();
-  assert.equal(f.form.hidden,false);
-  f.requests[0].success({ok:true,message:'Saved'});
-  assert.equal(f.form.hidden,true);
-  assert.equal(f.requests[1].key,'completeStudentGithubSetup');
-  f.requests[1].failure(new Error('Provisioning offline'));
-  assert.equal(f.requests[2].key,'loadDashboardRoleContent');
-  f.requests[2].success('Updated student dashboard');
-  assert.equal(f.panel.innerHTML,'Updated student dashboard');
-  assert.match(f.status.textContent,/valid username is saved/);
-  assert.equal(f.requests.filter(r=>r.key==='submitStudentGithubUsername').length,1);
-});
-
-test('setup and refresh failures preserve saved state, show actual errors and offer a read-only retry',()=>{
-  const f=browserFixture();f.submit();
-  f.requests[0].success({ok:true,message:'Saved'});
-  assert.match(f.summary.innerHTML,/valid GitHub username is saved/);
-  assert.equal(f.badge.textContent,'Waiting');assert.equal(f.detail.hidden,true);
-  f.requests[1].failure(new Error('Missing header Guide GitHub Username'));
-  f.requests[2].failure(new Error('Dashboard unavailable'));
-  assert.equal(f.form.hidden,true);
-  assert.equal(f.refreshButton.hidden,false);assert.equal(f.refreshButton.disabled,false);
-  assert.match(f.status.textContent,/Missing header Guide GitHub Username/);
-  assert.match(f.status.textContent,/Dashboard refresh failed: Dashboard unavailable/);
-  assert.doesNotMatch(f.summary.innerHTML,/Enter your/);
-  f.refresh();assert.equal(f.requests[3].key,'loadDashboardRoleContent');
-  f.requests[3].success('Current team status');
-  assert.equal(f.panel.innerHTML,'Current team status');
-  assert.equal(f.requests.filter(r=>r.key==='submitStudentGithubUsername').length,1);
 });

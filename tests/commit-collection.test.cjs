@@ -24,8 +24,8 @@ test('schema preserves A:F and requires a unique appended author ID without movi
  for(const invalid of [headers.slice(0,5).concat('',headers[5]),headers.concat('GitHub Author ID')]) {
   sheet.rows[0]=invalid;
   const before=JSON.stringify(sheet.rows);
-  assert.throws(()=>f.c.auditCommitHistory(),/header mismatch|Duplicate|Migration required/);
-  assert.throws(()=>f.c.appendCollectedCommits_(sheet,'T1',[commit(1)],'https://github.com/org/team'),/header mismatch|Duplicate|Migration required/);
+  assert.throws(()=>f.c.auditCommitHistory(),/header mismatch|Duplicate|GitHub Author ID column missing/);
+  assert.throws(()=>f.c.appendCollectedCommits_(sheet,'T1',[commit(1)],'https://github.com/org/team'),/header mismatch|Duplicate|GitHub Author ID column missing/);
   assert.equal(JSON.stringify(sheet.rows),before);
  }
 });
@@ -33,7 +33,7 @@ test('schema preserves A:F and requires a unique appended author ID without movi
 test('commit collection reuses authoritative helper/token, preserves dotted URL, and appends once by SHA',()=>{
  const f=fixture(),url=f.status.rows[1][f.ts.indexOf('Repo URL')];
  const first=f.c.fetchAllCommits();assert.equal(first[0].count,1);assert.equal(f.commits().length,2);
- assert.equal(f.properties.get(f.c.commitCollectionKey_('T1')),'ok');
+ assert.equal(f.c.readCommitCollectionStatus_('T1'),'ok');
  assert.match(f.calls[0].url,/\/repos\/org\/team\.repo\/commits\?/);
  assert.equal(f.calls[0].options.headers.Authorization,'token authoritative-test-token');
  assert.equal(f.status.rows[1][f.ts.indexOf('Repo URL')],url);
@@ -46,7 +46,7 @@ test('commit collection reuses authoritative helper/token, preserves dotted URL,
 test('missing authoritative token never falls back to legacy token',()=>{
  const f=fixture();f.properties.delete('GITHUB_ADMIN_TOKEN');const result=f.c.fetchAllCommits();
  assert.match(result[0].error,/GITHUB_ADMIN_TOKEN not configured/);assert.equal(f.calls.length,0);assert.equal(f.commits().length,1);
- assert.equal(f.properties.get(f.c.commitCollectionKey_('T1')),'error');
+ assert.equal(f.c.readCommitCollectionStatus_('T1'),'error');
 });
 
 test('401, access denial, rate limits and empty repository are distinct from missing repositories',()=>{
@@ -116,11 +116,46 @@ test('read-only audit reports duplicate SHA row numbers and unidentified rows wi
 test('dedup reads history after acquiring lock, including a competing run append',()=>{
  const f=fixture(),sheet=f.sheets.get('Commits');let held=false;
  f.c.LockService={getScriptLock:()=>({hasLock:()=>held,waitLock:()=>{held=true;sheet.rows.push([new Date('2026-01-01'),'T9','Concurrent','user','https://github.com/org/repo',sha(1)]);},releaseLock:()=>{held=false;}})};
- assert.equal(f.c.fetchAllCommits()[0].count,0);assert.equal(sheet.rows.length,2);assert.equal(held,false);
+ assert.equal(f.c.appendCollectedCommits_(sheet,'T1',[commit(1)],'https://github.com/org/team').count,0);assert.equal(sheet.rows.length,2);assert.equal(held,false);
 });
 
 test('commit writer holds lock for read/dedup/append and releases it on sheet failure',()=>{
  const f=fixture(),sheet=f.sheets.get('Commits'),getRange=sheet.getRange;
  sheet.getRange=(...args)=>{const range=getRange(...args),write=range.setValues;range.setValues=function(values){assert.equal(f.locked(),true);if(args[0]>1)throw Error('write failed');return write.call(this,values);};return range;};
  const result=f.c.fetchAllCommits();assert.match(result[0].error,/write failed/);assert.equal(f.locked(),false);assert.equal(sheet.rows.length,1);
+});
+
+test('status updates replace one team row, timestamp success and failure, and recover after failure',()=>{
+ const f=fixture();f.c.fetchAllCommits();
+ const sheet=f.sheets.get('CommitCollectionStatus');
+ assert.equal(sheet.rows.length,2);assert.equal(f.c.readCommitCollectionStatus_('t1'),'ok');
+ assert.equal(sheet.rows[1][2].toISOString(),'2026-01-02T12:00:00.000Z');
+ f.time('2026-01-03T12:00:00Z');f.response(()=>({status:500,body:{message:'failed'}}));f.c.fetchAllCommits();
+ assert.equal(f.c.readCommitCollectionStatus_('T1'),'error');assert.equal(sheet.rows.length,2);
+ assert.equal(sheet.rows[1][2].toISOString(),'2026-01-03T12:00:00.000Z');
+ f.response(()=>({status:200,body:[]}));f.c.fetchAllCommits();
+ assert.equal(f.c.readCommitCollectionStatus_('T1'),'ok');assert.equal(sheet.rows.length,2);
+});
+
+test('collection creates a missing status tab and records the result without changing properties',()=>{
+ const f=fixture();f.sheets.delete('CommitCollectionStatus');
+ const before=Array.from(f.properties.entries());
+ f.c.fetchAllCommits();
+ const rows=f.sheets.get('CommitCollectionStatus').rows;
+ assert.deepEqual(Array.from(rows[0]),['Team ID','Status','Updated At']);
+ assert.equal(rows.length,2);assert.equal(f.c.readCommitCollectionStatus_('T1'),'ok');
+ assert.deepEqual(Array.from(f.properties.entries()),before);
+});
+
+test('missing and ambiguous status fail closed; malformed headers never get rewritten',()=>{
+ const f=fixture();assert.equal(f.c.readCommitCollectionStatus_('missing'),'');
+ const sheet=f.sheets.get('CommitCollectionStatus');sheet.rows.push(['t1','ok','']);
+ assert.equal(f.c.readCommitCollectionStatus_('T1'),'');
+ assert.throws(()=>f.c.writeCommitCollectionStatus_('T1','ok'),/Duplicate/);assert.equal(f.locked(),false);
+ sheet.rows[0][1]='Wrong';const before=JSON.stringify(sheet.rows);
+ assert.throws(()=>f.c.writeCommitCollectionStatus_('T1','ok'),/header mismatch/);
+ assert.equal(JSON.stringify(sheet.rows),before);
+ const other=fixture();other.sheets.delete('CommitCollectionStatus');
+ assert.equal(other.c.readCommitCollectionStatus_('T1'),'');
+ assert.equal(other.sheets.has('CommitCollectionStatus'),false);
 });

@@ -60,9 +60,9 @@ test('tracker uses Lucide for repository, title, health and completion states wi
   assert.match(ready, /title="Repository URL recorded"><svg[^>]*lucide-check/);
   assert.match(ready, /aria-label="Completed"/);
   assert.match(ready, /lucide-clock/);
-  assert(ready.indexOf('<th>Repo</th>') < ready.indexOf('<th>Title</th>'));
+  assert(ready.indexOf('>Repo</th>') < ready.indexOf('>Title</th>'));
   const pending = c.buildTeamTrackerTable([{...base,repoStatus:'pending',health:'attention'}]);
-  assert.match(pending, /status-badge red[^>]*title="Pending"><svg[^>]*lucide-x/);
+  assert.match(pending, /tracker-health red[^>]*title="Pending"><svg[^>]*lucide-x/);
   assert.match(pending, /lucide-triangle-alert/);
   assert(!/[✓×◷]/.test(pending));
 });

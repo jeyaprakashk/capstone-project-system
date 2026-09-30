@@ -71,6 +71,7 @@ test('Coordinator System Status stays available when registry discovery is missi
   vm.runInContext(fs.readFileSync('coordinator-dashboard.js','utf8'),c);
   c.coordinatorRead_=(_,read)=>read();c.getColumnMap=()=>({});c.getSheetRows=()=>[];
   c.getRepoUrlMap=()=>({});c.getConfig=()=>'';c.buildGithubAccessSection=()=>'';c.renderLucideIcon_=()=>'';
+  c.buildTeamPagination_=()=>'';
   const html=c.loadCoordinatorSystemStatus();
   assert.match(html,/id="reviewConfigurationCard"/);
   assert.match(html,/id="createAssessmentDefinitionsButton"/);

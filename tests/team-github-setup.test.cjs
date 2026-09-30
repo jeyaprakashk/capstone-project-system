@@ -1,5 +1,3 @@
-// Transitional behavior is tested against Release 1; dedicated tests cover ID-only Release 2.
-const {releaseSource}=require('../scripts/build-github-identity-release.cjs');
 const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
@@ -10,19 +8,19 @@ function fixture() {
   const columns={TEAM_ID:0,SEMESTER:1,TITLE:2,S1_EMAIL:3,S2_EMAIL:4,S3_EMAIL:5,S4_EMAIL:6,S1_REGNO:8,S2_REGNO:9,
     GUIDE_EMAIL:10,REVIEWER_NOTES:11,GUIDE_DECISION:12,REVIEWER_DECISION:13};
   const team=['T1','Odd','','one@example.com','two@example.com','','','https://github.com/org/capstone-2026-27-odd-team-T1','R1','R2','guide@example.com'];
-  const usernames=[[new Date('2026-09-01T10:00:00Z'),'one@example.com','T1','one'],[new Date('2026-09-02T10:00:00Z'),'two@example.com','T1','two']];
+  const usernames=[[new Date('2026-09-01T10:00:00Z'),'one@example.com','T1','one','101','','https://github.com/one'],[new Date('2026-09-02T10:00:00Z'),'two@example.com','T1','two','102','','https://github.com/two']];
   const invitations=[], calls=[], writes=[], mails=[], logs=[];
   const permissions=new Map([['one','write'],['two','write']]);
   let repository=true, outage='', failWrite=false, apiFailure=0;
   const norm=value=>String(value||'').trim().toLowerCase();
   const c=createSheetReadContext({console,Date,
-    SHEET_NAMES:{TEAM_STATUS:'teams',TEAM_ROSTER:'roster',GITHUB_USERNAME_RAW:'users',TEAM_INTAKE_RAW:'intake',RAW_LOG:'logs'},
+    SHEET_NAMES:{TEAM_STATUS:'teams',TEAM_ROSTER:'roster',GITHUB_ACCOUNTS:'users',TEAM_INTAKE_RAW:'intake',RAW_LOG:'logs'},
     FIELD_DEFINITIONS:{TEAM_STATUS:{},TEAM_ROSTER:{}},
     getColumnMap:()=>columns,getSheetRows:name=>name==='teams'?[team]:name==='users'?usernames:[],
     getRepoUrlForTeam:()=>team[7],getOptionalHeaderIndex_:()=>7,
     normalizeEmail:norm,normalizeText_:norm,textEquals_:(a,b)=>norm(a)===norm(b),emailsMatch:(a,b)=>norm(a)===norm(b),
     Session:{getActiveUser:()=>({getEmail:()=>team[3]})},
-    LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},SpreadsheetApp:{flush(){}},
+    LockService:{getScriptLock:()=>({hasLock:()=>true,waitLock(){},releaseLock(){}})},SpreadsheetApp:{flush(){}},
     getConfig:key=>key==='GITHUB_ORG_NAME'?'org':key==='GUIDE_REPO_PERMISSION'?'push':key==='COLLABORATOR_REPO_PERMISSION'?'maintain':'',
     getCoordinatorEmail:()=> 'coord@example.com',getAcademicYear:()=> '2026-27',Logger:{log(){}},
     MailApp:{sendEmail:(...args)=>mails.push(args)},driveFileUrl:x=>x,findTeamStatusRow:()=>2,
@@ -34,18 +32,19 @@ function fixture() {
       return Date.parse(`${parts.year}-${parts.month}-${parts.day}T00:00:00Z`)/86400000;
     }
   });
-  c.weeklyStudents_=()=>[]; // pre-ID fixtures have no ID claims
   const originalSheet=c.getSheet;
-  c.getSheet=name=>name==='users'?{getLastColumn:()=>4,getLastRow:()=>usernames.length+1,getRange:(r,c,n)=>({getValues:()=>r===1?[['Timestamp','Email address','Team ID','GitHub Username']]:usernames})}:originalSheet(name);
-  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-provisioning.js','intake-approval-workflow.js','logbook-tracker.js']) vm.runInContext(releaseSource(file,1),c);
+  c.getSheet=name=>name==='users'?{getLastColumn:()=>7,getLastRow:()=>usernames.length+1,getRange:(r,c,n)=>({getValues:()=>r===1?[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL']]:usernames})}:originalSheet(name);
+  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-provisioning.js','intake-approval-workflow.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+  c.weeklyStudents_=()=>[1,2].filter(n=>team[n+2]).map(n=>({teamId:team[0],email:team[n+2],regNo:team[n+7]}));
+  c.refreshGithubAccountMetadata_=()=>{}; // Metadata persistence is exercised by account integration tests.
   c.updateTeamStatusRepoUrl_=(id,url)=>{if(failWrite)throw Error('Sheet write failed');team[7]=url;writes.push({id,url});};
   c.setReadmeHeading=()=>calls.push({method:'README'});
   c.makeGithubRequest=(method,path,payload)=>{
     calls.push({method,path,payload});
     if(outage && path.includes(outage))return {status:503};
-    if(path.startsWith('/users/')) {
-      const name=path.split('/').pop();
-      return name==='invalid'?{status:404}:{status:200,body:{login:name,type:'User'}};
+    if(path.startsWith('/user/')) {
+      const id=Number(path.split('/').pop()), name=id===101?'one':id===102?'two':'new';
+      return id===999?{status:404}:{status:200,body:{id,login:name,type:'User',name:null,html_url:'https://github.com/'+name}};
     }
     if(method==='POST'){repository=true;return {status:201,body:{html_url:'https://github.com/org/capstone-2026-27-odd-team-T1'}};}
     if(path.includes('/invitations?')) return {status:200,body:invitations};
@@ -58,10 +57,10 @@ function fixture() {
       const name=path.split('/collaborators/')[1].split('/')[0];
       if(method==='PUT') {
         if(apiFailure)return {status:apiFailure};
-        invitations.push({id:invitations.length+1,invitee:{login:name},permissions:'write'});
+        invitations.push({id:invitations.length+1,invitee:{login:name,id:name==='one'?101:name==='two'?102:103},permissions:'write'});
         return {status:201};
       }
-      return permissions.has(name)?{status:200,body:{permission:permissions.get(name)}}:{status:404};
+      return permissions.has(name)?{status:200,body:{permission:permissions.get(name),user:{id:name==='one'?101:name==='two'?102:103}}}:{status:404};
     }
     return repository?{status:200,body:{html_url:'https://github.com/org/capstone-2026-27-odd-team-T1'}}:{status:404};
   };
@@ -87,6 +86,7 @@ test('bulk readiness batches 62 teams and preserves live access decisions',()=>{
     const row=[...f.team];row[0]='T'+n;rows.push(row);repos['t'+n]='https://github.com/org/team-'+n;
     f.usernames.forEach(user=>{const copy=[...user];copy[2]=row[0];users.push(copy);});
   }
+  f.c.weeklyStudents_=()=>rows.flatMap(row=>[1,2].map(n=>({teamId:row[0],email:row[n+2],regNo:row[n+7]})));
   const read=()=>f.c.getTeamsGithubSetup_(rows,f.c.getColumnMap(),repos,users);
   const result=read();
   assert.equal(Object.keys(result).length,62);
@@ -107,9 +107,9 @@ test('an existing repository never bypasses missing, invalid or unverifiable tea
   assert.deepEqual(Array.from(f.state().outstandingMembers),['R2']);
   assert.equal(f.repair().usernamesComplete,false);
   assert.equal(f.writes.length,0);
-  f.usernames.push([new Date(),'two@example.com','T1','invalid']);
+  f.usernames.push([new Date(),'two@example.com','T1','invalid','999','','']);
   assert.equal(f.repair().ready,false);
-  f.usernames[1][3]='two';f.outage('/users/two');
+  f.usernames[1][3]='two';f.usernames[1][4]='102';f.outage('/user/102');
   assert.equal(f.repair().verificationUnavailable,true);
   assert.equal(f.calls.some(call=>['POST','PUT','PATCH'].includes(call.method)),false);
 });
@@ -120,7 +120,7 @@ test('membership comes from TeamStatus and latest matching team/email submission
   assert.equal(f.state().ready,true);
   f.team[4]='new@example.com';
   assert.equal(f.state().ready,false);
-  f.usernames.push([new Date(),'new@example.com','T1','new']);f.permissions.set('new','admin');
+  f.usernames.push([new Date(),'new@example.com','T1','new','103','','https://github.com/new']);f.permissions.set('new','admin');
   assert.equal(f.state().ready,true);
   f.usernames.push([new Date(),'new@example.com','T1','invalid']);
   assert.equal(f.state().ready,false);
@@ -141,7 +141,7 @@ test('repair reuses existing contents, preserves stronger access and accepts pen
 });
 
 test('read-only invitations are upgraded without replacing invitations; failed grants remain locked',()=>{
-  const f=fixture();f.permissions.set('two','read');f.invitations.push({id:15,invitee:{login:'two'},permissions:'read'});
+  const f=fixture();f.permissions.set('two','read');f.invitations.push({id:15,invitee:{login:'two',id:102},permissions:'read'});
   assert.equal(f.state().ready,false);
   f.apiFailure(403);assert.throws(()=>f.repair(),/Could not grant/);assert.equal(f.state().ready,false);
   f.apiFailure(0);assert.equal(f.repair().ready,true);
@@ -152,7 +152,7 @@ test('read-only invitations are upgraded without replacing invitations; failed g
 test('final valid member enables new creation; failed sheet write recovers existing repo on retry',()=>{
   const f=fixture();f.team[7]='';f.repository(false);f.usernames.pop();
   assert.equal(f.repair().ready,false);assert.equal(f.calls.some(call=>call.method==='POST'),false);
-  f.usernames.push([new Date(),'two@example.com','T1','two']);f.failWrite(true);
+  f.usernames.push([new Date(),'two@example.com','T1','two','102','','https://github.com/two']);f.failWrite(true);
   assert.throws(()=>f.repair(),/Sheet write failed/);
   f.failWrite(false);assert.equal(f.repair().ready,true);
   assert.equal(f.calls.filter(call=>call.method==='POST').length,1);
@@ -175,13 +175,13 @@ test('invitation inspection follows pagination and rejects expired invitations',
   f.c.makeGithubRequest=(method,path,payload)=>{
     if(path.includes('/invitations?')) {
       pages.push(path);
-      return {status:200,body:path.endsWith('page=1')?Array.from({length:100},(_,id)=>({id,invitee:{login:'unrelated'+id},permissions:'write'})):[{id:101,invitee:{login:'two'},permissions:'write'}]};
+      return {status:200,body:path.endsWith('page=1')?Array.from({length:100},(_,id)=>({id,invitee:{login:'unrelated'+id},permissions:'write'})):[{id:101,invitee:{login:'two',id:102},permissions:'write'}]};
     }
     return original(method,path,payload);
   };
   assert.equal(f.state().ready,true);assert.equal(pages.length,2);
   f.c.makeGithubRequest=original;
-  f.invitations.push({id:101,invitee:{login:'two'},permissions:'write',expired:true});
+  f.invitations.push({id:101,invitee:{login:'two',id:102},permissions:'write',expired:true});
   assert.equal(f.state().ready,false);
 });
 
@@ -193,7 +193,7 @@ test('timeliness uses all valid member timestamps, local deadline date, and repo
   f.usernames[1][0]=new Date('2026-09-02T19:00:00Z');assert.equal(timing(),'late');
   f.usernames[1][0]='';assert.equal(timing(),'unknown');
   f.usernames.pop();assert.equal(timing(),'overdue');
-  f.outage('/users/');assert.equal(timing(),'unknown');
+  f.outage('/user/');assert.equal(timing(),'unknown');
 });
 
 test('bookmarked title form remains guarded; weekly Form ingestion is retired',()=>{
@@ -216,12 +216,12 @@ test('ready teams retain title Form submission without weekly Form ingestion',()
 test('strict intake emails the team for each prerequisite failure without modifying records',()=>{
   const cases=[
     [f=>f.usernames.pop(),/valid GitHub usernames/],
-    [f=>{f.usernames[1][3]='invalid';},/valid GitHub usernames/],
+    [f=>{f.usernames[1][4]='999';},/could not verify/],
     [f=>{f.team[7]='';},/repository URL/],
     [f=>f.repository(false),/Repository could not be verified/],
     [f=>f.permissions.set('two','read'),/write access is missing/],
-    [f=>{f.permissions.delete('two');f.invitations.push({invitee:{login:'two'},permissions:'write'});},/invitations must be accepted/],
-    [f=>f.outage('/users/two'),/could not verify/],
+    [f=>{f.permissions.delete('two');f.invitations.push({invitee:{login:'two',id:102},permissions:'write'});},/invitations must be accepted/],
+    [f=>f.outage('/user/102'),/could not verify/],
     [f=>f.outage('/collaborators/two'),/could not be verified/],
     [f=>f.outage('/invitations'),/could not be verified/]
   ];
@@ -235,7 +235,7 @@ test('strict intake emails the team for each prerequisite failure without modify
 });
 
 test('strict intake unlocks after acceptance; outsiders cannot email the team',()=>{
-  const f=fixture();f.permissions.delete('two');f.invitations.push({invitee:{login:'two'},permissions:'write'});
+  const f=fixture();f.permissions.delete('two');f.invitations.push({invitee:{login:'two',id:102},permissions:'write'});
   assert.equal(f.state().ready,true);
   const intake={range:{getSheet:()=>({getName:()=> 'intake'})},namedValues:{'Email Address':['one@example.com'],'Team ID':['T1'],'Project Title':['New project']}};
   f.c.onTeamIntakeSubmit(intake);assert.equal(f.writes.length,0);

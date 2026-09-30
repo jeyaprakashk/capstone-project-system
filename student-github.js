@@ -23,14 +23,9 @@ function authorizeStudentGithub_() {
   return { email, teamId: row[columns.TEAM_ID], row };
 }
 
-/** Old RPC cannot bypass account preview/confirmation after cutover. */
-function submitStudentGithubUsername() {
-  throw new Error('Open Connect GitHub Account and confirm the resolved profile before saving.');
-}
-
 function previewStudentGithubAccount(profileUrl) {
   const student = authorizeStudentGithub_();
-  githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), true);
+  githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_ACCOUNTS));
   const username = githubProfileUsername_(profileUrl);
   const account = githubAccountResponse_(makeGithubRequest('GET','/users/' + encodeURIComponent(username)));
   const token = Utilities.getUuid();
@@ -50,7 +45,7 @@ function confirmStudentGithubAccount(token) {
     if (preview.expires < Date.now() || preview.email !== normalizeEmail(student.email) || !textEquals_(preview.teamId,student.teamId)) throw new Error('Account confirmation expired or belongs to another student.');
     const current = authorizeStudentGithub_();
     if (!emailsMatch(current.email,student.email) || !textEquals_(current.teamId,student.teamId)) throw new Error('Student membership changed. Reload the dashboard.');
-    const sheet = getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), columns = githubAccountColumns_(sheet,true);
+    const sheet = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS), columns = githubAccountColumns_(sheet);
     const rows = readSheetRows_(sheet,2), students = weeklyStudents_();
     const owners = students.filter(s=>emailsMatch(s.email,student.email) && textEquals_(s.teamId,student.teamId));
     if (owners.length !== 1) throw new Error('Student membership is ambiguous.');
@@ -64,8 +59,8 @@ function confirmStudentGithubAccount(token) {
       return matches.length !== 1 || !textEquals_(matches[0].regNo,owners[0].regNo);
     });
     if (duplicate) throw new Error('This GitHub account is assigned to another student. Contact the coordinator.');
-    // A legacy registration must be migrated, not silently relinked by a student.
-    if (mine.some(item=>item.row[3] && !githubId_(item.row[columns.ID]))) throw new Error('Migration required for your existing registration. Contact the coordinator.');
+    // Damaged existing account records require coordinator intervention, not student relinking.
+    if (mine.some(item=>item.row[3] && !githubId_(item.row[columns.ID]))) throw new Error('Your existing registration has no valid GitHub ID. Contact the coordinator.');
     if (mine.length > 1) throw new Error('Conflicting registration rows. Contact the coordinator.');
     let rowNumber = mine.length ? mine[0].index : sheet.getLastRow()+1;
     if (!mine.length) sheet.getRange(rowNumber,1,1,3).setValues([[new Date(),student.email,student.teamId]]);

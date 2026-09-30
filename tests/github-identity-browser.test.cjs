@@ -14,12 +14,24 @@ function fixture() {
     dashboardRun:()=>{const req={};const runner=new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>{req.success=fn;return runner;}:key==='withFailureHandler'?fn=>{req.failure=fn;return runner;}:(...args)=>{req.method=key;req.args=args;requests.push(req);}});return runner;}
   });
   vm.runInContext(source.slice(source.indexOf('  function byId('),source.indexOf('  // Session-only diagnostics:')),context);
-  const start=source.indexOf('  function previewGithubAccount(');
+  const start=source.indexOf('  function focusGithubAccountForm(');
   vm.runInContext(source.slice(start,source.indexOf('\n  return {',start)),context);
   const preview=()=>context.previewGithubAccount({preventDefault(){}},form);
   const reply=()=>requests.at(-1).success({token:'test-token',account:{githubId:'101',username:'canonical',displayName:'<Student>',profileUrl:'https://github.com/canonical',avatarUrl:'https://avatars.githubusercontent.com/u/101'}});
   return {document,form,input,requests,refreshes,preview,reply,context,panel:form.querySelector('[data-github-confirmation]')};
 }
+
+test('form jump scrolls and focuses inside the current card without navigation or RPC',()=>{
+  const f=fixture(),calls=[];
+  f.document.body.className='step-card';f.input.id='studentGithubProfile';
+  f.input.scrollIntoView=options=>calls.push(['scroll',options.block,options.behavior]);
+  f.input.focus=options=>calls.push(['focus',options.preventScroll]);
+  f.context.focusGithubAccountForm(f.form.querySelector('button'));
+  assert.deepEqual(calls,[['scroll','center','auto'],['focus',true]]);
+  assert.equal(f.requests.length,0);
+  f.input.disabled=true;f.context.focusGithubAccountForm(f.form.querySelector('button'));assert.equal(calls.length,2);
+  f.input.remove();assert.doesNotThrow(()=>f.context.focusGithubAccountForm(f.form.querySelector('button')));
+});
 
 test('profile lookup previews safely, prevents duplicate requests, and never saves before confirmation',()=>{
   const f=fixture();f.preview();f.preview();assert.equal(f.requests.length,1);assert.equal(f.panel.getAttribute('aria-busy'),'true');

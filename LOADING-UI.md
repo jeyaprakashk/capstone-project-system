@@ -11,8 +11,20 @@ Render `getSkeletonMarkup_(variant, label)` on the server, or
 `DashboardUI.renderSkeleton(variant, label)` in browser modules. Use `panel` for
 content, `drawer` for drawers, `inline` for small values/buttons/status checks,
 and `timeline` for the shared timeline. Retry states must show a skeleton again.
+Use `status` for a compact, left-aligned two-line readiness section. For its
+refresh, pass `{compact:true, variant:'status'}` to `beginContentLoading` to
+avoid retaining empty space from setup actions.
 
 ## Refreshing existing content
+
+For tabs with a refresh action, render the header with
+`buildTabHeader_(title, key, action, updated)`; role dashboards use
+`buildDashboardContainerHeader_(title, key)`. The shared `tab-header` and
+`tab-refresh-btn` styles provide the heading, timestamp beneath it, text Refresh
+button on the same row, and bottom divider. Keep button text, size, colors, and
+spacing in these common styles rather than adding tab-specific overrides. Pass
+the tab's own refresh action and update its timestamp only after a successful read.
+Refresh buttons use `app-btn btn-sm btn-secondary` from [BUTTON-UI.md](BUTTON-UI.md).
 
 Use `DashboardUI.beginContentLoading(element, label)`. It covers the existing DOM
 with the shared skeleton, retains the content's height and event handlers, sets

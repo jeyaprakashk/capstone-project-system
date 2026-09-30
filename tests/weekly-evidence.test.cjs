@@ -6,7 +6,7 @@ function fixture() {
  const f=weeklyFixture(), student={regNo:'001',teamId:'T1',email:'one@example.com'};
  const setup={ready:true,repoUrl:'https://github.com/org/team',members:[{email:student.email,label:'001',username:'Alice',githubId:'101',status:'valid'}]};
  f.c.getTeamGithubSetup_=()=>setup;
- f.properties.set(f.c.commitCollectionKey_('T1'),'ok');
+ f.collectionStatus('ok');
  const sheet=f.sheet('Commits',[['Date','Team ID','Commit Message','GitHub Username','Repository URL','Commit SHA','GitHub Author ID']]);
  let seq=0;
  function commit(date,extra={}) {
@@ -18,9 +18,19 @@ function fixture() {
 
 test('evidence uses inclusive configured normal boundaries, offsets and not late cutoff',()=>{
  const f=fixture();
- for(const date of ['2025-12-31T23:59:59.999Z','2026-01-01T05:30:00+05:30','2026-01-07T23:59:59Z','2026-01-07T23:59:59.001Z','2026-01-08T00:00:00Z','2026-01-14T23:59:59Z']) f.commit(date);
+ for(const date of ['2025-12-31T23:59:59.999Z','2026-01-01T05:30:00+05:30','2026-01-05T18:00:00Z','2026-01-05T18:00:00.001Z','2026-01-08T00:00:00Z','2026-01-12T18:00:00Z','2026-01-12T18:00:00.001Z','2026-01-14T23:59:59Z']) f.commit(date);
  assert.equal(f.read().count,2);assert.equal(f.read('W2').count,2);
  assert.throws(()=>f.read('unconfigured'),/Unknown/);
+});
+
+test('a late report does not include late-period commits or inherit their attribution errors',()=>{
+ const f=fixture();f.set('Progress Eligible From Week ID','W1');
+ f.commit('2026-01-05T18:00:00Z');
+ f.commit('2026-01-05T18:00:00.001Z',{authorId:'invalid'});
+ f.commit('2026-01-08T10:00:00Z');
+ f.time('2026-01-08T12:00:00Z');f.c.submitWeeklyProgress(f.input());
+ const result=f.read();assert.equal(result.log.timeliness,'LATE');assert.equal(result.state,'available');assert.equal(result.count,1);
+ assert.equal(result.commits[0].timestamp,'2026-01-05T18:00:00.000Z');
 });
 
 test('evidence requires team, verified roster mapping, repository and GitHub ID; unknown rows preserved',()=>{
@@ -42,9 +52,10 @@ test('students on the same team only receive their own GitHub commit details',()
 });
 
 test('shared reader returns effective log and safe commit details; scopes reads by Team ID once across weeks',()=>{
- const f=fixture();f.c.submitWeeklyProgress(f.input());f.c.submitWeeklyProgress(f.input({workCompleted:'Revised work'}));
+ const f=fixture();
  const row=f.commit('2026-01-02T00:00:00Z',{message:'<img src=x onerror=bad()>',sha:'A'.repeat(40)});
  f.commit('2026-01-02T00:00:00Z',{sha:row.sha});
+ f.c.submitWeeklyProgress(f.input());f.c.submitWeeklyProgress(f.input({workCompleted:'Revised work'}));
  const result=f.read();assert.equal(result.log.workCompleted,'Revised work');assert.equal(result.count,1);
  assert.deepEqual(JSON.parse(JSON.stringify(result.commits[0])),{timestamp:'2026-01-02T00:00:00.000Z',message:row.message,sha:'a'.repeat(40),shortSha:'aaaaaaa',url:f.setup.repoUrl+'/commit/'+'a'.repeat(40)});
  const read=f.c.readCollectedCommits_;let calls=0;f.c.readCollectedCommits_=team=>{assert.equal(team,'T1');calls++;return read(team);};
@@ -54,8 +65,8 @@ test('shared reader returns effective log and safe commit details; scopes reads 
 
 test('no commits, unavailable collection, failed reads and unmapped states remain distinct',()=>{
  const f=fixture();assert.equal(f.read().state,'available');assert.equal(f.read().count,0);
- for(const health of ['error','']) {f.properties.set(f.c.commitCollectionKey_('T1'),health);assert.equal(f.read().state,'unavailable');assert.equal(f.read().count,null);}
- f.properties.set(f.c.commitCollectionKey_('T1'),'ok');f.commitSheet.rows[0][0]='Broken';assert.equal(f.read().state,'unavailable');
+ for(const health of ['error','']) {f.collectionStatus(health);assert.equal(f.read().state,'unavailable');assert.equal(f.read().count,null);}
+ f.collectionStatus('ok');f.commitSheet.rows[0][0]='Broken';assert.equal(f.read().state,'unavailable');
  for(const status of ['missing','invalid','unavailable']) {f.setup.members[0].status=status;assert.equal(f.read().state,'unavailable');assert.equal(f.read().count,null);}
  f.setup.members[0].status='valid';f.setup.members.push({email:'two@example.com',label:'002',username:'ALICE',githubId:'101',status:'valid'});assert.equal(f.read().state,'unavailable');
 });

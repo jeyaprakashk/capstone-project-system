@@ -2,6 +2,40 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
+test('shared sorting handles natural IDs, numeric pairs, missing data and accessible toggles',()=>{
+ const {document}=require('linkedom').parseHTML('<table><thead><tr><th data-sort-type="text">Team</th><th data-sort-type="pair">Activity</th><th>Actions</th></tr></thead><tbody>'+[['T10','2/10'],['T2','2/9'],['T1','10/1'],['T3','—']].map(([id,v])=>'<tr><td>'+id+'</td><td>'+v+'</td><td>View</td></tr>').join('')+'</tbody></table>');
+ const c=vm.createContext({document,Intl});
+ const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
+ vm.runInContext(source.slice(source.indexOf('  function sortTableRows('),source.indexOf('  const trackerSort')),c);
+ const table=document.querySelector('table'), state={};
+ c.initializeTableSorting(table,{state});
+ const buttons=table.querySelectorAll('button'), ids=()=>Array.from(table.querySelectorAll('tbody tr')).map(r=>r.firstElementChild.textContent);
+ assert.equal(buttons.length,2);
+ buttons[0].onclick();assert.deepEqual(ids(),['T1','T2','T3','T10']);
+ assert.equal(table.querySelector('th').getAttribute('aria-sort'),'ascending');
+ buttons[0].onclick();assert.deepEqual(ids(),['T10','T3','T2','T1']);
+ buttons[1].onclick();assert.deepEqual(ids(),['T2','T10','T1','T3']);
+ buttons[1].onclick();assert.deepEqual(ids(),['T1','T10','T2','T3']);
+ assert.equal(table.querySelector('th').getAttribute('aria-sort'),'none');
+ assert.match(buttons[1].getAttribute('aria-label'),/ascending/);
+ const replacement=table.cloneNode(true);c.initializeTableSorting(replacement,{state});
+ assert.equal(replacement.querySelectorAll('th')[1].getAttribute('aria-sort'),'descending');
+});
+
+test('tracker sorts detached pages and retains sorting through searches',()=>{
+ const {document}=require('linkedom').parseHTML('<input id="trackerSearch"><table><thead><tr><th data-sort-type="text">Team</th></tr></thead><tbody id="trackerBody">'+Array.from({length:12},(_,i)=>'<tr data-search="team '+(12-i)+'" data-health="ontrack"><td>T'+(12-i)+'</td></tr>').join('')+'</tbody></table>');
+ const c=vm.createContext({document,Intl,byId:id=>document.getElementById(id),renderLucideIcon_:()=>''});
+ const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
+ vm.runInContext(source.slice(source.indexOf('  function sortTableRows('),source.indexOf('  function filterTeamTracker(')),c);
+ c.applyCoordinatorFilters(true);
+ const ids=()=>Array.from(document.querySelectorAll('tbody tr')).map(r=>r.textContent);
+ assert.equal(ids().length,10);
+ document.querySelector('button').onclick();assert.equal(ids()[0],'T1');assert.equal(ids()[9],'T10');
+ vm.runInContext('trackerPagination.page=2; applyCoordinatorFilters(false)',c);assert.deepEqual(ids(),['T11','T12']);
+ document.getElementById('trackerSearch').value='team 1';c.applyCoordinatorFilters(true);assert.deepEqual(ids(),['T1','T10','T11','T12']);
+ document.getElementById('trackerSearch').value='';c.applyCoordinatorFilters(true);assert.equal(ids()[0],'T1');
+ document.querySelector('button').onclick();assert.equal(ids()[0],'T12');
+});
 function dialogFixture(deferDestroy=false) {
  const nodes=[],scripts=[],calls=[];let focused=0;
  const node=()=>({style:{},children:[],setAttribute(){},addEventListener(){},appendChild(child){this.children.push(child);},showModal(){this.open=true;},close(){this.open=false;},remove(){this.removed=true;},focus(){focused++;}});
@@ -175,7 +209,7 @@ test('student rubric tab reuses shared content and switching back restores My Te
 test('shell selects the common theme before scripts or fonts load',()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})}});
  for(const file of ['common-styles.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- for(const name of ['getInternalAssessmentPublishingClientScript_','getDashboardClientScript','getGuideEvaluationClientScript','getReviewEvaluationClientScript_']) c[name]=()=>'';
+ for(const name of ['getInternalAssessmentPublishingClientScript_','getDashboardClientScript','getGuideEvaluationClientScript','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_']) c[name]=()=>'';
  for(const key of ['student','guide','reviewer','coord']) {
   const html=c.buildDashboardShell('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
   assert.match(html,/<body data-dashboard-theme="editorial">/);
@@ -259,7 +293,7 @@ test('rubrics start alongside pending role and timeline, deduplicate and survive
  const mobileRows=[...f.nodes.sharedRubricsContent.innerHTML.matchAll(/<div class="rubric-mobile-row">([\s\S]*?)<\/button><\/div>/g)];
  assert.equal(mobileRows.length,2);
  assert.match(mobileRows[0][1],/<strong>Review 1<\/strong><span class="rubric-mobile-weight"/);
- assert.match(mobileRows[0][1],/<button type="button" class="rubric-view-button" data-rubric-key="review1"/);
+ assert.match(mobileRows[0][1],/<button type="button" class="rubric-view-button[^"]*" data-rubric-key="review1"/);
  assert.equal((mobileRows[0][1].match(/data-rubric-key=/g)||[]).length,1,'only the action button opens the mobile rubric');
  assert.match(mobileRows[1][1],/Rubric not configured/);
  assert.match(mobileRows[1][1],/ disabled>View rubric/);

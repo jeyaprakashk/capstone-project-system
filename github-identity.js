@@ -5,30 +5,28 @@ function githubId_(value) {
   return /^[1-9][0-9]*$/.test(text) ? text : '';
 }
 
-function githubIdentityRequiresSchema_() { return true; }
-
-/** Legacy base headers retain their positions and spelling; normalize only case and outer whitespace. */
+/** Existing base headers retain their positions and spelling; normalize only case and outer whitespace. */
 function githubBaseHeaderEquals_(actual, expected) {
   return typeof actual === 'string' && actual.trim().toLowerCase() === expected.trim().toLowerCase();
 }
 
-function githubAccountColumns_(sheet, required) {
-  if (!sheet) throw new Error('Migration required: GithubUsernameRaw is missing.');
+function githubAccountColumns_(sheet) {
+  if (!sheet) throw new Error('GitHub setup unavailable: GitHubAccounts is missing.');
   const headers = readSheetRows_(sheet, 1, 1)[0] || [];
   const base = ['Timestamp','Email address','Team ID','GitHub Username'];
-  if (base.some((name,i)=>!githubBaseHeaderEquals_(headers[i],name))) throw new Error('GithubUsernameRaw header mismatch. Preserve existing columns.');
+  if (base.some((name,i)=>!githubBaseHeaderEquals_(headers[i],name))) throw new Error('GitHubAccounts header mismatch. Preserve existing columns.');
   const result = {ID:-1,NAME:-1,URL:-1};
   [['ID','GitHub ID'],['NAME','GitHub Display Name'],['URL','GitHub Profile URL']].forEach(([key,name])=>{
     const indexes = headers.flatMap((header,i)=>String(header).trim().toLowerCase() === name.toLowerCase() ? [i] : []);
     if (indexes.length > 1) throw new Error('Duplicate header: ' + name);
     result[key] = indexes.length ? indexes[0] : -1;
   });
-  if (required && Object.values(result).some(i=>i < 0)) throw new Error('Migration required: prepare GitHub identity storage.');
+  if (Object.values(result).some(i=>i < 0)) throw new Error('GitHub setup unavailable: required account columns are missing.');
   return result;
 }
 
 function githubCaptureReady_() {
-  try { githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), true); return true; }
+  try { githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_ACCOUNTS)); return true; }
   catch (error) { return false; }
 }
 
@@ -54,7 +52,7 @@ function githubAccountResponse_(response, expectedId) {
 
 function resolveGithubAccountId_(id, request, cache) {
   id = githubId_(id);
-  if (!id) throw new Error('Migration required: a valid GitHub ID is missing.');
+  if (!id) throw new Error('GitHub setup unavailable: a valid GitHub ID is missing.');
   cache = cache || new Map();
   if (!cache.has(id)) {
     try { cache.set(id, githubAccountResponse_((request || makeGithubRequest)('GET','/user/' + id), id)); }
@@ -88,7 +86,7 @@ function writeGithubAccount_(sheet, rowNumber, columns, account) {
 function refreshGithubAccountMetadata_(submission, account) {
   if (!submission || !account.githubId) return;
   githubIdentityLock_(()=>{
-    const sheet = getSheet(SHEET_NAMES.GITHUB_USERNAME_RAW), columns = githubAccountColumns_(sheet, true);
+    const sheet = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS), columns = githubAccountColumns_(sheet);
     readSheetRows_(sheet,2).forEach((row,index)=>{
       if (emailsMatch(row[1],submission[1]) && textEquals_(row[2],submission[2]) && githubId_(row[columns.ID]) === account.githubId) {
         if (row[3] !== account.username) sheet.getRange(index+2,4).setValue(githubLiteral_(account.username));
@@ -106,7 +104,7 @@ function githubStudentIdentity_(student, rows, columns, students) {
   if (academic.length !== 1) return {state:'unavailable',reason:'Student membership is ambiguous.'};
   const mine = rows.filter(r=>emailsMatch(r[1],student.email) && textEquals_(r[2],student.teamId));
   const ids = [...new Set(mine.map(r=>githubId_(r[columns.ID])).filter(Boolean))];
-  if (ids.length !== 1 || mine.some(r=>r[columns.ID] !== '' && r[columns.ID] != null && !githubId_(r[columns.ID]))) return {state:'unavailable',reason:'Migration required: GitHub identity is missing or conflicting.'};
+  if (ids.length !== 1 || mine.some(r=>r[columns.ID] !== '' && r[columns.ID] != null && !githubId_(r[columns.ID]))) return {state:'unavailable',reason:'GitHub setup unavailable: GitHub identity is missing or conflicting.'};
   const id = ids[0];
   const conflict = rows.some(r=>{
     if (githubId_(r[columns.ID]) !== id) return false;

@@ -457,10 +457,10 @@ function buildNeedsAttentionTable(teams) {
   const rows = teams.slice(0, 11).map((t, idx) => {
     const sev = t.severity === 'high' ? 'high' : t.severity === 'medium' ? 'medium' : 'low';
     const ts = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    return `<tr><td class="col-index">${idx + 1}</td><td class="col-severity"><span class="severity-badge ${sev}">${sev.toUpperCase()}</span></td><td class="col-team">${escapeHtml(t.row[ts.TEAM_ID])}</td><td class="col-issue">${escapeHtml(t.issue)}</td><td class="col-since">${t.daysOverdue} days</td><td class="col-guide">${escapeHtml(t.row[ts.GUIDE_NAME])}</td><td class="col-action"><button type="button" class="link-button action-link" onclick="focusCoordinatorTeam('${escapeHtml(String(t.row[ts.TEAM_ID]))}')">View</button></td></tr>`;
+    return `<tr><td class="col-index">${idx + 1}</td><td class="col-severity"><span class="severity-badge ${sev}">${sev.toUpperCase()}</span></td><td class="col-team">${escapeHtml(t.row[ts.TEAM_ID])}</td><td class="col-issue">${escapeHtml(t.issue)}</td><td class="col-since">${t.daysOverdue} days</td><td class="col-guide">${escapeHtml(t.row[ts.GUIDE_NAME])}</td><td class="col-action"><button type="button" class="link-button action-link app-btn btn-sm btn-secondary" onclick="focusCoordinatorTeam('${escapeHtml(String(t.row[ts.TEAM_ID]))}')">View</button></td></tr>`;
   }).join('');
 
-  return `<div class="needs-attention"><div class="table-title">Needs Attention (${teams.length} teams) <button type="button" class="link-button view-all" onclick="showAllCoordinatorTeams()">View all ${renderLucideIcon_('arrow-right')}</button></div><div class="tracker-table-scroll" role="region" aria-label="Teams needing attention, scroll horizontally for more columns" tabindex="0"><table class="attention-table"><thead><tr><th>#</th><th>Severity</th><th>Team</th><th>Issue</th><th>Overdue</th><th>Guide</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  return `<div class="needs-attention"><div class="table-title">Needs Attention (${teams.length} teams) <button type="button" class="link-button view-all app-btn btn-sm btn-secondary" onclick="showAllCoordinatorTeams()">View all ${renderLucideIcon_('arrow-right')}</button></div><div class="tracker-table-scroll" role="region" aria-label="Teams needing attention, scroll horizontally for more columns" tabindex="0"><table class="attention-table"><thead><tr><th>#</th><th>Severity</th><th>Team</th><th>Issue</th><th>Overdue</th><th>Guide</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 
 function buildAssessmentProgress(assessmentProgress) {
@@ -490,7 +490,7 @@ function buildGithubAccessSection(githubAccess) {
           Configured
         </span></div>
       <button
-        class="run-sync-btn"
+        class="run-sync-btn app-btn btn-md btn-primary"
         onclick="runGithubSync()">
         Run Sync
       </button>
@@ -530,9 +530,9 @@ function buildCoordinatorTeamActions_(team) {
   const label = escapeHtml(String(team.teamId));
   const recipients = team.emailRecipients || [];
   const email = recipients.length
-    ? `<a class="team-action-icon" href="${escapeHtml('mailto:' + recipients.map(encodeURIComponent).join(',') + '?subject=' + encodeURIComponent('Capstone — Team ' + team.teamId))}" aria-label="Email guide and members of team ${label}" title="Email guide and team members">${mail}</a>`
-    : `<button type="button" class="team-action-icon" disabled aria-label="No email addresses available for team ${label}" title="No email addresses available">${mail}</button>`;
-  return `<div class="team-action-controls"><button type="button" class="team-action-icon" onclick="focusCoordinatorTeam(this.closest('tr').getAttribute('data-team-id'))" aria-label="View team ${label}" title="View team details">${eye}</button>${email}</div>`;
+    ? `<a class="team-action-icon app-btn btn-sm btn-secondary btn-icon" href="${escapeHtml('mailto:' + recipients.map(encodeURIComponent).join(',') + '?subject=' + encodeURIComponent('Capstone — Team ' + team.teamId))}" aria-label="Email guide and members of team ${label}" title="Email guide and team members">${mail}</a>`
+    : `<button type="button" class="team-action-icon app-btn btn-sm btn-secondary btn-icon" disabled aria-label="No email addresses available for team ${label}" title="No email addresses available">${mail}</button>`;
+  return `<div class="team-action-controls"><button type="button" class="team-action-icon app-btn btn-sm btn-secondary btn-icon" onclick="focusCoordinatorTeam(this.closest('tr').getAttribute('data-team-id'))" aria-label="View team ${label}" title="View team details">${eye}</button>${email}</div>`;
 }
 
 function buildCompletionIndicator_(status) {
@@ -549,14 +549,14 @@ function buildTeamTrackerTable(teamData, deadlinePills) {
   const attentionCount = teamData.filter(t => t.health === 'attention').length;
   const onTrackCount = teamData.filter(t => t.health === 'ontrack').length;
   const rows = teamData.map(t => {
-    const titleBadge = t.titleStatus === 'APPROVED' ? `<span class="status-badge green">${renderLucideIcon_('check', 'Title approved')}</span>` : t.titleStatus === 'NEEDS_REVIEW' ? `<span class="status-badge orange">${renderLucideIcon_('clock', 'Title needs review')}</span>` : t.titleStatus === 'REJECTED_BY_GUIDE' ? `<span class="status-badge red">${renderLucideIcon_('x', 'Title rejected by guide')}</span>` : `<span class="status-badge gray">${renderLucideIcon_('clock', 'Title pending')}</span>`;
+    const titleBadge = t.titleStatus === 'APPROVED' ? `<span class="tracker-health green">${renderLucideIcon_('check', 'Title approved')}</span>` : t.titleStatus === 'NEEDS_REVIEW' ? `<span class="tracker-health orange">${renderLucideIcon_('clock', 'Title needs review')}</span>` : t.titleStatus === 'REJECTED_BY_GUIDE' ? `<span class="tracker-health red">${renderLucideIcon_('x', 'Title rejected by guide')}</span>` : `<span class="tracker-health gray">${renderLucideIcon_('clock', 'Title pending')}</span>`;
     const repoLabel = escapeHtml([t.repoStatus === 'ready' ? 'Repository URL recorded' : 'Pending', t.githubMessage, t.githubTiming, t.repoUrl ? 'Repository available' : ''].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join(' ? '));
-    const repoBadge = t.repoStatus === 'loading' ? getSkeletonMarkup_('inline', 'Checking GitHub setup') : `<span class="status-badge ${t.repoStatus === 'ready' ? 'green' : 'red'}" tabindex="0" role="img" aria-label="${repoLabel}" title="${repoLabel}">${renderLucideIcon_(t.repoStatus === 'ready' ? 'check' : 'x')}</span>`;
+    const repoBadge = t.repoStatus === 'loading' ? getSkeletonMarkup_('inline', 'Checking GitHub setup') : `<span class="tracker-health ${t.repoStatus === 'ready' ? 'green' : 'red'}" tabindex="0" role="img" aria-label="${repoLabel}" title="${repoLabel}">${renderLucideIcon_(t.repoStatus === 'ready' ? 'check' : 'x')}</span>`;
     const health = t.health === 'ontrack' ? {color:'green', label:'On track', icon:'check'} : t.health === 'monitor' ? {color:'orange', label:'Monitor', icon:'clock'} : {color:'red', label:'Needs attention', icon:'triangle-alert'};
     const healthBadge = t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading health') : `<span class="tracker-health ${health.color}" tabindex="0" role="img" aria-label="${health.label}" title="${health.label}">${renderLucideIcon_(health.icon)}</span>`;
     const registers = t.registerNumbers || [];
 
-    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td class="col-team"><strong>${escapeHtml(t.teamId)}</strong><div class="tracker-registers">${registers.length ? registers.map(value => escapeHtml(value)).join(', ') : '—'}</div></td><td class="col-guide">${escapeHtml(t.guide)}</td><td class="col-repo">${repoBadge}</td><td class="col-status">${titleBadge}</td><td class="col-activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation">${buildCompletionIndicator_(t.guideEvaluation)}</td><td class="col-health">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
+    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td class="col-team" data-sort-value="${escapeHtml(String(t.teamId))}"><strong>${escapeHtml(t.teamId)}</strong><div class="tracker-registers">${registers.length ? registers.map(value => escapeHtml(value)).join(', ') : '—'}</div></td><td class="col-guide">${escapeHtml(t.guide)}</td><td class="col-repo" data-sort-value="${escapeHtml(String(t.repoStatus || 'Unavailable'))}">${repoBadge}</td><td class="col-status" data-sort-value="${escapeHtml(String(t.titleStatus || 'Unavailable'))}">${titleBadge}</td><td class="col-activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review" data-sort-value="${escapeHtml(String(t.health === 'loading' ? 'loading' : t.reviews[review.key] || 'Unavailable'))}">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation" data-sort-value="${escapeHtml(String(t.guideEvaluation || 'Unavailable'))}">${buildCompletionIndicator_(t.guideEvaluation)}</td><td class="col-health" data-sort-value="${escapeHtml(String(t.health || 'Unavailable'))}">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
   }).join('');
 
   return `<div class="team-tracker-section"><div class="tracker-header"><h3 class="assessment-title tracker-title">Team Tracker (${teamData.length} teams)</h3></div>
@@ -566,9 +566,9 @@ function buildTeamTrackerTable(teamData, deadlinePills) {
       <button class="tab" data-filter="ontrack" ${teamData.some(t => t.health === "loading") ? "disabled" : ""} onclick="filterTeamTracker(this, 'ontrack')">On Track (${teamData.some(t => t.health === 'loading') ? getSkeletonMarkup_('inline', 'Loading on-track count') : onTrackCount})</button>
       ${deadlinePills.map(pill => `<button class="tab deadline-pill${pill.overdue ? ' deadline-overdue' : ''}" data-filter="deadline:${escapeHtml(pill.key)}" title="Due ${escapeHtml(formatProjectDay_(pill.due))}" onclick="filterTeamTracker(this, this.getAttribute('data-filter'))">${escapeHtml(pill.label)} (${pill.count})</button>`).join('')}
     </div>
-    <button type="button" id="weeklyActivityRetry" onclick="loadCoordinatorWeeklyActivity()" hidden>Retry activity</button>
-    <div class="tracker-search"><input type="text" id="trackerSearch" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" oninput="filterTrackerSearch()"><button class="reset-btn" onclick="resetTrackerFilters()">Reset</button></div>
-    <div class="tracker-table-scroll" role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="team-tracker-table"><thead><tr><th>Team</th><th>Guide</th><th>Repo</th><th>Title</th><th>Weekly Activity</th>${configuredReviews.map(review => `<th class="col-review" title="${escapeHtml(review.label)}">${escapeHtml(review.label.replace(/^Review\s+(\d+)$/i, 'R$1'))}</th>`).join('')}<th>Guide Eval</th><th>Health</th><th>Actions</th></tr></thead><tbody id="trackerBody">${rows}</tbody></table></div>
+    <button class="app-btn btn-md btn-secondary" type="button" id="weeklyActivityRetry" onclick="loadCoordinatorWeeklyActivity()" hidden>Retry activity</button>
+    <div class="tracker-search"><input type="text" id="trackerSearch" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" oninput="filterTrackerSearch()"><button class="reset-btn app-btn btn-md btn-secondary" onclick="resetTrackerFilters()">Reset</button></div>
+    <div class="tracker-table-scroll" role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="team-tracker-table"><thead><tr><th data-sort-type="text">Team</th><th data-sort-type="text">Guide</th><th data-sort-type="text">Repo</th><th data-sort-type="text">Title</th><th data-sort-type="pair" title="Sort by logs, then commit records">Weekly Activity</th>${configuredReviews.map(review => `<th data-sort-type="text" class="col-review" title="${escapeHtml(review.label)}">${escapeHtml(review.label.replace(/^Review\s+(\d+)$/i, 'R$1'))}</th>`).join('')}<th data-sort-type="text">Guide Eval</th><th data-sort-type="text">Health</th><th>Actions</th></tr></thead><tbody id="trackerBody">${rows}</tbody></table></div>
     ${buildTeamPagination_('tracker', 'coord', teamData.length)}
   </div>`;
 }
@@ -586,7 +586,7 @@ function buildCommitteeDirectory_(committees) {
 
 function buildCommitteeReadinessCard_() {
   return `<section id="committeeConfigurationCard" class="assessment-section system-status-card review-config-card configuration-card" aria-labelledby="committeeConfigurationHeading" aria-busy="true">
-    <div class="review-config-heading system-card-header"><div class="system-card-heading"><h3 class="system-card-title" id="committeeConfigurationHeading">Review Committees</h3><span id="committeeConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline','Checking review committees')}</span></div><button id="committeeConfigurationRecheck" type="button" onclick="DashboardUI.recheckCommitteeConfiguration()">Recheck</button></div>
+    <div class="review-config-heading system-card-header"><div class="system-card-heading"><h3 class="system-card-title" id="committeeConfigurationHeading">Review Committees</h3><span id="committeeConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline','Checking review committees')}</span></div><button class="app-btn btn-sm btn-secondary" id="committeeConfigurationRecheck" type="button" onclick="DashboardUI.recheckCommitteeConfiguration()">Recheck</button></div>
     <ul id="committeeConfigurationIssues" hidden></ul>
     <p>Select a committee to see reviewers and assigned teams.</p>
     <div id="committeeDirectoryContent"></div>
@@ -618,18 +618,23 @@ function getCoordinatorCommitteeConfiguration() {
 
 function buildReviewConfigurationCard_() {
   return `<section id="reviewConfigurationCard" class="assessment-section system-status-card review-config-card configuration-card assessment-setup" aria-labelledby="reviewConfigurationHeading" aria-busy="true">
-    <div class="review-config-heading system-card-header"><div class="system-card-heading"><h3 class="system-card-title" id="reviewConfigurationHeading">Assessment readiness</h3><span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span></div><button id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
+    <div class="review-config-heading system-card-header"><div class="system-card-heading"><h3 class="system-card-title" id="reviewConfigurationHeading">Assessment readiness</h3><span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span></div><button class="app-btn btn-sm btn-secondary" id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
     <ul id="reviewConfigurationIssues" hidden></ul>
-    <button type="button" id="createAssessmentDefinitionsButton" hidden disabled onclick="DashboardUI.bootstrapAssessmentDefinitions()">Create assessment definitions tab</button>
+    <button class="app-btn btn-md btn-secondary" type="button" id="createAssessmentDefinitionsButton" hidden disabled onclick="DashboardUI.bootstrapAssessmentDefinitions()">Create assessment definitions tab</button>
     <p>First create the definitions schema, then use Assessment definitions to enter the academic configuration. Setup never supplies assessment instances or policy choices.</p>
     <ul id="reviewAssessmentReadiness" class="review-assessment-readiness" aria-label="Readiness by assessment"></ul>
     <p class="review-readiness-note">Storage readiness is separate from team entry availability, which also checks reviewer assignment, opening dates and prerequisites.</p>
     <div id="assessmentStorageSetup">
     <div class="assessment-storage-controls">
       <p>Prepare configured assessment journals. Existing assessment data stays unchanged.</p>
-      <button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="run-sync-btn" onclick="initializeAssessmentStorage()">Create missing assessment storage</button>
+      <button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="run-sync-btn app-btn btn-md btn-primary" onclick="initializeAssessmentStorage()">Create missing assessment storage</button>
     </div>
     <p id="assessmentStorageStatus" role="status" aria-live="polite"></p><ul id="assessmentStorageResults"></ul>
+    </div>
+    <div id="weeklyPhase2Setup">
+      <h4>Weekly progress setup</h4>
+      <div data-weekly-setup-read>${getSkeletonMarkup_('status','Checking weekly progress setup')}</div>
+      <p data-weekly-setup-status role="status" aria-live="polite"></p>
     </div>
     <div class="review-config-footer"><a id="reviewDefinitionsLink" hidden target="_blank" rel="noopener">Assessment definitions ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><a id="reviewConfigLink" hidden target="_blank" rel="noopener">Milestones ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><a id="reviewRubricsLink" hidden target="_blank" rel="noopener">Rubric criteria ${renderLucideIcon_('external-link', '', 'icon-trailing')}</a><span id="reviewConfigurationCheckedAt"></span></div>
   </section>`;
@@ -675,7 +680,7 @@ function buildCoordinatorDrawer_() {
 
         <button
           type="button"
-          class="team-drawer-close"
+          class="team-drawer-close app-btn btn-sm btn-secondary btn-icon"
           onclick="closeCoordinatorTeamDrawer()"
           aria-label="Close">
           ${renderLucideIcon_('x')}
@@ -799,6 +804,10 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .assessment-setup-intro { margin:0 0 16px; color:#64748b; font-size:13px; line-height:1.5; }
 .system-status-primary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:stretch; margin-bottom:16px; }
 .system-status-primary > * { min-width:0; margin:0; }
+#studentInvitationResend .pagination, #studentInvitationResend .pagination-buttons { flex-wrap:wrap; gap:8px; }
+#studentInvitationResend summary { cursor:pointer; margin:8px 0; }
+#studentInvitationResend .pagination, #studentInvitationResend .pagination-buttons { flex-wrap:wrap; gap:8px; }
+#studentInvitationResend summary { cursor:pointer; margin:8px 0; }
 
 .rubrics-status-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
 .rubrics-status-title { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px; }
@@ -1257,6 +1266,7 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .tracker-health.green { background:var(--color-success-tint); color:var(--color-success); }
 .tracker-health.orange { background:var(--color-warning-tint); color:var(--color-warning); }
 .tracker-health.red { background:var(--color-danger-tint); color:var(--color-danger); }
+.tracker-health.gray { background:var(--color-soft); color:var(--color-ink-muted); }
 .team-tracker-section .pagination { flex-wrap:wrap; gap:12px; }
 .team-tracker-section .pagination-buttons { flex-wrap:wrap; }
 .tracker-search input { min-width:0; width:100%; box-sizing:border-box; }
@@ -1588,7 +1598,19 @@ function loadCoordinatorSystemStatus() {
     try {publishing=publicationDefinitions_().map(d=>buildInternalAssessmentPublishing_(d.key)).join('');}
     catch(err){publishing='<p role="status">Assessment configuration needs attention. Use Assessment readiness below.</p>';}
     return `<div class="coordinator-container system-status-cards">
-      <div class="system-status-primary">${buildGithubAccessSection(access)}</div>
+      <div class="system-status-primary">${buildGithubAccessSection(access)}
+      <section class="system-status-card" id="studentInvitationResend">
+        <h3 class="system-card-title">Student GitHub invitations</h3>
+        <p>Renew expired or missing invitations for students in existing team repositories. Joined students and pending invitations are skipped.</p>
+        <button type="button" class="app-btn btn-md btn-primary" onclick="DashboardUI.runStudentInvitationResend()">Resend expired student invitations</button>
+        <p data-resend-status role="status" aria-live="polite"></p>
+        <details data-resend-log hidden>
+          <summary>View student invitation log</summary>
+          <div data-resend-results class="tracker-table-scroll" role="region" aria-label="Student invitation results" tabindex="0"></div>
+          ${buildTeamPagination_('studentInvitations', 'invitations', 0, 'students')}
+        </details>
+      </section>
+      </div>
       ${publishing}
       ${buildCommitteeReadinessCard_()}
       ${buildReviewConfigurationCard_()}

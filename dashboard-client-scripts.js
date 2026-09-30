@@ -59,7 +59,7 @@ function dashboardDialogsBrowser_(renderSkeleton, renderIcon) {
       const dialogDestroyed=new Promise(resolve=>{finishDialog=resolve;});
       const result=await swal.fire({
         target:host,titleText:kind==='confirm'?'Please confirm':kind==='prompt'?'Add a remark':icon==='error'?'Unable to complete action':'Message',
-        text:String(text),icon:'info',iconHtml:renderIcon(({success:'check',error:'x',warning:'triangle-alert',question:'circle-help',info:'info'})[icon] || (kind==='confirm'?'circle-help':'info')),customClass:{icon:'dashboard-dialog-icon'},
+        text:String(text),icon:'info',iconHtml:renderIcon(({success:'check',error:'x',warning:'triangle-alert',question:'circle-help',info:'info'})[icon] || (kind==='confirm'?'circle-help':'info')),buttonsStyling:false,customClass:{icon:'dashboard-dialog-icon',confirmButton:'app-btn btn-md btn-primary',cancelButton:'app-btn btn-md btn-secondary'},
         showCancelButton:kind!=='alert',confirmButtonText:kind==='alert'?'OK':'Continue',
         cancelButtonText:'Cancel',focusCancel:kind==='confirm',allowOutsideClick:false,
         heightAuto:false,returnFocus:false,keydownListenerCapture:true,
@@ -79,7 +79,7 @@ function dashboardDialogsBrowser_(renderSkeleton, renderIcon) {
       const message=document.createElement('p');
       message.style.whiteSpace='pre-line';
       message.textContent=kind==='alert'?String(text):'Unable to open the confirmation. Your action was not performed. Please close this message and try again.';
-      const button=document.createElement('button');button.textContent='Close';
+      const button=document.createElement('button');button.className='app-btn btn-sm btn-secondary';button.textContent='Close';
       panel.appendChild(message);panel.appendChild(button);host.appendChild(panel);
       await new Promise(resolve=>{button.onclick=resolve;button.focus();});
       return {isConfirmed:false};
@@ -118,7 +118,7 @@ const DashboardUI = (function() {
     const compact = options && options.compact;
     // Hidden tabs measure zero during preloading; that is not a small control.
     const height = target.clientHeight;
-    overlay.innerHTML = renderSkeleton(!compact && height > 0 && height < 120 ? 'inline' : 'panel', label);
+    overlay.innerHTML = renderSkeleton(options && options.variant || (!compact && height > 0 && height < 120 ? 'inline' : 'panel'), label);
     const children = Array.from(target.children).map(function(child) { return {node:child, inert:child.inert}; });
     children.forEach(function(child) { child.node.inert = true; });
     target.setAttribute('aria-busy', 'true');
@@ -239,6 +239,7 @@ const DashboardUI = (function() {
     activatedRoles[key] = true;
     if (key === 'coord') initializeCoordinatorAsync();
     if (key === 'reviewer') filterReviewerAssignedTeams();
+    if (key === 'guide' && typeof GuideWeekly !== 'undefined') GuideWeekly.load();
     if (key === 'student') { loadWeeklyProgress(); GuideEvaluation.student(); if(typeof ReviewEvaluations!=='undefined')document.querySelectorAll('[data-review-result]').forEach(host=>ReviewEvaluations.student(host.dataset.reviewResult)); }
   }
 
@@ -252,7 +253,7 @@ const DashboardUI = (function() {
     const start = Math.max(0, (next < 0 ? milestones.length : next) - 2);
     const finish = next < 0 ? milestones.length : Math.min(milestones.length, next + 3);
     target.innerHTML = '<div class="timeline-heading"><h2>Project timeline</h2>' +
-      (milestones.length ? '<button type="button" class="timeline-toggle" aria-expanded="false" aria-controls="projectTimelineMilestones">View full timeline</button>' : '') + '</div>' +
+      (milestones.length ? '<button type="button" class="timeline-toggle app-btn btn-sm btn-secondary" aria-expanded="false" aria-controls="projectTimelineMilestones">View full timeline</button>' : '') + '</div>' +
       (!milestones.length ? '<p class="timeline-empty">No project milestones scheduled</p>' : '') +
       '<ol id="projectTimelineMilestones" class="timeline-track" style="--timeline-stops:' + (finish-start) + '">' + milestones.map(function(m,index) {
         const past = m.day < data.today, current = index === next;
@@ -305,7 +306,7 @@ const DashboardUI = (function() {
         timelineRequest = null;
         if (target) {
           target.setAttribute('aria-busy', 'false');
-          target.innerHTML = '<div class="timeline-heading"><h2>Project timeline</h2><span role="status">Schedule unavailable</span><button type="button" class="timeline-retry">Retry</button></div>';
+          target.innerHTML = '<div class="timeline-heading"><h2>Project timeline</h2><span role="status">Schedule unavailable</span><button type="button" class="timeline-retry app-btn btn-sm btn-secondary">Retry</button></div>';
           target.querySelector('.timeline-retry').addEventListener('click', function() { loadSharedTimeline().catch(function() {}); });
         }
         reject(err);
@@ -333,7 +334,7 @@ const DashboardUI = (function() {
         try {
           target.innerHTML = '<div class="rubric-assessments">' + data.assessments.map(function(item) {
             const desktopCard = '<button type="button" class="rubric-assessment" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span class="rubric-header"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-weight">' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span class="rubric-footer"><span class="rubric-metadata">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span class="rubric-action"><span class="rubric-mobile-hidden">View rubric</span> '+renderLucideIcon_('arrow-right')+'</span>' : '') + '</span></button>';
-            const mobileRow = '<div class="rubric-mobile-row"><div class="rubric-mobile-details"><div class="rubric-mobile-title"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-mobile-weight" aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span class="rubric-mobile-meta">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="rubric-view-button" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
+            const mobileRow = '<div class="rubric-mobile-row"><div class="rubric-mobile-details"><div class="rubric-mobile-title"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-mobile-weight" aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span class="rubric-mobile-meta">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="rubric-view-button app-btn btn-sm btn-secondary" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
             return desktopCard + mobileRow;
           }).join('') + '</div>' + (data.assessments.length ? '' : '<p>No graded assessments configured.</p>');
           sharedRubrics = data;
@@ -347,7 +348,7 @@ const DashboardUI = (function() {
     }).catch(function(err) {
       rubricsRequest = null;
       section.setAttribute('aria-busy', 'false');
-      target.innerHTML = '<p role="status">Unable to load rubrics.</p><button type="button">Retry</button>';
+      target.innerHTML = '<p role="status">Unable to load rubrics.</p><button class="app-btn btn-md btn-secondary" type="button">Retry</button>';
       target.querySelector('button').addEventListener('click', function() { loadSharedRubrics().catch(function() {}); });
       throw err;
     });
@@ -366,6 +367,16 @@ const DashboardUI = (function() {
         return text ? '<dt>Level ' + level + '</dt><dd>' + escapeClientHtml(text) + '</dd>' : '';
       }).join('') + '</dl></section>';
     }).join('');
+    openContentDrawer(item.label, byId('rubricDrawerContent').innerHTML, trigger);
+  }
+
+  function openContentDrawer(title, content, trigger) {
+    const drawer = byId('rubricDrawer');
+    if (!drawer) return;
+    closeCoordinatorTeamDrawer();
+    rubricTrigger = trigger || document.activeElement;
+    byId('rubricDrawerTitle').textContent = title;
+    byId('rubricDrawerContent').innerHTML = content;
     drawer.inert = false;
     drawer.classList.add('open');
     drawer.setAttribute('aria-hidden', 'false');
@@ -391,7 +402,7 @@ const DashboardUI = (function() {
     if (!drawer || !drawer.classList.contains('open')) return;
     if (event.key === 'Escape') { event.preventDefault(); closeRubricDrawer(); }
     if (event.key === 'Tab') {
-      const controls = Array.from(drawer.querySelectorAll('button:not([disabled]), a[href], [tabindex="0"]'));
+      const controls = Array.from(drawer.querySelectorAll('button:not([disabled]), a[href], summary, [tabindex="0"]'));
       const first = controls[0], last = controls[controls.length - 1];
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
@@ -546,7 +557,7 @@ const DashboardUI = (function() {
           return;
         }
         target.innerHTML = '<div class="role-load-error">Unable to load announcements: ' +
-          escapeClientHtml(errorMessage(err)) + '<button type="button" class="announcement-refresh-btn" onclick="refreshAnnouncements()">Try again</button></div>';
+          escapeClientHtml(errorMessage(err)) + '<button type="button" class="announcement-refresh-btn app-btn btn-sm btn-secondary" onclick="refreshAnnouncements()">Try again</button></div>';
       })
       .loadAnnouncementsForCurrentUser();
   }
@@ -716,7 +727,7 @@ const DashboardUI = (function() {
           dashboardRun()
             .withSuccessHandler(function(html) {
               const target = byId('guideContent');
-              if (target) { target.innerHTML = html; filterReviewerAssignedTeams(); }
+              if (target) { target.innerHTML = html; filterReviewerAssignedTeams(); if(typeof GuideWeekly !== 'undefined')GuideWeekly.load(); }
             })
             .withFailureHandler(function(err) {
               setText('status-' + teamId, 'Refresh failed: ' + errorMessage(err));
@@ -797,6 +808,70 @@ const DashboardUI = (function() {
     shortEl.style.display = showingFull ? 'inline' : 'none';
   }
 
+  // Supply the complete row collection before pagination or filtering detaches rows.
+  function sortTableRows(rows, state) {
+    if (!state || state.column == null) return rows.slice();
+    const value = row => {
+      const cell = row.children[state.column];
+      if (!cell || cell.querySelector('.skeleton, [aria-label^="Loading"], [aria-label^="Checking"]')) return null;
+      const explicit = cell.getAttribute('data-sort-value');
+      const text = (explicit !== null ? explicit : cell.textContent).trim();
+      if ((state.type === 'number' || state.type === 'pair') && !text.split('/').every(part=>part.trim() !== '' && Number.isFinite(Number(part)))) return null;
+      return !text || text === '—' || /^(loading|unavailable)$/i.test(text) ? null : text;
+    };
+    const collator = new Intl.Collator(undefined, {numeric:true, sensitivity:'base'});
+    return rows.map((row, index) => ({row, index, value:value(row)})).sort((a,b) => {
+      if (a.value === null || b.value === null) return a.value === b.value ? a.index-b.index : a.value === null ? 1 : -1;
+      let comparison = 0;
+      if (state.type === 'number' || state.type === 'pair') {
+        const av = a.value.split('/').map(Number), bv = b.value.split('/').map(Number);
+        for (let i=0; i < (state.type === 'pair' ? 2 : 1); i++) {
+          comparison = (av[i] || 0) - (bv[i] || 0);
+          if (comparison) break;
+        }
+      } else comparison = collator.compare(a.value,b.value);
+      return comparison * (state.direction === 'descending' ? -1 : 1) || a.index-b.index;
+    }).map(item=>item.row);
+  }
+
+  function initializeTableSorting(table, options = {}) {
+    if (!table) return;
+    const state = options.state || table.tableSortState || {};
+    table.tableSortState = state;
+    Array.from(table.querySelectorAll('thead th')).forEach((header, column) => {
+      if (!header.hasAttribute('data-sort-type')) return;
+      let button = header.querySelector('[data-table-sort]');
+      if (!button) {
+        const label = header.textContent.trim();
+        header.textContent = '';
+        button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'app-btn btn-sm btn-secondary btn-table-sort';
+        button.setAttribute('data-table-sort', label);
+        header.appendChild(button);
+      }
+      const selected = state.column === column;
+      header.setAttribute('aria-sort', selected ? state.direction : 'none');
+      const label = button.getAttribute('data-table-sort');
+      button.textContent = label;
+      button.setAttribute('data-sort-direction', selected ? state.direction : 'none');
+      button.setAttribute('aria-label', 'Sort by ' + label + (selected && state.direction === 'ascending' ? ' descending' : ' ascending'));
+      button.onclick = function() {
+        state.direction = state.column === column && state.direction === 'ascending' ? 'descending' : 'ascending';
+        state.column = column;
+        state.type = header.getAttribute('data-sort-type');
+        initializeTableSorting(table, options);
+        if (options.onSort) options.onSort(state);
+        else {
+          const body = table.querySelector('tbody');
+          if (body) body.replaceChildren(...sortTableRows(Array.from(body.children),state));
+        }
+      };
+    });
+    return state;
+  }
+
+  const trackerSort = {};
   const trackerPagination = { page:1, size:10 };
 
   let trackerRowsBody = null;
@@ -828,7 +903,7 @@ const DashboardUI = (function() {
     });
   }
 
-  function renderTeamPagination(totalRows, state, prefix, onChange) {
+  function renderTeamPagination(totalRows, state, prefix, onChange, rowLabel = 'teams') {
     const info = byId(prefix + 'PaginationInfo');
     const buttons = byId(prefix + 'PaginationButtons');
     const select = byId(prefix + 'PageSize');
@@ -843,7 +918,7 @@ const DashboardUI = (function() {
     const end = Math.min(state.page * pageSize, totalRows);
 
     if (info) {
-      info.textContent = 'Showing ' + start + ' - ' + end + ' of ' + totalRows + ' teams';
+      info.textContent = 'Showing ' + start + ' - ' + end + ' of ' + totalRows + ' ' + rowLabel;
     }
 
     const bounds = {start:start ? start - 1 : 0, end:end};
@@ -851,13 +926,13 @@ const DashboardUI = (function() {
     buttons.innerHTML = '';
 
     function addButton(label, page, disabled, active) {
-      const btn = document.createElement('button');
+      const btn = document.createElement('button');btn.className='app-btn btn-sm btn-secondary';
       btn.type = 'button';
       btn.textContent = label;
       if (label === 'Previous') btn.innerHTML = renderLucideIcon_('chevron-left', '', 'icon-leading') + 'Previous';
       if (label === 'Next') btn.innerHTML = 'Next' + renderLucideIcon_('chevron-right', '', 'icon-trailing');
       btn.disabled = !!disabled;
-      if (active) { btn.classList.add('active'); btn.setAttribute('aria-current', 'page'); }
+      if (active) { btn.className='app-btn btn-sm btn-primary'; btn.classList.add('active'); btn.setAttribute('aria-current', 'page'); }
       btn.addEventListener('click', function() {
         if (disabled) return;
         state.page = page;
@@ -903,6 +978,14 @@ const DashboardUI = (function() {
 
   function changeTeamPageSize(key, value) {
     if (!['10','25','50','all'].includes(String(value))) return;
+    if (key === 'invitations') {
+      const host = byId('studentInvitationResend');
+      if (!host || !host.resendPagination) return;
+      host.resendPagination.size = value === 'all' ? 'all' : Number(value);
+      host.resendPagination.page = 1;
+      host.renderResendLog();
+      return;
+    }
     const state = key === 'coord' ? trackerPagination : key === 'reviewer' ? reviewerPagination : null;
     if (!state) return;
     state.size = value === 'all' ? 'all' : Number(value);
@@ -913,7 +996,9 @@ const DashboardUI = (function() {
 
   function applyCoordinatorFilters(resetPage) {
     if (resetPage !== false) trackerPagination.page = 1;
-    const filteredRows = getCoordinatorFilteredRows();
+    const bodyForSorting = byId('trackerBody');
+    initializeTableSorting(bodyForSorting && bodyForSorting.closest('table'), {state:trackerSort, onSort:()=>applyCoordinatorFilters(true)});
+    const filteredRows = sortTableRows(getCoordinatorFilteredRows(), trackerSort);
     const bounds = renderTeamPagination(filteredRows.length, trackerPagination, 'tracker', function() { applyCoordinatorFilters(false); });
     const body = byId('trackerBody');
     if (body) body.replaceChildren(...filteredRows.slice(bounds.start, bounds.end));
@@ -997,7 +1082,7 @@ const DashboardUI = (function() {
       : '<div class="drawer-person-meta">Committee details not available.</div>';
 
     const repoHtml = data.repoUrl
-      ? '<a class="drawer-repo-link" href="' +
+      ? '<a class="drawer-repo-link app-btn btn-md btn-secondary" href="' +
           escapeDrawerHtml(data.repoUrl) +
           '" target="_blank" rel="noopener">' +
           escapeDrawerHtml(data.repoUrl) +
@@ -1168,7 +1253,7 @@ const DashboardUI = (function() {
       function current() { return request === coordinatorDrawerRequest && drawer.classList.contains('open') && target === byId('drawerSection-' + section); }
       function showRetry(message) {
         const note = document.createElement('div');note.className = 'drawer-error';note.textContent = message + ' ';
-        const button = document.createElement('button');button.type = 'button';button.textContent = 'Retry';
+        const button = document.createElement('button');button.className='app-btn btn-sm btn-secondary';button.type = 'button';button.textContent = 'Retry';
         button.addEventListener('click', function() { loadSection(section); });
         note.appendChild(button);target.appendChild(note);
       }
@@ -1221,7 +1306,7 @@ const DashboardUI = (function() {
 
   function markCoordinatorProgressUnavailable() {
     getCoordinatorRows().forEach(function(row) {
-      row.querySelectorAll('.col-review, .col-guide-evaluation, .col-health').forEach(function(cell) { cell.innerHTML = renderLucideIcon_('triangle-alert', 'Unavailable'); });
+      row.querySelectorAll('.col-review, .col-guide-evaluation, .col-health').forEach(function(cell) { cell.setAttribute('data-sort-value', 'Unavailable'); cell.innerHTML = renderLucideIcon_('triangle-alert', 'Unavailable'); });
     });
     document.querySelectorAll('#coordinatorStats .stat-card-teal .stat-num, #coordinatorStats .stat-card-red .stat-num').forEach(function(el) { el.textContent = 'Unavailable'; });
     document.querySelectorAll('.tracker-tabs button:disabled').forEach(function(el) { el.textContent = el.getAttribute('data-filter') === 'attention' ? 'Attention (Unavailable)' : 'On Track (Unavailable)'; });
@@ -1270,7 +1355,7 @@ const DashboardUI = (function() {
     function retry(message) {
       if (!status) return;
       status.textContent = message + ' ';
-      const button = document.createElement('button');
+      const button = document.createElement('button');button.className='app-btn btn-sm btn-secondary';
       button.type = 'button';button.textContent = 'Retry';
       button.addEventListener('click', function() { loadCoordinatorSectionAsync(section); });
       status.appendChild(button);
@@ -1339,6 +1424,7 @@ const DashboardUI = (function() {
         const cell = row.querySelector('.col-activity');
         if (cell) { cell.textContent = item && result.state === 'active' ? item.logs + '/' + item.commits : '—'; cell.title = label; }
       });
+      applyCoordinatorFilters(false);
       setText('coordinatorActiveTeams', result.activeTeams === null ? '—' : result.activeTeams);
       const activeValue = byId('coordinatorActiveTeams');
       const activeCard = activeValue && activeValue.closest ? activeValue.closest('.stat-card') : null;
@@ -1437,6 +1523,7 @@ const DashboardUI = (function() {
   function recheckReviewConfiguration() {
     const card = byId('reviewConfigurationCard');
     if (!card || checkingReviewConfiguration || initializingAssessmentStorage || bootstrappingDefinitions) return;
+    if(typeof WeeklyPhase2Setup !== 'undefined')WeeklyPhase2Setup.load();
     checkingReviewConfiguration = true;
     const finishLoading = beginContentLoading(card, 'Checking assessment readiness');
     reviewConfigurationValid = false;
@@ -1602,11 +1689,61 @@ const DashboardUI = (function() {
       .syncCoordinatorGithubAccess();
   }
 
+  let studentInvitationResendBusy = false;
+  function runStudentInvitationResend() {
+    if (studentInvitationResendBusy) return;
+    const host = document.getElementById('studentInvitationResend');
+    if (!host) return;
+    const button = host.querySelector('button'), status = host.querySelector('[data-resend-status]');
+    const output = host.querySelector('[data-resend-results]');
+    const results = host.resendResults || new Map();
+    host.resendResults = results;
+    host.resendPagination = host.resendPagination || {page:1, size:10};
+    studentInvitationResendBusy = true;
+    button.disabled = true;
+    host.setAttribute('aria-busy', 'true');
+    function render() {
+      const rows = Array.from(results.values());
+      host.querySelector('[data-resend-log]').hidden = !rows.length;
+      const bounds = renderTeamPagination(rows.length, host.resendPagination, 'studentInvitations', render, 'students');
+      output.innerHTML = rows.length ? '<table><thead><tr><th>Team</th><th>Student</th><th>GitHub</th><th>Result</th><th>Details</th></tr></thead><tbody>' + rows.slice(bounds.start, bounds.end).map(row => '<tr>' + [row.teamId,row.student,row.username,row.status,row.reason].map(value => '<td>' + escapeClientHtml(value || '') + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '';
+      return ['invited','already joined','pending','skipped','failed'].map(kind => rows.filter(row => row.status === kind).length + ' ' + kind).join(' · ');
+    }
+    host.renderResendLog = render;
+    function finish(message, retry) {
+      studentInvitationResendBusy = false;
+      button.disabled = false;
+      host.setAttribute('aria-busy', 'false');
+      button.textContent = retry ? 'Retry remaining invitations' : 'Resend expired student invitations';
+      status.textContent = message + ' ' + render();
+    }
+    function batch(cursor) {
+      status.textContent = 'Processing student invitations. Completed results remain below.';
+      dashboardRun().withSuccessHandler(function(result) {
+        result.results.forEach(row => results.set(row.teamId + ':' + row.email, row));
+        render();
+        host.resendCursor = result.nextCursor;
+        if (result.stopped) { finish('GitHub paused this run. Check rate limits or token permissions before retrying.', true); return; }
+        if (result.nextCursor !== null) {
+          if (host.isConnected) batch(result.nextCursor);
+          else finish('Run paused because this section was closed. Reopen it to recheck remaining invitations.', true);
+          return;
+        }
+        host.resendCursor = null;
+        finish('Invitation check complete.', false);
+      }).withFailureHandler(function(error) {
+        host.resendCursor = cursor;
+        finish('Run interrupted: ' + (error && error.message || 'Unknown error') + '. Retry to recheck unfinished work.', true);
+      }).resendExpiredStudentInvitations(cursor);
+    }
+    batch(host.resendCursor || '');
+  }
+
   const weeklyFields = [
-    ['workCompleted','Work Completed','Summarize what you finished and the outcome.','E.g. Built the sensor prototype and tested its readings.'],
-    ['guideDiscussion','Guide Discussion/Decision','Note your guide discussion and any agreed decisions.','E.g. Agreed to compare two designs before choosing one.'],
-    ['blockers','Problems/Blockers','Describe what is blocking progress or where you need help.','E.g. Waiting for a component; write None if there are no blockers.'],
-    ['nextAction','Next Week Plan','List the concrete tasks you plan to complete next.','E.g. Run three trials, compare results and update the design.'],
+    ['workCompleted','Work Completed','Built, tested, learned — share your progress.'],
+    ['guideDiscussion','Guide Discussion/Decision','What did you discuss or decide?'],
+    ['blockers','Problems/Blockers','Need help? Add it here. Otherwise, write None.'],
+    ['nextAction','Next Week Plan','Your next few steps. Keep it specific.'],
   ];
   const weeklySeparator = ' ' + String.fromCharCode(183) + ' ';
   function weeklyDate(value, timezone) {
@@ -1617,49 +1754,95 @@ const DashboardUI = (function() {
     return match ? 'Week ' + match[0].padStart(2,'0') : String(weekId);
   }
   function weeklyHeading(host, action) {
-    const window = JSON.parse(host.dataset.weeklyWindows || '[]').find(w=>w.weekId === action.weekId);
     const label = weeklyWeekLabel(action.weekId);
-    if (!window) return label;
+    if (!action.opens) return label;
     const shortDate = value => new Date(value).toLocaleDateString('en-GB',{timeZone:host.weeklyData.timezone,day:'numeric',month:'short'}).replace('Sept','Sep');
-    return label + weeklySeparator + shortDate(window.opens) + ' ' + String.fromCharCode(8211) + ' ' + shortDate(window.closes);
+    return label + weeklySeparator + shortDate(action.opens) + ' ' + String.fromCharCode(8211) + ' ' + shortDate(action.deadline);
+  }
+  function weeklyStateLabel(week, timezone) {
+    if (week.guideFrozen) return week.state + weeklySeparator + 'Guide confirmed; further revisions are frozen';
+    if (week.state === 'OPEN') return 'OPEN' + weeklySeparator + 'Not submitted';
+    if (week.state === 'LATE') return 'LATE' + weeklySeparator + 'Submission available until ' + weeklyDate(week.cutoff,timezone);
+    return week.state;
+  }
+  function weeklyStatusTone(state, deadline, timezone, now) {
+    if (state === 'SUBMITTED ON TIME') return 'success';
+    if (state === 'LATE' || state === 'SUBMITTED LATE' || state === 'MISSED' || now > Date.parse(deadline)) return 'danger';
+    const day = value => {
+      const parts = new Intl.DateTimeFormat('en-US',{timeZone:timezone,year:'numeric',month:'numeric',day:'numeric'}).formatToParts(new Date(value));
+      const part = name => Number(parts.find(p=>p.type === name).value);
+      return Date.UTC(part('year'),part('month')-1,part('day')) / 86400000;
+    };
+    return day(deadline) - day(now) <= 1 ? 'warning' : 'success';
   }
   function updateWeeklyFormPresentation(host, form, action, saved) {
     const data = host.weeklyData, esc = escapeClientHtml;
     const latest = saved || data.history.filter(r=>r.weekId === action.weekId && r.entryStatus !== 'MISSED').slice(-1)[0];
-    const labels = latest ? [latest.entryStatus] : [action.overdue || Date.now() > Date.parse(action.deadline) ? 'LATE' : 'OPEN'];
-    if (latest && latest.timeliness === 'LATE') labels.push('LATE');
-    form.querySelector('[data-weekly-heading]').textContent = weeklyHeading(host,action);
-    form.querySelector('[data-weekly-dates]').textContent = 'Due: ' + weeklyDate(action.deadline,data.timezone) + weeklySeparator + 'Late submission until: ' + weeklyDate(action.cutoff,data.timezone);
-    form.querySelector('[data-weekly-state]').innerHTML = labels.map(label=>'<span class="weekly-state" data-state="' + esc(label) + '">' + esc(label) + '</span>').join('');
-    form.querySelector('[type="submit"]').textContent = (latest ? 'Update ' : 'Submit ') + weeklyWeekLabel(action.weekId) + ' Progress';
+    const state = latest ? (latest.timeliness === 'ON_TIME' ? 'SUBMITTED ON TIME' : 'SUBMITTED LATE') : action.state;
+    const label = weeklyStateLabel({...action,state},data.timezone);
+    host.querySelector('[data-weekly-heading]').textContent = weeklyHeading(host,action);
+    const dates = host.querySelector('[data-weekly-dates]');
+    dates.innerHTML = '<span>Due ' + esc(weeklyDate(action.deadline,data.timezone)) + '</span><span class="weekly-late-date">Late submission until ' + esc(weeklyDate(action.cutoff,data.timezone)) + '</span>';
+    dates.hidden = !dates.textContent;
+    host.querySelector('[data-weekly-state]').innerHTML = '<span class="weekly-state" data-tone="' + weeklyStatusTone(state,action.deadline,data.timezone,data.checkedAt ? Date.parse(data.checkedAt) : Date.now()) + '" data-state="' + esc(state) + '">' + esc(label) + '</span>';
+    if (form && form.dataset.week === action.weekId) form.querySelector('[type="submit"]').textContent = (latest ? 'Update ' : 'Submit ') + weeklyWeekLabel(action.weekId) + ' Progress';
+  }
+  function openWeeklyActivity(trigger) {
+    const data = byId('studentWeeklyProgress')?.weeklyData;
+    if (!data) { openContentDrawer('All weekly logs','<p>Logs unavailable. Refresh weekly progress and try again.</p>',trigger); return; }
+    const esc=escapeClientHtml, weeks=data.allWeeks || data.weeks;
+    const now=Date.parse(data.checkedAt) || Date.now();
+    const content='<p>'+weeks.length+' weeks</p>'+weeks.map(week=>{
+      const future=Date.parse(week.opens)>now;
+      const entries=data.history.filter(entry=>entry.weekId===week.weekId).slice().reverse();
+      const evidence=(data.evidence || []).find(item=>item.weekId===week.weekId);
+      const github=evidence?.state==='available' ? (evidence.count ? '<ul>'+evidence.commits.map(commit=>'<li>'+esc(weeklyDate(commit.timestamp,data.timezone))+' | '+esc(commit.message)+' | <a href="'+esc(commit.url)+'" target="_blank" rel="noopener noreferrer">'+esc(commit.shortSha)+'</a></li>').join('')+'</ul>' : '<p>No qualifying GitHub activity recorded.</p>') : '<p>'+esc(evidence?.message || (evidence?.state==='unmapped' ? 'GitHub username mapping is unavailable.' : 'GitHub activity is unavailable.'))+'</p>';
+      return '<section class="drawer-section weekly-log-history'+(future?' is-future':'')+'"><h3>'+esc(weeklyWeekLabel(week.weekId))+(future?' · Upcoming':'')+'</h3><p>Opens '+esc(weeklyDate(week.opens,data.timezone))+'<br>Deadline '+esc(weeklyDate(week.deadline,data.timezone))+'</p>'+(entries.length ? entries.map(entry=>entry.entryStatus==='MISSED' ? '<p>Missed</p>' : '<details><summary>'+esc(weeklyDate(entry.recordedAt,data.timezone)+weeklySeparator+entry.entryStatus+weeklySeparator+entry.timeliness)+'</summary><p>First submitted: '+esc(weeklyDate(entry.firstSubmittedAt,data.timezone))+'</p>'+weeklyFields.map(field=>'<h4>'+esc(field[1])+'</h4><p class="weekly-log-answer">'+esc(entry[field[0]] || '')+'</p>').join('')+'<h4>Your GitHub activity</h4>'+github+'</details>').join('') : '<p>'+(future?'Not open yet':'No submission recorded')+'</p>')+'</section>';
+    }).join('');
+    openContentDrawer('All weekly logs',content,trigger);
+  }
+  function hasWeeklyGithubEvidence(host, weekId) {
+    const evidence = (host.weeklyData.evidence || []).find(item=>item.weekId === weekId);
+    return !!evidence && evidence.state === 'available' && evidence.count > 0;
   }
   function renderWeeklyGithub(host, weekId) {
     let panel = host.querySelector('[data-weekly-github]');
     if (!panel) {
       panel = document.createElement('section'); panel.setAttribute('data-weekly-github','');
-      panel.className = 'weekly-github-activity'; host.appendChild(panel);
+      panel.className = 'weekly-github-activity';
     }
-    const form = host.querySelector('form');
-    if (form) form.insertBefore(panel, form.querySelector('[type="submit"]'));
+    // Keep the gate visible even when its form is hidden; never discard draft text.
+    host.insertBefore(panel,host.querySelector('[data-weekly-form]'));
     const data = host.weeklyData, evidence = (data.evidence || []).find(item=>item.weekId === weekId), esc = escapeClientHtml;
-    if (!weekId) { panel.hidden = true; return; }
-    panel.hidden = false;
-    let body = '<p>GitHub activity is unavailable. Use Refresh weekly progress to retry.</p>';
-    if (evidence && evidence.state === 'unmapped') body = '<p>Your GitHub username mapping is unavailable or unverified.</p>';
-    if (evidence && evidence.state === 'available') {
-      body = '<p>' + evidence.count + ' commits this week</p>' + (evidence.count ? '<ul>' + evidence.commits.map(commit=>
-        '<li><time datetime="' + esc(commit.timestamp) + '">' + esc(weeklyDate(commit.timestamp,data.timezone)) + '</time><span>' + esc(commit.message) + '</span><a href="' + esc(commit.url) + '" target="_blank" rel="noopener noreferrer">' + esc(commit.shortSha) + '</a></li>').join('') + '</ul>' : '<p>No GitHub activity recorded for you this week</p>');
+    panel.hidden = !weekId;
+    let header = host.querySelector('[data-weekly-header]');
+    if (!header) {
+      header = document.createElement('header'); header.className = 'weekly-form-header heading-row'; header.setAttribute('data-weekly-header','');
+      header.innerHTML = '<h4 data-weekly-heading></h4><div class="weekly-status-strip" data-weekly-state role="status" aria-label="Submission status"></div><p class="weekly-dates" data-weekly-dates></p>';
     }
-    panel.innerHTML = '<h4>Your GitHub activity this week' + weeklySeparator + esc(weeklyWeekLabel(weekId)) + '</h4><p class="weekly-helper">GitHub Supporting Evidence · System-observed project artifacts</p>' + body;
+    host.insertBefore(header,panel);
+    const week = data.weeks.find(w=>w.weekId === weekId);
+    header.hidden = !week;
+    if (week) updateWeeklyFormPresentation(host,host.querySelector('form'),week);
+    if (!weekId) return;
+    let body = '<p>' + esc(evidence && evidence.message || 'GitHub activity is unavailable. Refresh GitHub Activity to retry.') + '</p>';
+    if (evidence && evidence.state === 'unmapped') body = '<p>Your GitHub username mapping is unavailable or unverified. Complete GitHub setup, then refresh.</p>';
+    if (evidence && evidence.state === 'available') {
+      body = evidence.count > 0 ? '<details class="weekly-commit-details"><summary>' + evidence.count + (evidence.count === 1 ? ' commit' : ' commits') + ' this week</summary><ul>' + evidence.commits.map(commit=>
+        '<li><time datetime="' + esc(commit.timestamp) + '">' + esc(weeklyDate(commit.timestamp,data.timezone)) + '</time><span>' + esc(commit.message) + '</span><a href="' + esc(commit.url) + '" target="_blank" rel="noopener noreferrer">' + esc(commit.shortSha) + '</a></li>').join('') + '</ul></details>'
+        : '<p>No GitHub activity found for you this week. Commit your project work/evidence to the team repository, then refresh.</p>';
+    }
+    panel.innerHTML = '<div class="heading-row"><h5>Your GitHub activity' + weeklySeparator + esc(weeklyWeekLabel(weekId)) + '</h5>' +
+      '<button type="button" class="app-btn btn-sm btn-secondary btn-icon" data-weekly-github-refresh title="Refresh GitHub Activity" aria-label="Refresh GitHub Activity" onclick="DashboardUI.loadWeeklyProgress()">' + renderLucideIcon_('refresh-cw') + '</button></div>' + body;
   }
   function loadWeeklyProgress() {
     const host = byId('studentWeeklyProgress');
     if (!host || host.weeklyBusy || host.weeklySaving) return;
     const target = host.querySelector('[data-weekly-read]'), status = host.querySelector('[data-weekly-status]');
-    const button = host.querySelector('[data-weekly-refresh]');
-    host.weeklyBusy = true; button.disabled = true;
+    const buttons = host.querySelectorAll('[data-weekly-refresh], [data-weekly-github-refresh]');
+    host.weeklyBusy = true; buttons.forEach(button=>{button.disabled = true;});
     const finish = beginContentLoading(host,'Refreshing weekly progress',{compact:true});
-    function settle() { finish(); host.weeklyBusy = false; button.disabled = false; }
+    function settle() { finish(); host.weeklyBusy = false; buttons.forEach(button=>{button.disabled = false;}); }
     dashboardRun().withSuccessHandler(function(data) {
       settle();
       if (!host.isConnected || byId('studentWeeklyProgress') !== host) return;
@@ -1668,49 +1851,95 @@ const DashboardUI = (function() {
         host.weeklyRefreshError = null;
       }
       host.weeklyData = data;
-      const esc = escapeClientHtml;
-      target.innerHTML = '<p>' + esc(data.message) + '</p><p>Expected weeks: ' + data.summary.expectedWeeks + ' &middot; Missing: ' + data.summary.missing + '</p>' +
-        data.actions.map(function(action) { return '<button type="button" class="workflow-btn secondary" data-week="' + esc(action.weekId) + '" onclick="DashboardUI.chooseWeeklyAction(this)">' +
-          (action.overdue ? 'Overdue: ' : '') + esc(weeklyHeading(host,action)) + '</button>'; }).join(' ') +
-        '<details><summary>Submission history (' + data.history.length + ')</summary>' + data.history.slice().reverse().map(function(entry) {
-          return '<details><summary>' + esc(weeklyWeekLabel(entry.weekId) + weeklySeparator + entry.entryStatus + weeklySeparator + entry.timeliness + weeklySeparator + weeklyDate(entry.recordedAt,data.timezone)) + '</summary>' +
-            '<p>First submitted: ' + esc(weeklyDate(entry.firstSubmittedAt,data.timezone)) + '</p>' + weeklyFields.map(function(field) {
-              return '<p><strong>' + esc(field[1]) + '</strong></p><p style="white-space:pre-wrap">' + esc(entry[field[0]] || '') + '</p>';
-            }).join('') + '</details>';
-        }).join('') + '</details>';
-      const formContainer = host.querySelector('[data-weekly-form]');
-      formContainer.hidden = !data.ready;
-      const form = host.querySelector('form');
-      if (form) {
-        const stillAllowed = data.ready && data.actions.some(a=>a.weekId === form.dataset.week && String(a.overdue) === form.dataset.overdue);
-        Array.from(form.elements).forEach(el=>{el.disabled = !stillAllowed;});
-        const action = data.actions.find(a=>a.weekId === form.dataset.week);
-        if (action) updateWeeklyFormPresentation(host,form,action);
-        if (!stillAllowed) status.textContent = 'This action is no longer available. Your unsaved text is retained. Choose an available week to continue.';
-      } else {
-        const normal = data.actions.find(a=>!a.overdue);
-        if (data.ready && normal) renderWeeklyForm(host,normal);
+      const recent=byId('studentRecentActivity');
+      if(recent) {
+        const latest=new Map();
+        data.history.slice().reverse().forEach(entry=>{if(!latest.has(entry.weekId))latest.set(entry.weekId,entry);});
+        recent.innerHTML=Array.from(latest.values()).slice(0,3).map(entry=>'<div class="student-activity-row"><strong>'+escapeClientHtml(weeklyWeekLabel(entry.weekId))+'</strong><span>'+escapeClientHtml(entry.entryStatus==='MISSED'?'Missed':entry.timeliness==='ON_TIME'?'Submitted on time':'Submitted late')+'</span><time>'+escapeClientHtml(weeklyDate(entry.recordedAt,data.timezone))+'</time></div>').join('') || '<p>No weekly submissions yet.</p>';
       }
-      renderWeeklyGithub(host,(host.querySelector('form') || {}).dataset?.week || (data.evidence || []).slice(-1)[0]?.weekId);
+      const esc = escapeClientHtml;
+      target.innerHTML = (data.message && (!data.ready || !data.weeks.length) ? '<p>' + esc(data.message) + '</p>' : '') +
+        data.weeks.filter(week=>week.weekId !== host.querySelector('form')?.dataset.week && !data.actions.some(action=>action.weekId === week.weekId)).map(function(week) {
+          return '<p class="weekly-closed-state">' + esc(weeklyWeekLabel(week.weekId) + weeklySeparator + weeklyStateLabel(week,data.timezone)) + '</p>';
+        }).join('') + (data.actions.length > 1 ? '<nav class="weekly-week-switcher" aria-label="Choose progress week">' +
+        data.actions.map(function(action) { return '<button type="button" class="app-btn btn-sm btn-secondary" data-week="' + esc(action.weekId) + '" onclick="DashboardUI.chooseWeeklyAction(this)">' +
+          esc(weeklyWeekLabel(action.weekId)) + '</button>'; }).join(' ') + '</nav>' : '');
+      const formContainer = host.querySelector('[data-weekly-form]');
+      const form = host.querySelector('form');
+      const selectedWeek = host.weeklySelectedWeek || form?.dataset.week || (data.actions.find(a=>a.state === 'OPEN') || data.actions[0] || data.weeks.slice(-1)[0])?.weekId || (data.evidence || []).slice(-1)[0]?.weekId;
+      host.weeklySelectedWeek = selectedWeek;
+      const hasEvidence = hasWeeklyGithubEvidence(host,selectedWeek);
+      formContainer.hidden = !data.ready || !hasEvidence;
+      const action = data.actions.find(a=>a.weekId === selectedWeek);
+      if (form && form.dataset.week === selectedWeek) {
+        const stillAllowed = data.ready && hasEvidence && !!action;
+        Array.from(form.elements).forEach(el=>{el.disabled = !stillAllowed;});
+        const week = data.weeks.find(a=>a.weekId === selectedWeek);
+        if (week) updateWeeklyFormPresentation(host,form,week);
+        form.querySelector('[type="submit"]').hidden = !stillAllowed;
+        const cancel=form.querySelector('[data-weekly-cancel]');if(cancel)cancel.disabled=false;
+        if (!action && hasEvidence) status.textContent = 'This action is no longer available. Your unsaved text is retained. Choose an available week to continue.';
+      } else if (action || (latestWeeklySubmission(host,selectedWeek) && data.weeks.some(w=>w.weekId === selectedWeek))) {
+        renderWeeklyForm(host,action || data.weeks.find(w=>w.weekId === selectedWeek));
+      }
+      renderWeeklyGithub(host,selectedWeek);
     }).withFailureHandler(function(error) {
       settle();
       if (host.isConnected && byId('studentWeeklyProgress') === host) {
+        const recent=byId('studentRecentActivity');
+        if(recent && !host.weeklyData)recent.innerHTML='<p>Logs unavailable. Refresh weekly progress to retry.</p>';
         host.weeklyRefreshError = 'Could not refresh weekly progress: ' + errorMessage(error) + '. Use Refresh weekly progress to retry.';
         status.textContent = host.weeklyRefreshError;
       }
     }).loadStudentWeeklyProgress();
   }
-  function renderWeeklyForm(host, action) {
-    if (!host.weeklyData.ready) return;
+  function latestWeeklySubmission(host, weekId) {
+    return host.weeklyData.history.filter(r=>r.weekId === weekId && r.entryStatus !== 'MISSED').slice(-1)[0];
+  }
+  function renderWeeklyForm(host, action, editing) {
+    host.weeklySelectedWeek = action.weekId;
+    const container = host.querySelector('[data-weekly-form]');
+    const saved = latestWeeklySubmission(host,action.weekId);
+    if (saved && !editing) {
+      const esc=escapeClientHtml;
+      const editable=host.weeklyData.ready && hasWeeklyGithubEvidence(host,action.weekId) && host.weeklyData.actions.some(a=>a.weekId===action.weekId);
+      container.hidden=false;
+      container.innerHTML='<div class="weekly-submission-summary">'+weeklyFields.map(field=>'<section><h5>'+esc(field[1])+'</h5><p>'+esc(saved[field[0]] || '')+'</p></section>').join('')+'</div>'+(editable?'<button type="button" class="app-btn btn-sm btn-secondary" data-weekly-edit onclick="DashboardUI.editWeeklySubmission(this)">Edit submission</button>':'');
+      renderWeeklyGithub(host,action.weekId);
+      return;
+    }
+    container.hidden = !host.weeklyData.ready || !hasWeeklyGithubEvidence(host,action.weekId);
+    if (container.hidden) {
+      const form = host.querySelector('form');
+      if (form) Array.from(form.elements).forEach(el=>{el.disabled = true;});
+      renderWeeklyGithub(host,action.weekId);
+      return;
+    }
     const data = host.weeklyData, esc = escapeClientHtml;
     const latest = data.history.filter(r=>r.weekId === action.weekId && r.entryStatus !== 'MISSED').slice(-1)[0] || {};
-    host.querySelector('[data-weekly-form]').innerHTML = '<form class="weekly-progress-form" data-week="' + esc(action.weekId) + '" data-overdue="' + action.overdue + '" onsubmit="DashboardUI.submitWeeklyProgress(event,this)">' +
-      '<header class="weekly-form-header"><h4 data-weekly-heading></h4><div class="weekly-status-strip" data-weekly-state role="status" aria-label="Submission status"></div><p class="weekly-dates" data-weekly-dates></p></header>' +
-      weeklyFields.map(function(field) { return '<div class="weekly-field"><label for="weekly-' + field[0] + '">' + esc(field[1]) + '</label><p class="weekly-helper" id="weekly-help-' + field[0] + '">' + esc(field[2]) + '</p><textarea id="weekly-' + field[0] + '" name="' + field[0] + '" rows="3" required maxlength="10000" aria-describedby="weekly-help-' + field[0] + '" placeholder="' + esc(field[3]) + '">' + esc(latest[field[0]] || '') + '</textarea></div>'; }).join('') +
-      '<button type="submit" class="workflow-btn"></button></form>';
-    updateWeeklyFormPresentation(host,host.querySelector('form'),action);
+    host.querySelector('[data-weekly-form]').innerHTML = '<form class="weekly-progress-form" data-week="' + esc(action.weekId) + '" onsubmit="DashboardUI.submitWeeklyProgress(event,this)">' +
+      weeklyFields.map(function(field) { return '<div class="weekly-field"><label for="weekly-' + field[0] + '">' + esc(field[1]) + ' <span class="weekly-required" aria-hidden="true">*</span></label><textarea id="weekly-' + field[0] + '" name="' + field[0] + '" rows="3" required maxlength="10000" placeholder="' + esc(field[2]) + '">' + esc(latest[field[0]] || '') + '</textarea></div>'; }).join('') +
+      '<div class="weekly-form-actions"><button type="submit" class="workflow-btn app-btn btn-lg btn-primary"></button>' + (saved ? '<button type="button" class="app-btn btn-sm btn-secondary" data-weekly-cancel onclick="DashboardUI.cancelWeeklyEdit(this)">Cancel</button>' : '') + '</div></form>';
     renderWeeklyGithub(host,action.weekId);
     host.querySelector('form').addEventListener('input',function() { this.weeklyDirty = true; });
+  }
+  function editWeeklySubmission(button) {
+    const host=button.closest('#studentWeeklyProgress');
+    if (!host || host.weeklyBusy || host.weeklySaving) return;
+    const action=host.weeklyData.actions.find(a=>a.weekId===host.weeklySelectedWeek);
+    if (!action || !host.weeklyData.ready || !hasWeeklyGithubEvidence(host,action.weekId)) return;
+    renderWeeklyForm(host,action,true);
+    host.querySelector('textarea')?.focus();
+  }
+  async function cancelWeeklyEdit(button) {
+    const host=button.closest('#studentWeeklyProgress'), form=host?.querySelector('form');
+    if (!form || host.weeklyBusy || host.weeklySaving) return;
+    const saved=latestWeeklySubmission(host,form.dataset.week);
+    const changed=weeklyFields.some(field=>form.elements[field[0]].value !== (saved?.[field[0]] || ''));
+    if (changed && !await dialogs.ask('Discard unsaved changes to this weekly submission?')) return;
+    if (!host.isConnected || host.weeklyBusy || host.weeklySaving || host.querySelector('form')!==form) return;
+    const week=host.weeklyData.weeks.find(w=>w.weekId===form.dataset.week);
+    if (week) { renderWeeklyForm(host,week); host.querySelector('[data-weekly-edit]')?.focus(); }
   }
   async function chooseWeeklyAction(button) {
     const host = byId('studentWeeklyProgress');
@@ -1718,7 +1947,7 @@ const DashboardUI = (function() {
     const action = host.weeklyData.actions.find(a=>a.weekId === button.dataset.week);
     if (!action) return;
     const form = host.querySelector('form');
-    if (form && form.dataset.week === action.weekId && form.dataset.overdue === String(action.overdue)) return;
+    if (form && form.dataset.week === action.weekId && host.weeklySelectedWeek === action.weekId) return;
     if (form && form.weeklyDirty && !await dialogs.ask('Discard unsaved weekly text and open the selected week?')) return;
     if (!host.isConnected || host.weeklySaving) return;
     renderWeeklyForm(host,action);
@@ -1726,10 +1955,10 @@ const DashboardUI = (function() {
   function submitWeeklyProgress(event, form) {
     event.preventDefault();
     const host = form.closest('#studentWeeklyProgress');
-    if (host.weeklySaving || host.weeklyBusy || !form.reportValidity()) return;
+    if (host.weeklySaving || host.weeklyBusy || !hasWeeklyGithubEvidence(host,form.dataset.week) || !host.weeklyData.actions.some(a=>a.weekId === form.dataset.week) || !form.reportValidity()) return;
     const input = {};
     weeklyFields.forEach(field=>{input[field[0]] = form.elements[field[0]].value;});
-    if (form.dataset.overdue === 'true') input.overdueWeekId = form.dataset.week;
+    input.weekId = form.dataset.week;
     const content = JSON.stringify(input);
     if (!form.weeklyRequest || form.weeklyRequest.content !== content) form.weeklyRequest = {content:content,id:crypto.randomUUID()};
     input.requestId = form.weeklyRequest.id;
@@ -1743,8 +1972,10 @@ const DashboardUI = (function() {
       if (!host.isConnected) return;
       form.weeklyDirty = false; form.weeklyRequest = null;
       status.textContent = result.message + ' ' + weeklyWeekLabel(result.weekId) + weeklySeparator + result.entryStatus + weeklySeparator + result.timeliness;
-      const action = host.weeklyData.actions.find(a=>a.weekId === result.weekId);
-      if (action) updateWeeklyFormPresentation(host,form,action,result);
+      const saved={...latestWeeklySubmission(host,input.weekId),...input,...result};
+      host.weeklyData.history.push(saved);
+      const week=host.weeklyData.weeks.find(w=>w.weekId===input.weekId);
+      if(week)renderWeeklyForm(host,week);
       loadWeeklyProgress();
     }).withFailureHandler(function(error) {
       settle();
@@ -1776,6 +2007,14 @@ const DashboardUI = (function() {
       .withFailureHandler(function(err) { finish(errorMessage(err)); }).completeStudentGithubSetup();
   }
 
+  function focusGithubAccountForm(button) {
+    const card = button.closest('.step-card');
+    const input = card && card.querySelector('#studentGithubProfile');
+    if (!input || input.disabled) return;
+    input.scrollIntoView({block:'center', behavior:'auto'});
+    input.focus({preventScroll:true});
+  }
+
   function previewGithubAccount(event, form) {
     event.preventDefault();
     if (form.githubBusy || !form.reportValidity()) return;
@@ -1793,7 +2032,7 @@ const DashboardUI = (function() {
       const account = result.account, esc = escapeClientHtml;
       panel.innerHTML = (account.avatarUrl ? '<img width="48" height="48" alt="" src="' + esc(account.avatarUrl) + '">' : '') +
         '<p><strong>' + esc(account.displayName || '') + '</strong> <a target="_blank" rel="noopener" href="' + esc(account.profileUrl) + '">@' + esc(account.username) + '</a></p>' +
-        '<p>Is this your GitHub account?</p><button type="button" class="workflow-btn" data-confirm-account>Yes, this is my account</button> <button type="button" class="workflow-btn secondary" data-change-account>No, change profile link</button>';
+        '<p>Is this your GitHub account?</p><button type="button" class="workflow-btn app-btn btn-md btn-primary" data-confirm-account>Yes, this is my account</button> <button type="button" class="workflow-btn secondary app-btn btn-md btn-secondary" data-change-account>No, change profile link</button>';
       input.disabled = true;
       form.querySelector('button[type="submit"]').hidden = true;
       panel.querySelector('[data-confirm-account]').onclick = function() { confirmGithubAccount(form); };
@@ -1831,7 +2070,7 @@ const DashboardUI = (function() {
     loadWeeklyProgress, chooseWeeklyAction, submitWeeklyProgress,
     refreshGithubStatus,
     retryGithubSetup,
-    previewGithubAccount,
+    focusGithubAccountForm, previewGithubAccount,
     renderAssessmentHistory: renderAssessmentHistory,
     renderSkeleton: renderSkeleton,
     beginContentLoading: beginContentLoading,
@@ -1843,6 +2082,9 @@ const DashboardUI = (function() {
     loadSharedTimeline,
     loadSharedRubrics,
     openRubricDrawer,
+    openWeeklyActivity,
+    editWeeklySubmission,
+    cancelWeeklyEdit,
     closeRubricDrawer,
     getSharedSchedule: function() { return sharedSchedule; },
     showRoleTab,
@@ -1867,12 +2109,15 @@ const DashboardUI = (function() {
     closeCoordinatorTeamDrawer,
     showAllCoordinatorTeams,
     runGithubSync,
+    runStudentInvitationResend,
     loadCoordinatorWeeklyActivity,
     initializeAssessmentStorage,
     recheckCommitteeConfiguration,
     bootstrapAssessmentDefinitions,
     recheckReviewConfiguration,
-    initializeCoordinatorTracker
+    initializeCoordinatorTracker,
+    initializeTableSorting,
+    sortTableRows
   };
 })();
 

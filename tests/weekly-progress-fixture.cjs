@@ -5,9 +5,7 @@ function weeklyFixture() {
   let now = Date.parse('2026-01-02T12:00:00Z'), user='one@example.com', ready=true, locked=false, mailFails=false;
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now; } }
   const sheets = new Map(), properties = new Map(), mails=[], errors=[], triggers=[];
-  const config = {WEEKLY_SUBMISSION_WINDOWS:JSON.stringify([
-    {week_id:'W1',opens_at:'2026-01-01T00:00:00Z',deadline_at:'2026-01-05T18:00:00Z',closes_at:'2026-01-07T23:59:59Z',late_until:'2026-01-14T23:59:59Z'},
-    {week_id:'W2',opens_at:'2026-01-08T00:00:00Z',deadline_at:'2026-01-12T18:00:00Z',closes_at:'2026-01-14T23:59:59Z',late_until:'2026-01-21T23:59:59Z'}]),SUBMISSION_REMINDER_HOURS:24};
+  const config = {SUBMISSION_REMINDER_HOURS:24};
   function sheet(name, rows) {
     const value={rows,getName:()=>name,getLastRow:()=>rows.length,getLastColumn:()=>Math.max(0,...rows.map(r=>r.length)),getMaxRows:()=>1000,insertRowsAfter(){},
       getDataRange:()=>({getValues:()=>rows.map(r=>r.slice())}),
@@ -27,19 +25,30 @@ function weeklyFixture() {
     MailApp:{sendEmail:(...args)=>{if(mailFails)throw Error('Mail unavailable');mails.push(args);}},
     ScriptApp:{getProjectTriggers:()=>triggers.slice(),deleteTrigger:t=>triggers.splice(triggers.indexOf(t),1),newTrigger:name=>({timeBased(){return this;},everyHours(n){this.hours=n;return this;},create(){triggers.push({getHandlerFunction:()=>name,hours:this.hours});}})}
   });
-  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','github-identity-migration.js','weekly-activity.js','logbook-tracker.js','guide-dashboard.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','weekly-activity.js','logbook-tracker.js','weekly-progress-phase2.js','marks-tracker.js','guide-dashboard.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
   c.parseGithubRepoUrl_=url=>{const m=String(url).match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+?)(?:\.git)?\/?$/i);return m?{owner:m[1],repo:m[2]}:null;};
   const definitions=vm.runInContext('FIELD_DEFINITIONS',c);
   const ts=Object.values(definitions.TEAM_STATUS).concat('Repo URL','Progress Eligible From Week ID'),tr=Object.values(definitions.TEAM_ROSTER);
   const member={'Team ID':'T1','Student 1 Name':'One','Student 1 Register No':'001','Student 1 Email':'one@example.com','Student 2 Name':'Two','Student 2 Register No':'002','Student 2 Email':'two@example.com','Title':'Project','Reviewer Decision':'Approved','Repo URL':'https://github.com/org/team'};
   const status=sheet('TeamStatus',[ts,ts.map(h=>member[h]||'')]),roster=sheet('TeamRoster',[tr,tr.map(h=>member[h]||'')]);
-  sheet('LOG_ENTRIES',[Object.values(definitions.LOG_ENTRIES)]);
+  sheet('LogEntries',[Object.values(definitions.LOG_ENTRIES)]);
+  sheet('WeeklyWindows',[Object.values(definitions.WEEKLY_WINDOWS),
+    ['W1',new Clock('2026-01-01T00:00:00Z'),new Clock('2026-01-05T18:00:00Z'),new Clock('2026-01-14T23:59:59Z')],
+    ['W2',new Clock('2026-01-08T00:00:00Z'),new Clock('2026-01-12T18:00:00Z'),new Clock('2026-01-21T23:59:59Z')]]);
+  const githubSetup={repoUrl:'https://github.com/org/team',members:[
+    {email:'one@example.com',label:'001',username:'alice',githubId:'101',status:'valid'},
+    {email:'two@example.com',label:'002',username:'bob',githubId:'102',status:'valid'}]};
+  sheet('Commits',[['Date','Team ID','Commit Message','GitHub Username','Repository URL','Commit SHA','GitHub Author ID'],
+    ...['2026-01-01T00:00:00Z','2026-01-08T00:00:00Z'].flatMap((date,i)=>githubSetup.members.map((member,j)=>
+      [new Clock(date),'T1','Project work',member.username,githubSetup.repoUrl,String(i*2+j+1).padStart(40,'0'),member.githubId]))]);
+  sheet('CommitCollectionStatus',[Object.values(definitions.COMMIT_COLLECTION_STATUS),['T1','ok',new Clock()]]);
+  const collectionStatus=value=>sheets.get('CommitCollectionStatus').rows[1][1]=value;
   Object.assign(c,{getConfig:key=>{if(!(key in config))throw Error('Missing '+key);return config[key];},getCoordinatorEmail:()=> 'coord@example.com',
     activityIsCoordinator_:email=>email==='coord@example.com',getDashboardUrl:()=> 'https://script.google.com/dashboard',
-    getTeamGithubSetup_:()=>({ready,message:ready?'Ready':'Unavailable'}),requireTeamGithubReady_:()=>{if(!ready)throw Error('GitHub unavailable');return {ready};}});
+    getTeamGithubSetup_:()=>({...githubSetup,ready,message:ready?'Ready':'Unavailable'}),requireTeamGithubReady_:()=>{if(!ready)throw Error('GitHub unavailable');return c.getTeamGithubSetup_();}});
   const set=(header,value)=>status.rows[1][ts.indexOf(header)]=value;
-  const input=(extra={})=>({requestId:crypto.randomUUID(),workCompleted:'Work',guideDiscussion:'Decision',blockers:'None',nextAction:'Next',...extra});
-  return {c,config,sheets,status,roster,ts,tr,mails,properties,errors,triggers,sheet,input,set,
+  const input=(extra={})=>({requestId:crypto.randomUUID(),weekId:'W1',workCompleted:'Work',guideDiscussion:'Decision',blockers:'None',nextAction:'Next',...extra});
+  return {c,collectionStatus,config,sheets,status,roster,ts,tr,mails,properties,errors,triggers,sheet,input,set,githubSetup,
     time:value=>{now=Date.parse(value);},user:value=>{user=value;},ready:value=>{ready=value;},mailFails:value=>{mailFails=value;},locked:()=>locked,
     entries:()=>c.readLogEntries_(),eligible:()=>status.rows[1][ts.indexOf('Progress Eligible From Week ID')]};
 }

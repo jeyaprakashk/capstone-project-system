@@ -13,16 +13,16 @@ function fixture() {
  let user='coord@x', active=true;
  const norm=value=>String(value??'').trim().toLowerCase();
  const c=vm.createContext({Date,normalizeText_:norm,normalizeEmail:norm,emailsMatch:(a,b)=>norm(a)===norm(b),textEquals_:(a,b)=>norm(a)===norm(b),
-  SHEET_NAMES:{TEAM_STATUS:'teams',LOG_ENTRIES:'logs',COMMITS:'commits',GITHUB_USERNAME_RAW:'usernames'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},
+  SHEET_NAMES:{TEAM_STATUS:'teams',LOG_ENTRIES:'logs',COMMITS:'commits',GITHUB_ACCOUNTS:'usernames'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},
   getColumnMap:()=>columns,getSheet:()=>({getLastColumn:()=>5}),getSheetRows:name=>{calls.push(['all',name]);return rows[name];},
   withDashboardRead_:fn=>fn(),Session:{getActiveUser:()=>({getEmail:()=>user})},getCoordinatorEmail:()=> 'coord@x',getConfig:()=> 'pd@x',getCommitteeNumbersForReviewer:()=>[],
-  getWeeklySubmissionWindows_:()=>[{weekId:'W1',opens_at:10,closes_at:11}],getEffectiveLogEntries_:records=>[...new Map(records.map(r=>[r.regNo+':'+r.weekId,r])).values()],getProjectSchedule_:()=>({week1:10}),getProjectClock_:()=>({active,today:active?10:9,week:active?1:0,now:new Date(active?10:9)}),isCurrentProjectWeek_:date=>date===10
+  getWeeklySubmissionWindows_:()=>[{weekId:'W1',opens_at:10,deadline_at:11,late_until:12}],getEffectiveLogEntries_:records=>[...new Map(records.map(r=>[r.regNo+':'+r.weekId,r])).values()],getProjectSchedule_:()=>({week1:10}),getProjectClock_:()=>({active,today:active?10:9,week:active?1:0,now:new Date(active?10:9)}),isCurrentProjectWeek_:date=>date===10
  });
  vm.runInContext(fs.readFileSync('github-identity.js','utf8'),c);
  c.githubAccountColumns_=()=>({ID:4,NAME:5,URL:6});
  c.readSheetRows_=()=>rows.usernames;
  c.weeklyStudents_=()=>[{email:'a@x',teamId:'T1',regNo:'R1'},{email:'b@x',teamId:'T1',regNo:'R2'}];
- c.PropertiesService={getScriptProperties:()=>({getProperty:()=> 'ok'})};
+ c.readCommitCollectionStatus_=()=> 'ok';
  vm.runInContext(fs.readFileSync(path.join(__dirname,'..','weekly-activity.js'),'utf8'),c);
  c.readActivityRows_=(name,column,value,width)=>{calls.push([name,column,value,width]);return column===null?rows[name]:rows[name].filter(row=>norm(row[column-1])===norm(value));};
  c.readLogEntries_=(team,reg)=>{calls.push(['logs',team||reg?1:null]);return rows.logs.filter(r=>(!team||norm(r.teamId)===norm(team))&&(!reg||norm(r.regNo)===norm(reg)));};

@@ -254,13 +254,14 @@ ${systemPanel}
 <div id="rubricDrawerBackdrop" class="team-drawer-backdrop" onclick="DashboardUI.closeRubricDrawer()" aria-hidden="true"></div>
 <aside id="rubricDrawer" class="team-drawer" role="dialog" aria-modal="true" aria-labelledby="rubricDrawerTitle" aria-hidden="true" inert>
   <div class="team-drawer-header"><div><div class="team-drawer-eyebrow">ASSESSMENT RUBRIC</div><h2 id="rubricDrawerTitle" class="team-drawer-title"></h2></div>
-  <button type="button" id="rubricDrawerClose" class="team-drawer-close" aria-label="Close rubric details" onclick="DashboardUI.closeRubricDrawer()">${renderLucideIcon_('x')}</button></div>
+  <button type="button" id="rubricDrawerClose" class="team-drawer-close app-btn btn-sm btn-secondary btn-icon" aria-label="Close rubric details" onclick="DashboardUI.closeRubricDrawer()">${renderLucideIcon_('x')}</button></div>
   <div id="rubricDrawerContent" class="team-drawer-content"></div>
 </aside>
 <script>
 ${getDashboardClientScript()}
 ${getInternalAssessmentPublishingClientScript_()}
 ${getGuideEvaluationClientScript()}
+${getGuideWeeklyClientScript_()}
 ${getReviewEvaluationClientScript_()}
 </script>
 </body>
@@ -280,7 +281,7 @@ function getSharedProjectTimelineData_() {
   const schedule = getProjectSchedule_();
   const clock = getProjectClock_(schedule);
   const windows = getWeeklySubmissionWindows_();
-  const current = windows.find(w=>clock.now.getTime() >= w.opens_at && clock.now.getTime() <= w.closes_at);
+  const current = windows.find(w=>clock.now.getTime() >= w.opens_at && clock.now.getTime() <= w.deadline_at);
   const definitions = [...composeProjectTimeline_(schedule.milestones,schedule.assessments), {key:'week1',label:'Weekly logging starts',day:projectDay_(new Date(windows[0].opens_at),schedule.timezone)}];
   return {
     schedule, today:clock.today, todayLabel:formatProjectDay_(clock.today),
