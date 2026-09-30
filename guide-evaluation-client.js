@@ -18,12 +18,14 @@ function guideEvaluationBrowser_() {
     if(dirty && !await DashboardUI.ask('Discard unsaved evaluation changes?')) return;
     let host=el('guideEvaluationEditor');
     if(!host) return;
+    host.dataset.team=String(team);
+    if(typeof GuideWeekly!=='undefined')GuideWeekly.selectView('evaluation',true);
     const version=++generation;
     host.hidden=false;host.innerHTML=DashboardUI.renderSkeleton('panel', 'Loading guide evaluation');busy=true;
     host.scrollIntoView({behavior:'smooth',block:'start'});
     rpc('loadGuideEvaluation',[team,register || ''],data=>{
       if(version!==generation)return;
-      busy=false;dirty=false;pending=null;current=data;render();
+      busy=false;dirty=false;pending=null;current=data;render();if(typeof GuideWeekly!=='undefined')GuideWeekly.evaluationStatus(data.roster.team,data.statuses);
     },err=>{if(version!==generation)return;busy=false;host.textContent='Unable to load: '+err.message;const retry=document.createElement('button');retry.className='app-btn btn-sm btn-secondary';retry.textContent='Retry';retry.onclick=()=>open(team,register);host.appendChild(retry);});
   }
   function render() {
@@ -42,7 +44,7 @@ function guideEvaluationBrowser_() {
       }).join('')+'<p id="guideEvalTotal"></p><p id="guideEvalMessage" role="status"></p><button class="app-btn btn-md btn-secondary" type="button" id="guideEvalDraft" '+(locked?'disabled data-locked="true"':'')+'>Save Draft</button> <button class="app-btn btn-lg btn-primary" type="button" id="guideEvalSubmit" '+(locked?'disabled data-locked="true"':'')+'>Submit Evaluation</button> <button class="app-btn btn-sm btn-secondary" type="button" id="guideEvalReload">Reload</button> <button class="app-btn btn-md btn-secondary" type="button" id="guideEvalClose">Close</button>';
     el('guideEvalStudent').onchange=e=>{const selected=e.target.value;e.target.value=d.student.register;open(d.roster.team,selected);};
     el('guideEvalReload').onclick=()=>open(d.roster.team,d.student.register);
-    el('guideEvalClose').onclick=async ()=>{if(!dirty || await DashboardUI.ask('Discard unsaved changes?')){host.hidden=true;dirty=false;}};
+    el('guideEvalClose').onclick=async ()=>{if(!dirty || await DashboardUI.ask('Discard unsaved changes?')){host.hidden=true;dirty=false;delete host.dataset.team;if(typeof GuideWeekly!=='undefined')GuideWeekly.selectView('title');}};
     el('guideEvalDraft').onclick=()=>save(false);el('guideEvalSubmit').onclick=()=>save(true);
     host.querySelectorAll('fieldset').forEach((field,index)=>{
       const update=()=>{

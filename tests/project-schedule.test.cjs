@@ -54,20 +54,19 @@ test('Milestones read once per execution independently of legacy Config values',
  f.c.getConfig=()=>{throw Error('Legacy Config must not be read');};assert.equal(f.c.getInternalReviewsCount_(),2);
 });
 
-test('guide evaluation button uses configured opening in the schedule timezone',()=>{
+test('guide evaluation tab uses configured opening in the schedule timezone',()=>{
  const {c,schedule}=fixture();
  c.getColumnMap=()=>({TEAM_ID:0});
  c.buildRepoLine=()=>'';
  const due=c.projectDay_('2026-10-12',schedule.timezone);
  const configured={...schedule,guide_eval:due,assessments:[...schedule.assessments,{key:'guide_eval',type:'GUIDE_EVALUATION',day:due,opens:due-5}]};
- const render=(instant,plan=configured)=>c.buildTeamCard(['T1'],'NOT_SUBMITTED','',null,
-   {schedule:plan,clock:c.getProjectClock_(plan,new Date(instant))});
+ const render=(instant,plan=configured)=>c.buildGuideEvaluationTab_(plan,c.getProjectClock_(plan,new Date(instant)));
  const before=render('2026-10-06T18:29:59Z');
  assert.match(before, /disabled title="Available from 07 Oct 2026/);
- assert.doesNotMatch(before, /onclick="GuideEvaluation.open/);
+ assert.doesNotMatch(before, /onclick="GuideWeekly.selectView/);
  for(const instant of ['2026-10-06T18:30:00Z','2026-10-12T12:00:00Z','2026-10-20T12:00:00Z']) {
    const html=render(instant);
-   assert.match(html, /onclick="GuideEvaluation.open/);
+   assert.match(html, /onclick="GuideWeekly.selectView/);
    assert.doesNotMatch(html, /disabled/);
  }
  const missing=render('2026-10-07T12:00:00Z',schedule);

@@ -158,19 +158,10 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   const account = d.githubAccount || {};
   const connected = !!account.githubId;
   const githubMembers = (d.githubSetup || {}).members || [];
-  const githubRows = d.rosterSlots.filter(student => String(student.email || '').trim()).map(student => {
-    const member = githubMembers.find(item => emailsMatch(item.email, student.email));
-    const missing = !member || !member.githubId;
-    const joined = !missing && member.status === 'valid' && member.access === 'active';
-    const status = missing ? 'Submit GitHub Account' : joined ? 'Repository joined' : 'Accept Invitation Email';
-    const icon = missing ? 'triangle-alert' : joined ? 'check' : 'clock';
-    const statusText = missing && !connected && emailsMatch(student.email, email)
-      ? `<button type="button" class="github-form-jump app-btn btn-md btn-secondary" onclick="DashboardUI.focusGithubAccountForm(this)">${escapeHtml(status)}</button>` : `<span>${escapeHtml(status)}</span>`;
-    return `<li class="github-member-status${missing ? ' is-missing' : joined ? ' is-joined' : ''}"><span class="github-member-register">${escapeHtml(student.regno || '')}</span><span class="github-member-separator" aria-hidden="true">—</span><span class="github-member-state">${renderLucideIcon_(icon)}${statusText}</span></li>`;
-  }).join('');
+  const githubRows = buildGithubMemberRows_(d.rosterSlots, githubMembers, !connected ? email : '');
   const githubBody = `<p class="step-detail">Team & GitHub setup due ${formatProjectDay_(d.schedule.formation)} · ${escapeHtml(d.githubNeedsUsername && !connected ? 'Waiting for GitHub account connection.' : githubTiming.text)}</p>
     <ul class="github-team-status" aria-label="Team GitHub status">${githubRows}</ul>
-    <div class="github-team-repository"><span class="github-repository-label">${renderLucideIcon_('git-branch', 'Team repository')}</span>${d.repoUrl ? `<a class="mono-detail link" href="${escapeHtml(d.repoUrl)}" target="_blank" rel="noopener">${escapeHtml(d.repoUrl)} ${renderLucideIcon_('external-link')}</a>` : '<span>Not available yet</span>'}</div>`;
+    ${buildGithubRepositoryLine_(d.repoUrl)}`;
   const githubCta = !connected
     ? `<form class="github-username-form" onsubmit="DashboardUI.previewGithubAccount(event, this)">
         <label for="studentGithubProfile">Submit GitHub Account</label>
@@ -330,4 +321,22 @@ function buildStudentPage(email, teamId) {
     'studentContent',
     buildStudentContent(email, teamId)
   );
+}
+
+/** Shared status-only rendering; an action email opts in to the Student form shortcut. */
+function buildGithubMemberRows_(roster, members, actionEmail) {
+  return roster.filter(student => String(student.email || '').trim()).map(student => {
+    const member = members.find(item => emailsMatch(item.email, student.email));
+    const missing = !member || !member.githubId;
+    const joined = !missing && member.status === 'valid' && member.access === 'active';
+    const status = missing ? 'Submit GitHub Account' : joined ? 'Repository joined' : 'Accept Invitation Email';
+    const icon = missing ? 'triangle-alert' : joined ? 'check' : 'clock';
+    const statusText = missing && actionEmail && emailsMatch(student.email, actionEmail)
+      ? `<button type="button" class="github-form-jump app-btn btn-md btn-secondary" onclick="DashboardUI.focusGithubAccountForm(this)">${escapeHtml(status)}</button>` : `<span>${escapeHtml(status)}</span>`;
+    return `<li class="github-member-status${missing ? ' is-missing' : joined ? ' is-joined' : ''}"><span class="github-member-register">${escapeHtml(student.regno || '')}</span><span class="github-member-separator" aria-hidden="true">—</span><span class="github-member-state">${renderLucideIcon_(icon)}${statusText}</span></li>`;
+  }).join('');
+}
+
+function buildGithubRepositoryLine_(repoUrl) {
+  return `<div class="github-team-repository"><span class="github-repository-label">${renderLucideIcon_('git-branch', 'Team repository')}</span>${repoUrl ? `<a class="mono-detail link" href="${escapeHtml(repoUrl)}" target="_blank" rel="noopener">${escapeHtml(repoUrl)} ${renderLucideIcon_('external-link')}</a>` : '<span>Not available yet</span>'}</div>`;
 }

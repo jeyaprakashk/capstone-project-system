@@ -161,7 +161,6 @@ body { max-width: 980px; margin: 24px auto; padding: 0 16px; }
 .reviewer-previous-notes { white-space:pre-wrap; }
 .reviewer-review-cell { min-width:120px; }
 .reviewer-review-cell small { display:block; margin-top:6px; color:#667085; }
-.reviewer-review-cell button:disabled { opacity:.5; cursor:not-allowed; }
 `;
 }
 

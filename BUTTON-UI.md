@@ -42,3 +42,16 @@ font size, padding, height, border, or colors in feature styles. Preserve `hidde
 disabled, and loading behavior. Navigation tabs, disclosure controls, rubric
 cards, and assessment choice controls are distinct components; retain their
 layout and selected-state styling instead of turning them into action buttons.
+
+## Disabled appearance
+
+`getStandardButtonStyles_()` owns the disabled appearance for all buttons,
+including navigation controls, and `app-btn` links with `aria-disabled="true"`.
+Use the shared `--color-disabled-bg` (#E8EAED), muted text, subtle solid border, full
+opacity, and not-allowed cursor. Do not add feature-specific disabled colors
+or opacity. Existing button dimensions and layout remain unchanged.
+
+For an availability-gated control, use `disabled-button-label` on its label
+with a bundled lock icon, and `disabled-button-caption` for its availability
+text. Keep the date in its tooltip. Do not add lock icons to temporary loading
+states. Styling does not disable links: retain their existing activation guards.

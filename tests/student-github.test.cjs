@@ -137,3 +137,15 @@ test('coordinator access sync reads and deduplicates TeamStatus repository URLs'
   assert.deepEqual(checked,['org/one','org/two']);
   assert.equal(f.locked(),false);
 });
+
+test('shared GitHub status renderer keeps Guide read-only and Student form shortcut explicit',()=>{
+  const c=vm.createContext({emailsMatch:(a,b)=>String(a).toLowerCase()===String(b).toLowerCase(),escapeHtml:value=>String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'),renderLucideIcon_:name=>'<svg data-icon="'+name+'"></svg>'});
+  vm.runInContext(fs.readFileSync('student-dashboard.js','utf8'),c);
+  const roster=[{email:'a',regno:'R1'},{email:'b',regno:'R2'},{email:'c',regno:'R3'}];
+  const members=[{email:'b',githubId:'2',status:'valid',access:'pending'},{email:'c',githubId:'3',status:'valid',access:'active'}];
+  const html=c.buildGithubMemberRows_(roster,members,'');
+  assert.match(html,/Submit GitHub Account/);assert.match(html,/Accept Invitation Email/);assert.match(html,/Repository joined/);
+  assert.doesNotMatch(html,/<button|<input|<form|onclick=/);
+  assert.match(c.buildGithubMemberRows_(roster,members,'a'),/focusGithubAccountForm/);
+  assert.match(c.buildGithubRepositoryLine_('https://github.com/org/team'),/target="_blank" rel="noopener"/);
+});

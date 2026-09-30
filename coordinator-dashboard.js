@@ -765,7 +765,6 @@ function getCoordinatorStyles() {
 }
 .system-status-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
 .system-status-heading button { padding:9px 18px; border:1px solid #dcdfe4; border-radius:8px; background:#fff; cursor:pointer; }
-.system-status-heading button:disabled { opacity:.6; cursor:wait; }
 #systemStatusMessage { color:#6b7280; font-size:13px; }
 .coordinator-card-placeholder { background:#fff; border:1px solid #e5e7eb; border-radius:16px; margin-bottom:24px; overflow:hidden; min-height:200px; box-shadow:0 2px 8px rgba(15,23,42,.04); }
 .coordinator-stat-placeholder .app-skeleton { min-height:110px; padding:8px 0; }
@@ -847,7 +846,6 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 #reviewConfigurationIssues { margin:8px 0 0; padding-left:18px; font-size:12px; }
 .review-config-card li { margin:4px 0; }
 .review-config-card p { margin:6px 0; font-size:13px; line-height:1.4; }
-#initializeAssessmentStorageButton:disabled { opacity:.55; cursor:not-allowed; }
 .coord-stats.coordinator-stats-grid { display:grid; width:100%; grid-template-columns:repeat(4,minmax(0,1fr)); grid-auto-rows:1fr; gap:12px; margin-bottom:24px; }
 .coordinator-stats-grid .stat-card { position:relative; display:flex; flex-direction:column; gap:8px; min-width:0; min-height:114px; box-sizing:border-box; padding:13px; background:#fff; border:1px solid #f0edf8; border-radius:7px; box-shadow:0 1px 1px rgba(15,23,42,.02); }
 .coordinator-stats-grid .stat-label { min-height:22px; padding-right:29px; font-size:9px; color:#64748b; font-weight:500; letter-spacing:.45px; text-transform:uppercase; line-height:1.4; }
@@ -1308,13 +1306,11 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .team-action-icon { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border:1px solid #dce3ee; border-radius:9px; background:#fff; color:#3b5bdb; cursor:pointer; text-decoration:none; padding:0; }
 .team-action-icon:hover { background:#eef2ff; border-color:#a5b4fc; }
 .team-action-icon:focus-visible { outline:2px solid #3b5bdb; outline-offset:3px; }
-.team-action-icon:disabled { opacity:.4; cursor:not-allowed; }
 .link-button { border: 0; background: transparent; padding: 0; cursor: pointer; font: inherit; }
 .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px; }
 .pagination-buttons { display: flex; gap: 4px; }
 .pagination-buttons button { padding: 6px 10px; border: 1px solid #dcdfe4; border-radius: 6px; background: #fff; font-size: 12px; cursor: pointer; }
 .pagination-buttons button.active { background: #1f2430; color: #fff; border-color: #1f2430; }
-.pagination-buttons button:disabled { opacity: 0.45; cursor: not-allowed; }
 .pagination-ellipsis { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; color: #6b7280; }
 .team-drawer-backdrop {
   position: fixed;

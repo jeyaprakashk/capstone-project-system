@@ -195,8 +195,6 @@ ${getLucideStyles_()}
 .rubric-assessment { display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; min-width:0; gap:18px; padding:18px; border:1px solid #45526b; border-radius:10px; background:#1b2335; color:#c5cee0; font:inherit; text-align:left; cursor:pointer; overflow-wrap:anywhere; transition:background .18s ease,border-color .18s ease; }
 .rubric-assessment strong { flex:1 1 100px; min-width:0; font-size:16px; line-height:1.4; color:#f5f7fa; }
 .rubric-assessment:hover:enabled { border-color:#9e77ed; background:#302747; }
-.rubric-assessment:disabled { cursor:default; color:#a8b3c7; background:#171e2c; opacity:1; }
-.rubric-assessment:disabled strong { color:#bdc7da; }
 .rubric-assessment span { font-size:14px; line-height:1.5; }
 .rubric-assessment .rubric-weight { flex:0 0 auto; max-width:100%; box-sizing:border-box; padding:3px 9px; border:1px solid #705494; border-radius:var(--pill-radius); background:#332647; color:#e2d9ff; font-size:14px; font-weight:700; }
 .rubric-assessment .rubric-header, .rubric-assessment .rubric-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; width:100%; min-width:0; text-align:left; }
@@ -219,7 +217,6 @@ ${getLucideStyles_()}
   .shared-rubrics .rubric-view-button:hover:enabled { color:#f8fafc; }
   .shared-rubrics .rubric-view-button:hover:enabled::before { background:#1b2433; border-color:#64748b; }
   .shared-rubrics .rubric-view-button:focus-visible { outline:3px solid #cbd5e1; outline-offset:3px; }
-  .shared-rubrics .rubric-view-button:disabled { opacity:.5; cursor:default; }
 }
 @container rubrics (min-width:480px) { .rubric-assessments { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @container rubrics (min-width:960px) { .rubric-assessments { grid-template-columns:repeat(4,minmax(0,1fr)); } }
