@@ -207,12 +207,13 @@ function repairTeamGithubSetup_(teamId) {
 }
 
 function githubSubmissionTiming_(setup, schedule, clock) {
+  if (!Number.isFinite(schedule.git)) return { state:'unknown', text:'GitHub deadline is unavailable. Configure the git milestone.' };
   if (setup.verificationUnavailable || (setup.usernamesComplete && setup.completedAt === null)) return { state: 'unknown', text: 'Submission timing could not be verified.' };
-  if (!setup.usernamesComplete) return clock.today > schedule.formation
+  if (!setup.usernamesComplete) return clock.today > schedule.git
     ? { state: 'overdue', text: 'GitHub username submissions overdue.' }
     : { state: 'pending', text: 'Waiting for all valid username submissions.' };
   const day = projectDay_(new Date(setup.completedAt), schedule.timezone);
-  return day > schedule.formation ? { state: 'late', text: 'All valid usernames submitted late.' } : { state: 'on-time', text: 'All valid usernames submitted on time.' };
+  return day > schedule.git ? { state: 'late', text: 'All valid usernames submitted late.' } : { state: 'on-time', text: 'All valid usernames submitted on time.' };
 }
 
 /** Title intake requires accepted access; provisioning may still finish with invitations pending. */

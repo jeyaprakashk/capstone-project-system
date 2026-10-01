@@ -23,12 +23,12 @@ function weeklyFixture() {
     SpreadsheetApp:{openById:()=>book,flush(){}},LockService:{getScriptLock:()=>lock},Session:{getActiveUser:()=>({getEmail:()=>user})},
     Utilities:{getUuid:()=>crypto.randomUUID(),formatDate:(date,tz,pattern)=>pattern==='yyyy-MM-dd'?new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(date):date.toISOString()},
     MailApp:{sendEmail:(...args)=>{if(mailFails)throw Error('Mail unavailable');mails.push(args);}},
-    ScriptApp:{getProjectTriggers:()=>triggers.slice(),deleteTrigger:t=>triggers.splice(triggers.indexOf(t),1),newTrigger:name=>({timeBased(){return this;},everyHours(n){this.hours=n;return this;},create(){triggers.push({getHandlerFunction:()=>name,hours:this.hours});}})}
+    ScriptApp:{getProjectTriggers:()=>triggers.slice(),deleteTrigger:t=>triggers.splice(triggers.indexOf(t),1),newTrigger:name=>({timeBased(){return this;},everyHours(n){this.hours=n;return this;},atHour(n){this.hour=n;return this;},everyDays(n){this.days=n;return this;},inTimezone(tz){this.timezone=tz;return this;},create(){triggers.push({getHandlerFunction:()=>name,hours:this.hours,hour:this.hour,days:this.days,timezone:this.timezone});}})}
   });
-  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','weekly-activity.js','logbook-tracker.js','weekly-progress-phase2.js','marks-tracker.js','guide-dashboard.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','weekly-activity.js','logbook-tracker.js','progress-eligibility.js','progress-eligibility-migration.js','team-github-setup.js','weekly-progress-phase2.js','marks-tracker.js','guide-dashboard.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
   c.parseGithubRepoUrl_=url=>{const m=String(url).match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+?)(?:\.git)?\/?$/i);return m?{owner:m[1],repo:m[2]}:null;};
   const definitions=vm.runInContext('FIELD_DEFINITIONS',c);
-  const ts=Object.values(definitions.TEAM_STATUS).concat('Repo URL','Progress Eligible From Week ID'),tr=Object.values(definitions.TEAM_ROSTER);
+  const ts=Object.values(definitions.TEAM_STATUS).concat('Repo URL'),tr=Object.values(definitions.TEAM_ROSTER);
   const member={'Team ID':'T1','Student 1 Name':'One','Student 1 Register No':'001','Student 1 Email':'one@example.com','Student 2 Name':'Two','Student 2 Register No':'002','Student 2 Email':'two@example.com','Title':'Project','Reviewer Decision':'Approved','Repo URL':'https://github.com/org/team'};
   const status=sheet('TeamStatus',[ts,ts.map(h=>member[h]||'')]),roster=sheet('TeamRoster',[tr,tr.map(h=>member[h]||'')]);
   sheet('LogEntries',[Object.values(definitions.LOG_ENTRIES)]);
@@ -48,10 +48,13 @@ function weeklyFixture() {
   Object.assign(c,{getConfig:key=>{if(!(key in config))throw Error('Missing '+key);return config[key];},getCoordinatorEmail:()=> 'coord@example.com',
     activityIsCoordinator_:email=>email==='coord@example.com',getDashboardUrl:()=> 'https://script.google.com/dashboard',
     getTeamGithubSetup_:()=>({...githubSetup,ready,message:ready?'Ready':'Unavailable'}),requireTeamGithubReady_:()=>{if(!ready)throw Error('GitHub unavailable');return c.getTeamGithubSetup_();}});
+  const fields=vm.runInContext('PROGRESS_ELIGIBILITY_FIELDS_',c), peHeaders=Object.values(fields);
+  const pe=sheet('ProgressEligibility',[peHeaders,...['001','002'].map(reg=>peHeaders.map(h=>({'Register Number':reg,'Team':'T1','Progress Eligible From Week ID':'W1','Enforced From Week ID':'W1','Eligibility Fixed At':new Clock(),'Status':'FIXED'}[h]||'')))]);
+  const setEligibility=(week,reg)=>pe.rows.slice(1).forEach(row=>{if(!reg||row[0]===reg){row[peHeaders.indexOf('Progress Eligible From Week ID')]=week;row[peHeaders.indexOf('Enforced From Week ID')]=week;row[peHeaders.indexOf('Eligibility Fixed At')]=week?new Clock():'';}});
   const set=(header,value)=>status.rows[1][ts.indexOf(header)]=value;
   const input=(extra={})=>({requestId:crypto.randomUUID(),weekId:'W1',workCompleted:'Work',guideDiscussion:'Decision',blockers:'None',nextAction:'Next',...extra});
-  return {c,collectionStatus,config,sheets,status,roster,ts,tr,mails,properties,errors,triggers,sheet,input,set,githubSetup,
+  return {c,collectionStatus,config,sheets,status,roster,ts,tr,mails,properties,errors,triggers,sheet,input,set,setEligibility,pe,fields,githubSetup,
     time:value=>{now=Date.parse(value);},user:value=>{user=value;},ready:value=>{ready=value;},mailFails:value=>{mailFails=value;},locked:()=>locked,
-    entries:()=>c.readLogEntries_(),eligible:()=>status.rows[1][ts.indexOf('Progress Eligible From Week ID')]};
+    entries:()=>c.readLogEntries_(),eligible:()=>pe.rows[1][peHeaders.indexOf('Progress Eligible From Week ID')]};
 }
 module.exports={weeklyFixture};

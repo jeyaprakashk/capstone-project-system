@@ -143,15 +143,17 @@ Submit/Update buttons appear only for editable weeks; frozen reports remain in
 submission history. Refresh preserves unsaved text and disables a form that has
 become frozen. Missing counts begin after the late cutoff.
 
-Deploy the changed files together. From the Apps Script editor, as the configured
-Coordinator/PD:
+Release and setup require separate authorization. For the individual eligibility
+cutover, follow [PROGRESS-ELIGIBILITY.md](PROGRESS-ELIGIBILITY.md) before enabling
+weekly processing. The following describes storage and the existing hourly schedule:
 
 1. Run `setupWeeklySubmissionStorage()`. It creates/initializes only empty
-   LogEntries storage and adds the eligibility column to TeamStatus. Existing
+   LogEntries and ProgressEligibility storage. Existing
    incompatible storage fails instead of being overwritten.
-2. Run `processWeeklySubmissionSchedule()` to establish eligibility for currently
-   approved/ready teams. Use windows beginning at the intended Phase 1 cutover;
-   do not invent prior eligibility from archived Form timestamps.
+2. The hourly `processWeeklySubmissionSchedule()` consumes persisted individual
+   eligibility only; it never establishes or reconciles eligibility. The isolated
+   migration reconstructs historical eligibility and applies its cutover floor.
+   Complete and verify migration before activating daily reconciliation.
 3. Run `setupWeeklySubmissionTriggers()` to install one hourly schedule handler
    and remove current-owner installations of `onFormSubmit`,
    `sendWeeklyLogReminders`, and `sendWeeklyAnalysisDigest`.
@@ -179,18 +181,22 @@ Submitted At | First Submitted At | Timeliness | Entry Status | Work Completed |
 Guide Discussion/Decision | Problems/Blockers | Next Week Plan
 ```
 
-New TeamStatus header: **Progress Eligible From Week ID**.
+Individual eligibility authority: **ProgressEligibility**. Its complete schema,
+evidence policy and cutover procedure are in [PROGRESS-ELIGIBILITY.md](PROGRESS-ELIGIBILITY.md).
+The old TeamStatus eligibility column is not read or written by production code.
 
 Roster membership is checked against TeamRoster and TeamStatus; mismatches or
 ambiguous identities fail closed. Repository URLs remain solely in TeamStatus.
 No names, guide assignments, repository registry or readiness statuses are copied
-into LogEntries. Eligibility recording uses the first still-open normal window,
-or the next future window, when both title approval and GitHub readiness are
-confirmed. Earlier windows contribute no Expected Weeks, reminders or MISSED rows.
-Existing title-approval/provisioning completion hooks and the hourly handler
-capture eligibility; the dashboard also confirms it. Once persisted, temporary
-GitHub/API failure never moves or removes that boundary. Live prerequisite failures
-may still block a new submission without erasing obligations or history.
+into LogEntries. Eligibility uses the first normal Deadline At at or after the
+later of the student's effective collaborator date and authoritative title
+confirmation date. Only the daily reconciliation fixes unresolved students.
+Dashboard, submission, approval, provisioning and hourly processing never reconcile
+eligibility. Once fixed, it remains persisted. Each student's enforcement boundary
+controls required counts, reminders and MISSED generation. Earlier historically
+eligible windows may be submitted voluntarily while their existing timing rules
+permit it; they do not create obligations. Another student's incomplete GitHub
+setup does not block an individually eligible student.
 
 LogEntries is append-only. Do not manually edit, reorder or sort source rows; use
 separate sheet views when inspecting history. Effective entry is the last physical

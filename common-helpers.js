@@ -718,22 +718,22 @@ function getLogWeekSummary_(records, eligibleFrom, regNo, now) {
     due:current ? projectDay_(new Date(current.deadline_at),timezone) : null};
 }
 
-/** Roll up effective individual obligations, bounded by the durable team eligibility. */
+/** Roll up persisted individual obligations; students without an obligation do not prevent completion. */
 function getTeamLogWeekSummary_(row, columns, logs, schedule, clock) {
-  const index = getOptionalHeaderIndex_(getSheet(SHEET_NAMES.TEAM_STATUS),WEEKLY_ELIGIBILITY_HEADER_);
-  if (index < 0) throw new Error('Initialize weekly progress storage first.');
-  const eligibleFrom = String(row[index] || '');
   const registers = [1,2,3,4].filter(n=>row[columns['S'+n+'_EMAIL']]).map(n=>row[columns['S'+n+'_REGNO']]);
-  if (!eligibleFrom) return {missing:0,expectedWeeks:0,firstMissingDue:null,currentLogged:false,loggedStudents:0,totalStudents:registers.length,active:false,week:null,due:null};
   if (registers.some(r=>!r) || new Set(registers.map(normalizeText_)).size !== registers.length) throw new Error('Student register numbers are missing or ambiguous.');
-  const summaries = registers.map(regNo=>getLogWeekSummary_(logs,eligibleFrom,regNo,clock && clock.now));
+  const eligibility = readProgressEligibility_();
+  const summaries = registers.map(regNo=>{
+    const record = progressStudentEligibility_({regNo,teamId:row[columns.TEAM_ID]},eligibility);
+    return getLogWeekSummary_(logs,record.eligibleFrom ? record.enforcedFrom : '',regNo,clock && clock.now);
+  });
   const dueDates = summaries.filter(s=>s.firstMissingDue !== null).map(s=>s.firstMissingDue);
-  const current = summaries[0];
+  const active = summaries.filter(s=>s.active), current = active[0];
   return {missing:summaries.reduce((n,s)=>n+s.missing,0), expectedWeeks:summaries.reduce((n,s)=>n+s.expectedWeeks,0),
     firstMissingDue:dueDates.length ? Math.min(...dueDates) : null,
-    currentLogged:summaries.length > 0 && summaries.every(s=>s.currentLogged),
-    loggedStudents:summaries.filter(s=>s.currentLogged).length,totalStudents:registers.length,
-    active:!!current && current.active,week:current ? current.week : null,due:current ? current.due : null};
+    currentLogged:active.length > 0 && active.every(s=>s.currentLogged),
+    loggedStudents:active.filter(s=>s.currentLogged).length,totalStudents:registers.length,
+    active:active.length > 0,week:current ? current.week : null,due:current ? current.due : null};
 }
 
 /** Shared headers for refreshable, non-student dashboard containers. */

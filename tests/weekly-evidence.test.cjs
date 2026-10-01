@@ -24,7 +24,7 @@ test('evidence uses inclusive configured normal boundaries, offsets and not late
 });
 
 test('a late report does not include late-period commits or inherit their attribution errors',()=>{
- const f=fixture();f.set('Progress Eligible From Week ID','W1');
+ const f=fixture();f.setEligibility('W1');
  f.commit('2026-01-05T18:00:00Z');
  f.commit('2026-01-05T18:00:00.001Z',{authorId:'invalid'});
  f.commit('2026-01-08T10:00:00Z');

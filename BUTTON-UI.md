@@ -17,6 +17,7 @@ these are minimum heights, not clipping constraints.
 | --- | --- |
 | `btn-primary` | Main action, submit, publish |
 | `btn-secondary` | Refresh, email, view, cancel, reload |
+| `btn-help` | Borderless help or explanation trigger; pair with `btn-icon` and a labelled question-mark icon |
 | `btn-success` | Approve or accept |
 | `btn-warning` | Revise, reopen, or request corrections |
 | `btn-danger` | Reject or destructive actions |

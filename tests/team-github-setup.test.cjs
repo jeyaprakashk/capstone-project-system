@@ -186,10 +186,11 @@ test('invitation inspection follows pagination and rejects expired invitations',
 });
 
 test('timeliness uses all valid member timestamps, local deadline date, and reports unknown separately',()=>{
-  const f=fixture();const schedule={formation:Date.parse('2026-09-02T00:00:00Z')/86400000,timezone:'Asia/Kolkata'};
-  const clock={today:schedule.formation+2};
+  const f=fixture();const schedule={git:Date.parse('2026-09-02T00:00:00Z')/86400000,formation:Date.parse('2026-08-20T00:00:00Z')/86400000,timezone:'Asia/Kolkata'};
+  const clock={today:schedule.git+2};
   const timing=()=>f.c.githubSubmissionTiming_(f.state(),schedule,clock).state;
   assert.equal(timing(),'on-time');
+  assert.equal(f.c.githubSubmissionTiming_(f.state(),{formation:schedule.formation},clock).state,'unknown');
   f.usernames[1][0]=new Date('2026-09-02T19:00:00Z');assert.equal(timing(),'late');
   f.usernames[1][0]='';assert.equal(timing(),'unknown');
   f.usernames.pop();assert.equal(timing(),'overdue');

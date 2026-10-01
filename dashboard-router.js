@@ -195,7 +195,7 @@ ${getLucideStyles_()}
 .rubric-assessment { display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; min-width:0; gap:18px; padding:18px; border:1px solid #45526b; border-radius:10px; background:#1b2335; color:#c5cee0; font:inherit; text-align:left; cursor:pointer; overflow-wrap:anywhere; transition:background .18s ease,border-color .18s ease; }
 .rubric-assessment strong { flex:1 1 100px; min-width:0; font-size:16px; line-height:1.4; color:#f5f7fa; }
 .rubric-assessment:hover:enabled { border-color:#9e77ed; background:#302747; }
-.rubric-assessment span { font-size:14px; line-height:1.5; }
+.rubric-assessment span { font-size:var(--font-size-body); line-height:1.5; }
 .rubric-assessment .rubric-weight { flex:0 0 auto; max-width:100%; box-sizing:border-box; padding:3px 9px; border:1px solid #705494; border-radius:var(--pill-radius); background:#332647; color:#e2d9ff; font-size:14px; font-weight:700; }
 .rubric-assessment .rubric-header, .rubric-assessment .rubric-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; width:100%; min-width:0; text-align:left; }
 .rubric-assessment .rubric-footer { margin-top:auto; }
@@ -228,7 +228,7 @@ ${getLucideStyles_()}
 .rubric-assessment:focus-visible, #rubricDrawer button:focus-visible { outline:3px solid #9e77ed; outline-offset:3px; }
 .rubric-levels { margin:12px 0 0; }
 .rubric-levels dt { margin-top:10px; font-size:12px; font-weight:600; color:#344054; }
-.rubric-levels dd { margin:4px 0 0; color:#667085; font-size:13px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
+.rubric-levels dd { margin:4px 0 0; color:#667085; font-size:var(--font-size-body); line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
 #rubricDrawer .drawer-project-title { white-space:pre-wrap; overflow-wrap:anywhere; }
 @media(max-width:600px) { .shared-rubrics { padding:16px; } }
 ${getEditorialStyles_()}

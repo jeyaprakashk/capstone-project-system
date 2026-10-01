@@ -159,7 +159,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   const connected = !!account.githubId;
   const githubMembers = (d.githubSetup || {}).members || [];
   const githubRows = buildGithubMemberRows_(d.rosterSlots, githubMembers, !connected ? email : '');
-  const githubBody = `<p class="step-detail">Team & GitHub setup due ${formatProjectDay_(d.schedule.formation)} · ${escapeHtml(d.githubNeedsUsername && !connected ? 'Waiting for GitHub account connection.' : githubTiming.text)}</p>
+  const githubBody = `<p class="step-detail">GitHub setup due ${Number.isFinite(d.schedule.git) ? formatProjectDay_(d.schedule.git) : 'Date unavailable'} · ${escapeHtml(d.githubNeedsUsername && !connected ? 'Waiting for GitHub account connection.' : githubTiming.text)}</p>
     <ul class="github-team-status" aria-label="Team GitHub status">${githubRows}</ul>
     ${buildGithubRepositoryLine_(d.repoUrl)}`;
   const githubCta = !connected
@@ -248,7 +248,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   // WEEKLY PROGRESS LOG
   // ===============================================================
 
-  const logCard = setupComplete ? '<section class="student-weekly-card">' +
+  const logCard = titleApproved ? '<section class="student-weekly-card">' +
     '<section id="studentWeeklyProgress" aria-label="Weekly progress">' +
     '<div class="weekly-card-heading"><h3>Weekly progress</h3><button type="button" class="app-btn btn-sm btn-secondary" data-weekly-refresh aria-label="Refresh weekly progress" onclick="DashboardUI.loadWeeklyProgress()">Refresh</button></div>' +
     '<div data-weekly-read>' + getSkeletonMarkup_('panel','Loading weekly progress') + '</div>' +
@@ -301,8 +301,8 @@ function buildStudentContent(email, teamId, teamStatusRow) {
 
     <div class="student-summary-grid">
       <section class="student-summary-card" aria-label="Recent logs">
-        <header class="heading-row"><h3>Recent logs</h3>${setupComplete ? '<a href="#studentWeeklyProgress" onclick="DashboardUI.openWeeklyActivity(this);return false;">View all logs</a>' : ''}</header>
-        <div id="studentRecentActivity">${setupComplete ? getSkeletonMarkup_('panel','Loading recent logs') : '<p>Weekly logs will appear after project setup.</p>'}</div>
+        <header class="heading-row"><h3>Recent logs</h3>${titleApproved ? '<a href="#studentWeeklyProgress" onclick="DashboardUI.openWeeklyActivity(this);return false;">View all logs</a>' : ''}</header>
+        <div id="studentRecentActivity">${titleApproved ? getSkeletonMarkup_('panel','Loading recent logs') : '<p>Weekly logs will appear after project setup.</p>'}</div>
       </section>
       <section class="student-summary-card student-assessments-card" aria-label="Assessments"><header><h3>Assessments</h3></header>
     ${getAssessmentDefinitions_().filter(d=>d.type==='REVIEW').map(d=>'<section id="studentAssessment-'+escapeHtml(d.key)+'" data-review-result="'+escapeHtml(d.key)+'" data-assessment-label="'+escapeHtml(d.label)+'" class="assessment-section" aria-live="polite">'+getSkeletonMarkup_('panel', 'Loading '+d.label+' results')+'</section>').join('')}
@@ -324,7 +324,7 @@ function buildStudentPage(email, teamId) {
 }
 
 /** Shared status-only rendering; an action email opts in to the Student form shortcut. */
-function buildGithubMemberRows_(roster, members, actionEmail) {
+function buildGithubMemberRows_(roster, members, actionEmail, showNames, renderTiming) {
   return roster.filter(student => String(student.email || '').trim()).map(student => {
     const member = members.find(item => emailsMatch(item.email, student.email));
     const missing = !member || !member.githubId;
@@ -333,10 +333,12 @@ function buildGithubMemberRows_(roster, members, actionEmail) {
     const icon = missing ? 'triangle-alert' : joined ? 'check' : 'clock';
     const statusText = missing && actionEmail && emailsMatch(student.email, actionEmail)
       ? `<button type="button" class="github-form-jump app-btn btn-md btn-secondary" onclick="DashboardUI.focusGithubAccountForm(this)">${escapeHtml(status)}</button>` : `<span>${escapeHtml(status)}</span>`;
-    return `<li class="github-member-status${missing ? ' is-missing' : joined ? ' is-joined' : ''}"><span class="github-member-register">${escapeHtml(student.regno || '')}</span><span class="github-member-separator" aria-hidden="true">—</span><span class="github-member-state">${renderLucideIcon_(icon)}${statusText}</span></li>`;
+    return `<li class="github-member-status${missing ? ' is-missing' : joined ? ' is-joined' : ''}"><span class="github-member-register">${showNames && student.name ? '<strong>'+escapeHtml(student.name)+'</strong><br>' : ''}${escapeHtml(student.regno || '')}</span><span class="github-member-separator" aria-hidden="true">—</span><span class="github-member-state">${renderLucideIcon_(icon)}${statusText}</span>${renderTiming ? '<span class="github-member-timing">'+renderTiming(member)+'</span>' : ''}</li>`;
   }).join('');
 }
 
-function buildGithubRepositoryLine_(repoUrl) {
+function buildGithubRepositoryLine_(repoUrl, compact) {
+  const match=String(repoUrl || '').match(/^https:\/\/github\.com\/([^/]+)\/([^/?#]+)/i);
+  if(compact && match)return `<div class="github-team-repository">${renderLucideIcon_('git-branch', 'Team repository')}<a class="link" href="${escapeHtml(repoUrl)}" title="${escapeHtml(match[1])}" target="_blank" rel="noopener">${escapeHtml(match[2])} ${renderLucideIcon_('external-link')}</a></div>`;
   return `<div class="github-team-repository"><span class="github-repository-label">${renderLucideIcon_('git-branch', 'Team repository')}</span>${repoUrl ? `<a class="mono-detail link" href="${escapeHtml(repoUrl)}" target="_blank" rel="noopener">${escapeHtml(repoUrl)} ${renderLucideIcon_('external-link')}</a>` : '<span>Not available yet</span>'}</div>`;
 }

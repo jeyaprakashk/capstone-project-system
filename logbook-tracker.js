@@ -275,10 +275,7 @@ function weeklyTeam_(teamId) {
   const matches = readSheetRows_(sheet, 2).map((row,index) => ({row,rowNumber:index+2}))
     .filter(item => textEquals_(item.row[columns.TEAM_ID], teamId));
   if (matches.length !== 1) throw new Error('Team is missing or ambiguous.');
-  const eligibilityColumn = getOptionalHeaderIndex_(sheet, WEEKLY_ELIGIBILITY_HEADER_);
-  if (eligibilityColumn < 0) throw new Error('Initialize weekly progress storage first.');
-  return {...matches[0], sheet, columns, eligibilityColumn, teamId:String(matches[0].row[columns.TEAM_ID]),
-    eligibleFrom:String(matches[0].row[eligibilityColumn] || '')};
+  return {...matches[0], sheet, columns, teamId:String(matches[0].row[columns.TEAM_ID])};
 }
 
 /** Validated current roster; no duplicated identity registry. */
@@ -314,34 +311,6 @@ function authorizeWeeklyStudent_() {
   const student = weeklyStudents_().find(item => item.email === email);
   if (!student) throw new Error('Student membership was not found.');
   return student;
-}
-
-/** First applicable means the still-open normal window, or the next future one. */
-function ensureWeeklyProgressEligibility_(teamId, ready, now) {
-  return weeklyLock_(() => {
-    const team = weeklyTeam_(teamId), windows = getWeeklySubmissionWindows_();
-    if (team.eligibleFrom) {
-      if (!windows.some(w=>w.weekId === team.eligibleFrom)) throw new Error('Eligibility references an unknown Week ID.');
-      return team.eligibleFrom;
-    }
-    if (!ready || getTeamStatus(team.row) !== 'APPROVED') return '';
-    const window = windows.find(w => w.deadline_at >= (now || new Date()).getTime());
-    if (!window) return '';
-    team.sheet.getRange(team.rowNumber, team.eligibilityColumn+1).setValue(window.weekId);
-    SpreadsheetApp.flush();
-    return window.weekId;
-  });
-}
-
-/** Hooks must not fail unrelated title/provisioning operations before Phase 1 setup. */
-function recordWeeklyEligibilityIfConfigured_(teamId, setup) {
-  try {
-    if (getOptionalHeaderIndex_(getSheet(SHEET_NAMES.TEAM_STATUS), WEEKLY_ELIGIBILITY_HEADER_) < 0) return;
-    const team = weeklyTeam_(teamId);
-    if (team.eligibleFrom || getTeamStatus(team.row) !== 'APPROVED') return;
-    const verified = setup || getTeamGithubSetup_(teamId);
-    ensureWeeklyProgressEligibility_(teamId, verified.ready, new Date());
-  } catch (error) { console.error('Weekly eligibility not recorded: ' + error.message); }
 }
 
 function eligibleWeeklyWindows_(eligibleFrom, windows) {
@@ -442,14 +411,14 @@ function submitWeeklyProgress(input) {
     const team = weeklyTeam_(student.teamId);
     if (weeklyGuideFrozen_(records,input.weekId,weeklySignedEntryIds_())) throw new Error('Guide confirmation has frozen this week. Further revisions are not allowed.');
     if (getTeamStatus(team.row) !== 'APPROVED') throw new Error('Your title must be approved before weekly submission.');
-    const setup = requireTeamGithubReady_(student.teamId,student.email);
+    const eligibility = progressStudentEligibility_(student);
     if (!getRepoUrlForTeam(student.teamId)) throw new Error('The team repository is unavailable.');
     const now = new Date(), windows = getWeeklySubmissionWindows_();
-    const eligibleFrom = ensureWeeklyProgressEligibility_(student.teamId,true,now);
+    const eligibleFrom = eligibility.eligibleFrom;
     const window = resolveWeeklySubmissionWindow_(windows,eligibleFrom,now,input.weekId);
     const {first,editable} = weeklySubmissionState_(window,records,now);
     if (!editable) throw new Error('This submission is frozen and cannot be revised after its deadline.');
-    const evidence = readWeeklyProgressEvidence_(student,window.weekId,weeklyEvidenceSource_(student,{setup,logs:records}));
+    const evidence = readWeeklyProgressEvidence_(student,window.weekId,weeklyEvidenceSource_(student,{logs:records}));
     if (evidence.state !== 'available') throw new Error(evidence.message || 'GitHub activity is unavailable. Refresh GitHub Activity before submitting.');
     if (evidence.count < 1) throw new Error('No GitHub activity found for you this week. Commit your project work/evidence to the team repository, then refresh.');
     const record = {...content,id:Utilities.getUuid(),requestId:input.requestId,regNo:student.regNo,teamId:student.teamId,
@@ -464,36 +433,37 @@ function submitWeeklyProgress(input) {
 
 function loadStudentWeeklyProgress() {
   const student = authorizeWeeklyStudent_(), team = weeklyTeam_(student.teamId);
-  const setup = getTeamGithubSetup_(student.teamId);
+  const eligibility = progressStudentEligibility_(student);
   const now = new Date(), windows = getWeeklySubmissionWindows_();
-  const eligibleFrom = ensureWeeklyProgressEligibility_(student.teamId,setup.ready,now);
-  const ready = setup.ready && getTeamStatus(team.row) === 'APPROVED';
+  const eligibleFrom = eligibility.eligibleFrom, enforcedFrom = eligibility.enforcedFrom;
+  const ready = !!eligibleFrom && getTeamStatus(team.row) === 'APPROVED';
   const records = readLogEntries_(null,student.regNo);
   const allowed = eligibleWeeklyWindows_(eligibleFrom,windows);
   const signedIds = weeklySignedEntryIds_();
   const weeks = allowed.filter(w=>now.getTime() >= w.opens_at).map(w=>{
     const {state,editable} = weeklySubmissionState_(w,records,now);
     const guideFrozen = weeklyGuideFrozen_(records,w.weekId,signedIds);
-    return {weekId:w.weekId,state,guideFrozen,editable:ready && editable && !guideFrozen,opens:new Date(w.opens_at).toISOString(),
+    const obligatory = !!eligibleFrom && eligibleWeeklyWindows_(enforcedFrom,windows).some(value=>value.weekId === w.weekId);
+    return {weekId:w.weekId,state:!obligatory && state === 'MISSED' ? 'NOT REQUIRED' : state,obligatory,guideFrozen,editable:ready && editable && !guideFrozen,opens:new Date(w.opens_at).toISOString(),
       deadline:new Date(w.deadline_at).toISOString(),cutoff:new Date(w.late_until).toISOString()};
   });
   const actions = weeks.filter(w=>w.editable);
   const serial = records.map(r=>({...r, recordedAt:new Date(r.recordedAt).toISOString(),
     submittedAt:r.submittedAt ? new Date(r.submittedAt).toISOString() : '',
     firstSubmittedAt:r.firstSubmittedAt ? new Date(r.firstSubmittedAt).toISOString() : ''}));
-  return {checkedAt:now.toISOString(),eligibleFrom,ready,complete:!!eligibleFrom && windows.every(w=>now.getTime() > w.late_until) && getLogWeekSummary_(records,eligibleFrom,student.regNo,now).missing === 0,weeks,actions,history:serial,timezone:getSpreadsheet().getSpreadsheetTimeZone(),
+  return {checkedAt:now.toISOString(),eligibleFrom,enforcedFrom,eligibilityStatus:eligibility.status,ready,complete:!!eligibleFrom && windows.every(w=>now.getTime() > w.late_until) && getLogWeekSummary_(records,enforcedFrom,student.regNo,now).missing === 0,weeks,actions,history:serial,timezone:getSpreadsheet().getSpreadsheetTimeZone(),
     allWeeks:windows.map(w=>({weekId:w.weekId,opens:new Date(w.opens_at).toISOString(),deadline:new Date(w.deadline_at).toISOString()})),
-    evidence:readStudentWeeklyEvidence_(student,windows.filter(w=>now.getTime() >= w.opens_at),{setup,logs:records}),
-    summary:getLogWeekSummary_(records,eligibleFrom,student.regNo,now),
-    message:ready ? (actions.length ? '' : 'No submission window is open.') : 'An approved title and ready GitHub repository are required to submit.'};
+    evidence:readStudentWeeklyEvidence_(student,windows.filter(w=>now.getTime() >= w.opens_at),{logs:records}),
+    summary:getLogWeekSummary_(records,eligibleFrom ? enforcedFrom : '',student.regNo,now),
+    message:ready ? (actions.length ? '' : 'No submission window is open.') : 'An approved title and fixed individual progress eligibility are required to submit.'};
 }
 
 function appendMissedWeeklyEntries_(students, windows, now) {
   // Caller holds the same script lock used by student writes.
-  const records = readLogEntries_();
+  const records = readLogEntries_(), eligibilities = readProgressEligibility_();
   students.forEach(student => {
-    const team = weeklyTeam_(student.teamId);
-    eligibleWeeklyWindows_(team.eligibleFrom,windows).filter(w=>now.getTime() > w.late_until).forEach(window => {
+    const eligibility = progressStudentEligibility_(student,eligibilities);
+    eligibleWeeklyWindows_(eligibility.eligibleFrom ? eligibility.enforcedFrom : '',windows).filter(w=>now.getTime() > w.late_until).forEach(window => {
       if (records.some(r=>textEquals_(r.regNo,student.regNo) && r.weekId === window.weekId)) return;
       const record = {id:Utilities.getUuid(),requestId:'',regNo:student.regNo,teamId:student.teamId,weekId:window.weekId,
         actor:'SYSTEM',recordedAt:now,submittedAt:'',firstSubmittedAt:'',timeliness:'MISSED',entryStatus:'MISSED'};
@@ -506,16 +476,13 @@ function processWeeklySubmissionSchedule() {
   const windows = getWeeklySubmissionWindows_();
   const hours = Number(getConfig('SUBMISSION_REMINDER_HOURS'));
   if (!Number.isFinite(hours) || hours <= 0) throw new Error('SUBMISSION_REMINDER_HOURS must be positive.');
-  // Discover first eligibility without making existing obligations depend on live GitHub.
-  const students = weeklyStudents_();
-  [...new Set(students.map(s=>s.teamId))].forEach(teamId=>recordWeeklyEligibilityIfConfigured_(teamId));
   return weeklyLock_(() => {
     const currentStudents = weeklyStudents_(), now = new Date();
     appendMissedWeeklyEntries_(currentStudents,windows,now);
-    const records = readLogEntries_(), properties = PropertiesService.getScriptProperties();
+    const records = readLogEntries_(), properties = PropertiesService.getScriptProperties(), eligibilities = readProgressEligibility_();
     currentStudents.forEach(student => {
-      const team = weeklyTeam_(student.teamId);
-      eligibleWeeklyWindows_(team.eligibleFrom,windows).forEach(window => {
+      const eligibility = progressStudentEligibility_(student,eligibilities);
+      eligibleWeeklyWindows_(eligibility.eligibleFrom ? eligibility.enforcedFrom : '',windows).forEach(window => {
         const at = Date.now();
         if (at < window.opens_at || at < window.deadline_at-hours*3600000 || at >= window.deadline_at) return;
         if (records.some(r=>textEquals_(r.regNo,student.regNo) && r.weekId === window.weekId && r.entryStatus !== 'MISSED')) return;
@@ -544,8 +511,7 @@ function setupWeeklySubmissionStorage() {
     if (!sheet) sheet = getSpreadsheet().insertSheet(SHEET_NAMES.LOG_ENTRIES);
     if (!sheet.getLastRow()) sheet.getRange(1,1,1,Object.keys(FIELD_DEFINITIONS.LOG_ENTRIES).length).setValues([Object.values(FIELD_DEFINITIONS.LOG_ENTRIES)]);
     weeklyLogColumns_(sheet);
-    const status = getSheet(SHEET_NAMES.TEAM_STATUS);
-    if (getOptionalHeaderIndex_(status,WEEKLY_ELIGIBILITY_HEADER_) < 0) status.getRange(1,status.getLastColumn()+1).setValue(WEEKLY_ELIGIBILITY_HEADER_);
+    setupProgressEligibilityStorage();
     SpreadsheetApp.flush();
     return {ok:true};
   });
@@ -558,7 +524,7 @@ function setupWeeklySubmissionTriggers() {
   weeklyLogColumns_(getSheet(SHEET_NAMES.LOG_ENTRIES));
   const hours = Number(getConfig('SUBMISSION_REMINDER_HOURS'));
   if (!Number.isFinite(hours) || hours <= 0) throw new Error('SUBMISSION_REMINDER_HOURS must be positive.');
-  if (getOptionalHeaderIndex_(getSheet(SHEET_NAMES.TEAM_STATUS),WEEKLY_ELIGIBILITY_HEADER_) < 0) throw new Error('Initialize weekly progress storage first.');
+  readProgressEligibility_();
   return weeklyLock_(() => {
     const retired = ['onFormSubmit','sendWeeklyLogReminders','sendWeeklyAnalysisDigest'];
     const triggers = ScriptApp.getProjectTriggers();

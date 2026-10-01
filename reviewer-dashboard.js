@@ -141,7 +141,7 @@ body { max-width: 980px; margin: 24px auto; padding: 0 16px; }
 .coord-stat.red .coord-stat-num { color: #dc2626; }
 .coord-stat.gray .coord-stat-num { color: #6b7280; }
 .coord-stat.blue .coord-stat-num { color: #6366f1; }
-.guide-cell { font-size: 13px; color: #6b7280; }
+.guide-cell { font-size:var(--font-size-body); color: #6b7280; }
 .reviewer-assigned-teams { margin-bottom:24px; }
 .reviewer-assigned-teams [hidden] { display:none !important; }
 .reviewer-assigned-teams .team-tracker-table th,.reviewer-assigned-teams .team-tracker-table td { padding:10px 8px; }

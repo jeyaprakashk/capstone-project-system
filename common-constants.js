@@ -26,7 +26,6 @@ const SHEET_NAMES = {
 // ===================================================================
 // COLUMN DEFINITIONS — header-based lookup, case-insensitive
 // ===================================================================
-const WEEKLY_ELIGIBILITY_HEADER_ = 'Progress Eligible From Week ID';
 const FIELD_DEFINITIONS = {
   GuideSignoff: {id:'Signoff ID', entryId:'Entry ID', status:'Status', guideEmail:'Guide Email', signedAt:'Signed At'},
   AIProgressAnalysis: {id:'Analysis ID', entryId:'Entry ID', technical_substance:'Technical Substance', specificity:'Specificity', outcome:'Outcome', next_action:'Next Action', github_support:'GitHub Support', score:'AI Score', comment:'Comment', analyzedAt:'Analyzed At'},

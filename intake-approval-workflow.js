@@ -233,7 +233,6 @@ function applyReviewerDecision(teamId, decision, notes, submitterEmail) {
 
   if (decision === 'Approved') {
     setStatusFields(statusSheet, statusRow, { TITLE_APPROVED_BY: submitterEmail }, TS);
-    recordWeeklyEligibilityIfConfigured_(teamId);
     getHubRegistrySheet().appendRow([ACADEMIC_YEAR, semester, teamId, guideEmail, title, repoUrl, buildTeamMembersField(rowData, TS), new Date(), submitterEmail]);
     MailApp.sendEmail([guideEmail, ...studentEmails].join(','), `Project Title Approved — Team ${teamId}`,
       `Your project title "${title}" has final approval. Begin weekly logging.`);

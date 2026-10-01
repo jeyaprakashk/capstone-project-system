@@ -42,8 +42,8 @@ function fixture(overrides = {}, runtime = {}) {
     const opens=Date.parse('2026-09-21T00:00:00+05:30')+i*7*86400000;
     return {weekId:'W'+(i+1),opens_at:opens,deadline_at:opens+7*86400000-1,late_until:opens+14*86400000-1};
   });
-  const optionalHeader=c.getOptionalHeaderIndex_;
-  c.getOptionalHeaderIndex_=(sheet,name)=>name==='Progress Eligible From Week ID'?40:optionalHeader(sheet,name);
+  c.readProgressEligibility_=()=>['R1','R2'].map(regNo=>({regNo,eligibleFrom:'W1',enforcedFrom:'W1'}));
+  c.progressStudentEligibility_=(student,records)=>records.find(r=>r.regNo===student.regNo) || {eligibleFrom:'',enforcedFrom:''};
   c.readLogEntries_=()=>[];
   const clock = day => c.getProjectClock_(schedule,new Date(day+'T12:00:00+05:30'));
   return {c,schedule,clock,entries,milestoneRows,properties,sheet,reads:()=>reads};
@@ -108,8 +108,8 @@ test('one and three configured reviews drive timeline, student marks and coordin
     const html=f.c.buildCoordinatorHeaderStats({total:2,reviews:stats})+f.c.buildTeamCompletionProgress({...stats,setup:{completed:1,total:2},titleApproval:{completed:1,total:2}});
     assert(html.includes('Review '+count));assert(!html.includes('Review '+(count+1)));
     if(count===3) {
-      const status={REVIEWER_DECISION:0,S1_EMAIL:1};
-      const health=f.c.assessProjectTeam_(['Approved','a@example.com'],status,'repo',[],{review1:{completed:true},review2:{completed:true},review3:{completed:false}},f.schedule,f.clock('2026-12-01'));
+      const status={REVIEWER_DECISION:0,S1_EMAIL:1,S1_REGNO:2};
+      const health=f.c.assessProjectTeam_(['Approved','a@example.com','R1'],status,'repo',[],{review1:{completed:true},review2:{completed:true},review3:{completed:false}},f.schedule,f.clock('2026-12-01'));
       assert(health.issue.includes('Review 3 marks overdue'));
     }
   }
@@ -238,7 +238,7 @@ test('student setup gates weekly UI for every title state and keeps incomplete s
   c.getStudentDashboardData=()=>({githubReady,githubCaptureReady:true,titleStatus,githubState:githubReady?'done':'active',githubText:'Team member must accept the invitation.',githubNeedsUsername:!githubReady,githubCanRetry:!githubReady,githubSetup:{},schedule,clock:clock('2026-09-23'),rosterSlots:[],title:titleStatus==='NOT_SUBMITTED'?'':'A title',note:'Existing review feedback'});
   const {document}=parseHTML(c.buildStudentContent('me@example.test','T1')),setup=document.querySelector('.student-project-setup');
   const complete=githubReady&&titleStatus==='APPROVED';
-  assert.equal(!!document.getElementById('studentWeeklyProgress'),complete);
+  assert.equal(!!document.getElementById('studentWeeklyProgress'),titleStatus==='APPROVED');
   assert.equal(setup.tagName,complete?'DETAILS':'SECTION');assert.equal(setup.hasAttribute('open'),false);
   assert.equal(setup.querySelectorAll('.step-row').length,2);
   if(complete){assert.match(setup.querySelector('summary').textContent,/✓ CompleteViewHide/);setup.setAttribute('open','');assert(setup.hasAttribute('open'));setup.removeAttribute('open');}
@@ -287,7 +287,7 @@ test('GitHub status rows use existing icons without a table; connected students 
   assert(rendered.querySelector('.is-joined .lucide-check'));
   assert(rendered.querySelector('.is-missing .lucide-triangle-alert'));
   assert.doesNotMatch(rendered.textContent,/Action required:|No action required:/);
-  assert.equal((rendered.textContent.match(/Team & GitHub setup due/g)||[]).length,1);
+  assert.equal((rendered.textContent.match(/GitHub setup due/g)||[]).length,1);
   const noActions=card=>{
     assert.equal(card.querySelectorAll('form,button,input,[data-github-confirmation],#githubSubmitStatus').length,0);
     assert.equal(card.querySelectorAll('a').length,1);
@@ -317,7 +317,7 @@ test('GitHub status rows use existing icons without a table; connected students 
   assert.equal(rendered.querySelectorAll('.github-form-jump').length,1);
 });
 
-test('student locks depend on team readiness while preserving repository and recorded work',()=>{
+test('weekly panel is independent of teammate setup while preserving repository and recorded work',()=>{
   const {c,schedule,clock}=fixture();
   const data={repoUrl:'https://github.com/org/repo',githubAccount:{githubId:'101',username:'student'},githubReady:false,githubCanRetry:true,githubState:'waiting',githubText:'Waiting for teammate R2',
     titleStatus:'APPROVED',title:'Existing title',rosterSlots:[],schedule,clock:clock('2026-09-23'),logWeeks:{missing:0,currentLogged:true}};
@@ -325,7 +325,7 @@ test('student locks depend on team readiness while preserving repository and rec
   let html=(c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
   assert(html.includes('https://github.com/org/repo'));
   assert(html.includes('Current title:</strong> Existing title'));
-  assert(!html.includes('studentWeeklyProgress'));
+  assert(html.includes('studentWeeklyProgress'));
   assert(!html.includes('Retry GitHub setup'));
   assert(!html.includes('https://example.com/log'));
   assert(!html.includes('milestones complete'));

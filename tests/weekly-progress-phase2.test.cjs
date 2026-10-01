@@ -101,6 +101,9 @@ test('guide reads show only assigned effective submissions and details preserve 
   assert.equal(data.entries.length,1);assert.equal(data.entries[0].entryId,latest.entryId);assert.notEqual(latest.entryId,old.entryId);
   assert.equal(data.entries[0].status,'PENDING');assert.equal(data.entries[0].score,null);
   const details=f.c.loadGuideWeeklyProgressDetails(latest.entryId);assert.equal(details.guideDiscussion,'Measured noise');assert.equal(details.evidence.commits.length,1);
+  assert.equal(data.entries[0].guideDiscussion,'Measured noise');
+  assert.deepEqual(data.entries[0].evidence,details.evidence);
+  assert.equal(data.entries[0].workCompleted,details.workCompleted);
   f.user('outsider@example.com');assert.equal(f.c.loadGuideWeeklyProgress().entries.length,0);assert.throws(()=>f.c.loadGuideWeeklyProgressDetails(latest.entryId),/assigned guide/);
 });
 
@@ -154,7 +157,7 @@ test('AI waits past Deadline even with early signoff; saves once without dashboa
 test('unsigned on-time and late entries use their normal freeze; late signoff can freeze earlier',()=>{
   const ontime=fixture();ontime.c.submitWeeklyProgress(ontime.input());ontime.time('2026-01-06T00:00:00Z');assert.equal(ontime.c.processWeeklyProgressAI().analyzed,1);
   for(const sign of [false,true]) {
-    const f=fixture();f.set('Progress Eligible From Week ID','W1');f.time('2026-01-06T00:00:00Z');const entry=f.c.submitWeeklyProgress(f.input());
+    const f=fixture();f.setEligibility('W1');f.time('2026-01-06T00:00:00Z');const entry=f.c.submitWeeklyProgress(f.input());
     assert.equal(f.c.processWeeklyProgressAI().selected,0);
     if(sign){f.user('guide@example.com');f.c.submitWeeklyGuideSignoff(entry.entryId,'NOT_DISCUSSED');}
     else {f.time('2026-01-14T23:59:59Z');assert.equal(f.c.processWeeklyProgressAI().selected,0);f.time('2026-01-15T00:00:00Z');}

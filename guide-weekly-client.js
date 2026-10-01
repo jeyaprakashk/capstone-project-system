@@ -13,28 +13,43 @@ function guideWeeklyBrowser_() {
   }
   let selectedTeam = '', selectedView = 'title';
   function workspace() { return document.querySelector('[data-guide-workspace]'); }
+  function teamActions(team) {
+    const root=workspace(),node=host();if(!root || !node)return [];
+    const button=Array.from(root.querySelectorAll('[data-guide-select]')).find(button=>button.dataset.guideSelect===team);
+    const panel=Array.from(root.querySelectorAll('[data-guide-team]')).find(panel=>panel.dataset.guideTeam===team);
+    const students=panel?JSON.parse(panel.dataset.guideStudents).map(value=>String(value).trim().toLowerCase()):[];
+    const actions=[];
+    if(button?.dataset.titleAttention==='true')actions.push({key:'title',label:'Title review',count:1});
+    const pending=node.data?.entries.filter(entry=>entry.status==='PENDING' && node.data.weeks.includes(entry.weekId) && students.includes(String(entry.regNo).trim().toLowerCase())).length || 0;
+    if(pending)actions.push({key:'weekly',label:'Weekly progress',count:pending});
+    if(root.querySelector('[data-guide-tab="evaluation"]')?.disabled===false && root.evaluationAttention?.[team])actions.push({key:'evaluation',label:'Guide Evaluation',count:root.evaluationCounts?.[team] || 1});
+    if(button?.dataset.titleAttention==='true' && Number(button.dataset.documentsAttention)>0)actions.push({key:'documents',label:'Documents',count:Number(button.dataset.documentsAttention)});
+    return actions;
+  }
   function updateAttention() {
-    const root=workspace(), node=host();if(!root || !node)return;
-    const evaluationEnabled=root.querySelector('[data-guide-tab="evaluation"]')?.disabled===false;
+    const root=workspace(),node=host();if(!root || !node)return;
     root.querySelectorAll('[data-guide-select]').forEach(button=>{
       const pill=button.querySelector('[data-team-attention]');if(!pill)return;
-      const team=button.dataset.guideSelect;
-      const panel=Array.from(root.querySelectorAll('[data-guide-team]')).find(panel=>panel.dataset.guideTeam===team);
-      const students=panel?JSON.parse(panel.dataset.guideStudents).map(value=>String(value).trim().toLowerCase()):[];
-      const actions=[];
-      if(button.dataset.titleAttention==='true')actions.push('Title review');
-      if(node.data?.entries.some(entry=>entry.status==='PENDING' && node.data.weeks.includes(entry.weekId) && students.includes(String(entry.regNo).trim().toLowerCase())))actions.push('Weekly progress');
-      const evaluation=root.evaluationAttention?.[team];
-      if(evaluationEnabled && evaluation===true)actions.push('Guide Evaluation');
-      const unknown=!node.data || (evaluationEnabled && typeof evaluation!=='boolean');
-      if(!actions.length && node.data && evaluationEnabled && evaluation===undefined) {
-        pill.hidden=false;pill.className='';pill.title='';
+      const actions=teamActions(button.dataset.guideSelect),first=actions[0];
+      const unknown=!node.data || (root.querySelector('[data-guide-tab="evaluation"]')?.disabled===false && typeof root.evaluationAttention?.[button.dataset.guideSelect]!=='boolean');
+      const loading=node.attentionLoading || (!node.data && !node.attentionReadFailed) || root.evaluationLoading?.[button.dataset.guideSelect];
+      if(loading){
+        pill.hidden=false;pill.className='';pill.setAttribute('aria-busy','true');
         pill.innerHTML=DashboardUI.renderSkeleton('inline','Checking team actions');return;
       }
-      pill.hidden=!actions.length && !unknown;
-      pill.className='tag '+(actions.length?'orange':'gray');
-      pill.textContent=actions.length>1?actions.length+' actions':actions[0] || 'Status unavailable';
-      pill.title=actions.join(', ')+(unknown?(actions.length?' · ':'')+'Some action statuses could not be checked.':'');
+      pill.removeAttribute('aria-busy');
+      pill.hidden=!first;pill.className='tag orange';
+      pill.textContent=first?first.label+' · '+first.count:'';
+      button.setAttribute('aria-description',actions.map(action=>action.label+' · '+action.count).join(', ')+(unknown?' · Some action statuses could not be checked.':''));
+    });
+    const actions=teamActions(selectedTeam);
+    root.querySelectorAll('[data-guide-tab]').forEach(button=>{
+      let badge=button.querySelector('[data-guide-tab-attention]');
+      if(!badge){badge=document.createElement('span');badge.dataset.guideTabAttention='';badge.className='tag orange';(button.querySelector('strong') || button).appendChild(badge);}
+      const action=actions.find(action=>action.key===button.dataset.guideTab);
+      badge.hidden=!action;badge.textContent=action?String(action.count):'';
+      badge.title=action?(action.key==='documents'?'Documents supporting pending title review':action.label+' requiring action')+': '+action.count:'';
+      badge.setAttribute('aria-label',badge.title);
     });
   }
   function evaluationStatus(team,statuses) {
@@ -42,21 +57,28 @@ function guideWeeklyBrowser_() {
     root.evaluationAttention = root.evaluationAttention || {};
     root.evaluationVersions = root.evaluationVersions || {};
     root.evaluationVersions[team]=(root.evaluationVersions[team] || 0)+1;
-    root.evaluationAttention[team]=statuses.some(item=>item.status==='Not started' || item.status==='Draft');
+    root.evaluationCounts=root.evaluationCounts || {};
+    root.evaluationCounts[team]=statuses.filter(item=>item.status==='Not started' || item.status==='Draft').length;
+    root.evaluationAttention[team]=root.evaluationCounts[team]>0;
+    if(root.evaluationLoading)delete root.evaluationLoading[team];
     updateAttention();
+    if(root.attentionLandingTeam===team && selectedTeam===team && teamActions(team)[0]?.key==='evaluation')selectView('evaluation',false,true);
   }
   function readEvaluationAttention() {
     const root=workspace();if(!root || root.querySelector('[data-guide-tab="evaluation"]')?.disabled!==false)return;
-    root.evaluationAttention = root.evaluationAttention || {};root.evaluationVersions = root.evaluationVersions || {};
+    root.evaluationAttention = root.evaluationAttention || {};root.evaluationVersions = root.evaluationVersions || {};root.evaluationLoading=root.evaluationLoading || {};
     root.querySelectorAll('[data-guide-select]').forEach(button=>{
       const team=button.dataset.guideSelect;
       const version=(root.evaluationVersions[team] || 0)+1;root.evaluationVersions[team]=version;
+      root.evaluationLoading[team]=true;updateAttention();
       rpc('loadGuideEvaluation',[team,''],data=>{
         if(workspace()!==root || root.evaluationVersions[team]!==version)return;
         evaluationStatus(team,data.statuses);
       },()=>{
         if(workspace()!==root || root.evaluationVersions[team]!==version)return;
-        root.evaluationAttention[team]=null;updateAttention();
+        delete root.evaluationLoading[team];
+        if(typeof root.evaluationAttention[team]!=='boolean')root.evaluationAttention[team]=null;
+        updateAttention();
       });
     });
   }
@@ -70,20 +92,23 @@ function guideWeeklyBrowser_() {
       (!students || students.includes(String(entry.regNo).trim().toLowerCase()))).map(entry=>entry.weekId));
     node.week=node.data.weeks.slice().reverse().find(week=>pendingWeeks.has(week)) || node.data.weeks[0];
   }
-  function selectTeam(index) {
+  function selectTeam(index, preserveView) {
     const root=workspace();if(!root || host()?.busy)return;
     const teams=Array.from(root.querySelectorAll('[data-guide-team]'));
     const previousTeam=selectedTeam;
     selectedTeam=teams.some(team=>team.dataset.guideTeam===String(index))?String(index):(teams[0]?.dataset.guideTeam || '');
-    if(previousTeam!==selectedTeam && selectedView==='evaluation')selectView('title');
+    if(!preserveView)root.attentionLandingTeam=selectedTeam;
     root.querySelectorAll('[data-guide-select]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.guideSelect===selectedTeam)));
     root.querySelectorAll('[data-guide-heading]').forEach(heading=>{heading.hidden=heading.dataset.guideHeading!==selectedTeam;});
     teams.forEach(team=>{team.hidden=team.dataset.guideTeam!==selectedTeam || (selectedView==='weekly' || selectedView==='evaluation');});
     // Tab changes only toggle visibility; keep loaded details and disclosure state.
     if(host()?.data && previousTeam!==selectedTeam){selectDefaultWeek(host());render(host());}
+    updateAttention();
+    if(!preserveView)selectView(teamActions(selectedTeam)[0]?.key || 'title',false,true);
   }
-  function selectView(view, evaluationReady) {
+  function selectView(view, evaluationReady, automatic) {
     const root=workspace();if(!root || host()?.busy)return;
+    if(!automatic)root.attentionLandingTeam=null;
     const editor=document.getElementById('guideEvaluationEditor');
     if(view==='evaluation') {
       const tab=root.querySelector('[data-guide-tab="evaluation"]');
@@ -95,14 +120,15 @@ function guideWeeklyBrowser_() {
     root.querySelectorAll('[data-guide-tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.guideTab===view)));
     root.querySelectorAll('[data-guide-view]').forEach(panel=>{panel.hidden=panel.dataset.guideView!==view;});
     host().hidden=view!=='weekly';
-    selectTeam(selectedTeam);
+    selectTeam(selectedTeam,true);
   }
   function load() {
     const node=host();if(!node || node.busy)return;
-    if(workspace()){selectTeam(selectedTeam);selectView(selectedView);}
+    node.attentionLoading=true;
+    if(workspace())selectTeam(selectedTeam,true);
     node.busy=true;controls(node,true);
     const finish=DashboardUI.beginContentLoading(node.querySelector('[data-guide-weekly-read]'),'Reading weekly progress',{compact:true});
-    const settle=()=>{finish();node.busy=false;controls(node,false);};
+    const settle=()=>{finish();node.busy=false;node.attentionLoading=false;controls(node,false);};
     rpc('loadGuideWeeklyProgress',[],data=>{
       settle();if(!current(node))return;
       if(node.dataset.guideWeeks) {
@@ -110,77 +136,172 @@ function guideWeeklyBrowser_() {
           .sort((a,b)=>b.opensAt-a.opensAt).map(w=>w.weekId);
       }
       node.data=data;
+      node.attentionReadFailed=false;
       selectDefaultWeek(node);
       node.querySelector('[data-guide-weekly-status]').textContent='';
       render(node);
-      updateAttention();readEvaluationAttention();
-      const updated=node.querySelector('#guide-weeklyUpdated');
-      if(updated)updated.textContent='Updated '+new Date(data.checkedAt).toLocaleString('en-IN',{timeZone:data.timezone,hour12:true});
+      selectTeam(selectedTeam);updateAttention();readEvaluationAttention();
     },error=>{
-      settle();if(current(node)){node.querySelector('[data-guide-weekly-status]').textContent='Could not read weekly progress: '+message(error)+' Use Refresh to retry.';updateAttention();readEvaluationAttention();}
+      settle();node.attentionReadFailed=true;if(current(node)){node.querySelector('[data-guide-weekly-status]').textContent='Could not read weekly progress: '+message(error)+' Use dashboard Refresh to retry.';updateAttention();readEvaluationAttention();}
     });
   }
-  function decisionBadge(status) {
-    const state={PENDING:['Awaiting Decision','orange'],DISCUSSED:['Discussed','green'],NOT_DISCUSSED:['Not Discussed','gray']}[status] || [status,'gray'];
-    return '<span class="tag '+state[1]+'" data-decision-status>'+esc(state[0])+'</span>';
+  function submissionBadge(timeliness,firstSubmittedAt,deadlineAt,timeZone) {
+    const state={ON_TIME:['green','On-time submission'],LATE:['orange','Late submission']}[timeliness] || ['gray','Timing unavailable'];
+    if(timeliness==='LATE' && firstSubmittedAt && Number.isFinite(deadlineAt)) {
+      const submitted=new Date(firstSubmittedAt);
+      if(Number.isFinite(submitted.getTime()) && submitted.getTime()>deadlineAt) {
+        const day=date=>{
+          const parts=date.toLocaleDateString('en-GB',{timeZone,day:'2-digit',month:'2-digit',year:'numeric'}).split('/').map(Number);
+          return Date.UTC(parts[2],parts[1]-1,parts[0])/86400000;
+        };
+        const days=day(submitted)-day(new Date(deadlineAt));
+        state[1]=days>0?days+' day'+(days===1?'':'s')+' late':'Less than 1 day late';
+      }
+    }
+    return '<span class="tag '+state[0]+'" data-submission-timing>'+state[1]+'</span>';
+  }
+  function submissionDeadline(node,entry) {
+    const week=JSON.parse(node.dataset.guideWeeks || '[]').find(week=>week.weekId===entry.weekId);
+    const date=Number.isFinite(week?.deadlineAt)?new Date(week.deadlineAt):null;
+    const label=date?date.toLocaleDateString('en-GB',{timeZone:node.data.timezone,day:'numeric',month:'short',year:'numeric'}).replace(/\bSept\b/g,'Sep'):'Date unavailable';
+    const full=date?date.toLocaleString('en-IN',{timeZone:node.data.timezone,timeZoneName:'short',hour12:true}):'Submission deadline unavailable';
+    return '<div class="guide-weekly-deadline">'+submissionBadge(entry.timeliness,entry.firstSubmittedAt,week?.deadlineAt,node.data.timezone)+'<small title="'+esc(full)+'">Due: '+esc(label)+'</small></div>';
+  }
+  function qualityScore(value) {
+    const score=(typeof value==='number' || (typeof value==='string' && value.trim()!==''))?Number(value):NaN;
+    const label=Number.isInteger(score) && score>=0 && score<=10?score+'/10':'—';
+    const explanation='Based on the weekly log and GitHub commit messages: technical substance, specificity, outcome, next action, and GitHub support. Each is rated High (2), Medium (1), or Low (0), summed out of 10. A dash means not scored yet.';
+    return '<strong data-ai-quality tabindex="0" title="'+explanation+'" aria-label="AI Quality: '+(label==='—'?'Not scored yet':label)+'. '+explanation+'">'+label+'</strong>';
+  }
+  function lastTeamSubmission(node,students) {
+    const entries=node.data.entries.filter(entry=>!students || students.includes(String(entry.regNo).trim().toLowerCase()));
+    const dates=entries.map(entry=>entry.submittedAt ? new Date(entry.submittedAt).getTime() : NaN).filter(Number.isFinite);
+    return 'Last submission: '+(dates.length ? new Date(Math.max(...dates)).toLocaleDateString('en-GB',{timeZone:node.data.timezone,day:'numeric',month:'short',year:'numeric'}) : entries.length ? 'Date unavailable' : 'None recorded');
+  }
+  function weekDateRange(node) {
+    const week=JSON.parse(node.dataset.guideWeeks || '[]').find(week=>week.weekId===node.week);
+    if(!week || !Number.isFinite(week.opensAt) || !Number.isFinite(week.deadlineAt))return 'Dates unavailable';
+    const start=new Date(week.opensAt),end=new Date(week.deadlineAt),timeZone=node.data.timezone;
+    const year=date=>date.toLocaleDateString('en-GB',{timeZone,year:'numeric'});
+    const options={timeZone,day:'numeric',month:'short'};
+    if(year(start)!==year(end))options.year='numeric';
+    return (start.toLocaleDateString('en-GB',options)+' – '+end.toLocaleDateString('en-GB',options)).replace(/\bSept\b/g,'Sep');
+  }
+  function weeklyAnswers(entry) {
+    return '<div class="guide-weekly-fields">'+[['workCompleted','Work completed'],['guideDiscussion','Guide discussion / decision'],['blockers','Problems / blockers'],['nextAction','Next week plan']].map(([key,label])=>{
+      const answer=String(entry[key] || '').replace(/\r\n?/g,'\n').trim().replace(/(?:^|\s)Next\s*(?:…|\.{3})\s*$/i,'').trim()
+        .split(/\n\s*\n/).map(paragraph=>paragraph.split('\n').reduce((text,line)=>text+(text ? (/^\s*(?:[-*•]|\d+[.)])\s/.test(line)?'\n':' ') : '')+line.trim(),'')).join('\n\n');
+      return '<p class="weekly-log-answer" data-answer="'+key+'"><strong class="guide-question'+(key==='blockers'?' guide-question-blockers':key==='nextAction'?' guide-question-next':'')+'">'+label+'</strong>'+esc(answer || 'No response recorded.')+'</p>';
+    }).join('')+'</div>';
+  }
+  function weeklyEvidence(entry,timeZone) {
+    const evidence=entry.evidence,commits=Array.isArray(evidence?.commits)?evidence.commits:[];
+    const available=evidence?.state==='available';
+    const github=available ? (commits.length ? '<ul class="guide-commit-list">'+commits.map(commit=>'<li><a href="'+esc(commit.url)+'" target="_blank" rel="noopener noreferrer"><code>'+esc(commit.shortSha)+'</code></a><span>'+esc(commit.message)+'</span><time datetime="'+esc(commit.timestamp)+'">'+esc(new Date(commit.timestamp).toLocaleString('en-IN',{timeZone,day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true}))+'</time></li>').join('')+'</ul>' : '<p>No qualifying GitHub commits recorded for this student in this week.</p>') : '<p>'+esc(evidence?.message || 'GitHub evidence unavailable. Use dashboard Refresh to retry.')+'</p>';
+    const analysis=entry.analysis;
+    const ai=analysis ? '<p>'+esc(analysis.comment)+'</p><dl>'+[['technical_substance','Technical substance'],['specificity','Specificity'],['outcome','Outcome'],['next_action','Next action'],['github_support','GitHub support']].map(([key,label])=>'<dt>'+label+'</dt><dd>'+esc(analysis[key] || '—')+'</dd>').join('')+'</dl>' : '<p>Not scored yet.</p>';
+    return '<div class="guide-weekly-evidence"><section><h4>GitHub evidence (auto-collected)'+(available?' · '+commits.length+(commits.length===1?' commit':' commits'):'')+'</h4>'+github+'</section><section><h4>AI analysis</h4>'+ai+'</section></div>';
+  }
+  let actionBarObserver=null, resizeActionBars=null;
+  function reserveActionBarSpace(node) {
+    if(actionBarObserver)actionBarObserver.disconnect();
+    if(resizeActionBars && typeof window!=='undefined'){window.removeEventListener('resize',resizeActionBars);document.removeEventListener('scroll',resizeActionBars,true);}
+    if(typeof ResizeObserver==='undefined' || typeof window==='undefined')return;
+    const cards=Array.from(node.querySelectorAll('.guide-weekly-card'));
+    const update=()=>{
+      if(!current(node)){actionBarObserver.disconnect();window.removeEventListener('resize',update);document.removeEventListener('scroll',update,true);return;}
+      cards.forEach(card=>{
+        const content=card.querySelector('.guide-weekly-summary'),bar=card.querySelector('.guide-weekly-actions');
+        const height=bar.getBoundingClientRect().height;
+        if(!height)return; // Hidden tabs are measured when revealed.
+        const header=card.querySelector('.guide-weekly-student-header');
+        const previous=Number(card.dataset.actionReserve || 0);
+        const bounds=content.getBoundingClientRect(),bodyTop=header.getBoundingClientRect().bottom,bodyBottom=bounds.bottom-previous;
+        const bodyHeight=Math.max(0,bodyBottom-bodyTop);
+        const visibleBody=Math.max(0,Math.min(bodyBottom,window.innerHeight)-Math.max(bodyTop,0));
+        card.dataset.stickyDecision=String(bodyHeight>0 && visibleBody>=Math.min(bodyHeight,window.innerHeight)*0.6 && card.getBoundingClientRect().bottom>height);
+        const naturalHeight=bounds.height-previous+height;
+        const reserve=naturalHeight>window.innerHeight?Math.ceil(height):0;
+        if(reserve!==previous){card.dataset.actionReserve=String(reserve);card.style.setProperty('--guide-action-reserve',reserve+'px');}
+      });
+    };
+    actionBarObserver=new ResizeObserver(update);
+    cards.forEach(card=>{actionBarObserver.observe(card.querySelector('.guide-weekly-actions'));actionBarObserver.observe(card.querySelector('.guide-weekly-summary'));});
+    resizeActionBars=update;window.addEventListener('resize',update);document.addEventListener('scroll',update,true);update();
   }
   function render(node) {
     const target=node.querySelector('[data-guide-weekly-read]');
-    if(!node.data.weeks.length){target.innerHTML='<p>No weekly submissions available. Weekly navigation starts when the first configured week opens.</p>';return;}
+    if(!node.data.weeks.length){target.innerHTML='<p>No weekly submissions available. Weekly navigation starts when the first configured week opens.</p><p>'+esc(lastTeamSubmission(node,teamStudents()))+'</p>';return;}
     const students=teamStudents();
     const entries=node.data.entries.filter(entry=>entry.weekId===node.week && (!students || students.includes(String(entry.regNo).trim().toLowerCase())));
     const submitted=new Set(entries.map(entry=>String(entry.regNo).trim().toLowerCase())).size;
-    const total=students ? new Set(students).size : null;
+    const requiredWeek=(node.data.requiredByWeek || []).find(week=>week.weekId===node.week);
+    const required=requiredWeek ? new Set(requiredWeek.regNos.map(reg=>String(reg).trim().toLowerCase()).filter(reg=>!students || students.includes(reg))) : null;
+    const total=required ? required.size : null;
+    const completed=required ? new Set(entries.map(entry=>String(entry.regNo).trim().toLowerCase()).filter(reg=>required.has(reg))).size : submitted;
     const pending=entries.filter(entry=>entry.status==='PENDING').length;
     const weekStatus=!submitted ? {tone:'gray',label:'No submissions'}
-      : pending ? {tone:'orange',label:'Awaiting Decision'}
-      : total !== null && submitted===total ? {tone:'green',label:'All submitted'}
-      : {tone:'blue',label:total === null ? 'Submitted' : submitted+'/'+total+' submitted'};
-    const weekSummary=(total === null ? submitted+' submitted' : submitted+'/'+total+' submitted')+' · '+pending+' awaiting decision';
+      : pending ? {tone:'orange',label:pending+' pending'}
+      : total !== null && completed===total ? {tone:'green',label:total ? 'All required submitted' : 'No required submissions'}
+      : {tone:'blue',label:total === null ? 'Submitted' : completed+'/'+total+' required submitted'};
+    const weekSummary=(total === null ? submitted+' submitted' : completed+'/'+total+' required submitted')+' · '+pending+' awaiting decision';
     const weekIndex=node.data.weeks.indexOf(node.week);
     target.innerHTML='<nav class="guide-week-navigation" aria-label="Select weekly progress week">'+
-      '<button type="button" class="app-btn btn-md btn-secondary btn-icon" data-week-step="1" data-week-boundary="'+(weekIndex===node.data.weeks.length-1)+'" '+(weekIndex===node.data.weeks.length-1?'disabled':'')+' aria-label="Previous week">&#8249;</button>'+
-      '<span class="guide-week-label" aria-live="polite">'+esc(node.week)+'</span>'+
-      '<button type="button" class="app-btn btn-md btn-secondary btn-icon" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' aria-label="Next week">&#8250;</button>'+
+      '<button type="button" class="app-btn btn-md btn-secondary" data-week-step="1" data-week-boundary="'+(weekIndex===node.data.weeks.length-1)+'" '+(weekIndex===node.data.weeks.length-1?'disabled':'')+' title="'+(weekIndex===node.data.weeks.length-1?'First project week. No more previous weeks':'Previous week')+'" aria-label="Previous week">&#8249; Previous</button>'+
+      '<span class="guide-week-label" aria-live="polite">'+esc(weekDateRange(node))+'</span>'+
+      '<button type="button" class="app-btn btn-md btn-secondary" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' title="'+(weekIndex===0?'Latest available project week. No more next weeks':'Next week')+'" aria-label="Next week">Next &#8250;</button>'+
       '<span class="tag '+weekStatus.tone+' guide-week-status" data-week-status role="status" title="'+esc(weekSummary)+'">'+weekStatus.label+'</span></nav>'+
-      (entries.length ? entries.map(entry=>'<article class="guide-weekly-card"><div data-entry="'+esc(entry.entryId)+'" class="guide-weekly-summary"><header class="guide-weekly-student-header"><div><strong>'+esc(entry.student)+'</strong><small>'+esc(entry.regNo)+'</small></div>'+decisionBadge(entry.status)+'<span>AI Quality <strong>'+ (entry.score===null?'—':esc(entry.score)+'/10')+'</strong></span><button type="button" class="app-btn btn-sm btn-secondary" data-details aria-expanded="false">View Details</button></header><p class="weekly-log-answer">'+esc(entry.discussion.length > 240 ? entry.discussion.slice(0,240)+'…' : entry.discussion)+'</p></div><div class="guide-weekly-detail" data-detail-row="'+esc(entry.entryId)+'" hidden><div></div></div><div class="guide-weekly-actions" data-sign-entry="'+esc(entry.entryId)+'"><span>Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="app-btn btn-sm '+(entry.status===status?'btn-success':'btn-secondary')+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></article>').join(''):'<p>No weekly submissions for this team in the selected week.</p>');
+      (entries.length ? entries.map(entry=>'<article class="guide-weekly-card"><div data-entry="'+esc(entry.entryId)+'" class="guide-weekly-summary"><header class="guide-weekly-student-header"><div><strong>'+esc(entry.student)+'</strong><small>'+esc(entry.regNo)+'</small></div><span class="guide-weekly-score">AI Quality '+qualityScore(entry.score)+'</span>'+submissionDeadline(node,entry)+'</header>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div><div class="guide-weekly-actions" data-sign-entry="'+esc(entry.entryId)+'"><span>Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="app-btn btn-sm '+(status==='DISCUSSED'?'btn-primary':'btn-secondary')+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></article>').join(''):'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
     target.querySelectorAll('[data-week-step]').forEach(button=>button.onclick=()=>{if(node.busy || button.disabled)return;const next=node.data.weeks[weekIndex+Number(button.dataset.weekStep)];if(next){node.week=next;render(node);}});
     target.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>sign(node,button));
-    target.querySelectorAll('[data-details]').forEach(button=>button.onclick=()=>details(node,button));
+    reserveActionBarSpace(node);
   }
   function sign(node,button) {
     if(node.busy)return;
-    node.busy=true;controls(node,true);
     const entryId=button.closest('[data-sign-entry]').dataset.signEntry,status=button.dataset.sign;
-    const output=node.querySelector('[data-guide-weekly-status]');output.textContent='Saving guide confirmation…';
+    if(node.data.entries.find(entry=>entry.entryId===entryId)?.status===status)return;
+    node.busy=true;controls(node,true);
+    const output=node.querySelector('[data-guide-weekly-status]');
+    output.textContent=(status==='DISCUSSED'?'Discussed':'Not Discussed')+' will save in 5 seconds and freeze student revisions. ';
+    const undo=document.createElement('button');
+    undo.type='button';undo.className='app-btn btn-sm btn-secondary';undo.textContent='Undo';undo.dataset.signUndo='';
+    output.appendChild(undo);
+    const timer=setTimeout(()=>{
+      if(!current(node)){node.busy=false;return;}
+      output.textContent='Saving guide confirmation…';
+      saveSignoff(node,entryId,status,output);
+    },5000);
+    undo.onclick=()=>{
+      clearTimeout(timer);node.busy=false;controls(node,false);
+      output.textContent='Decision cancelled. No changes saved.';
+      button.focus();
+    };
+    undo.focus();
+  }
+  function saveSignoff(node,entryId,status,output) {
     rpc('submitWeeklyGuideSignoff',[entryId,status],result=>{
       node.busy=false;controls(node,false);if(!current(node))return;
       node.data.entries.find(entry=>entry.entryId===entryId).status=result.status;
       render(node);updateAttention();output.textContent=result.message;
     },error=>{node.busy=false;controls(node,false);if(current(node))output.textContent='Could not save confirmation: '+message(error);});
   }
-  function details(node,button) {
-    if(node.busy)return;
-    const row=button.closest('[data-entry]'),entryId=row.dataset.entry,detail=row.nextElementSibling,target=detail.firstElementChild;
-    if(!detail.hidden){detail.hidden=true;button.setAttribute('aria-expanded','false');button.textContent='View Details';return;}
-    detail.hidden=false;button.setAttribute('aria-expanded','true');button.textContent='Collapse';
-    if(target.dataset.loaded)return;
-    node.busy=true;controls(node,true);
-    const finish=DashboardUI.beginContentLoading(target,'Reading weekly details',{compact:true});
-    const settle=()=>{finish();node.busy=false;controls(node,false);};
-    rpc('loadGuideWeeklyProgressDetails',[entryId],data=>{
-      settle();if(!current(node)||!target.isConnected)return;
-      const fields=[['workCompleted','Work Completed'],['guideDiscussion','Guide Discussion/Decision'],['blockers','Problems/Blockers'],['nextAction','Next Week Plan']];
-      target.innerHTML='<div class="guide-weekly-fields">'+fields.map(([key,label])=>'<section><h4>'+label+'</h4><p class="weekly-log-answer">'+esc(data[key])+'</p></section>').join('')+'</div>'+
-        '<h4>AI Quality</h4>'+(data.analysis?'<p>'+esc(data.analysis.score)+'/10 — '+esc(data.analysis.comment)+'</p><dl>'+[['technical_substance','Technical substance'],['specificity','Specificity'],['outcome','Outcome'],['next_action','Next action'],['github_support','GitHub support']].map(([key,label])=>'<dt>'+label+'</dt><dd>'+esc(data.analysis[key])+'</dd>').join('')+'</dl>':'<p>—</p>')+
-        '<h4>GitHub evidence</h4>'+(data.evidence.state==='available'?'<ul>'+data.evidence.commits.map(commit=>'<li>'+esc(new Date(commit.timestamp).toLocaleString('en-IN',{timeZone:data.timezone,hour12:true}))+' | '+esc(commit.message)+' | <a href="'+esc(commit.url)+'" target="_blank" rel="noopener noreferrer">'+esc(commit.shortSha)+'</a></li>').join('')+'</ul>':'<p>'+esc(data.evidence.message||'GitHub evidence unavailable.')+'</p>');
-      target.dataset.loaded='true';
-    },error=>{
-      settle();if(!current(node)||!target.isConnected)return;
-      target.textContent='Could not read details: '+message(error)+' Close and reopen View Details to retry.';
-    });
+  function positionTitleInfo(event,popup) {
+    if(popup.dismissListeners){popup.dismissListeners();popup.dismissListeners=null;}
+    if(event.newState!=='open')return;
+    const button=document.querySelector('[popovertarget="'+popup.id+'"]');
+    if(!button)return;
+    const anchor=button.getBoundingClientRect(),box=popup.getBoundingClientRect();
+    const width=window.innerWidth,height=window.innerHeight,gap=8;
+    const left=Math.max(gap,Math.min(anchor.right-box.width,width-box.width-gap));
+    const below=anchor.bottom+gap;
+    const top=below+box.height<=height-gap?below:Math.max(gap,anchor.top-box.height-gap);
+    popup.style.left=left+'px';popup.style.top=top+'px';
+    const dismiss=()=>popup.hidePopover();
+    window.addEventListener('resize',dismiss);
+    document.addEventListener('scroll',dismiss,true);
+    popup.dismissListeners=()=>{window.removeEventListener('resize',dismiss);document.removeEventListener('scroll',dismiss,true);};
   }
-  return {load,selectTeam,selectView,evaluationStatus};
+  return {load,selectTeam,selectView,evaluationStatus,positionTitleInfo};
 }
 function weeklyPhase2SetupBrowser_() {
   const host=()=>document.getElementById('weeklyPhase2Setup');

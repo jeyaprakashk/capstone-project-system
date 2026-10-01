@@ -24,26 +24,27 @@ test('authentication and authoritative membership fail closed before appending',
  }
 });
 
-test('title and readiness prerequisites; durable eligibility never moves after failure',()=>{
+test('individual eligibility is required and teammate readiness never moves or blocks it',()=>{
  const f=weeklyFixture();f.set('Reviewer Decision','');assert.throws(()=>f.c.submitWeeklyProgress(f.input()),/approved/);
- f.set('Reviewer Decision','Approved');f.ready(false);assert.throws(()=>f.c.submitWeeklyProgress(f.input()),/GitHub/);assert.equal(f.eligible(),'');
- f.ready(true);f.c.loadStudentWeeklyProgress();assert.equal(f.eligible(),'W1');
+ f.set('Reviewer Decision','Approved');f.setEligibility('');assert.throws(()=>f.c.submitWeeklyProgress(f.input()),/eligible/);assert.equal(f.eligible(),'');
+ f.ready(true);f.c.loadStudentWeeklyProgress();assert.equal(f.eligible(),'');f.setEligibility('W1');
+ f.c.getTeamGithubSetup_=()=>{throw Error('Team readiness must not be read');};
  f.time('2026-01-08T12:00:00Z');f.ready(false);const data=f.c.loadStudentWeeklyProgress();
- assert.equal(data.eligibleFrom,'W1');assert.equal(data.summary.missing,0);assert.equal(data.actions.length,0);
+ assert.equal(data.eligibleFrom,'W1');assert.equal(data.summary.missing,0);assert.equal(data.actions.length,2);
  f.c.processWeeklySubmissionSchedule();assert.equal(f.entries().length,0);
  f.time('2026-01-15T00:00:00Z');
  f.c.processWeeklySubmissionSchedule();assert.equal(f.entries().length,2);assert(f.entries().every(r=>r.entryStatus==='MISSED'));
 });
 
 test('first applicable window excludes prior windows from expected, missed and reminder obligations',()=>{
- const f=weeklyFixture();f.time('2026-01-08T12:00:00Z');f.c.loadStudentWeeklyProgress();
+ const f=weeklyFixture();f.setEligibility('W2');f.time('2026-01-08T12:00:00Z');f.c.loadStudentWeeklyProgress();
  assert.equal(f.eligible(),'W2');const data=f.c.loadStudentWeeklyProgress();assert.equal(data.summary.expectedWeeks,1);assert.equal(data.summary.missing,0);
  f.c.processWeeklySubmissionSchedule();assert.equal(f.entries().length,0);assert.equal(f.mails.length,0);
  const before=weeklyFixture();before.time('2025-12-20T00:00:00Z');before.c.loadStudentWeeklyProgress();assert.equal(before.eligible(),'W1');assert.equal(before.c.loadStudentWeeklyProgress().summary.expectedWeeks,0);
 });
 
 test('late first submissions and revisions preserve timing; MISSED waits until the final cutoff',()=>{
- const f=weeklyFixture();f.set('Progress Eligible From Week ID','W1');f.time('2026-01-08T12:00:00Z');
+ const f=weeklyFixture();f.setEligibility('W1');f.time('2026-01-08T12:00:00Z');
  f.c.processWeeklySubmissionSchedule();f.c.processWeeklySubmissionSchedule();assert.equal(f.entries().length,0);
  const first=f.c.submitWeeklyProgress(f.input());assert.equal(first.entryStatus,'SUBMITTED');assert.equal(first.timeliness,'LATE');
  const original=JSON.stringify(f.entries()[0]);
@@ -64,7 +65,7 @@ test('one Week ID selection validates OPEN and LATE boundaries and timezone offs
  assert.equal(resolve('2026-01-08T00:00:00Z','W2').weekId,'W2');assert.equal(resolve('2026-01-08T00:00:00Z','W1').weekId,'W1');
  assert.throws(()=>resolve('2026-01-07T23:59:59Z','W2'));assert.equal(resolve('2026-01-14T23:59:59Z','W1').weekId,'W1');assert.throws(()=>resolve('2026-01-15T00:00:00Z','W1'));
  f.time('2026-01-05T23:30:00+05:30');assert.equal(f.c.submitWeeklyProgress(f.input()).timeliness,'ON_TIME');
- const late=weeklyFixture();late.set('Progress Eligible From Week ID','W1');late.time('2026-01-05T18:00:00.001Z');assert.equal(late.c.submitWeeklyProgress(late.input()).timeliness,'LATE');
+ const late=weeklyFixture();late.setEligibility('W1');late.time('2026-01-05T18:00:00.001Z');assert.equal(late.c.submitWeeklyProgress(late.input()).timeliness,'LATE');
 });
 
 test('four narratives only; removed evidence is rejected and formula text remains literal',()=>{
@@ -80,7 +81,7 @@ test('four narratives only; removed evidence is rejected and formula text remain
 });
 
 test('one pre-deadline reminder only; actual submissions suppress it; no other weekly emails',()=>{
- const f=weeklyFixture();f.set('Progress Eligible From Week ID','W1');
+ const f=weeklyFixture();f.setEligibility('W1');
  f.time('2026-01-04T17:59:59Z');f.c.processWeeklySubmissionSchedule();assert.equal(f.mails.length,0);
  f.time('2026-01-04T18:00:00Z');f.c.submitWeeklyProgress(f.input());f.c.processWeeklySubmissionSchedule();
  assert.equal(f.mails.length,1);assert.equal(f.mails[0][0],'two@example.com');
@@ -91,7 +92,7 @@ test('one pre-deadline reminder only; actual submissions suppress it; no other w
 });
 
 test('mail failure retries without marking delivery; previously successful recipients remain deduplicated',()=>{
- const f=weeklyFixture();f.set('Progress Eligible From Week ID','W1');f.time('2026-01-04T18:00:00Z');f.mailFails(true);
+ const f=weeklyFixture();f.setEligibility('W1');f.time('2026-01-04T18:00:00Z');f.mailFails(true);
  f.c.processWeeklySubmissionSchedule();assert.equal([...f.properties.keys()].filter(k=>k.startsWith('weekly-reminder:')).length,0);assert.equal(f.errors.length,2);assert.equal(f.locked(),false);
  f.mailFails(false);f.c.processWeeklySubmissionSchedule();f.c.processWeeklySubmissionSchedule();assert.equal(f.mails.length,2);
 });
@@ -145,7 +146,7 @@ test('Week ID is required and validated against eligibility, dates and request i
  for(const extra of [{weekId:undefined},{weekId:'unknown'},{weekId:'W2'}]) {
   const f=weeklyFixture();assert.throws(()=>f.c.submitWeeklyProgress(f.input(extra)));assert.equal(f.entries().length,0);
  }
- const f=weeklyFixture();f.set('Progress Eligible From Week ID','W2');f.time('2026-01-08T12:00:00Z');
+ const f=weeklyFixture();f.setEligibility('W2');f.time('2026-01-08T12:00:00Z');
  assert.throws(()=>f.c.submitWeeklyProgress(f.input()),/eligible/);
  const input=f.input({weekId:'W2'});f.c.submitWeeklyProgress(input);
  assert.throws(()=>f.c.submitWeeklyProgress({...input,weekId:'W1'}),/different data/);assert.equal(f.entries().length,1);
@@ -187,7 +188,7 @@ test('effective scoped history follows physical append order even if finder matc
 
 test('commit gate rejects direct saves with zero own evidence in OPEN and LATE without appending',()=>{
  for(const now of ['2026-01-02T12:00:00Z','2026-01-08T12:00:00Z']) {
-  const f=weeklyFixture();f.set('Progress Eligible From Week ID','W1');f.time(now);f.sheets.get('Commits').rows.splice(1);
+  const f=weeklyFixture();f.setEligibility('W1');f.time(now);f.sheets.get('Commits').rows.splice(1);
   assert.throws(()=>f.c.submitWeeklyProgress(f.input()),/No GitHub activity found for you this week/);
   assert.equal(f.entries().length,0);assert.equal(f.locked(),false);
   const data=f.c.loadStudentWeeklyProgress();assert.equal(data.evidence[0].state,'available');assert.equal(data.evidence[0].count,0);
@@ -200,7 +201,7 @@ test('commit gate requires the authenticated student, team, repository and origi
    row=>row[1]='T2',row=>row[4]='https://github.com/org/other',row=>row[6]='102',row=>row[3]='(unknown)',
    row=>row[3]='System',row=>row[3]='github-actions[bot]',row=>row[2]='Initial commit: Capstone project for Team T1']) {
   const f=weeklyFixture(),rows=f.sheets.get('Commits').rows;rows.splice(2);change(rows[1]);
-  f.set('Progress Eligible From Week ID','W1');f.time('2026-01-08T12:00:00Z');
+  f.setEligibility('W1');f.time('2026-01-08T12:00:00Z');
   const before=JSON.stringify(rows);assert.throws(()=>f.c.submitWeeklyProgress(f.input()),/No GitHub activity found/);
   assert.equal(f.entries().length,0);assert.equal(JSON.stringify(rows),before);
  }
@@ -209,7 +210,7 @@ test('commit gate requires the authenticated student, team, repository and origi
 test('both inclusive evidence boundaries qualify for ON_TIME and LATE saves and revisions',()=>{
  for(const date of ['2026-01-01T00:00:00Z','2026-01-05T18:00:00Z'])for(const now of ['2026-01-05T18:00:00Z','2026-01-08T12:00:00Z']) {
   const f=weeklyFixture(),rows=f.sheets.get('Commits').rows;rows.splice(2);rows[1][0]=new Date(date);
-  f.set('Progress Eligible From Week ID','W1');f.time(now);
+  f.setEligibility('W1');f.time(now);
   const first=f.c.submitWeeklyProgress(f.input()),revision=f.c.submitWeeklyProgress(f.input({workCompleted:'Updated'}));
   assert.equal(first.timeliness,now.includes('01-08')?'LATE':'ON_TIME');assert.equal(revision.entryStatus,'REVISED');
   assert.equal(revision.firstSubmittedAt,first.firstSubmittedAt);assert.equal(revision.timeliness,first.timeliness);
@@ -217,8 +218,8 @@ test('both inclusive evidence boundaries qualify for ON_TIME and LATE saves and 
 });
 
 test('unavailable mapping and failed collection block new saves without reporting zero',()=>{
- for(const change of [f=>f.githubSetup.members[0].status='missing',f=>f.githubSetup.members[0].githubId='',f=>f.githubSetup.members[0].username='',
-   f=>f.githubSetup.members[1].githubId='101',f=>f.collectionStatus('error'),f=>f.sheets.get('Commits').rows[0][0]='Broken']) {
+ for(const change of [f=>f.sheets.get('GitHubAccounts').rows.splice(1,1),f=>f.sheets.get('GitHubAccounts').rows[1][4]='',f=>f.sheets.get('GitHubAccounts').rows[1][3]='',
+   f=>f.sheets.get('GitHubAccounts').rows[2][4]='101',f=>f.collectionStatus('error'),f=>f.sheets.get('Commits').rows[0][0]='Broken']) {
   const f=weeklyFixture();change(f);const evidence=f.c.loadStudentWeeklyProgress().evidence[0];
   assert.equal(evidence.state,'unavailable');assert.equal(evidence.count,null);
   assert.throws(()=>f.c.submitWeeklyProgress(f.input()),/mapping|unavailable/);assert.equal(f.entries().length,0);

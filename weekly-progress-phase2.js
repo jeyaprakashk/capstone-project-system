@@ -75,18 +75,35 @@ function loadGuideWeeklyProgress() {
   const teams = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row=>emailsMatch(row[columns.GUIDE_EMAIL],email));
   const signs = new Map(weeklyPhase2Rows_('GuideSignoff').map(row=>[row.entryId,row]));
   const analyses = new Map(weeklyPhase2Rows_('AIProgressAnalysis').map(row=>[row.entryId,row]));
+  const evidenceSources = new Map();
   const entries = getEffectiveLogEntries_(readLogEntries_()).filter(row=>row.entryStatus !== 'MISSED').flatMap(entry=>{
     const team = teams.find(row=>textEquals_(row[columns.TEAM_ID],entry.teamId));
     if (!team) return [];
     const student = getStudentsFromTeamStatusRow_(team,columns).find(row=>textEquals_(row.regNo,entry.regNo));
     if (!student) return [];
     const analysis = analyses.get(entry.id);
+    const identity={...student,teamId:entry.teamId};
+    let evidence;
+    try {
+      const key=normalizeEmail(student.email);
+      if(!evidenceSources.has(key))evidenceSources.set(key,weeklyEvidenceSource_(identity));
+      evidence=readWeeklyProgressEvidence_(identity,entry.weekId,evidenceSources.get(key));
+    } catch(error) { evidence={state:'unavailable',message:'GitHub evidence could not be read. Use dashboard Refresh to retry.',commits:[]}; }
+
     return [{entryId:entry.id,weekId:entry.weekId,student:String(student.name || entry.regNo),regNo:String(entry.regNo),
-      discussion:String(entry.guideDiscussion || ''),status:signs.get(entry.id)?.status || 'PENDING',score:analysis ? analysis.score : null}];
+      workCompleted:entry.workCompleted,guideDiscussion:entry.guideDiscussion,blockers:entry.blockers,nextAction:entry.nextAction,
+      analysis:analysis ? {...analysis,analyzedAt:new Date(analysis.analyzedAt).toISOString()} : null,evidence:{state:evidence.state,message:evidence.message,commits:evidence.commits},
+      firstSubmittedAt:entry.firstSubmittedAt ? new Date(entry.firstSubmittedAt).toISOString() : null,timeliness:entry.timeliness,submittedAt:entry.submittedAt ? new Date(entry.submittedAt).toISOString() : null,discussion:String(entry.guideDiscussion || ''),status:signs.get(entry.id)?.status || 'PENDING',score:analysis ? analysis.score : null}];
   });
   const weeks = getWeeklySubmissionWindows_().filter(window=>entries.some(entry=>entry.weekId === window.weekId))
     .sort((a,b)=>b.opens_at-a.opens_at).map(window=>window.weekId);
-  return {entries,weeks,checkedAt:new Date().toISOString(),timezone:getSpreadsheet().getSpreadsheetTimeZone()};
+  const eligibility = readProgressEligibility_(), windows = getWeeklySubmissionWindows_();
+  const requiredByWeek = windows.map(window=>({weekId:window.weekId,regNos:teams.flatMap(team=>
+    getStudentsFromTeamStatusRow_(team,columns).filter(student=>{
+      const record = progressStudentEligibility_({regNo:student.regNo,teamId:team[columns.TEAM_ID]},eligibility);
+      return record.eligibleFrom && eligibleWeeklyWindows_(record.enforcedFrom,windows).some(w=>w.weekId === window.weekId);
+    }).map(student=>String(student.regNo)))}));
+  return {entries,weeks,requiredByWeek,checkedAt:new Date().toISOString(),timezone:getSpreadsheet().getSpreadsheetTimeZone()};
 }
 
 function loadGuideWeeklyProgressDetails(entryId) {

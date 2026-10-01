@@ -40,6 +40,8 @@ function initializeDashboardTooltips_() {
   }
   function show(target) {
     if (!target || !target.closest) return;
+    const nativeOwner = target.closest('[data-native-tooltip]');
+    if (nativeOwner && nativeOwner.getAttribute('data-native-tooltip') !== null) { hide(); return; }
     const owner = target.closest('[data-tooltip], [title], svg[aria-label]');
     if (!owner || owner === active) return;
     const text = owner.getAttribute('data-tooltip') || owner.getAttribute('title') || owner.getAttribute('aria-label');
