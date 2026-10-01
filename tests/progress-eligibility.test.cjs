@@ -357,3 +357,11 @@ test('a hold added during evidence reads prevents an automated boundary write',(
  const f=fixture();f.respond(path=>{f.properties.set('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS',JSON.stringify(['001','002']));return f.normal(path);});
  const before=JSON.stringify(f.pe.rows);assert.equal(f.run().fixed,0);assert.equal(JSON.stringify(f.pe.rows),before);
 });
+
+test('fixed cohort validation reuses a window snapshot without weakening boundary validation',()=>{
+ const f=fixture();f.run();const records=f.c.readProgressEligibility_(),windows=f.c.getWeeklySubmissionWindows_();
+ f.c.getWeeklySubmissionWindows_=()=>{throw Error('redundant read');};
+ assert.equal(f.c.progressStudentEligibility_({regNo:'001',teamId:'T1'},records,windows).eligibleFrom,'W1');
+ assert.throws(()=>f.c.progressStudentEligibility_({regNo:'001',teamId:'T1'},records,[]),/Invalid fixed/);
+ assert.throws(()=>f.c.progressStudentEligibility_({regNo:'001',teamId:'T1'},records),/redundant read/);
+});

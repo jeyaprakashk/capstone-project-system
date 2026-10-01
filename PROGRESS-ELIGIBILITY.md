@@ -135,6 +135,8 @@ These are future coordinator operations, not executed by this local change:
    Each evidence pass selects at most 20 unresolved students, with a 90-second
    evidence-read budget to leave time for persistence. Unchecked students precede
    previously checked exceptions. Deferred students are not written.
+   Batch-level fixed-row checks reuse one validated WeeklyWindows snapshot;
+   per-student writes still reread current authorities under the script lock.
 3. After authorization, `initializeProgressEligibilityMigration(cutoverIso)` saves
    the immutable cohort/cutover and seeds enforcement floors. Partial writes can
    resume. Pass the same reviewed timestamp when initializing after a preview.

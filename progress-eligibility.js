@@ -42,12 +42,12 @@ function readProgressEligibility_() {
   });
 }
 
-function progressStudentEligibility_(student, records) {
+function progressStudentEligibility_(student, records, windowSnapshot) {
   const record = (records || readProgressEligibility_()).find(row=>textEquals_(row.regNo,student.regNo));
   if (!record) return {regNo:student.regNo,teamId:student.teamId,eligibleFrom:'',enforcedFrom:'',status:'PENDING'};
   if (!textEquals_(record.teamId,student.teamId)) throw new Error('ProgressEligibility team identity conflict. Coordinator review required.');
   if (record.eligibleFrom) {
-    const windows = getWeeklySubmissionWindows_();
+    const windows = windowSnapshot || getWeeklySubmissionWindows_();
     const historical = windows.findIndex(w=>w.weekId === record.eligibleFrom), enforced = windows.findIndex(w=>w.weekId === record.enforcedFrom);
     if (historical < 0 || enforced < historical || !record.fixedAt) throw new Error('Invalid fixed ProgressEligibility boundaries.');
   }
@@ -216,7 +216,7 @@ function reconcileProgressEligibility() {
   if (installedOwner && !emailsMatch(installedOwner,owner)) throw new Error('Eligibility trigger belongs to another coordinator.');
   const records = readProgressEligibility_(), students = weeklyStudents_(), windows = getWeeklySubmissionWindows_();
   const holds = progressEligibilityHolds_();
-  const unresolved = students.map(student=>({student,record:progressStudentEligibility_(student,records)})).filter(item=>!item.record.eligibleFrom);
+  const unresolved = students.map(student=>({student,record:progressStudentEligibility_(student,records,windows)})).filter(item=>!item.record.eligibleFrom);
   const held = unresolved.filter(item=>holds.has(normalizeText_(item.student.regNo)) || item.record.enforcedFrom).length;
   const pending = unresolved.filter(item=>!holds.has(normalizeText_(item.student.regNo)) && !item.record.enforcedFrom)
     .sort((a,b)=>(progressDateMs_(a.record.checkedAt)||0)-(progressDateMs_(b.record.checkedAt)||0));

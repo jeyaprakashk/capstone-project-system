@@ -62,7 +62,7 @@ function previewProgressEligibilityMigrationEvidence(cutoverIso) {
   const results = members.map(member=>{
     const student = roster.find(s=>textEquals_(s.regNo,member.regNo) && textEquals_(s.teamId,member.teamId));
     if (!student) throw new Error('Migration cohort membership changed; coordinator review required.');
-    let record = {...progressStudentEligibility_(student,records),error:''};
+    let record = {...progressStudentEligibility_(student,records,windows),error:''};
     if (record.eligibleFrom) return {student,record,alreadyFixed:true};
     if (selected >= 20 || Date.now() >= context.deadline) return {student,record,deferred:true};
     selected++;
@@ -119,8 +119,8 @@ function executeProgressEligibilityMigration() {
       if (next.eligibleFrom) fixed++;
     });
   });
-  const records = readProgressEligibility_();
-  const unresolved = plan.students.filter(student=>!progressStudentEligibility_(student,records).eligibleFrom).length;
+  const records = readProgressEligibility_(), windows = getWeeklySubmissionWindows_();
+  const unresolved = plan.students.filter(student=>!progressStudentEligibility_(student,records,windows).eligibleFrom).length;
   const report = {fixed,unresolved,deferred:preview.deferred,complete:unresolved === 0};
   console.log('Progress eligibility migration: '+JSON.stringify(report));
   return report;
@@ -132,8 +132,8 @@ function holdProgressEligibilityMigrationExceptions() {
   return weeklyLock_(()=>{
     const plan = readProgressEligibilityMigration_();
     if (!plan || plan.state !== 'INITIALIZED') throw new Error('Initialize and verify the migration cohort first.');
-    const records = readProgressEligibility_(), holds = progressEligibilityHolds_();
-    const unresolved = plan.students.filter(student=>!progressStudentEligibility_(student,records).eligibleFrom);
+    const records = readProgressEligibility_(), holds = progressEligibilityHolds_(), windows = getWeeklySubmissionWindows_();
+    const unresolved = plan.students.filter(student=>!progressStudentEligibility_(student,records,windows).eligibleFrom);
     unresolved.forEach(student=>holds.add(normalizeText_(student.regNo)));
     PropertiesService.getScriptProperties().setProperty('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS',JSON.stringify([...holds]));
     const report = {held:unresolved.length,totalHolds:holds.size,cutover:plan.cutover,cutoverWeek:plan.cutoverWeek};
