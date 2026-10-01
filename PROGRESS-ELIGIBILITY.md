@@ -125,7 +125,7 @@ sign-offs and AI analyses are never rewritten or deleted.
 
 ## Migration workflow and later cleanup
 
-These are future coordinator operations, not executed by this local change:
+These coordinator operations require authorization; the live outcome is recorded below:
 
 1. Set up storage only after separate authorization.
 2. `previewProgressEligibilityMigration(cutoverIso)` previews cohort/cutover only.
@@ -190,15 +190,57 @@ Submission fields, numeric attribution, own qualifying-commit requirements,
 ON_TIME/LATE timing, retry deduplication, freezing, guide sign-off, AI scheduling
 and assessment/publication systems are unchanged.
 
-## Local policy-update scope
+## Live verification — October 1, 2026
 
-Changed for this policy revision: `progress-eligibility.js`,
-`progress-eligibility-migration.js`, `tests/progress-eligibility.test.cjs`, this
-file and `WEEKLY-PROGRESS.md`. Prior uncommitted work remains intact.
-No deployment, live spreadsheet change, migration execution or trigger installation
-was performed. Tests use local mocks only.
+Spreadsheet: `1nPtioEYUanqZ42WtBQOJfoHxJPOUGrxNKDGDFMAkq3w`.
+Apps Script: `1AyDrQfSOAiTO4iFwdRzQ0QojwC_c6uKZIrJquQWL-MUVEDwD-NREDvYH`.
+The original 182-student cohort and cutover `2026-10-01T01:24:47.633Z`
+(`2026-W02`) were retained. No initialization was rerun.
 
-Validation: 36 eligibility-policy tests passed; the focused eligibility, weekly,
-evidence, Phase 2, schedule and browser suites passed all 195 tests. The full suite
-passed all 633 tests, with no failures or skips. Syntax checks passed for both
-changed JavaScript modules and the changed test file; `git diff --check` passed.
+All 182 unique students were checked. The final execution completed at 11:01:59
+IST with 171 fixed, 11 unresolved and zero deferred students. Of the fixed rows,
+144 are historically eligible from `2026-W01` and 27 from `2026-W02`; all 171
+are enforced from `2026-W02`. All 20 headers, identity-matched registration
+references, authoritative title approvals, earliest effective evidence dates,
+fixing dates and normal-deadline boundaries were verified. The original 20 fixed
+rows remained unchanged.
+
+Remaining prerequisites (11 unique students; two have both kinds of issue):
+
+| Prerequisite | Team | Register numbers |
+| --- | --- | --- |
+| Numeric GitHub identity | G24 | 9923005155 |
+| Numeric GitHub identity | G45 | 9923005019 |
+| Numeric GitHub identity | G50 | 9923005087 |
+| Authoritative title approval | G20 | 9923005048, 9923005037, 9923005008 |
+| Authoritative title approval | G45 | 9923005019 |
+| Authoritative title approval | G50 | 9923005154, 9923005308, 9923005087 |
+| Authoritative title approval | G56 | 9923005192, 9923005220, 9923005025 |
+
+Persistent holds were verified for all 11 unresolved students. The hold list
+retains its 117 entries from installation during migration; already-fixed entries
+are inert. Daily reconciliation completed at 11:05:03 IST with
+`checked:0, fixed:0, deferred:0, held:11`, and a complete eligibility-sheet
+comparison confirmed no row changed. Never clear these holds or delete the
+cohort/module to let steady state finish an exception. Once genuine prerequisites
+arrive, manually resume migration using the saved cohort and original cutover.
+
+The coordinator-owned daily trigger was installed and its Day timer, 2–3 AM
+GMT+05:30 schedule verified. All five existing triggers were retained:
+`processWeeklySubmissionSchedule`, `processWeeklyProgressAI`, `fetchAllCommits`,
+`onTeamIntakeSubmit` and `sendGuideReminderDigest`.
+
+Only the obsolete TeamStatus column was deleted after rechecking its unique
+header at AC. Readback confirmed 28 remaining columns, unchanged A:AB data and
+unchanged structures for all other sheets. Logs, revisions, sign-offs, AI analyses
+and other history were not rewritten or deleted. Migration code and properties
+remain necessary for the exceptions; cleanup has not been performed.
+
+The live source was compared with local code before edits, preserving the
+20-student/90-second batching fix. Saved source readback matched the tested local
+files. The hold and window-snapshot changes were committed and pushed as
+`770b4a4` and `a1ec2e2` respectively. Validation: 42 eligibility tests and all
+639 full-suite tests passed, with no failures or skips; syntax and diff checks
+passed. A few live batches hit script-lock timeouts and were resumed without
+resetting or overwriting fixed records. No execution remains running from this
+migration workflow.
