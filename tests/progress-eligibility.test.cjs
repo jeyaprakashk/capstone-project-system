@@ -327,3 +327,33 @@ test('migration batches cap unresolved work and resume unchecked students before
  f.time('2026-01-03');f.c.executeProgressEligibilityMigration();
  assert.equal(f.c.readProgressEligibility_().filter(r=>r.checkedAt).length,25);
 });
+
+test('held migration exceptions remain untouched by daily reconciliation and resolve manually with original benefit',()=>{
+ const f=fixture();f.time('2026-01-09');f.c.initializeProgressEligibilityMigration();
+ f.sheets.get('GitHubAccounts').rows.slice(1).forEach(row=>row[0]=new Date('2026-01-01'));
+ f.set('Reviewer Decision','');f.c.executeProgressEligibilityMigration();
+ const plan=f.properties.get('PROGRESS_ELIGIBILITY_MIGRATION');
+ assert.equal(f.c.holdProgressEligibilityMigrationExceptions().held,2);
+ const before=JSON.stringify(f.pe.rows),calls=f.calls.length;
+ f.set('Reviewer Decision','Approved');const daily=f.run();
+ assert.equal(daily.held,2);assert.equal(daily.checked,0);assert.equal(f.calls.length,calls);assert.equal(JSON.stringify(f.pe.rows),before);
+ assert.equal(f.c.executeProgressEligibilityMigration().complete,true);
+ assert.equal(f.record().eligibleFrom,'W1');assert.equal(f.record().enforcedFrom,'W2');assert.equal(f.record().source,'MIGRATION_REGISTRATION');
+ assert.equal(f.properties.get('PROGRESS_ELIGIBILITY_MIGRATION'),plan);assert.equal(f.run().held,0);
+});
+
+test('persisted enforcement floors protect unresolved students even before explicit holds are installed',()=>{
+ const f=fixture();f.time('2026-01-09');f.c.initializeProgressEligibilityMigration();
+ const before=JSON.stringify(f.pe.rows);assert.equal(f.run().held,2);assert.equal(f.calls.length,0);assert.equal(JSON.stringify(f.pe.rows),before);
+});
+
+test('holds preserve unrelated students and fail closed on malformed configuration',()=>{
+ const f=fixture();f.properties.set('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS',JSON.stringify(['001']));
+ assert.equal(f.run().fixed,1);assert.equal(f.record().eligibleFrom,'');assert.equal(f.record('002').eligibleFrom,'W1');
+ const g=fixture();g.properties.set('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS','{}');assert.throws(()=>g.run(),/Invalid eligibility/);assert.equal(g.calls.length,0);
+});
+
+test('a hold added during evidence reads prevents an automated boundary write',()=>{
+ const f=fixture();f.respond(path=>{f.properties.set('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS',JSON.stringify(['001','002']));return f.normal(path);});
+ const before=JSON.stringify(f.pe.rows);assert.equal(f.run().fixed,0);assert.equal(JSON.stringify(f.pe.rows),before);
+});

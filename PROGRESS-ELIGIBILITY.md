@@ -35,6 +35,14 @@ only unresolved roster students. Fixed students generate no eligibility GitHub
 requests or writes. No dashboard, save, approval, provisioning or hourly scheduler
 calls reconciliation.
 
+Coordinator-managed `PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS` stores a JSON array
+of normalized register numbers. Daily reconciliation skips held unresolved students
+without GitHub requests or row writes and reports their count as `held`. An unresolved
+row with a persisted enforcement floor is also protected from automatic fixing,
+including if the explicit hold property is missing. The hold/floor is rechecked
+under the write lock. Malformed hold configuration stops reconciliation.
+Fixed rows remain immutable and do not require removal from the hold list.
+
 ## Schema
 
 One row per normalized register number; register numbers and numeric GitHub IDs
@@ -135,11 +143,18 @@ These are future coordinator operations, not executed by this local change:
    can resume unresolved students, and never refreshes already-fixed students.
    Run repeatedly until no unchecked/deferred cohort members remain, then review
    exceptions. Each execution logs fixed, unresolved and deferred counts.
-5. Verify results and resolve all migration-cohort exceptions before activating
-   the normal daily job. Do not use steady-state reconciliation to finish unresolved
-   migration students: it intentionally cannot use their registration dates or
-   calculate a migration cutover. Initialization alone is not completed migration.
-6. After verification, separately authorize cleanup and daily trigger activation.
+5. Verify results and review all migration-cohort exceptions. Run
+   `holdProgressEligibilityMigrationExceptions()` to persist holds for unresolved
+   cohort members, preserving existing holds, cohort, cutover and sheet records.
+   The coordinator authorized this exception policy on October 1, 2026. Once the
+   holds and daily skip behavior are verified, the authorized daily trigger may be
+   activated for other students. Do not use steady-state reconciliation to finish
+   migration exceptions: it cannot use registration dates or calculate a cutover.
+   When prerequisites arrive, resume `executeProgressEligibilityMigration()` manually;
+   it ignores automated-reconciliation holds and retains the original policy.
+6. Retain the migration module and cohort properties while any exception remains.
+   Initialization or installation of holds alone is not completed migration.
+   Migration cleanup remains separately authorized, after every cohort member is fixed.
 
 Cleanup deletes the entire migration module, including its cohort preview,
 initialization, evidence preview, execution, registration-date helper and migration

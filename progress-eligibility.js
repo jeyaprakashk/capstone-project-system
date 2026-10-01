@@ -201,19 +201,35 @@ function progressResolveEvidence_(record, slug, context) {
   }
 }
 
+/** Coordinator-managed holds prevent automated changes while evidence needs manual review. */
+function progressEligibilityHolds_() {
+  const raw = PropertiesService.getScriptProperties().getProperty('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS');
+  if (!raw) return new Set();
+  const values = JSON.parse(raw);
+  if (!Array.isArray(values) || values.some(value=>typeof value !== 'string' || !normalizeText_(value))) throw new Error('Invalid eligibility reconciliation holds.');
+  return new Set(values.map(normalizeText_));
+}
+
 function reconcileProgressEligibility() {
   const owner = progressEligibilityCoordinator_(true), props = PropertiesService.getScriptProperties();
   const installedOwner = props.getProperty('PROGRESS_ELIGIBILITY_TRIGGER_OWNER');
   if (installedOwner && !emailsMatch(installedOwner,owner)) throw new Error('Eligibility trigger belongs to another coordinator.');
   const records = readProgressEligibility_(), students = weeklyStudents_(), windows = getWeeklySubmissionWindows_();
-  const pending = students.map(student=>({student,record:progressStudentEligibility_(student,records)})).filter(item=>!item.record.eligibleFrom)
+  const holds = progressEligibilityHolds_();
+  const unresolved = students.map(student=>({student,record:progressStudentEligibility_(student,records)})).filter(item=>!item.record.eligibleFrom);
+  const held = unresolved.filter(item=>holds.has(normalizeText_(item.student.regNo)) || item.record.enforcedFrom).length;
+  const pending = unresolved.filter(item=>!holds.has(normalizeText_(item.student.regNo)) && !item.record.enforcedFrom)
     .sort((a,b)=>(progressDateMs_(a.record.checkedAt)||0)-(progressDateMs_(b.record.checkedAt)||0));
-  if (!pending.length) return {checked:0,fixed:0,deferred:0};
+  if (!pending.length) {
+    const report = {checked:0,fixed:0,deferred:0,held};
+    console.log('Progress eligibility reconciliation: '+JSON.stringify(report));
+    return report;
+  }
   const context = {request:progressGithubGet_,cache:new Map(),deadline:Date.now()+240000};
   const accounts = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS), accountColumns = githubAccountColumns_(accounts), accountRows = readSheetRows_(accounts,2);
   let registry, registryError;
   try { registry = readSheetRows_(getHubRegistrySheet(),2); } catch(error) { registryError = true; }
-  const report = {checked:0,fixed:0,deferred:0,writeErrors:0};
+  const report = {checked:0,fixed:0,deferred:0,writeErrors:0,held};
   for (const item of pending) {
     if (Date.now() >= context.deadline) { report.deferred += pending.length-report.checked; break; }
     const {student,record} = item;
@@ -241,6 +257,7 @@ function reconcileProgressEligibility() {
       if (!currentStudent) throw new Error('Student membership changed during reconciliation.');
       const current = progressStudentEligibility_(student);
       if (current.eligibleFrom) return;
+      if (current.enforcedFrom || progressEligibilityHolds_().has(normalizeText_(student.regNo))) return;
       const currentAccounts = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS);
       const currentIdentity = githubStudentIdentity_(student,readSheetRows_(currentAccounts,2),githubAccountColumns_(currentAccounts));
       if (!next.error && next.githubId && (currentIdentity.state !== 'available' || currentIdentity.githubId !== next.githubId)) throw new Error('GitHub identity changed during reconciliation.');
@@ -263,6 +280,7 @@ function reconcileProgressEligibility() {
     }); } catch(error) { report.writeErrors++; console.error('Progress eligibility persistence deferred; no boundary committed for this attempt.'); }
     report.checked++;
   }
+  console.log('Progress eligibility reconciliation: '+JSON.stringify(report));
   return report;
 }
 

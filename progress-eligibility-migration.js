@@ -1,6 +1,6 @@
 /** MIGRATION ONLY. Remove this entire file after separately authorized migration cleanup.
- * No production caller uses this module. Complete and verify this workflow before
- * activating daily reconciliation; there is no migration branch in the daily job.
+ * No production caller uses this module. Verify fixed results and hold unresolved
+ * exceptions before daily reconciliation; there is no migration policy in the daily job.
  */
 function readProgressEligibilityMigration_() {
   const properties = PropertiesService.getScriptProperties(), raw = properties.getProperty('PROGRESS_ELIGIBILITY_MIGRATION');
@@ -124,6 +124,22 @@ function executeProgressEligibilityMigration() {
   const report = {fixed,unresolved,deferred:preview.deferred,complete:unresolved === 0};
   console.log('Progress eligibility migration: '+JSON.stringify(report));
   return report;
+}
+
+/** Retain unresolved cohort members for manual migration; never clear existing holds. */
+function holdProgressEligibilityMigrationExceptions() {
+  progressEligibilityCoordinator_();
+  return weeklyLock_(()=>{
+    const plan = readProgressEligibilityMigration_();
+    if (!plan || plan.state !== 'INITIALIZED') throw new Error('Initialize and verify the migration cohort first.');
+    const records = readProgressEligibility_(), holds = progressEligibilityHolds_();
+    const unresolved = plan.students.filter(student=>!progressStudentEligibility_(student,records).eligibleFrom);
+    unresolved.forEach(student=>holds.add(normalizeText_(student.regNo)));
+    PropertiesService.getScriptProperties().setProperty('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS',JSON.stringify([...holds]));
+    const report = {held:unresolved.length,totalHolds:holds.size,cutover:plan.cutover,cutoverWeek:plan.cutoverWeek};
+    console.log('Progress eligibility holds: '+JSON.stringify(report));
+    return report;
+  });
 }
 
 function previewProgressEligibilityMigration(cutoverIso) {
