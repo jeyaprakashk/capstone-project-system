@@ -124,12 +124,17 @@ These are future coordinator operations, not executed by this local change:
    `previewProgressEligibilityMigrationEvidence(cutoverIso)` additionally performs
    read-only historical evidence checks and returns proposed student records and
    unresolved counts, without saving first observations or changing properties.
+   Each evidence pass selects at most 20 unresolved students, with a 90-second
+   evidence-read budget to leave time for persistence. Unchecked students precede
+   previously checked exceptions. Deferred students are not written.
 3. After authorization, `initializeProgressEligibilityMigration(cutoverIso)` saves
    the immutable cohort/cutover and seeds enforcement floors. Partial writes can
    resume. Pass the same reviewed timestamp when initializing after a preview.
 4. `executeProgressEligibilityMigration()` reconstructs and persists individual
    eligibility under the migration policy. It requires completed initialization,
    can resume unresolved students, and never refreshes already-fixed students.
+   Run repeatedly until no unchecked/deferred cohort members remain, then review
+   exceptions. Each execution logs fixed, unresolved and deferred counts.
 5. Verify results and resolve all migration-cohort exceptions before activating
    the normal daily job. Do not use steady-state reconciliation to finish unresolved
    migration students: it intentionally cannot use their registration dates or

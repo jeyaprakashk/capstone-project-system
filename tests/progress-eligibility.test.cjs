@@ -316,3 +316,14 @@ test('migration execution revalidates changed identities and resumes failed stud
  g.c.previewProgressEligibilityMigrationEvidence=()=>{const result=preview();g.sheets.get('GitHubAccounts').rows[1][4]='999';return result;};
  assert.throws(()=>g.c.executeProgressEligibilityMigration(),/identity changed/);assert.equal(g.record().eligibleFrom,'');
 });
+
+test('migration batches cap unresolved work and resume unchecked students before prior exceptions',()=>{
+ const f=fixture(),base=f.c.weeklyStudents_();
+ f.c.weeklyStudents_=()=>[...base,...Array.from({length:23},(_,i)=>({regNo:'extra'+i,teamId:'T1',email:'extra'+i+'@example.com'}))];
+ f.c.initializeProgressEligibilityMigration();
+ const preview=f.c.previewProgressEligibilityMigrationEvidence();assert.equal(preview.deferred,5);
+ const first=f.c.executeProgressEligibilityMigration();assert.equal(first.deferred,5);
+ assert.equal(f.c.readProgressEligibility_().filter(r=>r.checkedAt).length,20);
+ f.time('2026-01-03');f.c.executeProgressEligibilityMigration();
+ assert.equal(f.c.readProgressEligibility_().filter(r=>r.checkedAt).length,25);
+});

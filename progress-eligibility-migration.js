@@ -52,12 +52,21 @@ function previewProgressEligibilityMigrationEvidence(cutoverIso) {
   const plan = previewProgressEligibilityMigration(cutoverIso), roster = weeklyStudents_(), records = readProgressEligibility_();
   const accounts = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS), columns = githubAccountColumns_(accounts), rows = readSheetRows_(accounts,2);
   const registry = readSheetRows_(getHubRegistrySheet(),2), windows = getWeeklySubmissionWindows_();
-  const context = {request:progressGithubGet_,cache:new Map(),deadline:Date.now()+240000};
-  const results = plan.students.map(member=>{
+  // MIGRATION ONLY: leave time for persistence within the Apps Script execution limit.
+  const context = {request:progressGithubGet_,cache:new Map(),deadline:Date.now()+90000};
+  let selected = 0;
+  const members = plan.students.slice().sort((a,b)=>{
+    const x = records.find(r=>textEquals_(r.regNo,a.regNo)), y = records.find(r=>textEquals_(r.regNo,b.regNo));
+    return (progressDateMs_(x && x.checkedAt)||0)-(progressDateMs_(y && y.checkedAt)||0);
+  });
+  const results = members.map(member=>{
     const student = roster.find(s=>textEquals_(s.regNo,member.regNo) && textEquals_(s.teamId,member.teamId));
     if (!student) throw new Error('Migration cohort membership changed; coordinator review required.');
     let record = {...progressStudentEligibility_(student,records),error:''};
     if (record.eligibleFrom) return {student,record,alreadyFixed:true};
+    if (selected >= 20 || Date.now() >= context.deadline) return {student,record,deferred:true};
+    selected++;
+    record.checkedAt = new Date();
     try {
       const identity = githubStudentIdentity_(student,rows,columns,roster);
       if (identity.state !== 'available') throw new Error(identity.reason);
@@ -76,7 +85,8 @@ function previewProgressEligibilityMigrationEvidence(cutoverIso) {
     } catch(error) { record.status = 'CHECK_ERROR'; record.error = error.message; }
     return {student,record};
   });
-  return {...plan,results,unresolved:results.filter(item=>!item.record.eligibleFrom).length};
+  return {...plan,results,unresolved:results.filter(item=>!item.record.eligibleFrom).length,
+    deferred:results.filter(item=>item.deferred).length};
 }
 
 /** MIGRATION ONLY. Explicit manual execution after preview/authorization; safe to resume. */
@@ -87,7 +97,7 @@ function executeProgressEligibilityMigration() {
   const preview = previewProgressEligibilityMigrationEvidence(); // Network reads outside the lock.
   let fixed = 0;
   preview.results.forEach(item=>{
-    if (item.alreadyFixed) return;
+    if (item.alreadyFixed || item.deferred) return;
     weeklyLock_(()=>{
       const roster = weeklyStudents_(), student = roster.find(s=>textEquals_(s.regNo,item.student.regNo) && textEquals_(s.teamId,item.student.teamId) && emailsMatch(s.email,item.student.email));
       if (!student) throw new Error('Migration cohort membership changed.');
@@ -111,7 +121,9 @@ function executeProgressEligibilityMigration() {
   });
   const records = readProgressEligibility_();
   const unresolved = plan.students.filter(student=>!progressStudentEligibility_(student,records).eligibleFrom).length;
-  return {fixed,unresolved,complete:unresolved === 0};
+  const report = {fixed,unresolved,deferred:preview.deferred,complete:unresolved === 0};
+  console.log('Progress eligibility migration: '+JSON.stringify(report));
+  return report;
 }
 
 function previewProgressEligibilityMigration(cutoverIso) {
