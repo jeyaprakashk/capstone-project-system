@@ -84,17 +84,8 @@ function loadDashboardRoleContent_(key) {
   // IMPORTANT: authorize only the requested role. The previous version called
   // getDashboardRoleViews_() again, which needlessly checked every role and
   // reread unrelated sheets before loading one tab.
-  if (key === 'student') {
-    const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS);
-    const teamRow = rows.find(r =>
-      r[TS.TEAM_ID] &&
-      [r[TS.S1_EMAIL], r[TS.S2_EMAIL], r[TS.S3_EMAIL], r[TS.S4_EMAIL]]
-        .some(e => emailsMatch(e, email))
-    );
-    if (!teamRow) throw new Error('Student team was not found.');
-    return buildStudentContent(email, teamRow[TS.TEAM_ID], teamRow);
-  }
+  // The student role loads as a DTO through API_student_getDashboard (student-api.js).
+  if (key === 'student') throw new Error('The student dashboard loads through its data endpoint.');
 
   // The reviewer role loads as a DTO through API_reviewer_getDashboard (reviewer-api.js).
   if (key === 'reviewer') throw new Error('The reviewer dashboard loads through its data endpoint.');

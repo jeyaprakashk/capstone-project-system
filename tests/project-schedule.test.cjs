@@ -28,7 +28,7 @@ function fixture(overrides = {}, runtime = {}) {
       return new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'short',year:'numeric'}).format(date);
     }}
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','api-envelope.js','guide-api.js','data-bridge-client.js','reviewer-view.js','guide-view.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
+  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','api-envelope.js','guide-api.js','student-api.js','data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
   const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
@@ -216,121 +216,6 @@ test('team health requires a log from every rostered student',()=>{
 });
 
 
-test('student card hides weekly component until title approval and keeps the title action',()=>{
-  const {c,schedule,clock}=fixture();
-  c.buildTeamIntakeLink=()=> 'https://example.com/title';
-  c.getStudentDashboardData=()=>({repoUrl:'https://example.com/repo',githubReady:true,githubState:'done',titleStatus:'NOT_SUBMITTED',title:'',rosterSlots:[],schedule,clock:clock('2026-09-23')});
-  c.getAssessmentDefinitions_=()=>[];
-  const html=c.buildStudentContent('student@example.com','T1');
-  assert.doesNotMatch(html,/id="studentWeeklyProgress"|data-weekly-form/);
-  assert.match(html,/https:\/\/example.com\/title/);assert.doesNotMatch(html,/forms.gle|buildWeeklyLogLink/);
-});
-
-test('student setup gates weekly UI for every title state and keeps incomplete steps expanded',()=>{
- const {parseHTML}=require('linkedom');const {c,schedule,clock}=fixture();
- c.buildTeamIntakeLink=()=> 'https://example.test/title';
- c.getAssessmentDefinitions_=()=>[];
- for(const githubReady of [false,true])for(const titleStatus of ['NOT_SUBMITTED','NEEDS_REVIEW','REVISE_AWAITING_STUDENT','AWAITING_REVIEWER','APPROVED','REJECTED_BY_GUIDE']) {
-  c.getStudentDashboardData=()=>({githubReady,githubCaptureReady:true,titleStatus,githubState:githubReady?'done':'active',githubText:'Team member must accept the invitation.',githubNeedsUsername:!githubReady,githubCanRetry:!githubReady,githubSetup:{},schedule,clock:clock('2026-09-23'),rosterSlots:[],title:titleStatus==='NOT_SUBMITTED'?'':'A title',note:'Existing review feedback'});
-  const {document}=parseHTML(c.buildStudentContent('me@example.test','T1')),setup=document.querySelector('.student-project-setup');
-  const complete=githubReady&&titleStatus==='APPROVED';
-  assert.equal(!!document.getElementById('studentWeeklyProgress'),titleStatus==='APPROVED');
-  assert.equal(setup.tagName,complete?'DETAILS':'SECTION');assert.equal(setup.hasAttribute('open'),false);
-  assert.equal(setup.querySelectorAll('[data-step-row]').length,2);
-  if(complete){assert.match(setup.querySelector('summary').textContent,/✓ CompleteViewHide/);setup.setAttribute('open','');assert(setup.hasAttribute('open'));setup.removeAttribute('open');}
-  else {assert(setup.querySelector('[data-setup-pending]'));if(!githubReady)assert.match(setup.textContent,/Step 1: Team member must accept/);if(titleStatus!=='APPROVED')assert.match(setup.textContent,/Step 2:/);}
-  assert.equal(document.querySelectorAll('#studentGithubProfile').length,1); // No student ID in this fixture, independent of team readiness.
- }
-});
-
-test('unregistered student card offers only account connection and hides repository retry',()=>{
-  const {parseHTML}=require('linkedom');const {c,schedule,clock}=fixture();
-  c.getAssessmentDefinitions_=()=>[];
-  const data={githubReady:false,githubCaptureReady:true,githubNeedsUsername:true,githubCanRetry:true,githubAccount:{},
-    githubState:'active',githubText:'Waiting for GitHub account connection.',githubSetup:{},
-    titleStatus:'NOT_SUBMITTED',title:'',rosterSlots:[],schedule,clock:clock('2026-09-23')};
-  c.getStudentDashboardData=()=>data;
-  const {document}=parseHTML(c.buildStudentContent('student@example.com','T1'));
-  const card=document.querySelector('[data-step-row]');
-  assert.match(card.textContent,/Waiting for GitHub account connection/);
-  assert.doesNotMatch(card.textContent,/valid username|Retry GitHub setup|could not verify/i);
-  assert.match(card.textContent,/Submit GitHub Account/);
-  assert.equal(card.querySelector('button[type="submit"]').textContent,'Continue');
-  assert.equal(card.querySelectorAll('button.btn-primary').length,1);
-  data.githubNeedsUsername=false;data.githubAccount={githubId:'101',username:'student'};
-  data.githubText='GitHub could not verify all teammates right now. Please try again shortly.';
-  const connected=c.buildStudentContent('student@example.com','T1');
-  assert.doesNotMatch(connected,/Retry GitHub setup/);
-});
-
-test('GitHub status rows use existing icons without a table; connected students have no secondary actions',()=>{
-  const {parseHTML}=require('linkedom');const {c,schedule,clock}=fixture();
-  c.getAssessmentDefinitions_=()=>[];
-  const mine={email:'student@example.com',githubId:'101',status:'valid',access:'invited'};
-  const other={email:'other@example.com',githubId:'102',status:'valid',access:'active'};
-  const missing={email:'missing@example.com',githubId:'',status:'missing',access:'unchecked'};
-  const data={repoUrl:'https://github.com/org/repo',githubReady:false,githubCaptureReady:true,githubNeedsUsername:false,
-    githubCanRetry:true,githubAccount:{githubId:'101',username:'student'},githubSetup:{members:[other,mine,missing,{email:'staff@example.com',githubId:'999'}]},
-    githubState:'waiting',githubText:'Team setup pending.',titleStatus:'NOT_SUBMITTED',title:'',
-    rosterSlots:[{email:mine.email,regno:'R1'},{email:other.email,regno:'R2'},{email:missing.email,regno:'R3'},{email:'',regno:''}],schedule,clock:clock('2026-09-23')};
-  c.getStudentDashboardData=()=>data;
-  const card=()=>parseHTML(c.buildStudentContent('student@example.com','T1')).document.querySelector('[data-step-row]');
-  let rendered=card();
-  assert.equal(rendered.querySelector('table'),null);
-  assert.deepEqual([...rendered.querySelectorAll('[data-member-status]')].map(row=>[row.querySelector('[data-member-register]').textContent,row.querySelector('[data-member-state]').textContent]),[
-    ['R1','Accept Invitation Email'],['R2','Repository joined'],['R3','Submit GitHub Account']]);
-  assert(rendered.querySelector('[data-member-status] .lucide-clock'));
-  assert(rendered.querySelector('[data-member-status="joined"] .lucide-check'));
-  assert(rendered.querySelector('[data-member-status="missing"] .lucide-triangle-alert'));
-  assert.doesNotMatch(rendered.textContent,/Action required:|No action required:/);
-  assert.equal((rendered.textContent.match(/GitHub setup due/g)||[]).length,1);
-  const noActions=card=>{
-    assert.equal(card.querySelectorAll('form,button,input,[data-github-confirmation],#githubSubmitStatus').length,0);
-    assert.equal(card.querySelectorAll('a').length,1);
-    assert.deepEqual([...card.querySelector('[data-step-card]').children].map(node=>node.hasAttribute('data-step-header')?'step-header':node.hasAttribute('data-step-body')?'step-body':node.tagName),['step-header','step-body']);
-    assert.doesNotMatch(card.innerHTML,/retryGithubSetup|\/invitations|Your GitHub setup is complete/);
-  };
-  noActions(rendered);
-  assert.equal(rendered.querySelector('.github-team-repository a').getAttribute('href'),'https://github.com/org/repo');
-  mine.access='active';other.access='invited';rendered=card();
-  assert.equal(rendered.querySelector('[data-member-state]').textContent,'Repository joined');
-  noActions(rendered);
-  assert.equal(rendered.querySelector('a.btn-primary'),null);assert.equal(rendered.querySelector('form'),null);
-  assert.doesNotMatch(rendered.textContent,/Retry GitHub setup/);
-  // A teammate joining cannot supply this student's personal access status.
-  mine.access='unchecked';other.access='active';rendered=card();
-  assert.equal(rendered.querySelector('[data-member-state]').textContent,'Accept Invitation Email');
-  noActions(rendered);
-  data.repoUrl='';rendered=card();assert.match(rendered.querySelector('.github-team-repository').textContent,/Not available yet/);
-  assert.equal(rendered.querySelectorAll('[data-member-status]').length,3);
-  data.githubAccount={};mine.githubId='';rendered=card();
-  const jump=rendered.querySelector('[data-github-form-jump]');
-  assert.equal(jump.textContent,'Submit GitHub Account');
-  assert.equal(jump.getAttribute('type'),'button');
-  assert.equal(jump.getAttribute('onclick'),'DashboardUI.focusGithubAccountForm(this)');
-  assert.equal(jump.hasAttribute('href'),false);
-  assert(rendered.querySelector('#studentGithubProfile'));
-  assert.equal(rendered.querySelectorAll('[data-github-form-jump]').length,1);
-});
-
-test('weekly panel is independent of teammate setup while preserving repository and recorded work',()=>{
-  const {c,schedule,clock}=fixture();
-  const data={repoUrl:'https://github.com/org/repo',githubAccount:{githubId:'101',username:'student'},githubReady:false,githubCanRetry:true,githubState:'waiting',githubText:'Waiting for teammate R2',
-    titleStatus:'APPROVED',title:'Existing title',rosterSlots:[],schedule,clock:clock('2026-09-23'),logWeeks:{missing:0,currentLogged:true}};
-  c.getStudentDashboardData=()=>data;
-  let html=(c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
-  assert(html.includes('https://github.com/org/repo'));
-  assert(html.includes('Current title:</strong> Existing title'));
-  assert(html.includes('studentWeeklyProgress'));
-  assert(!html.includes('Retry GitHub setup'));
-  assert(!html.includes('https://example.com/log'));
-  assert(!html.includes('milestones complete'));
-  data.githubReady=true;data.githubCanRetry=false;data.githubState='done';
-  html=(c.getAssessmentDefinitions_=()=>[],c.buildStudentContent)('student@example.com','T1');
-  assert(html.includes('data-weekly-form'));
-  assert(!html.includes('milestones complete'));
-});
-
 test('coordinator statistics, attention list and tracker share one health result',()=>{
   const {c,clock}=fixture({COLLABORATOR_GITHUB_USERNAME:'coordinator',COLLABORATOR_REPOS_ACCESS:1});
   const definitions=vm.runInContext('FIELD_DEFINITIONS',c);
@@ -452,7 +337,7 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   const document={readyState:'loading',addEventListener(){},getElementById:id=>elements[id],createElement:element,body:element()};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorDrawerSection(teamId,section){requests.push({...handlers,teamId,section});}};return chain;}};
   const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
-  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext("focusCoordinatorTeam('A'); focusCoordinatorTeam('B');",browser);
   assert.deepEqual(requests.map(r=>r.section),['basic','progress','activity','basic','progress','activity']);
   requests[3].success({title:'Team B project',students:[],reviewers:[]});
@@ -560,11 +445,12 @@ function timelineBrowser() {
       loadDashboardRoleContent(role){requests.push({type:'role',role,...handlers});},
       // Migrated reviewer role answers through the data bridge with a response envelope.
       API_reviewer_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'reviewer',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
-      API_guide_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'guide',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});}};
+      API_guide_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'guide',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
+      API_student_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'student',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});}};
     return chain;
   }};
   const browser=createSheetReadContext({window:{matchMedia:()=>({matches:false})},ResizeObserver:class {constructor(callback){this.callback=callback;} observe(){} disconnect(){}},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
-  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext('ReviewerView.render=GuideView.render=(host,dto)=>{host.innerHTML=dto.html;}',browser);vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=(host,dto)=>{host.innerHTML=dto.html;}',browser);vm.runInContext(c.getDashboardClientScript(),browser);
   return {c,browser,requests,timeline,guide,reviewer,initialize:()=>initialize()};
 }
 
@@ -750,7 +636,7 @@ function coordinatorAsyncBrowser(fonts) {
   const document={fonts,readyState:'loading',addEventListener(){},getElementById:id=>elements[id]||null,querySelector:()=>null,querySelectorAll:()=>[],createElement:element};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorSection(section){requests.push({...handlers,section});},loadAllTeamsWeeklyActivity(){requests.push({...handlers,section:'activity'});}};return chain;}};
   const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console:{log(){}}});
-  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext('DashboardUI.initializeCoordinatorAsync()',browser);
   return {browser,requests,elements,element};
 }

@@ -158,14 +158,14 @@ function fixture(system=false) {
  querySelectorAll:selector=>selector==='[data-role-content]'?panels:[]};
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>{
   // Migrated reviewer role: log it like the role-content request, answering with an envelope.
-  const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide'}[key];
+  const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getDashboard:'student'}[key];
   if(migrated)return requests.push({key:'loadDashboardRoleContent',args:[migrated],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   return requests.push({key,args,success,failure});}}); }
  const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').split('function renderAssessmentHistory_')[1].replace(/^/, 'function renderAssessmentHistory_'):fs.readFileSync(file,'utf8'),c);
  vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
- for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
+ for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
  return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
 }
 
@@ -535,7 +535,7 @@ test('GitHub status refresh uses compact student loading and restores content af
  assert(host.classList.contains('app-content-loading--compact'));
  assert.equal(host.querySelectorAll('.app-skeleton-lines > span').length,3);
  assert.equal(button.inert,true);
- const request=f.requests.at(-1);request.done=true;request.failure(new Error('offline'));
+ const request=f.requests.at(-1);request.done=true;request.failure(new Error('offline'));await f.settle();
  assert.equal(host.firstElementChild,button);assert(!button.inert);
  assert.equal(host.getAttribute('aria-busy'),'false');
  assert(!host.classList.contains('app-content-loading--compact'));

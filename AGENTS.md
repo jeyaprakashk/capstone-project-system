@@ -60,7 +60,9 @@ or removing any class. Do not add inline `<style>` blocks or hand-written CSS fi
 - Do not put a display utility (`flex`, `grid`, ...) on an element scripts toggle with `hidden`.
 - No preflight: the base rules in the input file are the dashboard's reset.
 
-Migrated so far: **Reviewer** (`reviewer-api.js`, `reviewer-view.js`) and **Guide**
+Migrated so far: **Reviewer** (`reviewer-api.js`, `reviewer-view.js`), **Student**
+(`student-api.js`, `student-view.js`; its weekly-progress, assessment and GitHub-connection modules are
+still legacy and attach to placeholders) and **Guide**
 (`guide-api.js`, `guide-view.js`; the weekly-progress and evaluation panels inside it are
 still legacy modules and attach to the view through its `data-guide-*` markup). Shared pieces:
 `api-envelope.js` (server) and `data-bridge-client.js` (browser).

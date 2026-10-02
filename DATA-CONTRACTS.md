@@ -27,6 +27,7 @@ One section per migrated endpoint, added with the dashboard that needs it:
 
 | Endpoint | Role | Request | `data` shape | Replaces |
 | --- | --- | --- | --- | --- |
+| `API_student_getDashboard()` | Student | none | `StudentDashboard` (below) | `buildStudentContent` (removed) |
 | `API_guide_getDashboard()` | Guide | none | `GuideDashboard` (below) | `buildDashboardContent` (removed) |
 | `API_guide_submitDecision(teamId, decision, notes, editedTitle)` | Guide | `decision` is `Approved` or `Rejected`; notes required for `Rejected` | `{message}` | `decide` in the old client |
 | `API_reviewer_getDashboard()` | Reviewer | none | `ReviewerDashboard` (below) | `buildReviewerContent` (removed) |
@@ -51,6 +52,26 @@ comparison against the output of the function it replaces.
 
 Only teams in the reviewer's committees are returned. `tone` is semantic; the view maps it to colours.
 Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invariants/snapshots/reviewer-*.json`).
+
+### StudentDashboard
+
+```
+{ teamId, titleApproved:boolean,
+  roster:[{name, initials, regno, isMe}],
+  setup:{complete:boolean, pendingSteps:[string]},            // complete = GitHub ready and title approved
+  github:{ state:'done'|'waiting'|'active'|'locked', text, connected:boolean, captureReady:boolean,
+           due:string, statusText, repoUrl,
+           members:[{regno, status:'missing'|'joined'|'pending', canConnect:boolean}] },  // canConnect: this student, not yet connected
+  title:{ locked:boolean, state:'locked'|'active'|'waiting'|'done', statusText, currentTitle, note,
+          intake:{url,label}|null, due:{date,overdue}|null },
+  assessments:{ reviews:[{key,label}], guideEvaluationLabel } }
+```
+
+Weekly progress, recent logs, assessment results and the GitHub account connection are separate modules that attach to
+placeholders in the view (`#studentWeeklyProgress`, `#studentRecentActivity`, `#studentAssessment-<key>`,
+`#studentGuideEvaluation`, `#studentGithubProfile`); they still call the server directly and are migrated separately.
+Contract tests: `tests/student-migration.test.cjs` (snapshot `tests/invariants/snapshots/student-legacy-facts.json`,
+captured from the removed HTML for eight states).
 
 ### GuideDashboard
 

@@ -84,5 +84,6 @@ function dataBridgeBrowser_() {
 function getMigratedViewsClientScript_() {
   return `const DataBridge = (${dataBridgeBrowser_.toString()})();
 const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI);
+const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => typeof GuideWeekly === 'undefined' ? null : GuideWeekly);`;
 }

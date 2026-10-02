@@ -450,7 +450,7 @@ const DashboardUI = (function() {
     loadRoleContent(key, false, true);
   }
   // Roles already on the DTO + view architecture: load() resolves a DTO, render() draws it.
-  const migratedRoles = { reviewer: ReviewerView, guide: GuideView };
+  const migratedRoles = { reviewer: ReviewerView, guide: GuideView, student: StudentView };
   function loadRoleContent(activeKey, background, refresh, onLoaded, onError) {
     if ((!refresh && loadedRoleTabs[activeKey]) || loadingRoleTabs[activeKey]) {
       if (onError) onError(new Error('A dashboard refresh is already in progress. Please retry shortly.'));

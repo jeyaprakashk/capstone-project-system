@@ -297,7 +297,6 @@
   .student-project-setup > summary::-webkit-details-marker { display: none; }
   .student-project-setup .setup-hide, .student-project-setup[open] .setup-view { display: none; }
   .student-project-setup[open] .setup-hide { display: inline; }
-  .student-setup-steps .step-line { display: none; }
   #studentWeeklyProgress [data-weekly-status]:empty, #studentWeeklyProgress [data-weekly-read]:empty { display: none; }
   .weekly-progress-form textarea { resize: vertical; }
   .github-member-separator { display: none; }

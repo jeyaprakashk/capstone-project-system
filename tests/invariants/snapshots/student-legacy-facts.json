@@ -1,0 +1,648 @@
+{
+  "githubActive": {
+    "teamId": "T1",
+    "roster": [
+      {
+        "initials": "O",
+        "name": "One",
+        "regno": "001",
+        "you": true
+      },
+      {
+        "initials": "T",
+        "name": "Two",
+        "regno": "002",
+        "you": false
+      }
+    ],
+    "setup": {
+      "kind": "section",
+      "badge": "Action needed",
+      "pending": [
+        "Step 1: Waiting for GitHub account connection. Connect your GitHub account using your profile link.",
+        "Step 2: Not submitted yet. Finish GitHub setup first. Your team must submit a project title for approval."
+      ]
+    },
+    "steps": [
+      {
+        "title": "GitHub setup",
+        "badge": "Action needed",
+        "body": [
+          "GitHub setup due 2026-01-08T00:00:00.000Z · Waiting for GitHub account connection."
+        ],
+        "members": [
+          {
+            "status": "missing",
+            "regno": "001",
+            "state": "Submit GitHub Account",
+            "button": true
+          },
+          {
+            "status": "joined",
+            "regno": "002",
+            "state": "Repository joined",
+            "button": false
+          }
+        ],
+        "repo": "https://github.com/org/team",
+        "cta": {
+          "kind": "form",
+          "inputDisabled": false
+        }
+      },
+      {
+        "title": "Project title",
+        "badge": "Locked",
+        "body": [
+          "Finish GitHub setup first."
+        ],
+        "members": [],
+        "repo": null,
+        "cta": null
+      }
+    ],
+    "weekly": false,
+    "recent": {
+      "link": false,
+      "text": "Weekly logs will appear after project setup."
+    },
+    "assessments": {
+      "reviews": [
+        {
+          "id": "studentAssessment-review1",
+          "label": "Review 1"
+        },
+        {
+          "id": "studentAssessment-review2",
+          "label": "Review 2"
+        }
+      ],
+      "guide": "Guide Evaluation"
+    }
+  },
+  "githubWaiting": {
+    "teamId": "T1",
+    "roster": [
+      {
+        "initials": "O",
+        "name": "One",
+        "regno": "001",
+        "you": true
+      },
+      {
+        "initials": "T",
+        "name": "Two",
+        "regno": "002",
+        "you": false
+      }
+    ],
+    "setup": {
+      "kind": "section",
+      "badge": "Action needed",
+      "pending": [
+        "Step 1: Repository invitations must be accepted.",
+        "Step 2: Submitted — awaiting your guide's review. Finish GitHub setup first. Your team is waiting for approval; check the review status below."
+      ]
+    },
+    "steps": [
+      {
+        "title": "GitHub setup",
+        "badge": "Waiting",
+        "body": [
+          "GitHub setup due 2026-01-08T00:00:00.000Z · All valid usernames submitted late."
+        ],
+        "members": [
+          {
+            "status": "pending",
+            "regno": "001",
+            "state": "Accept Invitation Email",
+            "button": false
+          },
+          {
+            "status": "joined",
+            "regno": "002",
+            "state": "Repository joined",
+            "button": false
+          }
+        ],
+        "repo": "https://github.com/org/team",
+        "cta": null
+      },
+      {
+        "title": "Project title",
+        "badge": "Locked",
+        "body": [
+          "Finish GitHub setup first.",
+          "Current title: Project",
+          "Submitted — awaiting your guide's review"
+        ],
+        "members": [],
+        "repo": null,
+        "cta": null
+      }
+    ],
+    "weekly": false,
+    "recent": {
+      "link": false,
+      "text": "Weekly logs will appear after project setup."
+    },
+    "assessments": {
+      "reviews": [
+        {
+          "id": "studentAssessment-review1",
+          "label": "Review 1"
+        },
+        {
+          "id": "studentAssessment-review2",
+          "label": "Review 2"
+        }
+      ],
+      "guide": "Guide Evaluation"
+    }
+  },
+  "notSubmitted": {
+    "teamId": "T1",
+    "roster": [
+      {
+        "initials": "O",
+        "name": "One",
+        "regno": "001",
+        "you": true
+      },
+      {
+        "initials": "T",
+        "name": "Two",
+        "regno": "002",
+        "you": false
+      }
+    ],
+    "setup": {
+      "kind": "section",
+      "badge": "Action needed",
+      "pending": [
+        "Step 2: Not submitted yet. Your team must submit a project title for approval."
+      ]
+    },
+    "steps": [
+      {
+        "title": "GitHub setup",
+        "badge": "Done",
+        "body": [
+          "GitHub setup due 2026-01-08T00:00:00.000Z · All valid usernames submitted on time."
+        ],
+        "members": [
+          {
+            "status": "joined",
+            "regno": "001",
+            "state": "Repository joined",
+            "button": false
+          },
+          {
+            "status": "joined",
+            "regno": "002",
+            "state": "Repository joined",
+            "button": false
+          }
+        ],
+        "repo": "https://github.com/org/team",
+        "cta": null
+      },
+      {
+        "title": "Project title",
+        "badge": "Action needed",
+        "body": [
+          "Not submitted yet",
+          "Approval due 2026-01-10T00:00:00.000Z · Overdue"
+        ],
+        "members": [],
+        "repo": null,
+        "cta": {
+          "kind": "link",
+          "text": "Submit title",
+          "href": "https://forms.example/intake?team=T1"
+        }
+      }
+    ],
+    "weekly": false,
+    "recent": {
+      "link": false,
+      "text": "Weekly logs will appear after project setup."
+    },
+    "assessments": {
+      "reviews": [
+        {
+          "id": "studentAssessment-review1",
+          "label": "Review 1"
+        },
+        {
+          "id": "studentAssessment-review2",
+          "label": "Review 2"
+        }
+      ],
+      "guide": "Guide Evaluation"
+    }
+  },
+  "needsReview": {
+    "teamId": "T1",
+    "roster": [
+      {
+        "initials": "O",
+        "name": "One",
+        "regno": "001",
+        "you": true
+      },
+      {
+        "initials": "T",
+        "name": "Two",
+        "regno": "002",
+        "you": false
+      }
+    ],
+    "setup": {
+      "kind": "section",
+      "badge": "Action needed",
+      "pending": [
+        "Step 2: Submitted — awaiting your guide's review. Your team is waiting for approval; check the review status below."
+      ]
+    },
+    "steps": [
+      {
+        "title": "GitHub setup",
+        "badge": "Done",
+        "body": [
+          "GitHub setup due 2026-01-08T00:00:00.000Z · All valid usernames submitted on time."
+        ],
+        "members": [
+          {
+            "status": "joined",
+            "regno": "001",
+            "state": "Repository joined",
+            "button": false
+          },
+          {
+            "status": "joined",
+            "regno": "002",
+            "state": "Repository joined",
+            "button": false
+          }
+        ],
+        "repo": "https://github.com/org/team",
+        "cta": null
+      },
+      {
+        "title": "Project title",
+        "badge": "Waiting",
+        "body": [
+          "Submitted — awaiting your guide's review",
+          "Current title: Project",
+          "Approval due 2026-01-10T00:00:00.000Z · Overdue"
+        ],
+        "members": [],
+        "repo": null,
+        "cta": null
+      }
+    ],
+    "weekly": false,
+    "recent": {
+      "link": false,
+      "text": "Weekly logs will appear after project setup."
+    },
+    "assessments": {
+      "reviews": [
+        {
+          "id": "studentAssessment-review1",
+          "label": "Review 1"
+        },
+        {
+          "id": "studentAssessment-review2",
+          "label": "Review 2"
+        }
+      ],
+      "guide": "Guide Evaluation"
+    }
+  },
+  "revise": {
+    "teamId": "T1",
+    "roster": [
+      {
+        "initials": "O",
+        "name": "One",
+        "regno": "001",
+        "you": true
+      },
+      {
+        "initials": "T",
+        "name": "Two",
+        "regno": "002",
+        "you": false
+      }
+    ],
+    "setup": {
+      "kind": "section",
+      "badge": "Action needed",
+      "pending": [
+        "Step 2: Reviewer Committee requested changes — resubmit needed. Your team must address the feedback below and resubmit the title."
+      ]
+    },
+    "steps": [
+      {
+        "title": "GitHub setup",
+        "badge": "Done",
+        "body": [
+          "GitHub setup due 2026-01-08T00:00:00.000Z · All valid usernames submitted on time."
+        ],
+        "members": [
+          {
+            "status": "joined",
+            "regno": "001",
+            "state": "Repository joined",
+            "button": false
+          },
+          {
+            "status": "joined",
+            "regno": "002",
+            "state": "Repository joined",
+            "button": false
+          }
+        ],
+        "repo": "https://github.com/org/team",
+        "cta": null
+      },
+      {
+        "title": "Project title",
+        "badge": "Action needed",
+        "body": [
+          "Reviewer Committee requested changes — resubmit needed",
+          "Current title: Project",
+          "Narrow the scope <b>",
+          "Approval due 2026-01-10T00:00:00.000Z · Overdue"
+        ],
+        "members": [],
+        "repo": null,
+        "cta": {
+          "kind": "link",
+          "text": "Resubmit title",
+          "href": "https://forms.example/intake?team=T1"
+        }
+      }
+    ],
+    "weekly": false,
+    "recent": {
+      "link": false,
+      "text": "Weekly logs will appear after project setup."
+    },
+    "assessments": {
+      "reviews": [
+        {
+          "id": "studentAssessment-review1",
+          "label": "Review 1"
+        },
+        {
+          "id": "studentAssessment-review2",
+          "label": "Review 2"
+        }
+      ],
+      "guide": "Guide Evaluation"
+    }
+  },
+  "rejected": {
+    "teamId": "T1",
+    "roster": [
+      {
+        "initials": "O",
+        "name": "One",
+        "regno": "001",
+        "you": true
+      },
+      {
+        "initials": "T",
+        "name": "Two",
+        "regno": "002",
+        "you": false
+      }
+    ],
+    "setup": {
+      "kind": "section",
+      "badge": "Action needed",
+      "pending": [
+        "Step 2: Guide requested changes — resubmit needed. Your team must address the feedback below and resubmit the title."
+      ]
+    },
+    "steps": [
+      {
+        "title": "GitHub setup",
+        "badge": "Done",
+        "body": [
+          "GitHub setup due 2026-01-08T00:00:00.000Z · All valid usernames submitted on time."
+        ],
+        "members": [
+          {
+            "status": "joined",
+            "regno": "001",
+            "state": "Repository joined",
+            "button": false
+          },
+          {
+            "status": "joined",
+            "regno": "002",
+            "state": "Repository joined",
+            "button": false
+          }
+        ],
+        "repo": "https://github.com/org/team",
+        "cta": null
+      },
+      {
+        "title": "Project title",
+        "badge": "Action needed",
+        "body": [
+          "Guide requested changes — resubmit needed",
+          "Current title: Project",
+          "Too broad",
+          "Approval due 2026-01-10T00:00:00.000Z · Overdue"
+        ],
+        "members": [],
+        "repo": null,
+        "cta": {
+          "kind": "link",
+          "text": "Resubmit title",
+          "href": "https://forms.example/intake?team=T1"
+        }
+      }
+    ],
+    "weekly": false,
+    "recent": {
+      "link": false,
+      "text": "Weekly logs will appear after project setup."
+    },
+    "assessments": {
+      "reviews": [
+        {
+          "id": "studentAssessment-review1",
+          "label": "Review 1"
+        },
+        {
+          "id": "studentAssessment-review2",
+          "label": "Review 2"
+        }
+      ],
+      "guide": "Guide Evaluation"
+    }
+  },
+  "awaitingReviewer": {
+    "teamId": "T1",
+    "roster": [
+      {
+        "initials": "O",
+        "name": "One",
+        "regno": "001",
+        "you": true
+      },
+      {
+        "initials": "T",
+        "name": "Two",
+        "regno": "002",
+        "you": false
+      }
+    ],
+    "setup": {
+      "kind": "section",
+      "badge": "Action needed",
+      "pending": [
+        "Step 2: Guide-approved — awaiting Reviewer Committee. Your team is waiting for approval; check the review status below."
+      ]
+    },
+    "steps": [
+      {
+        "title": "GitHub setup",
+        "badge": "Done",
+        "body": [
+          "GitHub setup due 2026-01-08T00:00:00.000Z · All valid usernames submitted on time."
+        ],
+        "members": [
+          {
+            "status": "joined",
+            "regno": "001",
+            "state": "Repository joined",
+            "button": false
+          },
+          {
+            "status": "joined",
+            "regno": "002",
+            "state": "Repository joined",
+            "button": false
+          }
+        ],
+        "repo": "https://github.com/org/team",
+        "cta": null
+      },
+      {
+        "title": "Project title",
+        "badge": "Waiting",
+        "body": [
+          "Guide-approved — awaiting Reviewer Committee",
+          "Current title: Project",
+          "Approval due 2026-01-10T00:00:00.000Z · Overdue"
+        ],
+        "members": [],
+        "repo": null,
+        "cta": null
+      }
+    ],
+    "weekly": false,
+    "recent": {
+      "link": false,
+      "text": "Weekly logs will appear after project setup."
+    },
+    "assessments": {
+      "reviews": [
+        {
+          "id": "studentAssessment-review1",
+          "label": "Review 1"
+        },
+        {
+          "id": "studentAssessment-review2",
+          "label": "Review 2"
+        }
+      ],
+      "guide": "Guide Evaluation"
+    }
+  },
+  "approved": {
+    "teamId": "T1",
+    "roster": [
+      {
+        "initials": "O",
+        "name": "One",
+        "regno": "001",
+        "you": true
+      },
+      {
+        "initials": "T",
+        "name": "Two",
+        "regno": "002",
+        "you": false
+      }
+    ],
+    "setup": {
+      "kind": "details",
+      "badge": "✓ Complete",
+      "pending": []
+    },
+    "steps": [
+      {
+        "title": "GitHub setup",
+        "badge": "Done",
+        "body": [
+          "GitHub setup due 2026-01-08T00:00:00.000Z · All valid usernames submitted on time."
+        ],
+        "members": [
+          {
+            "status": "joined",
+            "regno": "001",
+            "state": "Repository joined",
+            "button": false
+          },
+          {
+            "status": "joined",
+            "regno": "002",
+            "state": "Repository joined",
+            "button": false
+          }
+        ],
+        "repo": "https://github.com/org/team",
+        "cta": null
+      },
+      {
+        "title": "Project title",
+        "badge": "Done",
+        "body": [
+          "Approved",
+          "Current title: Project <i>X</i>",
+          "Approval due 2026-01-10T00:00:00.000Z"
+        ],
+        "members": [],
+        "repo": null,
+        "cta": null
+      }
+    ],
+    "weekly": true,
+    "recent": {
+      "link": true,
+      "text": null
+    },
+    "assessments": {
+      "reviews": [
+        {
+          "id": "studentAssessment-review1",
+          "label": "Review 1"
+        },
+        {
+          "id": "studentAssessment-review2",
+          "label": "Review 2"
+        }
+      ],
+      "guide": "Guide Evaluation"
+    }
+  }
+}

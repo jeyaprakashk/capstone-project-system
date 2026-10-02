@@ -67,12 +67,7 @@ test('tracker shows labeled status badges for repository, title, health and comp
   assert(!/[✓×◷]/.test(pending));
 });
 
-test('student step icons and expandable sections use the shared library', () => {
-  const c = icons();
-  for (const file of ['student-dashboard.js','common-styles.js']) vm.runInContext(fs.readFileSync(file, 'utf8'), c);
-  assert.match(c.buildStepNode(1,'done'), /lucide-check/);
-  assert.match(c.buildStepNode(2,'locked'), /lucide-lock-keyhole/);
-  assert.match(c.buildStepNode(3,'active'), />3<\/div>/);
+test('compiled stylesheet carries no text-glyph disclosure markers', () => {
   assert(!/[▸▾]/.test(require('node:fs').readFileSync('tailwind-styles.html', 'utf8')));
 });
 const events={}, appended=[];
