@@ -29,6 +29,7 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | --- | --- | --- | --- | --- |
 | `API_coordinator_getOverview()` / `API_coordinator_getProgress()` | Coordinator | none | `CoordinatorDashboard` (below); overview has `loading:true` | `buildCoordinatorContent`, `loadCoordinatorSection` (removed) |
 | `API_coordinator_getActivity()` | Coordinator | none | `{state, week, checkedAt, teams:{<teamId lower-case>:{logs,commits}}, totalTeams, activeTeams}` | `loadAllTeamsWeeklyActivity` (wrapped) |
+| `API_coordinator_getSystemStatus()` | Coordinator | none | `SystemStatus` (below) | `loadCoordinatorSystemStatus` (removed) |
 | `API_student_getDashboard()` | Student | none | `StudentDashboard` (below) | `buildStudentContent` (removed) |
 | `API_guide_getDashboard()` | Guide | none | `GuideDashboard` (below) | `buildDashboardContent` (removed) |
 | `API_guide_submitDecision(teamId, decision, notes, editedTitle)` | Guide | `decision` is `Approved` or `Rejected`; notes required for `Rejected` | `{message}` | `decide` in the old client |
@@ -71,9 +72,23 @@ Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invaria
 
 The overview renders first; progress and weekly activity are requested at the same time and settle independently
 (each failure is isolated, with its own retry). Percentages, tones and badge labels are derived in the view.
-The team drawer and System Status tab are still server-driven. Contract tests: `tests/coordinator-migration.test.cjs`
+The team drawer is still driven by DashboardUI. Contract tests: `tests/coordinator-migration.test.cjs`
 (snapshot `tests/invariants/snapshots/coordinator-legacy-facts.json`, captured from the removed HTML for the overview,
 progress and no-reviews cases).
+
+### SystemStatus
+
+```
+{ github:{ coordUsername:string, reposWithAccess:number, totalRepos:number },
+  publishing:{ configured:boolean, items:[{key,title}] } }       // configured:false when assessment definitions are invalid
+```
+
+This is only the frame: GitHub access, the invitation-resend card, one collapsed publishing card per assessment, and the
+committee and assessment-readiness cards. Each card's own checks (`getCoordinatorCommitteeConfiguration`,
+`getCoordinatorReviewConfiguration`, publishing reads, weekly setup, invitation resend, GitHub sync) are separate calls made
+by their dashboard modules against hooks the view renders. `getCoordinatorCommitteeConfiguration` returns structured
+`committees:[{number, members:[{name,email}], teams:[string]}]`; the view builds the directory (no server HTML).
+Contract tests: `tests/system-status-view.test.cjs` and the System Status cases in `tests/project-schedule.test.cjs`.
 
 ### StudentDashboard
 

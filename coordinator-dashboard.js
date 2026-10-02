@@ -387,75 +387,6 @@ function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock
 // ===================================================================
 
 
-function buildGithubAccessSection(githubAccess) {
-  return `
-    <div class="card">
-
-      <div><div>
-        <h3>
-          GitHub Access for Coordinator
-        </h3>
-        <span>
-          Configured
-        </span></div>
-      <button
-        id="githubSyncButton"
-        class="btn btn-primary"
-        onclick="runGithubSync()">
-        Run Sync
-      </button>
-      </div>
-
-      <div>
-
-        <div>
-          <span>
-            Coordinator GitHub Username
-          </span>
-          <span>
-            ${escapeHtml(githubAccess.coordUsername)}
-          </span>
-        </div>
-
-        <div>
-          <span>
-            Repositories with access
-          </span>
-          <span
-            id="githubReposAccess"
-           >
-            ${githubAccess.reposWithAccess} / ${githubAccess.totalRepos}
-          </span>
-        </div>
-
-      </div>
-
-    </div>
-  `;
-}
-
-
-function buildCommitteeDirectory_(committees) {
-  const items = (committees || []).map(committee => {
-    return `<details class="committee-item tile" data-committee-key="${escapeHtml(normalizeText_(committee.number))}">
-      <summary><span>Committee ${escapeHtml(committee.number)}<small>${committee.members.length} reviewers · ${committee.teams.length} teams</small></span><span aria-hidden="true" class="committee-chevron">${renderLucideIcon_('chevron-down')}</span></summary>
-      <div><ul>${committee.members.length ? committee.members.map((member, index) => `<li><span class="avatar avatar-${index % 3 + 1} " aria-hidden="true">${escapeHtml((member.name || member.email).slice(0,1).toUpperCase())}</span><div><strong>${escapeHtml(member.name || 'Name not provided')}</strong><span>${escapeHtml(member.email || 'Email not provided')}</span></div></li>`).join('') : '<li>No reviewers assigned.</li>'}</ul>
-      <div><span>Assigned teams</span><div>${committee.teams.length ? committee.teams.map(team => `<span>${escapeHtml(team)}</span>`).join('') : 'No teams assigned'}</div></div></div>
-    </details>`;
-  }).join('');
-  return `<div id="committeeReadinessGrid">${items}</div>`;
-}
-
-function buildCommitteeReadinessCard_() {
-  return `<section id="committeeConfigurationCard" class="card" aria-labelledby="committeeConfigurationHeading" aria-busy="true">
-    <div><div><h3 id="committeeConfigurationHeading">Review Committees</h3><span id="committeeConfigurationSummary" role="status" aria-live="polite">${getSkeletonMarkup_('inline','Checking review committees')}</span></div><button class="btn btn-sm btn-outline" id="committeeConfigurationRecheck" type="button" onclick="DashboardUI.recheckCommitteeConfiguration()">Recheck</button></div>
-    <ul id="committeeConfigurationIssues" hidden></ul>
-    <p>Select a committee to see reviewers and assigned teams.</p>
-    <div id="committeeDirectoryContent"></div>
-    <div><a id="committeeConfigLink" hidden target="_blank" rel="noopener">Review committees ${renderLucideIcon_('external-link')}</a><a id="committeeAssignmentsLink" hidden target="_blank" rel="noopener">Team assignments ${renderLucideIcon_('external-link')}</a><span id="committeeConfigurationCheckedAt"></span></div>
-  </section>`;
-}
-
 function getCoordinatorCommitteeConfiguration() {
   const email=Session.getActiveUser().getEmail();
   if(!email||(!emailsMatch(email,getCoordinatorEmail())&&!emailsMatch(email,getConfig('CELL_PD_EMAIL'))))throw new Error('Coordinator access is required.');
@@ -464,7 +395,7 @@ function getCoordinatorCommitteeConfiguration() {
     try {
       const committeeSheet=getSheet(SHEET_NAMES.REVIEW_COMMITTEE),teamSheet=getSheet(SHEET_NAMES.TEAM_STATUS);
       for(const [key,sheet] of [['committees',committeeSheet],['assignments',teamSheet]])if(sheet)links[key]='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit#gid='+sheet.getSheetId();
-      if(!committeeSheet)return {valid:false,state:'definitions-missing',summary:'Review committee configuration required',issues:[{message:'The ReviewCommittee tab is missing.'}],committees,html:buildCommitteeDirectory_(committees),links,checkedAt};
+      if(!committeeSheet)return {valid:false,state:'definitions-missing',summary:'Review committee configuration required',issues:[{message:'The ReviewCommittee tab is missing.'}],committees,links,checkedAt};
       const RC=getColumnMap(SHEET_NAMES.REVIEW_COMMITTEE,FIELD_DEFINITIONS.REVIEW_COMMITTEE);
       const rows=getSheetRows(SHEET_NAMES.REVIEW_COMMITTEE);
       const TS=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
@@ -473,33 +404,9 @@ function getCoordinatorCommitteeConfiguration() {
       if(!committees.length)issues.push({message:'No review committees configured. Add committee numbers and reviewer email addresses in ReviewCommittee.'});
       committees.filter(c=>!c.members.some(m=>m.email.trim())).forEach(c=>issues.push({message:'Committee '+c.number+' has no reviewer email addresses.'}));
       const valid=!issues.length;
-      return {valid,state:valid?'ready':committees.length?'invalid':'definitions-empty',summary:valid?'Review committees configured':committees.length?'Configuration needs attention':'Review committee configuration required',issues,committees,html:buildCommitteeDirectory_(committees),links,checkedAt};
-    }catch(err){return {valid:false,state:'invalid',summary:'Configuration needs attention',issues:[{message:err.message}],committees,html:buildCommitteeDirectory_(committees),links,checkedAt};}
+      return {valid,state:valid?'ready':committees.length?'invalid':'definitions-empty',summary:valid?'Review committees configured':committees.length?'Configuration needs attention':'Review committee configuration required',issues,committees,links,checkedAt};
+    }catch(err){return {valid:false,state:'invalid',summary:'Configuration needs attention',issues:[{message:err.message}],committees,links,checkedAt};}
   });
-}
-
-function buildReviewConfigurationCard_() {
-  return `<section id="reviewConfigurationCard" class="card" aria-labelledby="reviewConfigurationHeading" aria-busy="true">
-    <div><div><h3 id="reviewConfigurationHeading">Assessment readiness</h3><span id="reviewConfigurationSummary" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span></div><button class="btn btn-sm btn-outline" id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
-    <ul id="reviewConfigurationIssues" hidden></ul>
-    <button class="btn btn-outline" type="button" id="createAssessmentDefinitionsButton" hidden disabled onclick="DashboardUI.bootstrapAssessmentDefinitions()">Create assessment definitions tab</button>
-    <p>First create the definitions schema, then use Assessment definitions to enter the academic configuration. Setup never supplies assessment instances or policy choices.</p>
-    <ul id="reviewAssessmentReadiness" aria-label="Readiness by assessment"></ul>
-    <p>Storage readiness is separate from team entry availability, which also checks reviewer assignment, opening dates and prerequisites.</p>
-    <div id="assessmentStorageSetup">
-    <div>
-      <p>Prepare configured assessment journals. Existing assessment data stays unchanged.</p>
-      <button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="btn btn-primary" onclick="initializeAssessmentStorage()">Create missing assessment storage</button>
-    </div>
-    <p id="assessmentStorageStatus" role="status" aria-live="polite"></p><ul id="assessmentStorageResults"></ul>
-    </div>
-    <div id="weeklyPhase2Setup">
-      <h4>Weekly progress setup</h4>
-      <div data-weekly-setup-read>${getSkeletonMarkup_('status','Checking weekly progress setup')}</div>
-      <p data-weekly-setup-status role="status" aria-live="polite"></p>
-    </div>
-    <div><a id="reviewDefinitionsLink" hidden target="_blank" rel="noopener">Assessment definitions ${renderLucideIcon_('external-link')}</a><a id="reviewConfigLink" hidden target="_blank" rel="noopener">Milestones ${renderLucideIcon_('external-link')}</a><a id="reviewRubricsLink" hidden target="_blank" rel="noopener">Rubric criteria ${renderLucideIcon_('external-link')}</a><span id="reviewConfigurationCheckedAt"></span></div>
-  </section>`;
 }
 
 
@@ -511,46 +418,4 @@ function buildCommitteeData_(committeeRows, statusRows, RC, TS) {
     })).sort((a,b) => a.number.localeCompare(b.number, undefined, {numeric:true}));
 }
 
-function buildRubricsStatusCard_() {
-  const status = getRubricsStatus_();
-  const count = (status.assessments || []).length;
-  return `<section class="rubrics-status-card card" aria-labelledby="rubricsStatusHeading">
-    <div><div><h3 id="rubricsStatusHeading">Rubrics</h3>
-      <span data-configured="${status.configured}" role="status">${status.configured?'Configured':'Not configured'}</span></div></div>
-    ${count ? '<p>'+count+' '+(count===1?'assessment':'assessments')+'</p>' : ''}
-    ${status.configured ? '' : '<p>'+escapeHtml(status.detail)+'</p>'}
-    ${(status.assessments || []).length ? '<dl>'+status.assessments.map(item=>'<div><dt>'+escapeHtml(item.label)+'</dt><dd>'+escapeHtml(item.summary)+'</dd></div>').join('')+'</dl>' : ''}
-  </section>`;
-}
 
-function loadCoordinatorSystemStatus() {
-  return coordinatorRead_('system-status', () => {
-    const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]);
-    const repos = getRepoUrlMap();
-    const access = {coordUsername:String(getConfig('COLLABORATOR_GITHUB_USERNAME') || '').trim(),
-      reposWithAccess:Number(getConfig('COLLABORATOR_REPOS_ACCESS')) || 0,
-      totalRepos:rows.filter(row => repos[normalizeText_(row[TS.TEAM_ID])]).length};
-    let publishing;
-    try {publishing=publicationDefinitions_().map(d=>buildInternalAssessmentPublishing_(d.key)).join('');}
-    catch(err){publishing='<p role="status">Assessment configuration needs attention. Use Assessment readiness below.</p>';}
-    return `<div data-status-cards>
-      <div data-status-primary>${buildGithubAccessSection(access)}
-      <section class="card" id="studentInvitationResend">
-        <h3>Student GitHub invitations</h3>
-        <p>Renew expired or missing invitations for students in existing team repositories. Joined students and pending invitations are skipped.</p>
-        <button type="button" class="btn btn-primary" onclick="DashboardUI.runStudentInvitationResend()">Resend expired student invitations</button>
-        <p data-resend-status role="status" aria-live="polite"></p>
-        <details data-resend-log hidden>
-          <summary>View student invitation log</summary>
-          <div data-resend-results data-tooltip-boundary class="tracker-table-scroll table-wrap" role="region" aria-label="Student invitation results" tabindex="0"></div>
-          ${buildTeamPagination_('studentInvitations', 'invitations', 0, 'students')}
-        </details>
-      </section>
-      </div>
-      ${publishing}
-      ${buildCommitteeReadinessCard_()}
-      ${buildReviewConfigurationCard_()}
-      </div>`;
-  });
-}

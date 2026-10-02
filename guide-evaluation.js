@@ -166,6 +166,3 @@ function guideCompletion_() {
     return {available:true,completed:Object.values(teams).filter(Boolean).length,teams};
   } catch(err) { return {available:false,completed:0,teams:{}}; }
 }
-function buildGuideEvaluationAdmin_() {
-  return buildInternalAssessmentPublishing_('guide_eval');
-}

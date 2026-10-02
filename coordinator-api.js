@@ -68,3 +68,22 @@ function API_coordinator_getProgress() {
 function API_coordinator_getActivity() {
   return apiHandle_(() => { coordinatorAccessOrThrow_(); return loadAllTeamsWeeklyActivity(); });
 }
+
+/** System Status frame data; every card's own readiness checks load separately. */
+function buildSystemStatusDto_() {
+  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]);
+  const repos = getRepoUrlMap();
+  let publishing = {configured:true, items:[]};
+  try { publishing.items = publicationDefinitions_().map(d => ({key:String(d.key), title:String(internalPublishingConfig_(d.key).title)})); }
+  catch (err) { publishing = {configured:false, items:[]}; }
+  return {
+    github:{coordUsername:String(getConfig('COLLABORATOR_GITHUB_USERNAME') || '').trim(), reposWithAccess:Number(getConfig('COLLABORATOR_REPOS_ACCESS')) || 0,
+      totalRepos:rows.filter(row => repos[normalizeText_(row[TS.TEAM_ID])]).length},
+    publishing
+  };
+}
+
+function API_coordinator_getSystemStatus() {
+  return apiHandle_(() => coordinatorRead_('system-status', () => { coordinatorAccessOrThrow_(); return buildSystemStatusDto_(); }));
+}

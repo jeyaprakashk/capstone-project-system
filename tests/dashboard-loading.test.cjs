@@ -144,15 +144,16 @@ function fixture(system=false) {
  querySelectorAll:selector=>selector==='[data-role-content]'?panels:[]};
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>{
   // Migrated reviewer role: log it like the role-content request, answering with an envelope.
+  if(key==='API_coordinator_getSystemStatus')return requests.push({key:'loadCoordinatorSystemStatus',args,success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getDashboard:'student',API_coordinator_getOverview:'coord'}[key];
   if(migrated)return requests.push({key:'loadDashboardRoleContent',args:[migrated],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   return requests.push({key,args,success,failure});}}); }
- const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
+ const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:(fn,delay)=>{timers.set(++id,Object.assign(()=>fn(),{delay}));return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').split('function renderAssessmentHistory_')[1].replace(/^/, 'function renderAssessmentHistory_'):fs.readFileSync(file,'utf8'),c);
  vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
- for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
- return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
+ for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','system-status-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=SystemStatusView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
+ return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{ /* bridge read timeouts (30s+) are not part of idle/preload timing */ const entries=[...timers.entries()].filter(([,fn])=>!(fn.delay>=10000));entries.forEach(([key])=>timers.delete(key));entries.forEach(([,fn])=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
 }
 
 test('common theme applies to all tabs immediately, cached content and late responses cannot change it',async()=>{
@@ -547,15 +548,15 @@ test('System Status starts after announcements settle while the role is still pe
  assert.equal(f.requests.at(-1).key,'loadCoordinatorSystemStatus');
  f.done('loadDashboardRoleContent');await f.settle();f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
  f.click('system-status');assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,1);
- f.done('loadCoordinatorSystemStatus','system cards');f.click('system-status');
+ f.done('loadCoordinatorSystemStatus','system cards');await f.settle();f.click('system-status');
  assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,1);
  assert.equal(f.systemContent.innerHTML,'system cards');
 });
 test('System Status click retries failures; failed refresh preserves cards',async()=>{
- const f=fixture(true);f.click('system-status');f.requests[0].failure(new Error('offline'));f.requests[0].done=true;
- f.click('system-status');f.done('loadCoordinatorSystemStatus','cards');
+ const f=fixture(true);f.click('system-status');f.requests[0].failure(new Error('offline'));f.requests[0].done=true;await f.settle();
+ f.click('system-status');f.done('loadCoordinatorSystemStatus','cards');await f.settle();
  vm.runInContext('DashboardUI.refreshSystemStatus()',f.c);
- f.requests.at(-1).failure(new Error('refresh failed'));
+ f.requests.at(-1).failure(new Error('refresh failed'));await f.settle();
  assert.equal(f.systemContent.innerHTML,'cards');assert.match(f.systemMessage.textContent,/refresh failed/);
 });
 
@@ -700,14 +701,14 @@ test('readiness cards render server rubric and overall states and preserve both 
 
 function configurationCardsFixture(){
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body></body></html>');
- const server=vm.createContext({getSkeletonMarkup_:()=>'<span>Skeleton</span>',renderLucideIcon_:()=>''});vm.runInContext(fs.readFileSync('coordinator-dashboard.js','utf8'),server);
- document.body.innerHTML=server.buildCommitteeReadinessCard_()+server.buildReviewConfigurationCard_();
+ const viewContext=vm.createContext({});vm.runInContext(fs.readFileSync('system-status-view.js','utf8'),viewContext);
+ viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>'<span>Skeleton</span>'}),()=>null).render(document.body,{github:{coordUsername:'',reposWithAccess:0,totalRepos:0},publishing:{configured:false,items:[]}});
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
  return {...f,document,ui:vm.runInContext('DashboardUI',f.c),node:id=>document.getElementById(id)};
 }
 
 test('configuration cards are siblings and committee refresh preserves expansion, retries and ignores replaced cards',async()=>{
- const f=configurationCardsFixture(),report={state:'ready',summary:'Review committees configured',issues:[],links:{committees:'https://example.test/committees'},checkedAt:new Date().toISOString(),html:'<div id="committeeReadinessGrid"><details data-committee-key="c1"><summary>Committee C1</summary><p>Reviewer</p></details></div>'};
+ const f=configurationCardsFixture(),report={state:'ready',summary:'Review committees configured',issues:[],links:{committees:'https://example.test/committees'},checkedAt:new Date().toISOString(),committees:[{number:'C1',members:[{name:'Reviewer',email:'r@example.test'}],teams:['T1']}]};
  assert.equal(f.node('committeeConfigurationCard').parentNode,f.node('reviewConfigurationCard').parentNode);
  f.ui.recheckCommitteeConfiguration();f.ui.recheckCommitteeConfiguration();assert.equal(f.requests.filter(r=>r.key==='getCoordinatorCommitteeConfiguration').length,1);
  assert.equal(f.requests.filter(r=>r.key==='getCoordinatorReviewConfiguration').length,0);

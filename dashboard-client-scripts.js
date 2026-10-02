@@ -203,7 +203,7 @@ const DashboardUI = (function() {
         return function() {
           const started = performance.now();
           // Follow-up reads started by utility callbacks stay in the utility lane.
-          const utility = utilityRequestContext || method === 'loadAnnouncementsForCurrentUser' || method === 'loadCoordinatorSystemStatus';
+          const utility = utilityRequestContext || method === 'loadAnnouncementsForCurrentUser' || method === 'API_coordinator_getSystemStatus';
           pendingRequests++;
           if (!utility) { pendingRoleRequests++; clearTimeout(preloadTimer); }
           let finished = false;
@@ -602,6 +602,12 @@ const DashboardUI = (function() {
       .replace(/"/g, '&quot;');
   }
 
+  // Work started from a utility callback stays in the utility lane even when it runs after a promise settles.
+  function inUtilityLane(work) {
+    const previous = utilityRequestContext;
+    utilityRequestContext = true;
+    try { return work(); } finally { utilityRequestContext = previous; }
+  }
   const systemStatusState = {loading:false, loaded:false, attempted:false};
   function ensureSystemStatusLoaded(refresh) {
     const target = byId('systemStatusContent');
@@ -621,11 +627,11 @@ const DashboardUI = (function() {
     const finishCards = (cards.length ? cards : [target]).map(function(card) { return beginContentLoading(card, 'Loading system status'); });
     target.setAttribute('aria-busy', 'true');
     setText('systemStatusMessage', '');
-    dashboardRun().withSuccessHandler(function(html) {
+    SystemStatusView.load().then(function(dto) { inUtilityLane(function() {
       finishCards.forEach(function(finish) { finish(); });
       disconnectConfigurationGrids();
       checkingReviewConfiguration=false;checkingCommitteeConfiguration=false;
-      target.innerHTML = html;
+      SystemStatusView.render(target, dto);
       systemStatusState.loading = false;
       systemStatusState.loaded = true;
       target.setAttribute('aria-busy', 'false');
@@ -637,7 +643,8 @@ const DashboardUI = (function() {
       recheckCommitteeConfiguration();
       arrangeAssessmentReadiness();
       target.querySelectorAll('[data-publishing]').forEach(function(section) { InternalAssessmentPublishing.refresh(section.dataset.publishing); });
-    }).withFailureHandler(function(err) {
+    }); }).catch(function(err) {
+      if (err && err.superseded) return;
       finishCards.forEach(function(finish) { finish(); });
       systemStatusState.loading = false;
       target.setAttribute('aria-busy', 'false');
@@ -645,7 +652,7 @@ const DashboardUI = (function() {
       buttons.forEach(function(item) { item.el.disabled = item.disabled; });
       if (!systemStatusState.loaded) target.textContent = 'System status is unavailable.';
       setText('systemStatusMessage', 'Unable to load system status: ' + errorMessage(err) + '. Select Refresh to retry.');
-    }).loadCoordinatorSystemStatus();
+    });
   }
 
   function setRoleMenuOpen(open, restoreFocus) {
@@ -1196,7 +1203,7 @@ const DashboardUI = (function() {
       messages.forEach(issue=>{const li=document.createElement('li');li.textContent=issue.message;issues.appendChild(li);});
       if(error){if(!card.hasAttribute('data-readiness-loaded'))setText('committeeConfigurationSummary','Unable to check readiness');return;}
       setText('committeeConfigurationSummary',report.summary);
-      content.innerHTML=report.html;
+      content.innerHTML=SystemStatusView.committeeDirectory(report.committees);
       content.querySelectorAll('details').forEach(item=>{item.open=expanded.has(item.getAttribute('data-committee-key'));});
       card.setAttribute('data-readiness-loaded','true');
       setText('committeeConfigurationCheckedAt','Last checked: '+new Date(report.checkedAt).toLocaleString());

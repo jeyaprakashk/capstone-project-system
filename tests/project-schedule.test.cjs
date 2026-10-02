@@ -28,7 +28,7 @@ function fixture(overrides = {}, runtime = {}) {
       return new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'short',year:'numeric'}).format(date);
     }}
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','api-envelope.js','guide-api.js','student-api.js','coordinator-api.js','data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
+  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','api-envelope.js','guide-api.js','student-api.js','coordinator-api.js','data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','system-status-view.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
   const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
@@ -291,21 +291,21 @@ test('coordinator endpoints authorize every request before reading protected dat
   c.getCoordinatorDashboardData_=()=>{reads++;return {stats:{total:0,reviews:{},guideEvaluation:null},teamTrackerData:[],deadlinePills:[]};};
   c.getCoordinatorTeamDetails_=()=>{reads++;return {};};
   c.loadAllTeamsWeeklyActivity=()=>{reads++;return {state:'active',teams:{}};};
-  const api=[()=>c.API_coordinator_getOverview(),()=>c.API_coordinator_getProgress(),()=>c.API_coordinator_getActivity()];
+  c.buildSystemStatusDto_=()=>{reads++;return {github:{},publishing:{configured:false,items:[]}};};
+  const api=[()=>c.API_coordinator_getOverview(),()=>c.API_coordinator_getProgress(),()=>c.API_coordinator_getActivity(),()=>c.API_coordinator_getSystemStatus()];
   const legacy=[()=>c.getCoordinatorDashboardData(),()=>c.getCoordinatorTeamDetails('T1')];
   for (const section of ['basic','progress','activity']) assert.throws(()=>c.loadCoordinatorDrawerSection('T1',section),/Coordinator access/);
-  assert.throws(()=>c.loadCoordinatorSystemStatus(),/Coordinator access/);
   for(const endpoint of legacy) assert.throws(endpoint,/Coordinator access/);
   for(const endpoint of api) assert.equal(JSON.parse(endpoint()).error.code,'UNAUTHENTICATED');
   assert.equal(reads,0);
   email='coord@example.com';
   legacy.forEach(endpoint=>endpoint());
   api.forEach(endpoint=>assert.equal(JSON.parse(endpoint()).ok,true));
-  assert.equal(reads,5);
+  assert.equal(reads,6);
   allowed=false;
   for(const endpoint of legacy) assert.throws(endpoint,/Coordinator access/);
   for(const endpoint of api) assert.deepEqual(JSON.parse(endpoint()).error,{code:'UNAUTHORIZED',message:'Coordinator access is required.'});
-  assert.equal(reads,5);
+  assert.equal(reads,6);
   assert(logs.filter(log=>log.event==='coordinator_request').every(log=>Number.isFinite(log.durationMs)));
   assert.equal(vm.runInContext('dashboardReadSnapshot_',c),null);
 });
@@ -331,7 +331,7 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   const document={readyState:'loading',addEventListener(){},getElementById:id=>elements[id],createElement:element,body:element()};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorDrawerSection(teamId,section){requests.push({...handlers,teamId,section});}};return chain;}};
   const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
-  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','system-status-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext("focusCoordinatorTeam('A'); focusCoordinatorTeam('B');",browser);
   assert.deepEqual(requests.map(r=>r.section),['basic','progress','activity','basic','progress','activity']);
   requests[3].success({title:'Team B project',students:[],reviewers:[]});
@@ -445,7 +445,7 @@ function timelineBrowser() {
     return chain;
   }};
   const browser=createSheetReadContext({window:{matchMedia:()=>({matches:false})},ResizeObserver:class {constructor(callback){this.callback=callback;} observe(){} disconnect(){}},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
-  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=(host,dto)=>{host.innerHTML=dto.html;}',browser);vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','system-status-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=SystemStatusView.render=(host,dto)=>{host.innerHTML=dto.html;}',browser);vm.runInContext(c.getDashboardClientScript(),browser);
   return {c,browser,requests,timeline,guide,reviewer,initialize:()=>initialize()};
 }
 
@@ -698,18 +698,25 @@ test('System Status is coordinator-only and its endpoint avoids marks and dashbo
  const {parseHTML}=require('linkedom');
  assert(!parseHTML(c.buildDashboardShell('user',[view('guide')])).document.querySelector('button[data-role-tab="system-status"]'));
  assert(parseHTML(c.buildDashboardShell('user',[view('coord')])).document.querySelector('button[data-role-tab="system-status"]'));
+ c.console={log(){},error(){}};
  c.Session={getActiveUser:()=>({getEmail:()=> 'coordinator'})};
  c.activityIsCoordinator_=()=>false;
  c.getColumnMap=()=>{throw Error('must authorize first');};
- assert.throws(()=>c.loadCoordinatorSystemStatus(),/Coordinator access/);
+ assert.deepEqual(JSON.parse(c.API_coordinator_getSystemStatus()).error,{code:'UNAUTHORIZED',message:'Coordinator access is required.'});
  c.activityIsCoordinator_=()=>true;
- c.getConfig=()=>'';
- c.getColumnMap=()=>({TEAM_ID:0,COMMITTEE_NUMBER:1});c.getSheetRows=()=>[];c.getRepoUrlMap=()=>({});
+ c.getConfig=(key)=>key==='COLLABORATOR_REPOS_ACCESS'?'2':key==='COLLABORATOR_GITHUB_USERNAME'?'coord-gh':'';
+ c.getColumnMap=()=>({TEAM_ID:0,COMMITTEE_NUMBER:1});c.getSheetRows=()=>[['T1'],['T2']];c.getRepoUrlMap=()=>({t1:'https://github.com/org/t1'});
  c.getCoordinatorDashboardData_=()=>{throw Error('must not aggregate progress');};
  c.getAllReviewCompletionStatus_=()=>{throw Error('must not read marks');};
- const html=c.loadCoordinatorSystemStatus();
- assert(html.includes('githubReposAccess'));assert(html.includes('reviewConfigurationCard'));
- assert(html.includes('initializeAssessmentStorageButton'));
+ const dto=JSON.parse(c.API_coordinator_getSystemStatus()).data;
+ assert.deepEqual(dto.github,{coordUsername:'coord-gh',reposWithAccess:2,totalRepos:1});
+ assert(Array.isArray(dto.publishing.items));
+ // The cards themselves come from the view; each keeps the hooks its dashboard module attaches to.
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'..','system-status-view.js'),'utf8'),c);
+ const target=parseHTML('<div id="t"></div>').document.getElementById('t');
+ c.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null).render(target,JSON.parse(JSON.stringify(dto)));
+ for(const id of ['githubReposAccess','reviewConfigurationCard','initializeAssessmentStorageButton','committeeConfigurationCard','studentInvitationResend','githubSyncButton','weeklyPhase2Setup']) assert(target.querySelector('#'+id),id);
+ assert.equal(target.querySelector('#githubReposAccess').textContent,'2 / 1');
 });
 
 test('timeline composes lifecycle events and configured assessments without overrides',()=>{

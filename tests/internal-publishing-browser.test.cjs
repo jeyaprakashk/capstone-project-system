@@ -1,3 +1,4 @@
+const {publishingCardMarkup}=require('./publishing-card.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),crypto=require('node:crypto');
 const {parseHTML}=require('linkedom');
 const {publishingFixture}=require('./internal-publishing-fixture.cjs');
@@ -20,7 +21,7 @@ test('uncertain reopening reconciles even after resubmission and uses accurate c
 });
 function fixture(key='review1') {
   const server=publishingFixture(key);if(key==='guide_eval')server.students.forEach(s=>server.guideSubmit(s.regNo));else server.submit();
-  const {window}=parseHTML('<html><body>'+server.c.buildInternalAssessmentPublishing_(key)+'</body></html>'),document=window.document;
+  const {window}=parseHTML('<html><body>'+publishingCardMarkup(server.c,key)+'</body></html>'),document=window.document;
   const calls=[],questions=[],loading={begun:0,settled:0},timers=new Map();let timerId=0,approve=true;
   function runner(ok,fail){return new Proxy({withSuccessHandler:fn=>runner(fn,fail),withFailureHandler:fn=>runner(ok,fn)},{get(target,name){return target[name]||((...args)=>calls.push({method:name,args,ok,fail}));}});}
   const c=vm.createContext({document,window:{crypto},Map,Set,setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),DashboardUI:{
@@ -94,7 +95,7 @@ test('read timeout settles loading and offers retry',async()=>{
 });
 
 test('re-entered screen does not retain an initial skeleton after a failed read',async()=>{
-  const f=fixture();await f.load();f.section().remove();f.document.body.innerHTML=f.server.c.buildInternalAssessmentPublishing_('review1');
+  const f=fixture();await f.load();f.section().remove();f.document.body.innerHTML=publishingCardMarkup(f.server.c,'review1');
   const pending=f.api.refresh('review1');f.calls.at(-1).fail({message:'Offline'});await pending;assert.match(f.host().textContent,/Publication data is unavailable/);assert(!f.host().textContent.includes('Skeleton'));
 });
 

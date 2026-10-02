@@ -1,16 +1,3 @@
-function buildInternalAssessmentPublishing_(key) {
-  const config=internalPublishingConfig_(key);
-  return `<section class="card" data-publishing="${key}" aria-labelledby="${key}PublishingHeading">
-    <header><div><h3 id="${key}PublishingHeading">${escapeHtml(config.title)}</h3></div>
-      <button type="button" class="publishing-toggle btn btn-sm btn-outline" data-publishing-toggle aria-expanded="false" aria-controls="${key}PublishingBody" aria-label="Expand ${escapeHtml(config.title)} publishing" onclick="InternalAssessmentPublishing.toggle('${key}')">${renderLucideIcon_('chevron-down')}</button>
-    </header>
-    <div id="${key}PublishingBody" data-publishing-body hidden>
-      <div><p>Publish internal assessment results using the assessment's existing publication rules.</p><button class="btn btn-sm btn-outline" type="button" data-refresh onclick="InternalAssessmentPublishing.refresh('${key}')">Refresh evaluations</button></div>
-      <div data-notice role="status" aria-live="polite"></div><div data-publishing-content>${getSkeletonMarkup_('panel','Reading '+config.title+' publication status')}</div>
-    </div>
-  </section>`;
-}
-
 function internalAssessmentPublishingBrowser_() {
   const states=new Map();
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

@@ -63,21 +63,23 @@ test('missing registry definitions and unconfigured milestone reviews cannot act
 });
 
 test('Coordinator System Status stays available when registry discovery is missing or invalid',()=>{
+ const {parseHTML}=require('linkedom');
  for(const state of ['missing','empty','invalid']){
   const f=coordinatorStorageSetup(),c=f.c;
   if(state==='missing')delete f.extra.AssessmentDefinitions;
   if(state==='empty')f.rows.splice(1);
   if(state==='invalid')f.rows[1][8]='unsupported';
-  vm.runInContext(fs.readFileSync('coordinator-dashboard.js','utf8'),c);
+  for(const file of ['coordinator-dashboard.js','coordinator-api.js','system-status-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.coordinatorRead_=(_,read)=>read();c.getColumnMap=()=>({});c.getSheetRows=()=>[];
-  c.getRepoUrlMap=()=>({});c.getConfig=()=>'';c.buildGithubAccessSection=()=>'';c.renderLucideIcon_=()=>'';
-  c.buildTeamPagination_=()=>'';
-  const html=c.loadCoordinatorSystemStatus();
-  assert.match(html,/id="reviewConfigurationCard"/);
-  assert.match(html,/id="createAssessmentDefinitionsButton"/);
-  assert.match(html,/id="reviewDefinitionsLink"/);
-  assert.match(html,/id="initializeAssessmentStorageButton" disabled/);
-  if(state==='invalid')assert.match(html,/Assessment configuration needs attention/);
+  c.getRepoUrlMap=()=>({});c.getConfig=()=>'';
+  const dto=c.buildSystemStatusDto_();
+  const {document}=parseHTML('<div id="status"></div>'),target=document.getElementById('status');
+  c.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null).render(target,JSON.parse(JSON.stringify(dto)));
+  assert(target.querySelector('#reviewConfigurationCard'));
+  assert(target.querySelector('#createAssessmentDefinitionsButton'));
+  assert(target.querySelector('#reviewDefinitionsLink'));
+  assert.equal(target.querySelector('#initializeAssessmentStorageButton').hasAttribute('disabled'),true);
+  if(state==='invalid'){assert.equal(dto.publishing.configured,false);assert.match(target.textContent,/Assessment configuration needs attention/);}
  }
 });
 
@@ -163,7 +165,7 @@ test('spreadsheet-only Review 3 supports generic discovery, publication, correct
  const f=setup(),c=f.c;f.actor('coord@x');c.provisionAssessmentJournals();
  assert(c.publicationDefinitions_().some(d=>d.key==='review3'));
  assert.equal(c.internalPublishingConfig_('review3').publishMethod,'publishInternalAssessment');
- assert.match(c.buildInternalAssessmentPublishing_('review3'),/data-publishing="review3"/);
+ assert.match(require('./publishing-card.cjs').publishingCardMarkup(c,'review3'),/data-publishing="review3"/);
  for(const key of ['review1','review2','review3']){
   f.actor('reviewer@x');const d=c.loadReviewEvaluation('g18',key);
   c.submitReviewEvaluation({assessmentId:key,team:'g18',revision:0,token:d.token,requestId:crypto.randomUUID(),teamScores:{PI1:{level:3,marks:d.config.criteria[0].maxMarks*.8,remark:''}},students:d.roster.students.map(s=>({register:s.register,absence:{type:'NORMAL'},scores:{PI2:{level:3,marks:d.config.criteria[1].maxMarks*.8,remark:''}}}))});

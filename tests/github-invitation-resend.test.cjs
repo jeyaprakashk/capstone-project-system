@@ -82,11 +82,10 @@ test('204 responses require verified identity and write access',()=>{
 });
 
 function browser() {
-  const markup=fs.readFileSync('coordinator-dashboard.js','utf8').match(/<section(?: class="[^"]*")? id="studentInvitationResend">[\s\S]*?<\/section>/)[0];
-  const helper=fs.readFileSync('common-helpers.js','utf8');
-  const helperContext=vm.createContext({escapeHtml:x=>x});
-  vm.runInContext(helper.slice(helper.indexOf('function buildTeamPagination_('),helper.indexOf('/** Presentation only:',helper.indexOf('function buildTeamPagination_('))),helperContext);
-  const {document}=parseHTML('<html><body>'+markup.replace(/\$\{buildTeamPagination_.*?\}/,helperContext.buildTeamPagination_('studentInvitations','invitations',0,'students'))+'</body></html>');
+  // The invitation card comes from the real System Status view.
+  const viewContext=vm.createContext({});vm.runInContext(fs.readFileSync('system-status-view.js','utf8'),viewContext);
+  const {document}=parseHTML('<html><body><div id="status"></div></body></html>');
+  viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null).render(document.getElementById('status'),{github:{coordUsername:'',reposWithAccess:0,totalRepos:0},publishing:{configured:false,items:[]}});
   const requests=[];const c=vm.createContext({document,Map,escapeClientHtml:x=>String(x).replaceAll('<','&lt;'),dashboardRun(){const r={};requests.push(r);return {withSuccessHandler(fn){r.success=fn;return this;},withFailureHandler(fn){r.failure=fn;return this;},resendExpiredStudentInvitations(cursor){r.cursor=cursor;}};}});
   const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
   c.byId=id=>document.getElementById(id);c.renderLucideIcon_=()=>'';
