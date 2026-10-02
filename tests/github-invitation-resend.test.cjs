@@ -92,7 +92,7 @@ function browser() {
   // linkedom lacks the browser select.value setter used by the shared helper.
   Object.defineProperty(document.getElementById('studentInvitationsPageSize'),'value',{value:'10',writable:true});
   vm.runInContext(source.slice(source.indexOf('  function renderTeamPagination('),source.indexOf('  function escapeDrawerHtml(')),c);
-  vm.runInContext(source.slice(source.indexOf('  let studentInvitationResendBusy'),source.indexOf('  const weeklyFields')),c);
+  vm.runInContext(source.slice(source.indexOf('  let studentInvitationResendBusy'),source.indexOf('  function refreshGithubStatus(')),c);
   return {document,requests,run:()=>c.runStudentInvitationResend(),resize:value=>c.changeTeamPageSize('invitations',value),host:document.getElementById('studentInvitationResend')};
 }
 test('browser blocks duplicate clicks, accumulates batches, preserves results on failure and retries cursor',()=>{

@@ -94,7 +94,7 @@ function studentViewBrowser_(bridge, getUi) {
     return '<div class="mt-4 grid gap-4 lg:grid-cols-2"><section class="' + CARD + ' p-4" aria-label="Recent logs"><header class="flex items-center justify-between gap-2"><h3 class="text-base font-semibold text-ink">Recent logs</h3>' +
       (dto.titleApproved ? '<a class="text-sm text-primary underline" href="#studentWeeklyProgress" data-action="open-logs">View all logs</a>' : '') + '</header>' +
       '<div id="studentRecentActivity" class="mt-2">' + (dto.titleApproved ? ui.renderSkeleton('panel', 'Loading recent logs') : '<p class="text-sm text-muted">Weekly logs will appear after project setup.</p>') + '</div></section>' +
-      '<section class="student-assessments-card ' + CARD + ' p-4" aria-label="Assessments"><header><h3 class="text-base font-semibold text-ink">Assessments</h3></header><div class="mt-2 flex flex-col gap-3">' +
+      '<section class="' + CARD + ' p-4" aria-label="Assessments"><header><h3 class="text-base font-semibold text-ink">Assessments</h3></header><div class="mt-2 flex flex-col gap-3">' +
       a.reviews.map(r => '<section id="studentAssessment-' + escape(r.key) + '" data-review-result="' + escape(r.key) + '" data-assessment-label="' + escape(r.label) + '" class="rounded-lg border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading ' + r.label + ' results') + '</section>').join('') +
       '<section id="studentGuideEvaluation" data-assessment-label="' + escape(a.guideEvaluationLabel) + '" class="rounded-lg border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading guide evaluation') + '</section></div></section></div>';
   }

@@ -1,9 +1,11 @@
 /* Serialized browser module; all reads use the common loading lifecycle. */
-function guideWeeklyBrowser_() {
+function guideWeeklyBrowser_(bridge) {
   const host = ()=>document.getElementById('guideWeeklyProgress');
   const esc = value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const ATTENTION_BADGE='inline-flex items-center rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/20';
-  const badgeClass = tone=>({green:'badge badge--success',orange:'badge badge--warning',blue:'badge badge--info',red:'badge badge--danger',gray:'chip'}[tone] || 'chip');
+  const BADGE='inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ';
+  const badgeClass = tone=>BADGE+({green:'bg-success-tint text-success ring-success/20',orange:'bg-warning-tint text-warning ring-warning/20',blue:'bg-info-tint text-info ring-info/20',red:'bg-danger-tint text-danger ring-danger/20',gray:'bg-soft text-ink-2 ring-control/20'}[tone] || 'bg-soft text-ink-2 ring-control/20');
+  const SMALL='border-0 rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50',SMALL_PRIMARY='border-0 rounded-md bg-primary px-2 py-1 text-xs font-semibold text-paper hover:bg-primary-hover disabled:opacity-50',NAV_BUTTON='border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const message = error=>typeof error === 'string' ? error : error?.message || 'Request failed.';
   function rpc(method,args,success,failure) {
     try { DashboardUI.guideRun().withSuccessHandler(success).withFailureHandler(failure)[method](...args); }
@@ -73,7 +75,7 @@ function guideWeeklyBrowser_() {
       const team=button.dataset.guideSelect;
       const version=(root.evaluationVersions[team] || 0)+1;root.evaluationVersions[team]=version;
       root.evaluationLoading[team]=true;updateAttention();
-      rpc('loadGuideEvaluation',[team,''],data=>{
+      bridge.read('guide-evaluation-attention:'+team,'API_guide_getEvaluation',[team,''],{timeoutMs:60000}).then(data=>{
         if(workspace()!==root || root.evaluationVersions[team]!==version)return;
         evaluationStatus(team,data.statuses);
       },()=>{
@@ -131,7 +133,7 @@ function guideWeeklyBrowser_() {
     node.busy=true;controls(node,true);
     const finish=DashboardUI.beginContentLoading(node.querySelector('[data-guide-weekly-read]'),'Reading weekly progress',{compact:true});
     const settle=()=>{finish();node.busy=false;node.attentionLoading=false;controls(node,false);};
-    rpc('loadGuideWeeklyProgress',[],data=>{
+    bridge.read('guide-weekly','API_guide_getWeekly',[],{timeoutMs:60000}).then(data=>{
       settle();if(!current(node))return;
       if(node.dataset.guideWeeks) {
         data.weeks=JSON.parse(node.dataset.guideWeeks).filter(w=>w.opensAt<=new Date(data.checkedAt).getTime())
@@ -143,7 +145,8 @@ function guideWeeklyBrowser_() {
       node.querySelector('[data-guide-weekly-status]').textContent='';
       render(node);
       selectTeam(selectedTeam);updateAttention();readEvaluationAttention();
-    },error=>{
+    }).catch(error=>{
+      if(error && error.superseded){settle();return;}
       settle();node.attentionReadFailed=true;if(current(node)){node.querySelector('[data-guide-weekly-status]').textContent='Could not read weekly progress: '+message(error)+' Use dashboard Refresh to retry.';updateAttention();readEvaluationAttention();}
     });
   }
@@ -167,7 +170,7 @@ function guideWeeklyBrowser_() {
     const date=Number.isFinite(week?.deadlineAt)?new Date(week.deadlineAt):null;
     const label=date?date.toLocaleDateString('en-GB',{timeZone:node.data.timezone,day:'numeric',month:'short',year:'numeric'}).replace(/\bSept\b/g,'Sep'):'Date unavailable';
     const full=date?date.toLocaleString('en-IN',{timeZone:node.data.timezone,timeZoneName:'short',hour12:true}):'Submission deadline unavailable';
-    return '<div data-weekly-deadline>'+submissionBadge(entry.timeliness,entry.firstSubmittedAt,week?.deadlineAt,node.data.timezone)+'<small title="'+esc(full)+'">Due: '+esc(label)+'</small></div>';
+    return '<div data-weekly-deadline>'+submissionBadge(entry.timeliness,entry.firstSubmittedAt,week?.deadlineAt,node.data.timezone)+'<small class="ml-2 text-xs text-muted" title="'+esc(full)+'">Due: '+esc(label)+'</small></div>';
   }
   function qualityScore(value) {
     const score=(typeof value==='number' || (typeof value==='string' && value.trim()!==''))?Number(value):NaN;
@@ -190,19 +193,19 @@ function guideWeeklyBrowser_() {
     return (start.toLocaleDateString('en-GB',options)+' – '+end.toLocaleDateString('en-GB',options)).replace(/\bSept\b/g,'Sep');
   }
   function weeklyAnswers(entry) {
-    return '<div>'+[['workCompleted','Work completed'],['guideDiscussion','Guide discussion / decision'],['blockers','Problems / blockers'],['nextAction','Next week plan']].map(([key,label])=>{
+    return '<div class="mt-3">'+[['workCompleted','Work completed'],['guideDiscussion','Guide discussion / decision'],['blockers','Problems / blockers'],['nextAction','Next week plan']].map(([key,label])=>{
       const answer=String(entry[key] || '').replace(/\r\n?/g,'\n').trim().replace(/(?:^|\s)Next\s*(?:…|\.{3})\s*$/i,'').trim()
         .split(/\n\s*\n/).map(paragraph=>paragraph.split('\n').reduce((text,line)=>text+(text ? (/^\s*(?:[-*•]|\d+[.)])\s/.test(line)?'\n':' ') : '')+line.trim(),'')).join('\n\n');
-      return '<p data-answer="'+key+'"><strong>'+label+'</strong>'+esc(answer || 'No response recorded.')+'</p>';
+      return '<p data-answer="'+key+'" class="mt-2 whitespace-pre-line break-words text-sm text-ink-2"><strong class="block text-ink">'+label+'</strong>'+esc(answer || 'No response recorded.')+'</p>';
     }).join('')+'</div>';
   }
   function weeklyEvidence(entry,timeZone) {
     const evidence=entry.evidence,commits=Array.isArray(evidence?.commits)?evidence.commits:[];
     const available=evidence?.state==='available';
-    const github=available ? (commits.length ? '<ul data-commit-list>'+commits.map(commit=>'<li><a href="'+esc(commit.url)+'" target="_blank" rel="noopener noreferrer"><code>'+esc(commit.shortSha)+'</code></a><span>'+esc(commit.message)+'</span><time datetime="'+esc(commit.timestamp)+'">'+esc(new Date(commit.timestamp).toLocaleString('en-IN',{timeZone,day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true}))+'</time></li>').join('')+'</ul>' : '<p>No qualifying GitHub commits recorded for this student in this week.</p>') : '<p>'+esc(evidence?.message || 'GitHub evidence unavailable. Use dashboard Refresh to retry.')+'</p>';
+    const github=available ? (commits.length ? '<ul data-commit-list class="mt-1 list-none p-0 text-sm">'+commits.map(commit=>'<li class="flex flex-wrap items-baseline gap-2 py-0.5"><a class="text-primary underline" href="'+esc(commit.url)+'" target="_blank" rel="noopener noreferrer"><code>'+esc(commit.shortSha)+'</code></a><span>'+esc(commit.message)+'</span><time datetime="'+esc(commit.timestamp)+'">'+esc(new Date(commit.timestamp).toLocaleString('en-IN',{timeZone,day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true}))+'</time></li>').join('')+'</ul>' : '<p>No qualifying GitHub commits recorded for this student in this week.</p>') : '<p>'+esc(evidence?.message || 'GitHub evidence unavailable. Use dashboard Refresh to retry.')+'</p>';
     const analysis=entry.analysis;
-    const ai=analysis ? '<p>'+esc(analysis.comment)+'</p><dl>'+[['technical_substance','Technical substance'],['specificity','Specificity'],['outcome','Outcome'],['next_action','Next action'],['github_support','GitHub support']].map(([key,label])=>'<dt>'+label+'</dt><dd>'+esc(analysis[key] || '—')+'</dd>').join('')+'</dl>' : '<p>Not scored yet.</p>';
-    return '<div data-weekly-evidence><section><h4>GitHub evidence (auto-collected)'+(available?' · '+commits.length+(commits.length===1?' commit':' commits'):'')+'</h4>'+github+'</section><section><h4>AI analysis</h4>'+ai+'</section></div>';
+    const ai=analysis ? '<p>'+esc(analysis.comment)+'</p><dl class="m-0 mt-2 grid grid-cols-2 gap-y-1 text-sm">'+[['technical_substance','Technical substance'],['specificity','Specificity'],['outcome','Outcome'],['next_action','Next action'],['github_support','GitHub support']].map(([key,label])=>'<dt class="text-muted">'+label+'</dt><dd class="m-0 font-semibold">'+esc(analysis[key] || '—')+'</dd>').join('')+'</dl>' : '<p>Not scored yet.</p>';
+    return '<div data-weekly-evidence class="mt-3 grid gap-3 md:grid-cols-2"><section class="rounded-md bg-canvas p-3"><h4 class="m-0 text-sm font-semibold text-ink">GitHub evidence (auto-collected)'+(available?' · '+commits.length+(commits.length===1?' commit':' commits'):'')+'</h4>'+github+'</section><section class="rounded-md bg-canvas p-3"><h4 class="m-0 text-sm font-semibold text-ink">AI analysis</h4>'+ai+'</section></div>';
   }
   let actionBarObserver=null, resizeActionBars=null;
   function reserveActionBarSpace(node) {
@@ -248,12 +251,12 @@ function guideWeeklyBrowser_() {
       : {tone:'blue',label:total === null ? 'Submitted' : completed+'/'+total+' required submitted'};
     const weekSummary=(total === null ? submitted+' submitted' : completed+'/'+total+' required submitted')+' · '+pending+' awaiting decision';
     const weekIndex=node.data.weeks.indexOf(node.week);
-    target.innerHTML='<nav aria-label="Select weekly progress week">'+
-      '<button type="button" class="btn btn-outline" data-week-step="1" data-week-boundary="'+(weekIndex===node.data.weeks.length-1)+'" '+(weekIndex===node.data.weeks.length-1?'disabled':'')+' title="'+(weekIndex===node.data.weeks.length-1?'First project week. No more previous weeks':'Previous week')+'" aria-label="Previous week">&#8249; Previous</button>'+
-      '<span aria-live="polite">'+esc(weekDateRange(node))+'</span>'+
-      '<button type="button" class="btn btn-outline" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' title="'+(weekIndex===0?'Latest available project week. No more next weeks':'Next week')+'" aria-label="Next week">Next &#8250;</button>'+
+    target.innerHTML='<nav aria-label="Select weekly progress week" class="mt-3 flex flex-wrap items-center gap-3">'+
+      '<button type="button" class="'+NAV_BUTTON+'" data-week-step="1" data-week-boundary="'+(weekIndex===node.data.weeks.length-1)+'" '+(weekIndex===node.data.weeks.length-1?'disabled':'')+' title="'+(weekIndex===node.data.weeks.length-1?'First project week. No more previous weeks':'Previous week')+'" aria-label="Previous week">&#8249; Previous</button>'+
+      '<span aria-live="polite" class="text-sm font-semibold text-ink-2">'+esc(weekDateRange(node))+'</span>'+
+      '<button type="button" class="'+NAV_BUTTON+'" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' title="'+(weekIndex===0?'Latest available project week. No more next weeks':'Next week')+'" aria-label="Next week">Next &#8250;</button>'+
       '<span class="'+badgeClass(weekStatus.tone)+'" data-week-status role="status" title="'+esc(weekSummary)+'">'+weekStatus.label+'</span></nav>'+
-      (entries.length ? entries.map(entry=>'<article class="guide-weekly-card" data-weekly-card><div data-entry="'+esc(entry.entryId)+'" data-weekly-summary><header data-weekly-student-header><div><strong>'+esc(entry.student)+'</strong><small>'+esc(entry.regNo)+'</small></div><span>AI Quality '+qualityScore(entry.score)+'</span>'+submissionDeadline(node,entry)+'</header>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div><div class="guide-weekly-actions" data-weekly-actions data-sign-entry="'+esc(entry.entryId)+'"><span>Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="btn btn-sm '+(status==='DISCUSSED'?'btn-primary':'btn-outline')+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></article>').join(''):'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
+      (entries.length ? entries.map(entry=>'<article class="group relative mt-3 rounded-lg border border-edge bg-paper p-4" data-weekly-card><div data-entry="'+esc(entry.entryId)+'" data-weekly-summary><header data-weekly-student-header class="flex flex-wrap items-center justify-between gap-3"><div class="flex flex-col"><strong>'+esc(entry.student)+'</strong><small class="text-xs text-muted">'+esc(entry.regNo)+'</small></div><span class="text-sm">AI Quality '+qualityScore(entry.score)+'</span>'+submissionDeadline(node,entry)+'</header>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div><div class="relative bottom-0 z-10 mt-3 flex flex-wrap items-center gap-2 bg-paper py-2 group-data-[sticky-decision=true]:sticky" data-weekly-actions data-sign-entry="'+esc(entry.entryId)+'"><span class="text-sm">Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="'+(status==='DISCUSSED'?SMALL_PRIMARY:SMALL)+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></article>').join(''):'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
     target.querySelectorAll('[data-week-step]').forEach(button=>button.onclick=()=>{if(node.busy || button.disabled)return;const next=node.data.weeks[weekIndex+Number(button.dataset.weekStep)];if(next){node.week=next;render(node);}});
     target.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>sign(node,button));
     reserveActionBarSpace(node);
@@ -266,7 +269,7 @@ function guideWeeklyBrowser_() {
     const output=node.querySelector('[data-guide-weekly-status]');
     output.textContent=(status==='DISCUSSED'?'Discussed':'Not Discussed')+' will save in 5 seconds and freeze student revisions. ';
     const undo=document.createElement('button');
-    undo.type='button';undo.className='btn btn-sm btn-outline';undo.textContent='Undo';undo.dataset.signUndo='';
+    undo.type='button';undo.className=SMALL;undo.textContent='Undo';undo.dataset.signUndo='';
     output.appendChild(undo);
     const timer=setTimeout(()=>{
       if(!current(node)){node.busy=false;return;}
@@ -281,7 +284,7 @@ function guideWeeklyBrowser_() {
     undo.focus();
   }
   function saveSignoff(node,entryId,status,output) {
-    rpc('submitWeeklyGuideSignoff',[entryId,status],result=>{
+    bridge.write('API_guide_signWeekly',[entryId,status]).then(result=>{
       node.busy=false;controls(node,false);if(!current(node))return;
       node.data.entries.find(entry=>entry.entryId===entryId).status=result.status;
       render(node);updateAttention();output.textContent=result.message;
@@ -344,4 +347,4 @@ function weeklyPhase2SetupBrowser_() {
   }
   return {load};
 }
-function getGuideWeeklyClientScript_() { return 'const GuideWeekly = ('+guideWeeklyBrowser_.toString()+')();\nconst WeeklyPhase2Setup = ('+weeklyPhase2SetupBrowser_.toString()+')();'; }
+function getGuideWeeklyClientScript_() { return 'const GuideWeekly = ('+guideWeeklyBrowser_.toString()+')(DataBridge);\nconst WeeklyPhase2Setup = ('+weeklyPhase2SetupBrowser_.toString()+')();'; }

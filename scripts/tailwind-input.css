@@ -278,9 +278,6 @@
   .expandable-text[open] .expandable-text-preview { display: none; }
   .expandable-text[open] .expandable-text-full { display: inline; }
   .github-team-repository a { overflow: visible; }
-  .guide-weekly-card { overflow: visible; position: relative; }
-  .guide-weekly-actions { position: relative; bottom: 0; z-index: var(--z-sticky); }
-  .guide-weekly-card[data-sticky-decision="true"] .guide-weekly-actions { position: sticky; }
   .coordinator-card-placeholder { overflow: hidden; }
   .coordinator-stat-placeholder .app-skeleton-lines > :last-child { display: none; }
   .committee-item { overflow: hidden; }
@@ -298,7 +295,6 @@
   .student-project-setup .setup-hide, .student-project-setup[open] .setup-view { display: none; }
   .student-project-setup[open] .setup-hide { display: inline; }
   #studentWeeklyProgress [data-weekly-status]:empty, #studentWeeklyProgress [data-weekly-read]:empty { display: none; }
-  .weekly-progress-form textarea { resize: vertical; }
   .github-member-separator { display: none; }
   #studentGithubProfile { scroll-margin-top: 80px; }
   @media (min-width: 1000px) { .github-team-repository a { overflow: hidden; } }
@@ -342,7 +338,6 @@
     .rubric-mobile-row { display: grid; }
   }
   .publishing-toggle[aria-expanded="true"] .lucide-icon { transform: rotate(180deg); }
-  .student-assessments-card .student-assessment-result > summary::-webkit-details-marker { display: none; }
 }
 
 /* ---------- Keyframes ---------- */

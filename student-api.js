@@ -79,3 +79,21 @@ function API_student_getDashboard() {
     return buildStudentDto_(student.email, student.teamId, getStudentDashboardData(student.email, student.teamId, student.row));
   }));
 }
+
+/** Weekly progress: existing rules and messages; the browser module renders and saves through the bridge. */
+function API_student_getWeekly() {
+  return apiHandle_(() => loadStudentWeeklyProgress());
+}
+
+function API_student_submitWeekly(input) {
+  return apiHandle_(() => submitWeeklyProgress(input));
+}
+
+/** Published results shown on the Student dashboard; the server decides what the student may see. */
+function API_student_getReviewResult(key) {
+  return apiHandle_(() => loadPublishedReviewEvaluation(String(key || '')));
+}
+
+function API_student_getGuideResult() {
+  return apiHandle_(() => loadPublishedGuideEvaluation());
+}

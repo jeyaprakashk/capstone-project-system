@@ -2,19 +2,6 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),crypto=re
 const {publishingFixture}=require('./internal-publishing-fixture.cjs');
 const id=()=>crypto.randomUUID(),plain=x=>JSON.parse(JSON.stringify(x));
 
-for(const key of ['review1','guide_eval'])test(key+' student release refresh preserves content, deduplicates, retries and ignores detached callbacks',()=>{
- const f=publishingFixture(key);if(key==='review1'){f.submit();f.publish();}else{f.guideSubmit('s1');f.report();f.c.publishGuideEvaluation({team:'g18',student:'s1',revision:1,requestId:id()});}
- reopen(f,key,key==='guide_eval'?'s1':undefined);f.actor('one@x');const result=f.c.loadPublishedAssessment_(key);
- const {window}=require('linkedom').parseHTML('<html><body><section id="'+(key==='review1'?'studentAssessment-review1':'studentGuideEvaluation')+'"></section></body></html>'),document=window.document,calls=[];let begun=0,settled=0;
- function runner(ok,fail){return new Proxy({withSuccessHandler:fn=>runner(fn,fail),withFailureHandler:fn=>runner(ok,fn)},{get:(o,k)=>o[k]||((...args)=>calls.push({ok,fail,args}))});}
- const c=vm.createContext({window,document,DashboardUI:{guideRun:()=>runner(),beginContentLoading:()=>{begun++;let done=false;return()=>{if(!done){done=true;settled++;}};}}});
- vm.runInContext(fs.readFileSync(key==='review1'?'review-evaluation-client.js':'guide-evaluation-client.js','utf8'),c);
- const api=key==='review1'?c.reviewEvaluationBrowser_('review1'):c.guideEvaluationBrowser_(),host=document.querySelector('section');
- api.student();api.student();assert.equal(calls.length,1);calls[0].ok(result);assert.match(host.textContent,/Under correction/);assert.doesNotMatch(host.textContent,/Private correction/);
- const heading=host.querySelector('h3');api.student();calls[1].fail({message:'Offline'});assert.equal(host.querySelector('h3'),heading);assert.match(host.textContent,/Offline/);assert.equal(begun,settled);
- host.querySelector('button').click();calls[2].ok(result);assert(!host.querySelector('button'));assert.equal(begun,settled);
- api.student();host.remove();document.body.innerHTML='<section id="'+host.id+'">Replacement screen</section>';calls[3].ok(result);assert.equal(document.querySelector('section').textContent,'Replacement screen');assert.equal(begun,settled);
-});
 function reopen(f,key='review1',student){const t=f.report().teams[0];return f.c.reopenInternalAssessment({assessmentId:key,team:'g18',student,revision:student?t.students.find(s=>s.register===student).revision:t.revision,requestId:id(),reason:'Private correction reason'});}
 
 test('publication is a minimal frozen release with a verified exact academic source, not duplicate evidence',()=>{

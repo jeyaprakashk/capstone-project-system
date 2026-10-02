@@ -152,7 +152,7 @@ function fixture(system=false) {
  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').split('function renderAssessmentHistory_')[1].replace(/^/, 'function renderAssessmentHistory_'):fs.readFileSync(file,'utf8'),c);
  vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
- for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','system-status-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=SystemStatusView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
+ for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','system-status-view.js','student-weekly-view.js','student-results-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=SystemStatusView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
  return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{ /* bridge read timeouts (30s+) are not part of idle/preload timing */ const entries=[...timers.entries()].filter(([,fn])=>!(fn.delay>=10000));entries.forEach(([key])=>timers.delete(key));entries.forEach(([,fn])=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
 }
 
@@ -427,8 +427,7 @@ test('Student background results finish before the next role and are not repeate
  doc.querySelectorAll=selector=>selector==='[data-role-content]'?[queryAll(selector)[0],student,queryAll(selector)[1]]:
   selector==='[data-review-result]'?[{dataset:{reviewResult:'review1'}}]:queryAll(selector);
  const ui=vm.runInContext('DashboardUI',f.c);
- f.c.GuideEvaluation.student=()=>ui.guideRun().withSuccessHandler(()=>{}).loadPublishedGuideEvaluation();
- f.c.ReviewEvaluations={student:key=>ui.guideRun().withSuccessHandler(()=>{}).loadPublishedReviewEvaluation(key)};
+ vm.runInContext("StudentResults.all=()=>{DashboardUI.guideRun().withSuccessHandler(()=>{}).loadPublishedGuideEvaluation();DashboardUI.guideRun().withSuccessHandler(()=>{}).loadPublishedReviewEvaluation('review1');}",f.c);
  f.click('guide');f.done('loadDashboardRoleContent');await f.settle();f.tick();
  f.done('loadDashboardRoleContent');await f.settle();f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);

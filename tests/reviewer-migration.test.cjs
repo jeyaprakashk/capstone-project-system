@@ -95,7 +95,7 @@ test('dashboard shell compiles, defines the bridge before the dashboard script a
   const fs = require('node:fs');
   const files = ['common-styles.js', 'common-constants.js', 'common-helpers.js', 'guide-dashboard.js', 'coordinator-dashboard.js', 'student-dashboard.js', 'reviewer-dashboard.js',
     'lucide-icons.js', 'icon-renderer.js', 'review-evaluation-client.js', 'internal-assessment-publishing-client.js', 'guide-evaluation-client.js', 'guide-weekly-client.js',
-    'dashboard-client-scripts.js', 'review-academic-policy.js', 'data-bridge-client.js', 'reviewer-view.js', 'guide-view.js', 'student-view.js', 'coordinator-view.js', 'system-status-view.js', 'student-api.js', 'coordinator-api.js', 'dashboard-router.js'];
+    'dashboard-client-scripts.js', 'review-academic-policy.js', 'data-bridge-client.js', 'reviewer-view.js', 'guide-view.js', 'student-view.js', 'coordinator-view.js', 'system-status-view.js', 'student-weekly-view.js', 'student-results-view.js', 'student-api.js', 'coordinator-api.js', 'dashboard-router.js'];
   const c = loadSources(files, { PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }) },
     HtmlService: { createHtmlOutputFromFile: name => ({ getContent: () => fs.readFileSync(name + '.html', 'utf8') }) } });
   const html = c.buildDashboardShell('r@example.com', [{ key: 'reviewer', label: 'Reviewer', contentId: 'reviewerContent' }]);

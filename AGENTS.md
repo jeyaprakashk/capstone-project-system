@@ -60,7 +60,7 @@ or removing any class. Do not add inline `<style>` blocks or hand-written CSS fi
 - Do not put a display utility (`flex`, `grid`, ...) on an element scripts toggle with `hidden`.
 - No preflight: the base rules in the input file are the dashboard's reset.
 
-Migrated so far: **Coordinator dashboard tab** (`coordinator-api.js`, `coordinator-view.js`) and **System Status frame** (`system-status-view.js`; the cards' own checks and the team drawer
+Migrated so far: **Guide Evaluation** (`guide-evaluation-client.js`) and the **student published-results panels** (`student-results-view.js`), the **weekly-progress screens** (`student-weekly-view.js`; `guide-weekly-client.js` inside the Guide view) read and save through the bridge, **Coordinator dashboard tab** (`coordinator-api.js`, `coordinator-view.js`) and **System Status frame** (`system-status-view.js`; the cards' own checks and the team drawer
 are still driven by their legacy modules), **Reviewer** (`reviewer-api.js`, `reviewer-view.js`), **Student**
 (`student-api.js`, `student-view.js`; its weekly-progress, assessment and GitHub-connection modules are
 still legacy and attach to placeholders) and **Guide**

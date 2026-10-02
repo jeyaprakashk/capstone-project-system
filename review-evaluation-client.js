@@ -732,33 +732,9 @@ function reviewEvaluationBrowser_(reviewKey) {
     ReviewerView.refresh().then(refreshed=>{if(!refreshed&&drawer.open)message('Evaluation saved. The assigned-team table could not refresh; reload to retry.');});
   }
   function admin() { return InternalAssessmentPublishing.refresh(reviewKey); }
-  let studentBusy=false;
-  function student() {
-    const host=document.getElementById('studentAssessment-'+reviewKey);if(!host || studentBusy)return;
-    reviewLabel=host.dataset?.assessmentLabel || reviewLabel;
-    studentBusy=true;
-    const finish=DashboardUI.beginContentLoading(host,'Loading '+reviewLabel+' results',{compact:true});
-    rpc('loadPublishedReviewEvaluation',[reviewKey],result=>{
-      finish();studentBusy=false;
-      if(document.getElementById('studentAssessment-'+reviewKey)!==host)return;
-      if(!result){host.innerHTML='<div><strong>'+escape(reviewLabel)+ '</strong><span>Not published</span></div>';return;}
-      const a=result.assessment || {};
-      host.innerHTML='<h3>'+escape(result.config.label)+'</h3>'+(result.identity?'<p>'+escape(result.identity.name+' ('+result.identity.register+')')+'</p>':'')+(result.underCorrection?'<p role="status">Under correction. These are the last published results.</p>':'')+'<p>Team Mark: '+mark(a.teamMark)+' &middot; Individual Mark: '+mark(a.individualMark)+' &middot; Review Total: '+mark(result.total)+' / '+result.config.maximum+' &middot; Course contribution '+mark(result.weighted)+' / '+(result.config.weight*100)+' &middot; Status: '+escape(a.status || 'Pending')+'</p>'+result.config.criteria.map(c=>{
-        const score=result.scores[c.pi] || {},effective=a.effectiveScores && a.effectiveScores[c.pi] || score;
-        return '<p><strong>'+escape(c.name)+'</strong>: '+mark(effective?effective.marks:score.marks)+' / '+c.maxMarks+'</p>'+(effective && effective.source==='policy'?'<p>Policy-assigned zero</p>':(effective && effective.source==='makeup'?'<p>Individual Makeup result</p>':'')+'<p>'+escape(score.remark)+'</p>');
-      }).join('');
-      const content=host.innerHTML;
-      host.innerHTML='<details class="student-assessment-result"><summary><strong>'+escape(result.config.label)+'</strong><span>'+(result.underCorrection?'Under correction':'Published')+'</span><span>View marks</span></summary><div>'+content+'</div></details>';
-    },error=>{
-      finish();studentBusy=false;
-      if(document.getElementById('studentAssessment-'+reviewKey)!==host)return;
-      const notice=document.createElement('p');notice.textContent=reviewLabel+' results unavailable. '+error.message+' ';
-      const button=document.createElement('button');button.className='btn btn-sm btn-outline';button.textContent='Retry';button.onclick=()=>{notice.remove();student();};notice.appendChild(button);host.appendChild(notice);
-    });
-  }
   window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
-  return {open,admin,student};
+  return {open,admin};
 }
 function getReviewEvaluationClientScript_() {
-  return [reviewPolicyFacts_,reviewPolicyScoresComplete_,reviewPolicyCalculate_].map(f=>f.toString()).join('\n')+'\nconst ReviewAssessmentBrowser = '+reviewEvaluationBrowser_.toString()+'; const ReviewEvaluations = (()=>{const instances=new Map();const get=key=>{if(!instances.has(key))instances.set(key,ReviewAssessmentBrowser(key));return instances.get(key);};return {open:(team,key,button)=>get(key).open(team,button),student:key=>get(key).student(),admin:key=>get(key).admin()};})();';
+  return [reviewPolicyFacts_,reviewPolicyScoresComplete_,reviewPolicyCalculate_].map(f=>f.toString()).join('\n')+'\nconst ReviewAssessmentBrowser = '+reviewEvaluationBrowser_.toString()+'; const ReviewEvaluations = (()=>{const instances=new Map();const get=key=>{if(!instances.has(key))instances.set(key,ReviewAssessmentBrowser(key));return instances.get(key);};return {open:(team,key,button)=>get(key).open(team,button),admin:key=>get(key).admin()};})();';
 }

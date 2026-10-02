@@ -6,12 +6,15 @@ const {parseHTML}=require('linkedom');
 function fixture() {
   const {document}=parseHTML('<html><body><section id="guideWeeklyProgress"><p id="guide-weeklyUpdated"></p><button>Refresh</button><p data-guide-weekly-status></p><div data-guide-weekly-read>Initial skeleton</div></section></body></html>');
   const requests=[],timers=new Map();let starts=0,finishes=0,timerId=0;
+  const {Sync}=require('./sync-promise.cjs');
+  const bridge={read:(key,method,args)=>{const p=new Sync();requests.push({method:method==='API_guide_getEvaluation'?'loadGuideEvaluation':'loadGuideWeeklyProgress',args:args||[],success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;},
+    write:(method,args)=>{const p=new Sync();requests.push({method:'submitWeeklyGuideSignoff',args,success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;}};
   const c=vm.createContext({document,Date,setTimeout:(fn,delay)=>{assert.equal(delay,5000);timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),DashboardUI:{renderSkeleton:()=>'<span>Skeleton</span>',beginContentLoading:(target,label,options)=>{
     starts++;assert.equal(options.compact,true);target.setAttribute('aria-busy','true');let done=false;
     return()=>{if(!done){done=true;finishes++;target.removeAttribute('aria-busy');}};
   },guideRun:()=>{const request={};const runner=new Proxy({withSuccessHandler(fn){request.success=fn;return runner;},withFailureHandler(fn){request.failure=fn;return runner;}},{get(target,key){return target[key]||((...args)=>{request.method=key;request.args=args;requests.push(request);});}});return runner;}}});
   vm.runInContext(fs.readFileSync('guide-weekly-client.js','utf8'),c);
-  new vm.Script(c.getGuideWeeklyClientScript_());const api=c.guideWeeklyBrowser_();
+  new vm.Script(c.getGuideWeeklyClientScript_());const api=c.guideWeeklyBrowser_(bridge);
   const data={weeks:['W2','W1'],checkedAt:'2026-01-08T12:00:00Z',timezone:'Asia/Kolkata',entries:[
     {entryId:'e2',weekId:'W2',student:'Student <script>alert(1)</script>',regNo:'001',discussion:'Measured <b>signal</b>',status:'PENDING',score:null},
     {entryId:'e1',weekId:'W1',student:'Student',regNo:'001',discussion:'Decision',status:'DISCUSSED',score:0}]};
@@ -23,7 +26,7 @@ test('guide list defaults latest week, escapes content, renders absent score and
   assert.equal(f.host.week,'W2');assert.equal(f.host.querySelectorAll('[data-entry]').length,1);
   assert.match(f.host.textContent,/—/);assert.equal(f.host.querySelector('[data-decision-status]'),null);assert.equal(f.host.querySelector('script'),null);
   assert.equal(f.host.querySelector('[data-entry] b'),null);
-  f.host.querySelectorAll('[data-sign],[data-details]').forEach(button=>assert.match(button.className,/\bbtn btn-sm\b/));
+  f.host.querySelectorAll('[data-sign],[data-details]').forEach(button=>assert.match(button.className,/\btext-xs\b.*\bpx-2\b|\bpx-2\b.*\btext-xs\b/));
   f.host.querySelector('[data-week-step="1"]').onclick();
   assert(f.host.querySelector('[data-weekly-student-header] > [data-weekly-deadline]'));
   assert.match(f.host.textContent,/0\/10/);assert.equal(f.host.querySelector('[data-sign="DISCUSSED"]').getAttribute('aria-pressed'),'true');
@@ -39,10 +42,10 @@ test('guide required counts exclude ineligible and voluntary students without hi
 });
 
 test('weekly timeliness badges use recorded status and shared semantic colors',()=>{
-  for(const [timeliness,label,classes] of [['ON_TIME','On-time submission','badge badge--success'],['LATE','Late submission','badge badge--danger'],[undefined,'Timing unavailable','chip']]) {
+  for(const [timeliness,label,classes] of [['ON_TIME','On-time submission','bg-success-tint text-success'],['LATE','Late submission','bg-danger-tint text-danger'],[undefined,'Timing unavailable','bg-soft text-ink-2']]) {
     const f=fixture();f.data.entries[0].timeliness=timeliness;f.api.load();f.reply();
     const badge=f.host.querySelector('[data-submission-timing]');
-    assert.equal(badge.textContent,label);assert.equal(badge.className,classes);
+    assert.equal(badge.textContent,label);assert(badge.className.includes(classes),badge.className);
   }
 });
 
@@ -124,8 +127,8 @@ test('guide sign-off blocks duplicates, retains choice on failure and displays s
 test('undo cancels before persistence and releases controls; detached notices never save',()=>{
   const f=fixture();f.api.load();f.reply();
   const discussed=f.host.querySelector('[data-sign="DISCUSSED"]');
-  assert.match(discussed.className,/btn-primary/);
-  assert.match(f.host.querySelector('[data-sign="NOT_DISCUSSED"]').className,/btn-outline/);
+  assert.match(discussed.className,/\bbg-primary\b/);
+  assert.match(f.host.querySelector('[data-sign="NOT_DISCUSSED"]').className,/\bring-line\b/);
   discussed.onclick();assert.match(f.host.textContent,/will save in 5 seconds/);
   f.api.load();assert.equal(f.requests.length,1);
   f.host.querySelector('[data-sign-undo]').onclick();f.flush();

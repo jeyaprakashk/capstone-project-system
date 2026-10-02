@@ -86,6 +86,8 @@ function getMigratedViewsClientScript_() {
 const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => typeof InternalAssessmentPublishing === 'undefined' ? null : InternalAssessmentPublishing);
 const CoordinatorView = (${coordinatorViewBrowser_.toString()})(DataBridge, () => DashboardUI);
+const StudentResults = (${studentResultsViewBrowser_.toString()})(DataBridge, () => DashboardUI);
+const StudentWeekly = (${studentWeeklyViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => typeof GuideWeekly === 'undefined' ? null : GuideWeekly);`;
 }

@@ -650,16 +650,6 @@ test('review refresh retains entries on failure, deduplicates requests and settl
   f.requests[3].success(f.data);assert.equal(f.drawer.open,false);assert.equal(f.loading.settled,3);
 });
 
-test('student result refresh preserves published content on failure and renders pending without zero coercion',()=>{
-  const f=browserFixture(true),host={innerHTML:'Existing published result',children:[],appendChild(node){this.children.push(node);}};
-  f.context.document.getElementById=id=>id==='studentAssessment-review1'?host:null;
-  f.context.document.createElement=()=>({children:[],appendChild(node){this.children.push(node);},remove(){host.children=host.children.filter(n=>n!==this);}});
-  f.api.student();f.api.student();assert.equal(f.requests.length,1);assert.equal(f.loading.begun,1);
-  f.requests[0].failure({message:'Offline'});assert.equal(host.innerHTML,'Existing published result');assert.equal(f.loading.settled,1);
-  host.children[0].children[0].onclick();assert.equal(f.requests.length,2);
-  f.requests[1].success({config:{label:'Review 1',maximum:100,weight:.2,criteria:[]},total:null,weighted:null,assessment:{teamMark:48,individualMark:null,status:'MAKEUP_PENDING'}});
-  assert.equal(f.loading.settled,2);assert.match(host.innerHTML,/Individual Mark: Pending/);assert.match(host.innerHTML,/Review Total: Pending/);assert.doesNotMatch(host.innerHTML,/Review Total: 0/);
-});
 test('drawer ignores stale responses after close and escapes project text',async ()=>{
   const f=browserFixture();f.api.open('T1',f.trigger);await f.click('data-close');f.requests[0].success(f.data);assert.equal(f.drawer.open,false);assert(!f.drawer.innerHTML.includes('Team criteria'));
   f.api.open('T1',f.trigger);f.data.details.title='<script>bad</script>';f.requests[1].success(f.data);assert.match(f.drawer.innerHTML,/&lt;script&gt;/);assert.equal(f.fields().length,3);

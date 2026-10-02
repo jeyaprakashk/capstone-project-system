@@ -137,3 +137,25 @@ function API_guide_submitDecision(teamId, decision, notes, editedTitle) {
     return apiWorkflowResult_(submitGuideDecision(String(teamId || ''), String(decision || ''), String(notes || ''), String(editedTitle || '')), 'Decision saved.');
   });
 }
+
+/** Weekly progress for the guide's teams; the browser module renders and saves through the bridge. */
+function API_guide_getWeekly() {
+  return apiHandle_(() => { guideAccessOrThrow_(); return loadGuideWeeklyProgress(); });
+}
+
+function API_guide_signWeekly(entryId, status) {
+  return apiHandle_(() => { guideAccessOrThrow_(); const result = submitWeeklyGuideSignoff(String(entryId || ''), String(status || '')); if (result && result.ok === false) throw apiFail_('REJECTED', result.message || 'The confirmation was not accepted.'); return result; });
+}
+
+/** Guide Evaluation: existing rules and messages; the browser module renders and saves through the bridge. */
+function API_guide_getEvaluation(teamId, register) {
+  return apiHandle_(() => { guideAccessOrThrow_(); return loadGuideEvaluation(String(teamId || ''), String(register || '')); });
+}
+
+function API_guide_saveEvaluationDraft(input) {
+  return apiHandle_(() => { guideAccessOrThrow_(); return saveGuideEvaluationDraft(input); });
+}
+
+function API_guide_submitEvaluation(input) {
+  return apiHandle_(() => { guideAccessOrThrow_(); return submitGuideEvaluation(input); });
+}
