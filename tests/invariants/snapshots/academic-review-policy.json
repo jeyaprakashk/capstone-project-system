@@ -1,0 +1,3839 @@
+{
+  "unselected/level0": {
+    "scores": {
+      "T1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "UNSELECTED",
+        "attended": null
+      },
+      "teamMark": null,
+      "individualMark": null,
+      "teamState": "UNASSESSED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "policy",
+      "effectiveScores": {
+        "T1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "policy"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "policy"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "unselected/level1": {
+    "scores": {
+      "T1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 2,
+        "level": 1,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "UNSELECTED",
+        "attended": null
+      },
+      "teamMark": null,
+      "individualMark": null,
+      "teamState": "UNASSESSED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "policy",
+      "effectiveScores": {
+        "T1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "policy"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "policy"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "unselected/level2": {
+    "scores": {
+      "T1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3,
+        "level": 2,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "UNSELECTED",
+        "attended": null
+      },
+      "teamMark": null,
+      "individualMark": null,
+      "teamState": "UNASSESSED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "policy",
+      "effectiveScores": {
+        "T1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "policy"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "policy"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "unselected/level3": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "UNSELECTED",
+        "attended": null
+      },
+      "makeup": {
+        "eventId": "E1",
+        "scores": {
+          "I1": {
+            "marks": 7.5,
+            "level": 3,
+            "remark": ""
+          },
+          "I2": {
+            "marks": 3.75,
+            "level": 3,
+            "remark": ""
+          }
+        }
+      },
+      "teamMark": null,
+      "individualMark": null,
+      "teamState": "UNASSESSED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "policy",
+      "effectiveScores": {
+        "T1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "policy"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "policy"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "unselected/level5": {
+    "scores": {
+      "T1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 4.75,
+        "level": 5,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "UNSELECTED",
+        "attended": null
+      },
+      "teamMark": null,
+      "individualMark": null,
+      "teamState": "UNASSESSED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "policy",
+      "effectiveScores": {
+        "T1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "policy"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "policy"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "normal/level0": {
+    "scores": {
+      "T1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "NORMAL",
+        "attended": true
+      },
+      "teamMark": 0,
+      "individualMark": 0,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "common",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": 0,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "assessment"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 0,
+    "weighted": 0
+  },
+  "normal/level1": {
+    "scores": {
+      "T1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 2,
+        "level": 1,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "NORMAL",
+        "attended": true
+      },
+      "teamMark": 8,
+      "individualMark": 6,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "common",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": 2,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "assessment"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 14,
+    "weighted": 800
+  },
+  "normal/level2": {
+    "scores": {
+      "T1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3,
+        "level": 2,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "NORMAL",
+        "attended": true
+      },
+      "teamMark": 12,
+      "individualMark": 9,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "common",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": 3,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "assessment"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 21,
+    "weighted": 1200
+  },
+  "normal/level3": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "NORMAL",
+        "attended": true
+      },
+      "makeup": {
+        "eventId": "E1",
+        "scores": {
+          "I1": {
+            "marks": 7.5,
+            "level": 3,
+            "remark": ""
+          },
+          "I2": {
+            "marks": 3.75,
+            "level": 3,
+            "remark": ""
+          }
+        }
+      },
+      "teamMark": 15,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "normal/level5": {
+    "scores": {
+      "T1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 4.75,
+        "level": 5,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "NORMAL",
+        "attended": true
+      },
+      "teamMark": 19,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 9.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 9.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentApproved/level0": {
+    "scores": {
+      "T1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": true,
+        "attended": false
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentApproved/level1": {
+    "scores": {
+      "T1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 2,
+        "level": 1,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": true,
+        "attended": false
+      },
+      "teamMark": 8,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentApproved/level2": {
+    "scores": {
+      "T1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3,
+        "level": 2,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": true,
+        "attended": false
+      },
+      "teamMark": 12,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentApproved/level3": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": true,
+        "attended": false
+      },
+      "makeup": {
+        "eventId": "E1",
+        "scores": {
+          "I1": {
+            "marks": 7.5,
+            "level": 3,
+            "remark": ""
+          },
+          "I2": {
+            "marks": 3.75,
+            "level": 3,
+            "remark": ""
+          }
+        }
+      },
+      "teamMark": 15,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentApproved/level5": {
+    "scores": {
+      "T1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 4.75,
+        "level": 5,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": true,
+        "attended": false
+      },
+      "teamMark": 19,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 9.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 9.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentApprovedEvidence/level0": {
+    "scores": {
+      "T1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": true,
+        "attended": false,
+        "supportingEvidence": [
+          "MEDICAL_DOCUMENT",
+          "OTHER"
+        ],
+        "otherEvidenceText": "note"
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentApprovedEvidence/level1": {
+    "scores": {
+      "T1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 2,
+        "level": 1,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": true,
+        "attended": false,
+        "supportingEvidence": [
+          "MEDICAL_DOCUMENT",
+          "OTHER"
+        ],
+        "otherEvidenceText": "note"
+      },
+      "teamMark": 8,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentApprovedEvidence/level2": {
+    "scores": {
+      "T1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3,
+        "level": 2,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": true,
+        "attended": false,
+        "supportingEvidence": [
+          "MEDICAL_DOCUMENT",
+          "OTHER"
+        ],
+        "otherEvidenceText": "note"
+      },
+      "teamMark": 12,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentApprovedEvidence/level3": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": true,
+        "attended": false,
+        "supportingEvidence": [
+          "MEDICAL_DOCUMENT",
+          "OTHER"
+        ],
+        "otherEvidenceText": "note"
+      },
+      "makeup": {
+        "eventId": "E1",
+        "scores": {
+          "I1": {
+            "marks": 7.5,
+            "level": 3,
+            "remark": ""
+          },
+          "I2": {
+            "marks": 3.75,
+            "level": 3,
+            "remark": ""
+          }
+        }
+      },
+      "teamMark": 15,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentApprovedEvidence/level5": {
+    "scores": {
+      "T1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 4.75,
+        "level": 5,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": true,
+        "attended": false,
+        "supportingEvidence": [
+          "MEDICAL_DOCUMENT",
+          "OTHER"
+        ],
+        "otherEvidenceText": "note"
+      },
+      "teamMark": 19,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 9.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 9.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "absentRejected/level0": {
+    "scores": {
+      "T1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": false,
+        "attended": false
+      },
+      "teamMark": 0,
+      "individualMark": 0,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "common",
+      "individualSource": "policy",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I2": {
+          "marks": 0,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "policy"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 0,
+    "weighted": 0
+  },
+  "absentRejected/level1": {
+    "scores": {
+      "T1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 2,
+        "level": 1,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": false,
+        "attended": false
+      },
+      "teamMark": 8,
+      "individualMark": 0,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "common",
+      "individualSource": "policy",
+      "effectiveScores": {
+        "T1": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I2": {
+          "marks": 0,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "policy"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 8,
+    "weighted": 457.14
+  },
+  "absentRejected/level2": {
+    "scores": {
+      "T1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3,
+        "level": 2,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": false,
+        "attended": false
+      },
+      "teamMark": 12,
+      "individualMark": 0,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "common",
+      "individualSource": "policy",
+      "effectiveScores": {
+        "T1": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I2": {
+          "marks": 0,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "policy"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 12,
+    "weighted": 685.71
+  },
+  "absentRejected/level3": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": false,
+        "attended": false
+      },
+      "makeup": {
+        "eventId": "E1",
+        "scores": {
+          "I1": {
+            "marks": 7.5,
+            "level": 3,
+            "remark": ""
+          },
+          "I2": {
+            "marks": 3.75,
+            "level": 3,
+            "remark": ""
+          }
+        }
+      },
+      "teamMark": 15,
+      "individualMark": 0,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "common",
+      "individualSource": "policy",
+      "effectiveScores": {
+        "T1": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I2": {
+          "marks": 0,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "policy"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 15,
+    "weighted": 857.14
+  },
+  "absentRejected/level5": {
+    "scores": {
+      "T1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 4.75,
+        "level": 5,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "REVIEW_DAY_ABSENCE",
+        "approved": false,
+        "attended": false
+      },
+      "teamMark": 19,
+      "individualMark": 0,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "common",
+      "individualSource": "policy",
+      "effectiveScores": {
+        "T1": {
+          "marks": 9.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 9.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I2": {
+          "marks": 0,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "policy"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 19,
+    "weighted": 1085.71
+  },
+  "prolongedApprovedContribution/level0": {
+    "scores": {
+      "T1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": true,
+        "verifiedContribution": true,
+        "attended": false
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedApprovedContribution/level1": {
+    "scores": {
+      "T1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 2,
+        "level": 1,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": true,
+        "verifiedContribution": true,
+        "attended": false
+      },
+      "teamMark": 8,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedApprovedContribution/level2": {
+    "scores": {
+      "T1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3,
+        "level": 2,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": true,
+        "verifiedContribution": true,
+        "attended": false
+      },
+      "teamMark": 12,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedApprovedContribution/level3": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": true,
+        "verifiedContribution": true,
+        "attended": false
+      },
+      "makeup": {
+        "eventId": "E1",
+        "scores": {
+          "I1": {
+            "marks": 7.5,
+            "level": 3,
+            "remark": ""
+          },
+          "I2": {
+            "marks": 3.75,
+            "level": 3,
+            "remark": ""
+          }
+        }
+      },
+      "teamMark": 15,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedApprovedContribution/level5": {
+    "scores": {
+      "T1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 4.75,
+        "level": 5,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": true,
+        "verifiedContribution": true,
+        "attended": false
+      },
+      "teamMark": 19,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "common",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 9.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 9.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedApprovedNoContribution/level0": {
+    "scores": {
+      "T1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": true,
+        "verifiedContribution": false,
+        "attended": false
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "policy",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedApprovedNoContribution/level1": {
+    "scores": {
+      "T1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 2,
+        "level": 1,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": true,
+        "verifiedContribution": false,
+        "attended": false
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "policy",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedApprovedNoContribution/level2": {
+    "scores": {
+      "T1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3,
+        "level": 2,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": true,
+        "verifiedContribution": false,
+        "attended": false
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "policy",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedApprovedNoContribution/level3": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": true,
+        "verifiedContribution": false,
+        "attended": false
+      },
+      "makeup": {
+        "eventId": "E1",
+        "scores": {
+          "I1": {
+            "marks": 7.5,
+            "level": 3,
+            "remark": ""
+          },
+          "I2": {
+            "marks": 3.75,
+            "level": 3,
+            "remark": ""
+          }
+        }
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "policy",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedApprovedNoContribution/level5": {
+    "scores": {
+      "T1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 4.75,
+        "level": 5,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": true,
+        "verifiedContribution": false,
+        "attended": false
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "PENDING",
+      "teamSource": "policy",
+      "individualSource": "pending",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "PENDING",
+          "source": "pending"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "PENDING",
+          "source": "pending"
+        }
+      },
+      "completed": false,
+      "status": "MAKEUP_PENDING",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": true
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedRejected/level0": {
+    "scores": {
+      "T1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": false,
+        "verifiedContribution": true,
+        "attended": true
+      },
+      "teamMark": 0,
+      "individualMark": 0,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "policy",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": 0,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "assessment"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 0,
+    "weighted": 0
+  },
+  "prolongedRejected/level1": {
+    "scores": {
+      "T1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 2,
+        "level": 1,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": false,
+        "verifiedContribution": true,
+        "attended": true
+      },
+      "teamMark": 0,
+      "individualMark": 6,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "policy",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": 2,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "assessment"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 6,
+    "weighted": 342.86
+  },
+  "prolongedRejected/level2": {
+    "scores": {
+      "T1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3,
+        "level": 2,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": false,
+        "verifiedContribution": true,
+        "attended": true
+      },
+      "teamMark": 0,
+      "individualMark": 9,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "policy",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": 3,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "assessment"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 9,
+    "weighted": 514.29
+  },
+  "prolongedRejected/level3": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": false,
+        "verifiedContribution": true,
+        "attended": true
+      },
+      "makeup": {
+        "eventId": "E1",
+        "scores": {
+          "I1": {
+            "marks": 7.5,
+            "level": 3,
+            "remark": ""
+          },
+          "I2": {
+            "marks": 3.75,
+            "level": 3,
+            "remark": ""
+          }
+        }
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "UNASSESSED",
+      "teamSource": "policy",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedRejected/level5": {
+    "scores": {
+      "T1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 4.75,
+        "level": 5,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": false,
+        "verifiedContribution": true,
+        "attended": true
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "UNASSESSED",
+      "teamSource": "policy",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedNotApplicable/level0": {
+    "scores": {
+      "T1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 0,
+        "level": 0,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": null,
+        "verifiedContribution": false,
+        "attended": true
+      },
+      "teamMark": 0,
+      "individualMark": 0,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "policy",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": 0,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "assessment"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 0,
+    "weighted": 0
+  },
+  "prolongedNotApplicable/level1": {
+    "scores": {
+      "T1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "T2": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I1": {
+        "marks": 4,
+        "level": 1,
+        "remark": "needs work"
+      },
+      "I2": {
+        "marks": 2,
+        "level": 1,
+        "remark": "needs work"
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": null,
+        "verifiedContribution": false,
+        "attended": true
+      },
+      "teamMark": 0,
+      "individualMark": 6,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "policy",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": 4,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": 2,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "assessment"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 6,
+    "weighted": 342.86
+  },
+  "prolongedNotApplicable/level2": {
+    "scores": {
+      "T1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 6,
+        "level": 2,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3,
+        "level": 2,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": null,
+        "verifiedContribution": false,
+        "attended": true
+      },
+      "teamMark": 0,
+      "individualMark": 9,
+      "teamState": "RESOLVED",
+      "individualState": "RESOLVED",
+      "teamSource": "policy",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": 6,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": 3,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "RESOLVED",
+          "source": "assessment"
+        }
+      },
+      "completed": true,
+      "status": "COMPLETED",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": 9,
+    "weighted": 514.29
+  },
+  "prolongedNotApplicable/level3": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": null,
+        "verifiedContribution": false,
+        "attended": true
+      },
+      "makeup": {
+        "eventId": "E1",
+        "scores": {
+          "I1": {
+            "marks": 7.5,
+            "level": 3,
+            "remark": ""
+          },
+          "I2": {
+            "marks": 3.75,
+            "level": 3,
+            "remark": ""
+          }
+        }
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "UNASSESSED",
+      "teamSource": "policy",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "prolongedNotApplicable/level5": {
+    "scores": {
+      "T1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 9.5,
+        "level": 5,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 4.75,
+        "level": 5,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "PROLONGED",
+        "approved": null,
+        "verifiedContribution": false,
+        "attended": true
+      },
+      "teamMark": 0,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "UNASSESSED",
+      "teamSource": "policy",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "T2": {
+          "marks": 0,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "policy"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "incomplete": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "NORMAL",
+        "attended": true
+      },
+      "teamMark": null,
+      "individualMark": null,
+      "teamState": "UNASSESSED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "UNASSESSED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "halfMarks": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 8.5,
+        "level": 4,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "NORMAL",
+        "attended": true
+      },
+      "teamMark": 15,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "invalidBand": {
+    "scores": {
+      "T1": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 7.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 9.5,
+        "level": 3,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 3.75,
+        "level": 3,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "NORMAL",
+        "attended": true
+      },
+      "teamMark": 15,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "T2": {
+          "marks": 7.5,
+          "maximum": 10,
+          "co": "CO2",
+          "state": "RESOLVED",
+          "source": "common"
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "frozenTeam": {
+    "scores": {
+      "T1": {
+        "marks": 8.5,
+        "level": 4,
+        "remark": ""
+      },
+      "T2": {
+        "marks": 8.5,
+        "level": 4,
+        "remark": ""
+      },
+      "I1": {
+        "marks": 8.5,
+        "level": 4,
+        "remark": ""
+      },
+      "I2": {
+        "marks": 4.25,
+        "level": 4,
+        "remark": ""
+      }
+    },
+    "assessment": {
+      "facts": {
+        "type": "NORMAL",
+        "attended": true
+      },
+      "teamMark": 17,
+      "individualMark": null,
+      "teamState": "RESOLVED",
+      "individualState": "UNASSESSED",
+      "teamSource": "common",
+      "individualSource": "assessment",
+      "effectiveScores": {
+        "T1": {
+          "marks": 9
+        },
+        "T2": {
+          "marks": 8
+        },
+        "I1": {
+          "marks": null,
+          "maximum": 10,
+          "co": "CO1",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        },
+        "I2": {
+          "marks": null,
+          "maximum": 5,
+          "co": "CO3",
+          "state": "UNASSESSED",
+          "source": "assessment"
+        }
+      },
+      "completed": false,
+      "status": "INCOMPLETE",
+      "policyVersion": "review-attendance-v1",
+      "nextActions": {
+        "makeup": false
+      }
+    },
+    "total": null,
+    "weighted": null
+  },
+  "error/BOGUS{\"type\":\"BOGUS\"}": "Invalid attendance classification.",
+  "error/REVIEW_DAY_ABSENCE{\"type\":\"REVIEW_DAY_ABSENCE\"}": "Absence Approved must be Yes or No.",
+  "error/PROLONGED{\"type\":\"PROLONGED\",\"approved\":true}": "Contribution Established must be Yes or No.",
+  "error/version": "Unsupported Review academic policy version."
+}
