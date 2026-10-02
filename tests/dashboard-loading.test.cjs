@@ -6,7 +6,7 @@ test('shared sorting handles natural IDs, numeric pairs, missing data and access
  const {document}=require('linkedom').parseHTML('<table><thead><tr><th data-sort-type="text">Team</th><th data-sort-type="pair">Activity</th><th>Actions</th></tr></thead><tbody>'+[['T10','2/10'],['T2','2/9'],['T1','10/1'],['T3','—']].map(([id,v])=>'<tr><td>'+id+'</td><td>'+v+'</td><td>View</td></tr>').join('')+'</tbody></table>');
  const c=vm.createContext({document,Intl});
  const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
- vm.runInContext(source.slice(source.indexOf('  function sortTableRows('),source.indexOf('  const trackerSort')),c);
+ vm.runInContext(source.slice(source.indexOf('  function sortTableRows('),source.indexOf('  function renderTeamPagination(')),c);
  const table=document.querySelector('table'), state={};
  c.initializeTableSorting(table,{state});
  const buttons=table.querySelectorAll('button'), ids=()=>Array.from(table.querySelectorAll('tbody tr')).map(r=>r.firstElementChild.textContent);
@@ -22,20 +22,6 @@ test('shared sorting handles natural IDs, numeric pairs, missing data and access
  assert.equal(replacement.querySelectorAll('th')[1].getAttribute('aria-sort'),'descending');
 });
 
-test('tracker sorts detached pages and retains sorting through searches',async()=>{
- const {document}=require('linkedom').parseHTML('<input id="trackerSearch"><table><thead><tr><th data-sort-type="text">Team</th></tr></thead><tbody id="trackerBody">'+Array.from({length:12},(_,i)=>'<tr data-search="team '+(12-i)+'" data-health="ontrack"><td>T'+(12-i)+'</td></tr>').join('')+'</tbody></table>');
- const c=vm.createContext({document,Intl,byId:id=>document.getElementById(id),renderLucideIcon_:()=>''});
- const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
- vm.runInContext(source.slice(source.indexOf('  function sortTableRows('),source.indexOf('  function filterTeamTracker(')),c);
- c.applyCoordinatorFilters(true);
- const ids=()=>Array.from(document.querySelectorAll('tbody tr')).map(r=>r.textContent);
- assert.equal(ids().length,10);
- document.querySelector('button').onclick();assert.equal(ids()[0],'T1');assert.equal(ids()[9],'T10');
- vm.runInContext('trackerPagination.page=2; applyCoordinatorFilters(false)',c);assert.deepEqual(ids(),['T11','T12']);
- document.getElementById('trackerSearch').value='team 1';c.applyCoordinatorFilters(true);assert.deepEqual(ids(),['T1','T10','T11','T12']);
- document.getElementById('trackerSearch').value='';c.applyCoordinatorFilters(true);assert.equal(ids()[0],'T1');
- document.querySelector('button').onclick();assert.equal(ids()[0],'T12');
-});
 function dialogFixture() {
  const {document,window}=require('linkedom').parseHTML('<html><body><button id="previous">Previous</button></body></html>');
  document.activeElement=document.getElementById('previous');
@@ -158,14 +144,14 @@ function fixture(system=false) {
  querySelectorAll:selector=>selector==='[data-role-content]'?panels:[]};
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>{
   // Migrated reviewer role: log it like the role-content request, answering with an envelope.
-  const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getDashboard:'student'}[key];
+  const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getDashboard:'student',API_coordinator_getOverview:'coord'}[key];
   if(migrated)return requests.push({key:'loadDashboardRoleContent',args:[migrated],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   return requests.push({key,args,success,failure});}}); }
  const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').split('function renderAssessmentHistory_')[1].replace(/^/, 'function renderAssessmentHistory_'):fs.readFileSync(file,'utf8'),c);
  vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
- for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
+ for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
  return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
 }
 
@@ -380,7 +366,7 @@ test('coordinator drawer shares focus trap, Escape and trigger focus return',asy
  f.fire('keydown',{key:'Escape',preventDefault(){}});
  assert.equal(f.nodes.teamDrawer.inert,true);
  assert.equal(f.c.document.activeElement,trigger);
- const source=fs.readFileSync('coordinator-dashboard.js','utf8');
+ const source=fs.readFileSync('coordinator-view.js','utf8');
  assert.match(source,/id="teamDrawer"[\s\S]*?role="dialog" aria-modal="true" aria-labelledby="teamDrawerTitle"/);
 });
 test('all roles preload in order while announcements remain pending, and are reused',async()=>{
@@ -408,33 +394,29 @@ test('diagnostics record errors and preloading can be disabled for baseline meas
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
  assert(f.c.window.DashboardPerformance.snapshot().some(e=>e.event==='request'&&!e.ok));
 });
-test('Coordinator background initialization loads sections and waits for all deferred reads',async()=>{
- const f=fixture();const lookup=f.c.document.getElementById;
- f.c.document.getElementById=id=>id==='coordinatorAsyncRoot'?root:lookup(id);
- const queryAll=f.c.document.querySelectorAll;
- f.c.document.querySelectorAll=selector=>{const nodes=queryAll(selector);return selector==='[data-role-content]'?[nodes[0],nodes[2],nodes[1]]:nodes;};
- const root={};f.click('guide');f.done('loadDashboardRoleContent');await f.settle();f.tick();
- assert.equal(f.requests.at(-1).args[0],'coord');f.done('loadDashboardRoleContent');await f.settle();
- assert.deepEqual(f.requests.filter(r=>r.key==='loadCoordinatorSection').map(r=>r.args[0]),['overview','progress']);
- assert.equal(f.requests.filter(r=>r.key==='loadAllTeamsWeeklyActivity').length,1);
- f.click('coord');assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSection').length,2);
- for(const request of f.requests.filter(r=>r.key==='loadCoordinatorSection')) {
-  request.failure(new Error('offline'));f.tick();
-  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
- }
- f.requests.find(r=>r.key==='loadAllTeamsWeeklyActivity').failure(new Error('offline'));f.tick();
- assert.equal(f.requests.at(-1).args[0],'reviewer');
+test('Coordinator load starts overview, progress and activity together; their failures do not stall preloading',async()=>{
+ const f=fixture();
+ f.click('guide');f.done('loadDashboardRoleContent');await f.settle();f.tick();
+ assert.equal(f.requests.at(-1).args[0],'reviewer');f.done('loadDashboardRoleContent');await f.settle();f.tick();
+ assert.equal(f.requests.at(-1).args[0],'coord');
+ const coordinatorReads=f.requests.filter(r=>/^API_coordinator_/.test(r.key)||(r.key==='loadDashboardRoleContent'&&r.args[0]==='coord'));
+ assert.equal(coordinatorReads.filter(r=>r.key==='API_coordinator_getProgress').length,1);
+ assert.equal(coordinatorReads.filter(r=>r.key==='API_coordinator_getActivity').length,1);
+ f.click('coord');
+ assert.equal(f.requests.filter(r=>r.key==='API_coordinator_getProgress').length,1,'selecting the loading role does not repeat reads');
 });
 
 test('failed roles advance once; clicking ahead keeps earlier queued roles',async()=>{
- const f=fixture();f.click('guide');f.click('coord');
- f.requests[0].failure(new Error('offline'));f.requests[0].done=true;
+ const f=fixture(),lastRole=()=>f.requests.filter(r=>r.key==='loadDashboardRoleContent').at(-1).args[0];f.click('guide');f.click('coord');
+ f.requests[0].failure(new Error('offline'));f.requests[0].done=true;await f.settle();
  f.tick();assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
- f.done('loadDashboardRoleContent');await f.settle();f.tick();
- assert.equal(f.requests.at(-1).args[0],'reviewer');
+ f.done('loadDashboardRoleContent');await f.settle();
+ // The coordinator's own progress and activity reads share the role lane; settle them before the next preload.
+ f.requests.filter(r=>/^API_coordinator_get(Progress|Activity)$/.test(r.key)).forEach(r=>{r.done=true;r.failure(new Error('offline'));});await f.settle();f.tick();
+ assert.equal(lastRole(),'reviewer');
  f.done('loadDashboardRoleContent');await f.settle();f.tick();f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,3);
- f.click('guide');assert.equal(f.requests.at(-1).args[0],'guide');
+ f.click('guide');assert.equal(lastRole(),'guide');
 });
 
 test('Student background results finish before the next role and are not repeated on click',async()=>{

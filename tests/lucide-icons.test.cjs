@@ -46,26 +46,6 @@ test('browser and Apps Script render the same bundled Lucide SVGs without networ
   assert.match(server.getLucideIconNodes_.toString(), /ISC License/);
 });
 
-test('tracker shows labeled status badges for repository, title, health and completion', () => {
-  const c = icons();
-  Object.assign(c, {
-    escapeHtml: v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'),
-    getInternalReviews_: () => [{key:'r1',label:'Review 1'}],
-    getSkeletonMarkup_: () => '<span>Loading</span>',
-    buildTeamPagination_: () => ''
-  });
-  vm.runInContext(fs.readFileSync('coordinator-dashboard.js', 'utf8'), c);
-  const base = {teamId:'T1',guide:'Guide',registerNumbers:[],pendingDeadlines:[],emailRecipients:[],titleStatus:'APPROVED',reviews:{r1:'Completed'},guideEvaluation:'Pending',health:'ontrack'};
-  const ready = c.buildTeamTrackerTable([{...base,repoStatus:'ready'}]);
-  assert.match(ready, /title="Repository URL recorded">Ready<\/span>/);
-  assert.match(ready, /badge badge--success">Completed<\/span>/);
-  assert.match(ready, /badge badge--warning">Pending<\/span>/);
-  assert(ready.indexOf('>Repo</th>') < ready.indexOf('>Title</th>'));
-  const pending = c.buildTeamTrackerTable([{...base,repoStatus:'pending',health:'attention'}]);
-  assert.match(pending, /badge badge--danger"[^>]*title="Pending">Pending<\/span>/);
-  assert.match(pending, /badge badge--danger"[^>]*title="Needs attention">Needs attention<\/span>/);
-  assert(!/[✓×◷]/.test(pending));
-});
 
 test('compiled stylesheet carries no text-glyph disclosure markers', () => {
   assert(!/[▸▾]/.test(require('node:fs').readFileSync('tailwind-styles.html', 'utf8')));

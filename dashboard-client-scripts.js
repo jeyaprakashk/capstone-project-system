@@ -236,7 +236,6 @@ const DashboardUI = (function() {
   function activateRole(key) {
     if (!loadedRoleTabs[key] || activatedRoles[key]) return;
     activatedRoles[key] = true;
-    if (key === 'coord') initializeCoordinatorAsync();
     if (key === 'guide' && typeof GuideWeekly !== 'undefined') GuideWeekly.load();
     if (key === 'student') { loadWeeklyProgress(); GuideEvaluation.student(); if(typeof ReviewEvaluations!=='undefined')document.querySelectorAll('[data-review-result]').forEach(host=>ReviewEvaluations.student(host.dataset.reviewResult)); }
   }
@@ -450,7 +449,7 @@ const DashboardUI = (function() {
     loadRoleContent(key, false, true);
   }
   // Roles already on the DTO + view architecture: load() resolves a DTO, render() draws it.
-  const migratedRoles = { reviewer: ReviewerView, guide: GuideView, student: StudentView };
+  const migratedRoles = { reviewer: ReviewerView, guide: GuideView, student: StudentView, coord: CoordinatorView };
   function loadRoleContent(activeKey, background, refresh, onLoaded, onError) {
     if ((!refresh && loadedRoleTabs[activeKey]) || loadingRoleTabs[activeKey]) {
       if (onError) onError(new Error('A dashboard refresh is already in progress. Please retry shortly.'));
@@ -478,7 +477,7 @@ const DashboardUI = (function() {
         if (migrated) migrated.render(target, html); else target.innerHTML = html;
         if (onLoaded) onLoaded();
         if (refresh) activatedRoles[activeKey] = false;
-        if (activeKey === 'coord') console.log(JSON.stringify({event:'coordinator_core_render', durationMs:Date.now() - requestStarted, htmlCharacters:html.length}));
+        if (activeKey === 'coord') console.log(JSON.stringify({event:'coordinator_core_render', durationMs:Date.now() - requestStarted, htmlCharacters:migrated ? 0 : html.length}));
         loadedRoleTabs[activeKey] = true;
         loadingRoleTabs[activeKey] = false;
 
@@ -825,37 +824,6 @@ const DashboardUI = (function() {
     return state;
   }
 
-  const trackerSort = {};
-  const trackerPagination = { page:1, size:10 };
-
-  let trackerRowsBody = null;
-  let trackerRows = [];
-  function getCoordinatorRows() {
-    const body = byId('trackerBody');
-    if (body !== trackerRowsBody) {
-      trackerRowsBody = body;
-      trackerRows = body ? Array.from(body.querySelectorAll('tr[data-search]')) : [];
-    }
-    return trackerRows;
-  }
-
-  function getCoordinatorFilteredRows() {
-    const box = byId('trackerSearch');
-    const q = box ? box.value.trim().toLowerCase() : '';
-    const activeTab = document.querySelector('[data-tracker-filters] [data-filter][aria-pressed="true"]');
-    const filter = activeTab ? activeTab.getAttribute('data-filter') || 'all' : 'all';
-
-    return getCoordinatorRows().filter(function(row) {
-      const matchesSearch = row.getAttribute('data-search').includes(q);
-      let matchesFilter = true;
-
-      if (filter === 'attention') matchesFilter = row.getAttribute('data-health') === 'attention';
-      else if (filter === 'ontrack') matchesFilter = row.getAttribute('data-health') === 'ontrack';
-      else if (filter.indexOf('deadline:') === 0) matchesFilter = (row.getAttribute('data-deadlines') || '').split(' ').indexOf(filter.slice(9)) !== -1;
-
-      return matchesSearch && matchesFilter;
-    });
-  }
 
   function renderTeamPagination(totalRows, state, prefix, onChange, rowLabel = 'teams') {
     const info = byId(prefix + 'PaginationInfo');
@@ -940,46 +908,6 @@ const DashboardUI = (function() {
       host.renderResendLog();
       return;
     }
-    const state = key === 'coord' ? trackerPagination : null;
-    if (!state) return;
-    state.size = value === 'all' ? 'all' : Number(value);
-    state.page = 1;
-    if (key === 'coord') applyCoordinatorFilters(false);
-  }
-
-  function applyCoordinatorFilters(resetPage) {
-    if (resetPage !== false) trackerPagination.page = 1;
-    const bodyForSorting = byId('trackerBody');
-    initializeTableSorting(bodyForSorting && bodyForSorting.closest('table'), {state:trackerSort, onSort:()=>applyCoordinatorFilters(true)});
-    const filteredRows = sortTableRows(getCoordinatorFilteredRows(), trackerSort);
-    const bounds = renderTeamPagination(filteredRows.length, trackerPagination, 'tracker', function() { applyCoordinatorFilters(false); });
-    const body = byId('trackerBody');
-    if (body) body.replaceChildren(...filteredRows.slice(bounds.start, bounds.end));
-  }
-
-  function filterTeamTracker(btn, type) {
-    document.querySelectorAll('[data-tracker-filters] [data-filter]').forEach(function(tab) { tab.classList.remove('active'); tab.setAttribute('aria-pressed', 'false'); });
-    if (btn) {
-      btn.classList.add('active');
-      btn.setAttribute('aria-pressed', 'true');
-      btn.setAttribute('data-filter', type || 'all');
-    }
-    applyCoordinatorFilters(true);
-  }
-
-  function filterTrackerSearch() { applyCoordinatorFilters(true); }
-
-  function resetTrackerFilters() {
-    const box = byId('trackerSearch');
-    if (box) box.value = '';
-    const tabs = document.querySelectorAll('[data-tracker-filters] [data-filter]');
-    tabs.forEach(function(tab) { tab.classList.remove('active'); tab.setAttribute('aria-pressed', 'false'); });
-    if (tabs.length) {
-      tabs[0].classList.add('active');
-      tabs[0].setAttribute('aria-pressed', 'true');
-      tabs[0].setAttribute('data-filter', 'all');
-    }
-    applyCoordinatorFilters(true);
   }
 
   function escapeDrawerHtml(value) {
@@ -1226,177 +1154,8 @@ const DashboardUI = (function() {
     closeSharedDrawer('teamDrawer', restoreFocus);
   }
 
-  function showAllCoordinatorTeams() {
-    resetTrackerFilters();
-    const tracker = document.querySelector('[data-team-tracker="coordinator"]');
-    if (tracker) tracker.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  function initializeCoordinatorTracker() {
-    if (byId('trackerBody')) applyCoordinatorFilters(true);
-  }
-
-  function markCoordinatorProgressUnavailable() {
-    getCoordinatorRows().forEach(function(row) {
-      row.querySelectorAll('[data-col="review"], [data-col="guide-evaluation"], [data-col="health"]').forEach(function(cell) { cell.setAttribute('data-sort-value', 'Unavailable'); cell.innerHTML = renderLucideIcon_('triangle-alert', 'Unavailable'); });
-    });
-    document.querySelectorAll('#coordinatorStats [data-progress-stat] [data-stat-value]').forEach(function(el) { el.textContent = 'Unavailable'; });
-    document.querySelectorAll('[data-tracker-filters] [data-filter]:disabled').forEach(function(el) { el.textContent = el.getAttribute('data-filter') === 'attention' ? 'Attention (Unavailable)' : 'On Track (Unavailable)'; });
-  }
-
   // Application CSS is inline in the document head. Wait for web fonts as well
   // before revealing complete cards; the tracker intentionally stays progressive.
-  function revealCoordinatorCards() {
-    const state = coordinatorSectionState;
-    if (!state || !state.fontsReady || state.root !== byId('coordinatorAsyncRoot')) return;
-    const ready = {
-      coordinatorStats:state.overviewSettled || state.progressSettled
-    };
-    Object.keys(ready).forEach(function(id) {
-      const card = byId(id);
-      if (card && ready[id] && (id === 'coordinatorCommitteeCard' || card.getAttribute('aria-busy') !== 'true')) {
-        card.hidden = false;
-        const placeholder = byId(id + 'Placeholder');
-        if (placeholder) placeholder.hidden = true;
-      }
-    });
-  }
-
-  let coordinatorSectionState = null;
-  function initializeCoordinatorAsync() {
-    coordinatorSectionState = {root:byId('coordinatorAsyncRoot'), pending:{}, progressReady:false, fontsReady:!document.fonts};
-    const state = coordinatorSectionState;
-    if (document.fonts) document.fonts.ready.then(function() {
-      if (state !== coordinatorSectionState) return;
-      state.fontsReady = true;revealCoordinatorCards();
-    });
-    coordinatorActivityResult = null;
-    loadCoordinatorSectionAsync('overview');
-    loadCoordinatorSectionAsync('progress');
-    loadCoordinatorWeeklyActivity();
-  }
-
-  function loadCoordinatorSectionAsync(section) {
-    const state = coordinatorSectionState;
-    if (!state || !state.root || state.pending[section] || (section !== 'overview' && section !== 'progress')) return;
-    state.pending[section] = true;
-    const started = Date.now();
-    const status = byId(section === 'overview' ? 'coordinatorOverviewStatus' : 'coordinatorProgressStatus');
-    if (status) status.textContent = '';
-    function current() { return state === coordinatorSectionState && state.root === byId('coordinatorAsyncRoot'); }
-    function retry(message) {
-      if (!status) return;
-      status.textContent = message + ' ';
-      const button = document.createElement('button');button.className='btn btn-sm btn-outline';
-      button.type = 'button';button.textContent = 'Retry';
-      button.addEventListener('click', function() { loadCoordinatorSectionAsync(section); });
-      status.appendChild(button);
-    }
-    dashboardRun().withSuccessHandler(function(result) {
-      if (!current()) return;
-      if (Array.isArray(result.timings)) result.timings.forEach(function(timing) {
-        recordPerformance({event:'server_phase', section:section, phase:timing.phase, durationMs:timing.durationMs, calls:timing.calls, ok:timing.success});
-      });
-      state.pending[section] = false;
-      state[section + "Settled"] = true;
-      state[section + "Succeeded"] = true;
-      if (state.overviewSucceeded && state.progressSucceeded) setText('coordUpdated', updatedLabel());
-      const search = byId('trackerSearch');
-      const searchText = search ? search.value : '';
-      const selected = document.querySelector('[data-tracker-filters] [data-filter][aria-pressed="true"]');
-      const filter = selected ? selected.getAttribute('data-filter') : 'all';
-      if (section === 'progress') { state.progressReady = true;state.progressFailed = false; }
-      Object.keys(result.panels).forEach(function(id) {
-        // A slower overview must never replace completed assessment results.
-        if (section === 'overview' && state.progressReady && (id === 'coordinatorStats' || id === 'coordinatorTracker')) return;
-        const target = byId(id);
-        if (target) { target.innerHTML = result.panels[id];target.setAttribute('aria-busy', 'false'); }
-      });
-      if (byId('trackerSearch')) byId('trackerSearch').value = searchText;
-      const tabs = Array.from(document.querySelectorAll('[data-tracker-filters] [data-filter]'));
-      const restoredFilter = tabs.some(tab => tab.getAttribute('data-filter') === filter && !tab.disabled) ? filter : 'all';
-      tabs.forEach(function(tab) { const pressed = tab.getAttribute('data-filter') === restoredFilter; tab.classList.toggle('active', pressed); tab.setAttribute('aria-pressed', String(pressed)); });
-      applyCoordinatorFilters(false);
-      renderCoordinatorActivity();
-      if (state.progressFailed) markCoordinatorProgressUnavailable();
-      revealCoordinatorCards();
-      if (status) status.textContent = '';
-      if (result.partial) retry('Some assessment data is unavailable. Counts are partial; unavailable reviews are excluded from overdue alerts.');
-      console.log(JSON.stringify({event:'coordinator_section_render', section, durationMs:Date.now() - started}));
-    }).withFailureHandler(function(err) {
-      if (!current()) return;
-      state.pending[section] = false;
-      state[section + "Settled"] = true;
-      state[section + "Succeeded"] = true;
-      if (state.overviewSucceeded && state.progressSucceeded) setText('coordUpdated', updatedLabel());
-      if (section === 'progress' && !state.progressReady) { state.progressFailed = true;markCoordinatorProgressUnavailable(); }
-      const ids = [];
-      ids.forEach(function(id) {
-        const target = byId(id);
-        if (target && target.getAttribute('aria-busy') === 'true') {
-          target.textContent = 'Unavailable';target.setAttribute('aria-busy', 'false');
-        }
-      });
-      if (!state.pending.overview && !state.pending.progress) {
-        ['coordinatorStats','coordinatorTracker'].forEach(function(id) { const el=byId(id);if(el && el.getAttribute('aria-busy') === 'true') { el.textContent='Unavailable';el.setAttribute('aria-busy','false'); } });
-      }
-      revealCoordinatorCards();
-      retry('Unable to load ' + section + ': ' + errorMessage(err));
-    }).loadCoordinatorSection(section);
-  }
-
-  let coordinatorActivityResult = null;
-  function renderCoordinatorActivity() {
-    const result = coordinatorActivityResult;
-    if (!result) return;
-    const body = byId('trackerBody');
-      const label = result.state === 'active' ? 'Logs / commit records this week' : result.state === 'not-started' ? 'Weekly logging has not started' : result.state === 'ended' ? 'Weekly logging has ended' : 'Activity unavailable: check project dates';
-      if (body) getCoordinatorRows().forEach(function(row) {
-        const item = result.teams[row.getAttribute('data-team-id').trim().toLowerCase()];
-        const cell = row.querySelector('[data-col="activity"]');
-        if (cell) { cell.textContent = item && result.state === 'active' ? item.logs + '/' + item.commits : '—'; cell.title = label; }
-      });
-      applyCoordinatorFilters(false);
-      setText('coordinatorActiveTeams', result.activeTeams === null ? '—' : result.activeTeams);
-      const activeValue = byId('coordinatorActiveTeams');
-      const activeCard = activeValue && activeValue.closest ? activeValue.closest('[data-stat-card]') : null;
-      if (activeCard) {
-        const remaining = result.totalTeams - result.activeTeams;
-        const tone = result.activeTeams === null || !result.totalTeams || result.state !== 'active' ? 'neutral' : remaining <= 0 ? 'complete' : remaining / result.totalTeams >= .6 ? 'danger' : remaining / result.totalTeams >= .3 ? 'warning' : 'neutral';
-        activeCard.setAttribute('data-completion-tone', tone);
-      }
-      setText('coordinatorActiveTeamsPct', result.activeTeams === null ? label : '(' + (result.totalTeams ? Math.round(result.activeTeams / result.totalTeams * 100) : 0) + '%)');
-      setText('weeklyActivityStatus', label + ' · Updated ' + new Date(result.checkedAt).toLocaleString());
-      if (byId('weeklyActivityRetry')) byId('weeklyActivityRetry').hidden = result.state !== 'unavailable';
-      revealCoordinatorCards();
-  }
-
-  let activityRequestPending = false;
-  function loadCoordinatorWeeklyActivity() {
-    if (activityRequestPending) return;
-    const root = byId('coordinatorAsyncRoot');
-    if (!root) return;
-    activityRequestPending = true;
-    if (byId('weeklyActivityRetry')) byId('weeklyActivityRetry').hidden = true;
-    setLoading('weeklyActivityStatus', 'Loading weekly activity');
-    dashboardRun().withSuccessHandler(function(result) {
-      activityRequestPending = false;
-      if (root !== byId('coordinatorAsyncRoot')) return;
-      coordinatorActivityResult = result;
-      renderCoordinatorActivity();
-    }).withFailureHandler(function(err) {
-      activityRequestPending = false;
-      if (root !== byId('coordinatorAsyncRoot')) return;
-      const body = byId('trackerBody');
-      if (body) getCoordinatorRows().forEach(function(row) { const cell = row.querySelector('[data-col="activity"]'); if (cell) { cell.textContent = '—'; cell.title = 'Activity unavailable'; } });
-      setText('coordinatorActiveTeams', '—');setText('coordinatorActiveTeamsPct', 'Unavailable');
-      setText('weeklyActivityStatus', 'Unable to load weekly activity: ' + errorMessage(err));
-      if (byId('weeklyActivityRetry')) byId('weeklyActivityRetry').hidden = false;
-      coordinatorActivityResult = {state:'unavailable', teams:{}, activeTeams:null, checkedAt:new Date().toISOString()};
-      revealCoordinatorCards();
-    }).loadAllTeamsWeeklyActivity();
-  }
-
   let configurationGridObserver = null;
   function disconnectConfigurationGrids() {
     if(configurationGridObserver)configurationGridObserver.disconnect();
@@ -1469,7 +1228,6 @@ const DashboardUI = (function() {
       finishLoading();
       if(byId('reviewConfigurationCard')!==card)return;
       checkingReviewConfiguration = false;
-      if (coordinatorSectionState) coordinatorSectionState.configurationSettled = true;
       reviewConfigurationValid = !error && report.valid;
       assessmentStorageAvailable = reviewConfigurationValid && report.canInitializeStorage !== false;
       definitionsBootstrapAvailable = !error && report.canBootstrap === true;
@@ -1513,8 +1271,8 @@ const DashboardUI = (function() {
         });
       }
     }
-    dashboardRun().withSuccessHandler(function(report) { finish(report, null);revealCoordinatorCards(); })
-      .withFailureHandler(function(err) { finish(null, 'Unable to check configuration: ' + errorMessage(err) + '. Try Recheck.');revealCoordinatorCards(); })
+    dashboardRun().withSuccessHandler(function(report) { finish(report, null); })
+      .withFailureHandler(function(err) { finish(null, 'Unable to check configuration: ' + errorMessage(err) + '. Try Recheck.'); })
       .getCoordinatorReviewConfiguration();
   }
 
@@ -2009,8 +1767,6 @@ const DashboardUI = (function() {
     guideRun: dashboardRun,
     refreshRoleDashboard,
     refreshSystemStatus: function() { ensureSystemStatusLoaded(true); },
-    initializeCoordinatorAsync,
-    loadCoordinatorSectionAsync,
     loadSharedTimeline,
     loadSharedRubrics,
     openRubricDrawer,
@@ -2032,20 +1788,14 @@ const DashboardUI = (function() {
     openReviewerMarks: function(team, review, button) { ReviewEvaluations.open(team, review, button); },
     changeTeamPageSize,
     toggleStudentMessage,
-    filterTeamTracker,
-    filterTrackerSearch,
-    resetTrackerFilters,
     focusCoordinatorTeam,
     closeCoordinatorTeamDrawer,
-    showAllCoordinatorTeams,
     runGithubSync,
     runStudentInvitationResend,
-    loadCoordinatorWeeklyActivity,
     initializeAssessmentStorage,
     recheckCommitteeConfiguration,
     bootstrapAssessmentDefinitions,
     recheckReviewConfiguration,
-    initializeCoordinatorTracker,
     initializeTableSorting,
     sortTableRows
   };
@@ -2061,14 +1811,8 @@ function showRoleTab(key) { DashboardUI.showRoleTab(key); }
 function refreshAnnouncements() { DashboardUI.refreshAnnouncements(); }
 function toggleProblem(teamId) { DashboardUI.toggleProblem(teamId); }
 function toggleStudentMessage(idx) { DashboardUI.toggleStudentMessage(idx); }
-function filterTeamTracker(btn, type) { DashboardUI.filterTeamTracker(btn, type); }
-function filterTrackerSearch() { DashboardUI.filterTrackerSearch(); }
-function resetTrackerFilters() { DashboardUI.resetTrackerFilters(); }
 function focusCoordinatorTeam(teamId) { DashboardUI.focusCoordinatorTeam(teamId); }
-function showAllCoordinatorTeams() { DashboardUI.showAllCoordinatorTeams(); }
 function runGithubSync() { DashboardUI.runGithubSync(); }
-function loadCoordinatorWeeklyActivity() { DashboardUI.loadCoordinatorWeeklyActivity(); }
-function retryCoordinatorSection(section) { DashboardUI.loadCoordinatorSectionAsync(section); }
 function initializeAssessmentStorage() { DashboardUI.initializeAssessmentStorage(); }
 function recheckReviewConfiguration() { DashboardUI.recheckReviewConfiguration(); }
 function closeCoordinatorTeamDrawer() {

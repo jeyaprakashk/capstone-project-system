@@ -28,7 +28,7 @@ function fixture(overrides = {}, runtime = {}) {
       return new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'short',year:'numeric'}).format(date);
     }}
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','api-envelope.js','guide-api.js','student-api.js','data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
+  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','api-envelope.js','guide-api.js','student-api.js','coordinator-api.js','data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
   const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
@@ -100,9 +100,9 @@ test('one and three configured reviews drive timeline, student marks and coordin
     assert.equal(milestones.length,count);
     f.c.Session={getActiveUser:()=>({getEmail:()=> 'student@example.com'})};
     assert.equal(f.c.loadStudentMarksSection,undefined); // Student results use authenticated publication snapshots only.
-    const stats=Object.fromEntries(reviews.map(r=>[r.key,{completed:1,total:2,pending:1}]));
-    const html=f.c.buildCoordinatorHeaderStats({total:2,reviews:stats})+f.c.buildTeamCompletionProgress({...stats,setup:{completed:1,total:2},titleApproval:{completed:1,total:2}});
-    assert(html.includes('Review '+count));assert(!html.includes('Review '+(count+1)));
+    const stats=Object.fromEntries(reviews.map(r=>[r.key,{completed:1,total:2,unavailable:0}]));
+    const dto=f.c.buildCoordinatorDto_({stats:{total:2,reviews:stats,reposReady:0,titleApproved:0,needsAttention:0,guideEvaluation:null},teamTrackerData:[],deadlinePills:[]});
+    assert.equal(dto.reviewColumns.length,count);assert(dto.reviewColumns.some(r=>r.label==='Review '+count));assert(!dto.reviewColumns.some(r=>r.label==='Review '+(count+1)));
     if(count===3) {
       const status={REVIEWER_DECISION:0,S1_EMAIL:1,S1_REGNO:2};
       const health=f.c.assessProjectTeam_(['Approved','a@example.com','R1'],status,'repo',[],{review1:{completed:true},review2:{completed:true},review3:{completed:false}},f.schedule,f.clock('2026-12-01'));
@@ -194,12 +194,6 @@ test('shared timeline uses Milestones dates while coordinator keeps completion c
   assert.equal(data.milestones.find(m=>m.key==='week1').date,'21 Sept 2026');
   assert.equal(data.totalWeeks,9);
   assert.doesNotThrow(()=>JSON.stringify(data));
-  const stage={completed:0,total:1};
-  const stages=Object.fromEntries(['setup','titleApproval','development1','review1','development2','review2','guideEval','see'].map(k=>[k,stage]));
-  const html=c.buildTeamCompletionProgress(stages);
-  assert(!html.includes('21 Jul'));
-  assert(html.includes('Team Progress'));
-  assert(!html.includes('Project Start:'));
   new vm.Script(c.getDashboardClientScript());
 });
 
@@ -274,11 +268,11 @@ test('coordinator statistics, attention list and tracker share one health result
   c.getAllReviewCompletionStatus_=()=>{throw Error('Missing rubrics');};
   const degraded=c.getCoordinatorDashboardData_();
   assert.equal(degraded.stats.total,1);
-  const html=c.buildCoordinatorContent(degraded);
-  assert(!html.includes('reviewConfigurationCard'));assert(html.includes('trackerBody'));
-  assert(!html.includes('id="initializeAssessmentStorageButton"'));
+  const dto=c.buildCoordinatorDto_(degraded);
+  assert.equal(dto.teams.length,1);assert.equal(dto.stats.total,1);
   c.getInternalReviews_=()=>{throw Error('Invalid review count');};
-  assert(c.buildCoordinatorContent(c.getCoordinatorDashboardData_()).includes('trackerBody'));
+  const noReviews=c.buildCoordinatorDto_(c.getCoordinatorDashboardData_());
+  assert.equal(noReviews.teams.length,1);assert.equal(noReviews.reviewConfigurationError,true);assert.deepEqual(Array.from(noReviews.reviewColumns),[]);
 });
 
 
@@ -291,28 +285,28 @@ test('coordinator endpoints authorize every request before reading protected dat
   const {c}=fixture();
   let email='', allowed=true, reads=0;
   const logs=[];
-  c.console={log:value=>logs.push(JSON.parse(value))};
+  c.console={log:value=>{try{logs.push(JSON.parse(value));}catch(e){}},error(){}};
   c.Session={getActiveUser:()=>({getEmail:()=>email})};
   c.activityIsCoordinator_=()=>allowed;
-  c.getCoordinatorDashboardData_=()=>{reads++;return {};};
+  c.getCoordinatorDashboardData_=()=>{reads++;return {stats:{total:0,reviews:{},guideEvaluation:null},teamTrackerData:[],deadlinePills:[]};};
   c.getCoordinatorTeamDetails_=()=>{reads++;return {};};
-  c.buildCoordinatorContent=()=> 'rendered';
-  c.buildCoordinatorAsyncShell_=()=>{reads++;return 'shell';};
-  const endpoints=[()=>c.getCoordinatorDashboardData(),()=>c.getCoordinatorTeamDetails('T1'),()=>c.refreshCoordinatorContent()];
+  c.loadAllTeamsWeeklyActivity=()=>{reads++;return {state:'active',teams:{}};};
+  const api=[()=>c.API_coordinator_getOverview(),()=>c.API_coordinator_getProgress(),()=>c.API_coordinator_getActivity()];
+  const legacy=[()=>c.getCoordinatorDashboardData(),()=>c.getCoordinatorTeamDetails('T1')];
   for (const section of ['basic','progress','activity']) assert.throws(()=>c.loadCoordinatorDrawerSection('T1',section),/Coordinator access/);
-  assert.throws(()=>c.loadCoordinatorSection('overview'),/Coordinator access/);
-  assert.throws(()=>c.loadCoordinatorSection('progress'),/Coordinator access/);
   assert.throws(()=>c.loadCoordinatorSystemStatus(),/Coordinator access/);
-  for(const endpoint of endpoints) assert.throws(endpoint,/Coordinator access/);
+  for(const endpoint of legacy) assert.throws(endpoint,/Coordinator access/);
+  for(const endpoint of api) assert.equal(JSON.parse(endpoint()).error.code,'UNAUTHENTICATED');
   assert.equal(reads,0);
   email='coord@example.com';
-  endpoints.forEach(endpoint=>endpoint());
-  assert.equal(reads,3);
+  legacy.forEach(endpoint=>endpoint());
+  api.forEach(endpoint=>assert.equal(JSON.parse(endpoint()).ok,true));
+  assert.equal(reads,5);
   allowed=false;
-  for(const endpoint of endpoints) assert.throws(endpoint,/Coordinator access/);
-  assert.equal(reads,3);
-  assert(logs.every(log=>Number.isFinite(log.durationMs)));
-  assert.equal(logs.filter(log=>log.success).length,3);
+  for(const endpoint of legacy) assert.throws(endpoint,/Coordinator access/);
+  for(const endpoint of api) assert.deepEqual(JSON.parse(endpoint()).error,{code:'UNAUTHORIZED',message:'Coordinator access is required.'});
+  assert.equal(reads,5);
+  assert(logs.filter(log=>log.event==='coordinator_request').every(log=>Number.isFinite(log.durationMs)));
   assert.equal(vm.runInContext('dashboardReadSnapshot_',c),null);
 });
 
@@ -337,7 +331,7 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   const document={readyState:'loading',addEventListener(){},getElementById:id=>elements[id],createElement:element,body:element()};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorDrawerSection(teamId,section){requests.push({...handlers,teamId,section});}};return chain;}};
   const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
-  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext("focusCoordinatorTeam('A'); focusCoordinatorTeam('B');",browser);
   assert.deepEqual(requests.map(r=>r.section),['basic','progress','activity','basic','progress','activity']);
   requests[3].success({title:'Team B project',students:[],reviewers:[]});
@@ -446,11 +440,12 @@ function timelineBrowser() {
       // Migrated reviewer role answers through the data bridge with a response envelope.
       API_reviewer_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'reviewer',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
       API_guide_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'guide',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
-      API_student_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'student',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});}};
+      API_student_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'student',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
+      API_coordinator_getOverview(){const {success}=handlers;requests.push({type:'role',role:'coord',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});}};
     return chain;
   }};
   const browser=createSheetReadContext({window:{matchMedia:()=>({matches:false})},ResizeObserver:class {constructor(callback){this.callback=callback;} observe(){} disconnect(){}},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
-  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=(host,dto)=>{host.innerHTML=dto.html;}',browser);vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=(host,dto)=>{host.innerHTML=dto.html;}',browser);vm.runInContext(c.getDashboardClientScript(),browser);
   return {c,browser,requests,timeline,guide,reviewer,initialize:()=>initialize()};
 }
 
@@ -617,110 +612,16 @@ test('roster synchronization does not duplicate mixed-case or numeric IDs or fla
   assert(messages.includes('Orphaned: (none)'));
 });
 
-test('coordinator role returns a shell without building dashboard data',()=>{
+test('the legacy role route no longer builds coordinator content; the overview endpoint reads no marks or logs',()=>{
   const {c}=fixture();
   c.Session={getActiveUser:()=>({getEmail:()=> 'coord@example.com'})};
   c.getCoordinatorEmail=()=> 'coord@example.com';
   c.getConfig=()=> '';
-  c.getCoordinatorDashboardData=()=>{throw Error('No data on shell path');};
-  c.getCoordinatorDashboardData_=()=>{throw Error('No data on shell path');};
-  const html=c.loadDashboardRoleContent('coord');
-  for(const id of ['coordinatorStats','coordinatorTracker','teamDrawer']) assert(html.includes('id="'+id+'"'));
-});
-
-function coordinatorAsyncBrowser(fonts) {
-  const {c}=fixture();const requests=[];
-  const element=()=>({innerHTML:'',textContent:'',attributes:{'aria-busy':'true'},children:[],getAttribute(key){return this.attributes[key];},setAttribute(key,value){this.attributes[key]=value;},appendChild(child){this.children.push(child);},addEventListener(event,fn){this[event]=fn;}});
-  const ids=['coordinatorAsyncRoot','coordinatorOverviewStatus','coordinatorProgressStatus','coordinatorStats','coordinatorTracker','coordinatorCompletion','coordinatorGithub','coordinatorCommittees'];
-  const elements=Object.fromEntries(ids.map(id=>[id,element()]));
-  const document={fonts,readyState:'loading',addEventListener(){},getElementById:id=>elements[id]||null,querySelector:()=>null,querySelectorAll:()=>[],createElement:element};
-  const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorSection(section){requests.push({...handlers,section});},loadAllTeamsWeeklyActivity(){requests.push({...handlers,section:'activity'});}};return chain;}};
-  const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console:{log(){}}});
-  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
-  vm.runInContext('DashboardUI.initializeCoordinatorAsync()',browser);
-  return {browser,requests,elements,element};
-}
-
-test('coordinator sections start independently and late overview cannot overwrite progress',()=>{
-  const f=coordinatorAsyncBrowser();
-  assert.deepEqual(f.requests.map(r=>r.section),['overview','progress','activity']);
-  vm.runInContext("DashboardUI.loadCoordinatorSectionAsync('progress')",f.browser);
-  assert.equal(f.requests.length,3);
-  f.requests[1].success({panels:{coordinatorStats:'complete stats',coordinatorTracker:'complete tracker',coordinatorCompletion:'assessment'},partial:false});
-  f.requests[0].success({panels:{coordinatorStats:'loading stats',coordinatorTracker:'loading tracker',coordinatorGithub:'github'},partial:false});
-  assert.equal(f.elements.coordinatorStats.innerHTML,'complete stats');
-  assert.equal(f.elements.coordinatorTracker.innerHTML,'complete tracker');
-  assert.equal(f.elements.coordinatorGithub.innerHTML,'github');
-  assert.equal(f.requests.filter(r=>r.section==='activity').length,1);
-});
-
-test('coordinator section failures can retry without reloading successful sections',()=>{
-  const f=coordinatorAsyncBrowser();
-  f.requests[0].success({panels:{coordinatorStats:'overview',coordinatorGithub:'github'},partial:false});
-  f.requests[1].failure({message:'service unavailable'});
-  assert(f.elements.coordinatorProgressStatus.textContent.includes('Unable to load progress'));
-  assert.equal(f.elements.coordinatorGithub.innerHTML,'github');
-  f.elements.coordinatorProgressStatus.children[0].click();
-  assert.deepEqual(f.requests.map(r=>r.section),['overview','progress','activity','progress']);
-  f.requests[3].success({panels:{coordinatorCompletion:'recovered'},partial:true});
-  assert.equal(f.elements.coordinatorCompletion.innerHTML,'recovered');
-  assert(f.elements.coordinatorProgressStatus.textContent.includes('Counts are partial'));
-});
-
-test('coordinator callbacks from a replaced shell are ignored',()=>{
-  const f=coordinatorAsyncBrowser();
-  f.elements.coordinatorAsyncRoot=f.element();
-  f.requests[0].success({panels:{coordinatorStats:'stale'}});
-  f.requests[1].failure({message:'stale error'});
-  assert.equal(f.elements.coordinatorStats.innerHTML,'');
-  assert(!f.elements.coordinatorProgressStatus.textContent.includes('stale error'));
-});
-
-test('tracker only attaches its current page and activity updates detached rows',()=>{
-  const f=coordinatorAsyncBrowser();
-  const rows=Array.from({length:25},(_,i)=>({attributes:{'data-search':'team '+i,'data-team-id':'T'+i},cell:{},getAttribute(key){return this.attributes[key];},querySelector(){return this.cell;}}));
-  const body={children:rows.slice(),closest:()=>null,querySelectorAll:()=>rows,replaceChildren(...children){this.children=children;}};
-  f.elements.trackerBody=body;
-  f.elements.trackerSearch={value:''};
-  vm.runInContext('DashboardUI.initializeCoordinatorTracker()',f.browser);
-  assert.equal(body.children.length,10);
-  assert.equal(body.children[0],rows[0]);
-  f.requests[2].success({state:'active',teams:Object.fromEntries(rows.map((_,i)=>['t'+i,{logs:i,commits:2}])),activeTeams:25,totalTeams:25,checkedAt:'2026-09-22T12:00:00Z'});
-  assert.equal(rows[24].cell.textContent,'24/2');
-  f.elements.trackerSearch.value='team 24';
-  vm.runInContext('filterTrackerSearch()',f.browser);
-  assert.equal(body.children.length,1);
-  assert.equal(body.children[0],rows[24]);
-  f.elements.trackerSearch.value='';
-  vm.runInContext('filterTrackerSearch()',f.browser);
-  assert.equal(body.children.length,10);
-});
-
-test('activity result arriving before overview is reused without another RPC',()=>{
-  const f=coordinatorAsyncBrowser();
-  f.requests[2].success({state:'active',teams:{},activeTeams:7,totalTeams:10,checkedAt:'2026-09-22T12:00:00Z'});
-  f.elements.coordinatorActiveTeams=f.element();
-  f.elements.coordinatorActiveTeamsPct=f.element();
-  f.requests[0].success({panels:{coordinatorStats:'stats'},partial:false});
-  assert.equal(f.elements.coordinatorActiveTeams.textContent,7);
-  assert.equal(f.elements.coordinatorActiveTeamsPct.textContent,'(70%)');
-  assert.equal(f.requests.length,3);
-});
-
-test('non-tracker cards wait for their data and fonts before being revealed',async()=>{
-  let resolveFonts;
-  const f=coordinatorAsyncBrowser({ready:new Promise(resolve=>{resolveFonts=resolve;})});
-  for(const id of ['coordinatorStats','coordinatorGithub','coordinatorCompletion']) f.elements[id].hidden=true;
-  f.requests[0].success({panels:{coordinatorStats:'overview',coordinatorGithub:'github',coordinatorTracker:'teams'},partial:false});
-  assert.equal(f.elements.coordinatorGithub.hidden,true);
-  assert.equal(f.elements.coordinatorTracker.innerHTML,'teams');
-  resolveFonts();await Promise.resolve();
-  assert.equal(f.elements.coordinatorGithub.hidden,true); // System cards are no longer revealed by dashboard state.
-  assert.equal(f.elements.coordinatorStats.hidden,false);
-  f.requests[1].success({panels:{coordinatorStats:'complete stats',coordinatorCompletion:'completion'},partial:false});
-  assert.equal(f.elements.coordinatorStats.hidden,false);
-  f.requests[2].success({state:'active',teams:{},activeTeams:0,totalTeams:0,checkedAt:'2026-09-22T12:00:00Z'});
-  assert.equal(f.elements.coordinatorStats.hidden,false);
+  assert.throws(()=>c.loadDashboardRoleContent('coord'),/data endpoints/);
+  c.activityIsCoordinator_=()=>true;
+  c.console={log(){},error(){}};
+  c.getCoordinatorDashboardData_=(defer)=>{if(!defer)throw Error('Overview must not aggregate progress');return {stats:{loading:true,total:0,reviews:{},guideEvaluation:null},teamTrackerData:[],deadlinePills:[]};};
+  assert.equal(JSON.parse(c.API_coordinator_getOverview()).data.loading,true);
 });
 
 test('drawer basic and activity avoid marks; progress avoids roster and commit reads',()=>{
@@ -797,8 +698,6 @@ test('System Status is coordinator-only and its endpoint avoids marks and dashbo
  const {parseHTML}=require('linkedom');
  assert(!parseHTML(c.buildDashboardShell('user',[view('guide')])).document.querySelector('button[data-role-tab="system-status"]'));
  assert(parseHTML(c.buildDashboardShell('user',[view('coord')])).document.querySelector('button[data-role-tab="system-status"]'));
- const shell=c.buildCoordinatorAsyncShell_();
- assert(!shell.includes('coordinatorGithub'));assert(!shell.includes('reviewConfigurationCard'));
  c.Session={getActiveUser:()=>({getEmail:()=> 'coordinator'})};
  c.activityIsCoordinator_=()=>false;
  c.getColumnMap=()=>{throw Error('must authorize first');};
@@ -811,17 +710,6 @@ test('System Status is coordinator-only and its endpoint avoids marks and dashbo
  const html=c.loadCoordinatorSystemStatus();
  assert(html.includes('githubReposAccess'));assert(html.includes('reviewConfigurationCard'));
  assert(html.includes('initializeAssessmentStorageButton'));
-});
-
-test('Coordinator tracking uses small cards without a separate progress panel',()=>{
- const {c}=fixture();
- const html=c.buildCoordinatorHeaderStats({total:62,titleApproved:6,reposReady:50,needsAttention:56,reviews:{review1:{completed:0,unavailable:4},review2:{completed:3}}});
- assert.equal((html.match(/data-stat-card/g)||[]).length,8);
- for(const label of ['Total Teams','Title Approved','Repositories Available','Active This Week','Review 1 Completed','Review 2 Completed','Need Attention']) assert(html.includes(label));
- assert(html.includes('4 unavailable'));
- const shell=c.buildCoordinatorAsyncShell_();
- assert(!shell.includes('coordinatorCompletion'));assert(!shell.includes('coordinatorAssessment'));
- assert.equal((shell.match(/coordinator-stat-placeholder/g)||[]).length,8);
 });
 
 test('timeline composes lifecycle events and configured assessments without overrides',()=>{

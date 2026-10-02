@@ -93,14 +93,8 @@ function loadDashboardRoleContent_(key) {
   // The guide role loads as a DTO through API_guide_getDashboard (guide-api.js).
   if (key === 'guide') throw new Error('The guide dashboard loads through its data endpoint.');
 
-  if (key === 'coord') {
-    const coordinatorEmail = getCoordinatorEmail();
-    const cellPdEmail = String(getConfig('CELL_PD_EMAIL') || '').trim();
-    if (!emailsMatch(email, coordinatorEmail) && !(cellPdEmail && emailsMatch(email, cellPdEmail))) {
-      throw new Error('You do not have Coordinator access.');
-    }
-    return buildCoordinatorAsyncShell_();
-  }
+  // The coordinator role loads as DTOs through API_coordinator_* (coordinator-api.js).
+  if (key === 'coord') throw new Error('The coordinator dashboard loads through its data endpoints.');
 
   throw new Error('Unknown dashboard role.');
 }

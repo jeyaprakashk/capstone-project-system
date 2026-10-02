@@ -27,6 +27,8 @@ One section per migrated endpoint, added with the dashboard that needs it:
 
 | Endpoint | Role | Request | `data` shape | Replaces |
 | --- | --- | --- | --- | --- |
+| `API_coordinator_getOverview()` / `API_coordinator_getProgress()` | Coordinator | none | `CoordinatorDashboard` (below); overview has `loading:true` | `buildCoordinatorContent`, `loadCoordinatorSection` (removed) |
+| `API_coordinator_getActivity()` | Coordinator | none | `{state, week, checkedAt, teams:{<teamId lower-case>:{logs,commits}}, totalTeams, activeTeams}` | `loadAllTeamsWeeklyActivity` (wrapped) |
 | `API_student_getDashboard()` | Student | none | `StudentDashboard` (below) | `buildStudentContent` (removed) |
 | `API_guide_getDashboard()` | Guide | none | `GuideDashboard` (below) | `buildDashboardContent` (removed) |
 | `API_guide_submitDecision(teamId, decision, notes, editedTitle)` | Guide | `decision` is `Approved` or `Rejected`; notes required for `Rejected` | `{message}` | `decide` in the old client |
@@ -52,6 +54,26 @@ comparison against the output of the function it replaces.
 
 Only teams in the reviewer's committees are returned. `tone` is semantic; the view maps it to colours.
 Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invariants/snapshots/reviewer-*.json`).
+
+### CoordinatorDashboard
+
+```
+{ loading:boolean,                        // true for the overview stage: assessment values are not read yet
+  stats:{ total, titleApproved, reposReady, needsAttention,
+          guideEvaluation:{available,completed}|null,
+          reviews:[{key,label,completed:number|null,unavailable:number,known:boolean}] },
+  reviewColumns:[{key,label}], reviewConfigurationError:boolean, partial:boolean,
+  teams:[{ teamId, guide, title, titleStatus, repoStatus:'ready'|'pending', githubMessage, githubTiming, repoUrl,
+           registerNumbers:[string], emailRecipients:[string], health:'ontrack'|'monitor'|'attention'|'loading',
+           pendingDeadlines:[key], guideEvaluation:string, reviews:{<key>:'Completed'|'Pending'|'Unavailable'|'Loading…'} }],
+  deadlinePills:[{key,label,count,due:string,overdue:boolean}] }
+```
+
+The overview renders first; progress and weekly activity are requested at the same time and settle independently
+(each failure is isolated, with its own retry). Percentages, tones and badge labels are derived in the view.
+The team drawer and System Status tab are still server-driven. Contract tests: `tests/coordinator-migration.test.cjs`
+(snapshot `tests/invariants/snapshots/coordinator-legacy-facts.json`, captured from the removed HTML for the overview,
+progress and no-reviews cases).
 
 ### StudentDashboard
 

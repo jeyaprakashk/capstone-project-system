@@ -1,8 +1,7 @@
 /**
- * COORDINATOR DASHBOARD — PRODUCTION GRADE
- * Comprehensive oversight of all teams, semester progress, assessment tracking
- * Features: Stats, pipeline, needs attention, assessment progress, team tracker, team detail panel
- * Shared deployment via guide-dashboard.gs doGet()
+ * COORDINATOR DASHBOARD
+ * Data for the coordinator dashboard (see coordinator-api.js for the DTOs the browser renders in
+ * coordinator-view.js) and the System Status cards.
  */
 
 function coordinatorRead_(operation, read) {
@@ -11,7 +10,8 @@ function coordinatorRead_(operation, read) {
   try {
     return withDashboardRead_(() => {
       const email = Session.getActiveUser().getEmail();
-      if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
+      if (!email) throw apiFail_('UNAUTHENTICATED', 'Coordinator access is required.');
+      if (!activityIsCoordinator_(email)) throw apiFail_('UNAUTHORIZED', 'Coordinator access is required.');
       const result = read();
       success = true;
       return result;
@@ -381,102 +381,11 @@ function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock
   return { health:pending ? 'monitor' : 'ontrack', severity:'low', issue:!githubSetup.ready ? githubSetup.message : timing.state === 'late' || timing.state === 'unknown' ? timing.text : '', daysOverdue:0 };
 }
 
-function refreshCoordinatorContent() {
-  return coordinatorRead_('refresh', buildCoordinatorAsyncShell_);
-}
 
 // ===================================================================
 // CONTENT BUILDERS
 // ===================================================================
-function buildCoordinatorHeaderStats(stats) {
-  let reviews = [];
-  try { reviews = getInternalReviews_(); } catch (err) { /* System Status reports configuration problems. */ }
-  const pct = n => stats.total > 0 ? Math.round(n / stats.total * 100) : 0;
-  const skeleton = label => getSkeletonMarkup_('inline', label);
-  const completionTone = (value, color, note) => {
-    if (!stats.total || typeof value !== 'number' || /unavailable/i.test(note)) return 'neutral';
-    const remaining = color === 'red' ? value : stats.total - value;
-    return remaining <= 0 ? 'complete' : remaining / stats.total >= .6 ? 'danger' : remaining / stats.total >= .3 ? 'warning' : 'neutral';
-  };
-  const card = (label, value, color, note, icon, detail, ids, progressStat) => `<div class="card p-4" data-stat-card${progressStat ? ' data-progress-stat' : ''} data-completion-tone="${completionTone(value, color, note)}">
-    <div>${label}</div>${renderLucideIcon_(icon)}
-    <div><div data-stat-value${ids ? ' id="coordinatorActiveTeams"' : ''}>${value}</div><div class="stat-pct"${ids ? ' id="coordinatorActiveTeamsPct"' : ''}>${note}</div></div>
-    <div>${detail}</div></div>`;
-  const progress = (value, left, right) => `<div class="progress" aria-hidden="true"><span style="width:${pct(value)}%"></span></div><div><span>${left}</span><span>${right}</span></div>`;
-  const repos = stats.reposReady || 0, approved = stats.titleApproved || 0;
-  return `<div class="coordinator-stats-grid">
-    ${card('Total Teams', stats.total, 'blue', 'Teams Roster', 'users', '<span>●</span> Teams registered')}
-    ${card('Repositories Available', repos, 'purple', pct(repos) + '% linked', 'git-branch', progress(repos, repos + ' / ' + stats.total + ' recorded', Math.max(0, stats.total - repos) + ' missing'))}
-    ${card('Title Approved', approved, 'green', pct(approved) + '% validated', 'tag', progress(approved, approved + ' approved', Math.max(0, stats.total - approved) + ' pending approval'))}
-    ${card('Active This Week', skeleton('Loading activity'), 'orange', skeleton('Loading activity'), 'trending-up', 'Weekly repository activity', true)}
-    ${reviews.map((review, index) => {
-      const result = stats.reviews && stats.reviews[review.key];
-      const value = stats.loading ? skeleton('Loading ' + review.label) : result ? result.completed : '—';
-      const note = stats.loading ? '' : !result ? 'Unavailable' : result.unavailable ? result.unavailable + ' unavailable' : pct(result.completed) + '% (' + result.completed + '/' + stats.total + ')';
-      return card(escapeHtml(review.label) + ' Completed', value, 'teal', note, ['clipboard-check', 'file-text', 'book-open'][index % 3], 'Team review completion', false, true);
-    }).join('')}
-    ${card('Guide Evaluation Completed', stats.loading ? skeleton('Loading guide evaluation') : stats.guideEvaluation && stats.guideEvaluation.available ? stats.guideEvaluation.completed : '—', 'teal', stats.loading ? '' : stats.guideEvaluation && stats.guideEvaluation.available ? pct(stats.guideEvaluation.completed) + '% evaluated' : 'Unavailable', 'graduation-cap', 'Guide assessment completion', false, true)}
-    ${card('Need Attention', stats.loading ? skeleton('Loading attention count') : stats.needsAttention, 'red', stats.loading ? '' : pct(stats.needsAttention) + '% of cohort', 'triangle-alert', 'Teams with overdue requirements', false, true)}
-  </div>`;
-}
 
-function getSeeProgressRows_() {
-  try {return getAssessmentDefinitions_().filter(d=>d.type==='SEE').map(d=>({label:d.label,external:true}));}
-  catch(err){return [];}
-}
-
-function buildTeamCompletionProgress(stages) {
-  let reviews = [];
-  let configurationUnavailable = false;
-  try { reviews = getInternalReviews_(); } catch (err) { configurationUnavailable = true; }
-  const rows = [{label:'GitHub Setup', stage:stages.setup},
-    {label:'Title Approval', stage:stages.titleApproval},
-    ...reviews.map(review => ({label:review.label, stage:stages[review.key]})),
-    {label:'Guide Evaluation', untracked:true}, ...getSeeProgressRows_()];
-  return `<section class="card" aria-labelledby="teamProgressHeading">
-    <h3 id="teamProgressHeading">Team Progress</h3>
-    ${configurationUnavailable ? '<p role="status">Review configuration unavailable. Check System Status.</p>' : ''}
-    ${rows.map(({label, stage, untracked, external}) => {
-      const name = escapeHtml(label);
-      if (external) return `<div><span>${name}</span><span>Evaluated outside this app</span></div>`;
-      if (untracked) return `<div><span>${name}</span><span>Not tracked</span></div>`;
-      if (!stage) return `<div><span>${name}</span><span>Unavailable</span></div>`;
-      const completed = stage.completed || 0, total = stage.total || 0;
-      const percent = total ? Math.round(completed / total * 100) : 0;
-      const partial = stage.unavailable > 0;
-      const note = partial ? stage.unavailable + ' unavailable · partial data' : total ? percent + '%' : 'No teams';
-      return `<div><span>${name}</span>
-        <div><div class="progress" role="progressbar" aria-label="${name}: ${escapeHtml(note)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div>
-        <span>${note}</span></div><span>${completed} / ${total}</span></div>`;
-    }).join('')}
-  </section>`;
-}
-function buildNeedsAttentionTable(teams) {
-  if (teams.length === 0) return `<div><div>Needs Attention (0 teams)</div><div class="table-empty">All teams are on track.</div></div>`;
-
-  const rows = teams.slice(0, 11).map((t, idx) => {
-    const sev = t.severity === 'high' ? 'high' : t.severity === 'medium' ? 'medium' : 'low';
-    const ts = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    return `<tr><td>${idx + 1}</td><td><span class=" ${sev}">${sev.toUpperCase()}</span></td><td>${escapeHtml(t.row[ts.TEAM_ID])}</td><td class="col-issue">${escapeHtml(t.issue)}</td><td class="col-since">${t.daysOverdue} days</td><td>${escapeHtml(t.row[ts.GUIDE_NAME])}</td><td class="col-action"><button type="button" class="action-link btn btn-sm btn-outline" onclick="focusCoordinatorTeam('${escapeHtml(String(t.row[ts.TEAM_ID]))}')">View</button></td></tr>`;
-  }).join('');
-
-  return `<div><div>Needs Attention (${teams.length} teams) <button type="button" class="view-all btn btn-sm btn-outline" onclick="showAllCoordinatorTeams()">View all ${renderLucideIcon_('arrow-right')}</button></div><div class="tracker-table-scroll table-wrap" data-tooltip-boundary role="region" aria-label="Teams needing attention, scroll horizontally for more columns" tabindex="0"><table class="table table--compact"><thead><tr><th>#</th><th>Severity</th><th>Team</th><th>Issue</th><th>Overdue</th><th>Guide</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-}
-
-function buildAssessmentProgress(assessmentProgress) {
-  let configuredReviews = [];
-  try { configuredReviews = getInternalReviews_(); } catch (err) { /* See configuration card. */ }
-  const bar = (c, p) => { const pct = c + p > 0 ? Math.round((c / (c + p)) * 100) : 0; return `<div><div class="progress"><span style="width:${pct}%"></span></div><span>${pct}%</span></div>`; };
-
-  return `<div class="card"><h3>Assessment Progress</h3>
-    ${configuredReviews.map(review => {
-      const progress = assessmentProgress[review.key];
-      return `<div><div>${escapeHtml(review.label)}</div>${progress.unavailable ? "<span>Partial data: " + progress.unavailable + " unavailable</span>" : bar(progress.completed, progress.pending)}<div>${progress.completed} / ${progress.completed + progress.pending + (progress.unavailable || 0)}</div></div>`;
-    }).join('')}
-    <div><div>Guide Evaluation</div>${bar(assessmentProgress.guideEval.completed, assessmentProgress.guideEval.pending)}<div>${assessmentProgress.guideEval.completed} / ${assessmentProgress.guideEval.completed + assessmentProgress.guideEval.pending}</div></div>
-    ${getSeeProgressRows_().map(item=>`<div><div>${escapeHtml(item.label)}</div><span>Evaluated outside this app</span></div>`).join('')}
-  </div>`;
-}
 
 function buildGithubAccessSection(githubAccess) {
   return `
@@ -525,54 +434,6 @@ function buildGithubAccessSection(githubAccess) {
   `;
 }
 
-function buildCoordinatorTeamActions_(team) {
-  const eye = renderLucideIcon_('eye');
-  const mail = renderLucideIcon_('mail');
-  const label = escapeHtml(String(team.teamId));
-  const recipients = team.emailRecipients || [];
-  const email = recipients.length
-    ? `<a class="btn btn-sm btn-outline" href="${escapeHtml('mailto:' + recipients.map(encodeURIComponent).join(',') + '?subject=' + encodeURIComponent('Capstone — Team ' + team.teamId))}" aria-label="Email guide and members of team ${label}" title="Email guide and team members">${mail}</a>`
-    : `<button type="button" class="btn btn-sm btn-outline" disabled aria-label="No email addresses available for team ${label}" title="No email addresses available">${mail}</button>`;
-  return `<div><button type="button" class="btn btn-sm btn-outline" onclick="focusCoordinatorTeam(this.closest('tr').getAttribute('data-team-id'))" aria-label="View team ${label}" title="View team details">${eye}</button>${email}</div>`;
-}
-
-function buildCompletionIndicator_(status) {
-  if (status === 'Completed') return '<span class="badge badge--success">Completed</span>';
-  if (status === 'Pending') return '<span class="badge badge--warning">Pending</span>';
-  if (/^loading/i.test(status || '')) return getSkeletonMarkup_('inline', 'Loading assessment');
-  return '<span class="badge badge--danger">' + escapeHtml(status || 'Unavailable') + '</span>';
-}
-
-function buildTeamTrackerTable(teamData, deadlinePills) {
-  deadlinePills = deadlinePills || [];
-  let configuredReviews = [];
-  try { configuredReviews = getInternalReviews_(); } catch (err) { /* See configuration card. */ }
-  const attentionCount = teamData.filter(t => t.health === 'attention').length;
-  const onTrackCount = teamData.filter(t => t.health === 'ontrack').length;
-  const rows = teamData.map(t => {
-    const titleBadge = t.titleStatus === 'APPROVED' ? '<span class="badge badge--success">Approved</span>' : t.titleStatus === 'NEEDS_REVIEW' ? '<span class="badge badge--warning">Review</span>' : t.titleStatus === 'REJECTED_BY_GUIDE' ? '<span class="badge badge--danger">Rejected</span>' : '<span class="badge badge--info">Pending</span>';
-    const repoLabel = escapeHtml([t.repoStatus === 'ready' ? 'Repository URL recorded' : 'Pending', t.githubMessage, t.githubTiming, t.repoUrl ? 'Repository available' : ''].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join(' ? '));
-    const repoBadge = t.repoStatus === 'loading' ? getSkeletonMarkup_('inline', 'Checking GitHub setup') : `<span class="badge badge--${t.repoStatus === 'ready' ? 'success' : 'danger'}" tabindex="0" aria-label="${repoLabel}" title="${repoLabel}">${t.repoStatus === 'ready' ? 'Ready' : 'Pending'}</span>`;
-    const health = t.health === 'ontrack' ? {color:'green', label:'On track', icon:'check'} : t.health === 'monitor' ? {color:'orange', label:'Monitor', icon:'clock'} : {color:'red', label:'Needs attention', icon:'triangle-alert'};
-    const healthBadge = t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading health') : `<span class="badge badge--${health.color === 'green' ? 'success' : health.color === 'orange' ? 'warning' : 'danger'}" tabindex="0" aria-label="${health.label}" title="${health.label}">${health.label}</span>`;
-    const registers = t.registerNumbers || [];
-
-    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td data-sort-value="${escapeHtml(String(t.teamId))}"><strong>${escapeHtml(t.teamId)}</strong><div>${registers.length ? registers.map(value => escapeHtml(value)).join(', ') : '—'}</div></td><td>${escapeHtml(t.guide)}</td><td class="col-repo" data-sort-value="${escapeHtml(String(t.repoStatus || 'Unavailable'))}">${repoBadge}</td><td class="col-status" data-sort-value="${escapeHtml(String(t.titleStatus || 'Unavailable'))}">${titleBadge}</td><td data-col="activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review" data-col="review" data-sort-value="${escapeHtml(String(t.health === 'loading' ? 'loading' : t.reviews[review.key] || 'Unavailable'))}">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation" data-col="guide-evaluation" data-sort-value="${escapeHtml(String(t.guideEvaluation || 'Unavailable'))}">${buildCompletionIndicator_(t.guideEvaluation)}</td><td data-col="health" data-sort-value="${escapeHtml(String(t.health || 'Unavailable'))}">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
-  }).join('');
-
-  return `<div class="card" data-team-tracker="coordinator"><div class="tracker-header"><h3>Team Tracker (${teamData.length} teams)</h3></div>
-    <div class="segmented" data-tracker-filters>
-      <button class="active" data-filter="all" aria-pressed="true" onclick="filterTeamTracker(this, 'all')">All (${teamData.length})</button>
-      <button data-filter="attention" aria-pressed="false" ${teamData.some(t => t.health === "loading") ? "disabled" : ""} onclick="filterTeamTracker(this, 'attention')">Attention (${teamData.some(t => t.health === 'loading') ? getSkeletonMarkup_('inline', 'Loading attention count') : attentionCount})</button>
-      <button data-filter="ontrack" aria-pressed="false" ${teamData.some(t => t.health === "loading") ? "disabled" : ""} onclick="filterTeamTracker(this, 'ontrack')">On Track (${teamData.some(t => t.health === 'loading') ? getSkeletonMarkup_('inline', 'Loading on-track count') : onTrackCount})</button>
-      ${deadlinePills.map(pill => `<button class="deadline-pill${pill.overdue ? ' deadline-overdue' : ''}" data-filter="deadline:${escapeHtml(pill.key)}" aria-pressed="false" title="Due ${escapeHtml(formatProjectDay_(pill.due))}" onclick="filterTeamTracker(this, this.getAttribute('data-filter'))">${escapeHtml(pill.label)} (${pill.count})${pill.overdue ? ' <span class="badge badge--danger">Overdue</span>' : ''}</button>`).join('')}
-    </div>
-    <button class="btn btn-outline" type="button" id="weeklyActivityRetry" onclick="loadCoordinatorWeeklyActivity()" hidden>Retry activity</button>
-    <div><input type="text" id="trackerSearch" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" oninput="filterTrackerSearch()"><button class="btn btn-outline" onclick="resetTrackerFilters()">Reset</button></div>
-    <div class="tracker-table-scroll table-wrap" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="table table--compact"><thead><tr><th data-sort-type="text">Team</th><th data-sort-type="text">Guide</th><th data-sort-type="text">Repo</th><th data-sort-type="text">Title</th><th data-sort-type="pair" title="Sort by logs, then commit records">Weekly Activity</th>${configuredReviews.map(review => `<th data-sort-type="text" class="col-review" title="${escapeHtml(review.label)}">${escapeHtml(review.label.replace(/^Review\s+(\d+)$/i, 'R$1'))}</th>`).join('')}<th data-sort-type="text">Guide Eval</th><th data-sort-type="text">Health</th><th>Actions</th></tr></thead><tbody id="trackerBody">${rows}</tbody></table></div>
-    ${buildTeamPagination_('tracker', 'coord', teamData.length)}
-  </div>`;
-}
 
 function buildCommitteeDirectory_(committees) {
   const items = (committees || []).map(committee => {
@@ -640,113 +501,6 @@ function buildReviewConfigurationCard_() {
     <div><a id="reviewDefinitionsLink" hidden target="_blank" rel="noopener">Assessment definitions ${renderLucideIcon_('external-link')}</a><a id="reviewConfigLink" hidden target="_blank" rel="noopener">Milestones ${renderLucideIcon_('external-link')}</a><a id="reviewRubricsLink" hidden target="_blank" rel="noopener">Rubric criteria ${renderLucideIcon_('external-link')}</a><span id="reviewConfigurationCheckedAt"></span></div>
   </section>`;
 }
-
-function buildCoordinatorContent(data) {
-  return `
-    <div>
-      ${Object.values(data.stats.reviews).some(review => review.unavailable) ? '<p role="status">Some assessment data is unavailable. Completion counts are partial; unavailable reviews are excluded from overdue alerts. Reload the dashboard to retry.</p>' : ''}
-      ${buildCoordinatorHeaderStats(data.stats)}
-
-      ${buildTeamTrackerTable(data.teamTrackerData, data.deadlinePills)}
-      </div>
-    </div>
-
-    ${buildCoordinatorDrawer_()}
-  `;
-}
-
-function buildCoordinatorDrawer_() {
-  return `
-    <!-- Team details drawer -->
-    <div
-      id="teamDrawerBackdrop"
-      class="team-drawer-backdrop drawer-scrim" hidden>
-    </div>
-
-    <aside
-      id="teamDrawer"
-      class="drawer" data-tooltip-boundary
-      role="dialog" aria-modal="true" aria-labelledby="teamDrawerTitle"
-      aria-hidden="true" inert hidden>
-
-      <div class="drawer-header">
-        <div>
-          <div>TEAM DETAILS</div>
-          <div
-            id="teamDrawerTitle"
-           >
-            Team
-          </div>
-        </div>
-
-        <button
-          type="button"
-          class="btn btn-sm btn-outline" data-drawer-close
-          onclick="closeCoordinatorTeamDrawer()"
-          aria-label="Close">
-          ${renderLucideIcon_('x')}
-        </button>
-      </div>
-
-      <div
-        id="teamDrawerContent"
-        class="team-drawer-content drawer-body" data-drawer-content>
-      </div>
-
-      <div class="drawer-footer" hidden></div>
-
-    </aside>
-  `;
-}
-
-/** Small authorized shell; no marks, roster or historical activity reads. */
-function buildCoordinatorAsyncShell_() {
-  const placeholder = (id, label) => {
-    if (id === 'coordinatorStats') {
-      let reviews = [];
-      try { reviews = getInternalReviews_(); } catch (err) { /* See System Status. */ }
-      return `<div id="${id}Placeholder" class="coordinator-stats-grid" aria-label="Loading summary cards">${Array.from({length:6 + reviews.length}, () => `<div class="coordinator-stat-placeholder">${getSkeletonMarkup_('panel', label)}</div>`).join('')}</div>`;
-    }
-    return `<div id="${id}Placeholder" class="coordinator-card-placeholder card">${getSkeletonMarkup_('panel', label)}</div>`;
-  };
-  const panel = (id, label) => id === 'coordinatorTracker'
-    ? `<div id="${id}" aria-busy="true">${getSkeletonMarkup_('panel', label)}</div>`
-    : `${placeholder(id, label)}<div id="${id}" hidden aria-busy="true"></div>`;
-  return `${buildDashboardContainerHeader_('Coordinator Dashboard', 'coord')}<div id="coordinatorAsyncRoot">
-    <div id="coordinatorOverviewStatus" role="status"></div>
-    ${panel('coordinatorStats', 'Loading team summary')}
-    <div id="coordinatorProgressStatus" role="status"></div>
-    ${panel('coordinatorTracker', 'Loading teams')}
-  </div>${buildCoordinatorDrawer_()}`;
-}
-
-/** Related cards share one read; the expensive progress request runs independently. */
-function loadCoordinatorSection(section) {
-  return coordinatorRead_('section-' + section, () => {
-    if (section !== 'overview' && section !== 'progress') throw new Error('Unknown coordinator section.');
-    const timings = [];
-    const data = getCoordinatorDashboardData_(section === 'overview', true, timings);
-    const renderStarted = Date.now();
-    const panels = {
-      coordinatorStats:buildCoordinatorHeaderStats(data.stats),
-      coordinatorTracker:buildTeamTrackerTable(data.teamTrackerData, data.deadlinePills)
-    };
-    timings.push({phase:'render_panels', durationMs:Date.now() - renderStarted, success:true});
-    console.log(JSON.stringify({event:'coordinator_phases', section, timings}));
-    return {panels, timings, partial:section === 'progress' && Object.values(data.stats.reviews).some(review => review.unavailable)};
-  });
-}
-
-function buildCoordinatorPage(data) {
-  return buildSingleRoleDashboardPage(
-    getCoordinatorEmail(),
-    'coord',
-    'Coordinator',
-    'coordinatorContent',
-    buildCoordinatorContent(data)
-  );
-}
-
 
 
 function buildCommitteeData_(committeeRows, statusRows, RC, TS) {

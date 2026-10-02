@@ -1,0 +1,668 @@
+{
+  "overview": {
+    "cards": [
+      {
+        "label": "Total Teams",
+        "value": "5",
+        "note": "Teams Roster",
+        "detail": "● Teams registered",
+        "tone": "complete",
+        "progress": false
+      },
+      {
+        "label": "Repositories Available",
+        "value": "3",
+        "note": "60% linked",
+        "detail": "3 / 5 recorded2 missing",
+        "tone": "warning",
+        "progress": false
+      },
+      {
+        "label": "Title Approved",
+        "value": "1",
+        "note": "20% validated",
+        "detail": "1 approved4 pending approval",
+        "tone": "danger",
+        "progress": false
+      },
+      {
+        "label": "Active This Week",
+        "value": "loading",
+        "note": "loading",
+        "detail": "Weekly repository activity",
+        "tone": "neutral",
+        "progress": false
+      },
+      {
+        "label": "Review 1 Completed",
+        "value": "loading",
+        "note": "",
+        "detail": "Team review completion",
+        "tone": "neutral",
+        "progress": true
+      },
+      {
+        "label": "Review 2 Completed",
+        "value": "loading",
+        "note": "",
+        "detail": "Team review completion",
+        "tone": "neutral",
+        "progress": true
+      },
+      {
+        "label": "Guide Evaluation Completed",
+        "value": "loading",
+        "note": "",
+        "detail": "Guide assessment completion",
+        "tone": "neutral",
+        "progress": true
+      },
+      {
+        "label": "Need Attention",
+        "value": "loading",
+        "note": "",
+        "detail": "Teams with overdue requirements",
+        "tone": "neutral",
+        "progress": true
+      }
+    ],
+    "heading": "Team Tracker (5 teams)",
+    "filters": [
+      {
+        "filter": "all",
+        "text": "All (5)",
+        "disabled": false
+      },
+      {
+        "filter": "attention",
+        "text": "Attention (loading)",
+        "disabled": true
+      },
+      {
+        "filter": "ontrack",
+        "text": "On Track (loading)",
+        "disabled": true
+      }
+    ],
+    "headers": [
+      "Team",
+      "Guide",
+      "Repo",
+      "Title",
+      "Weekly Activity",
+      "R1",
+      "R2",
+      "Guide Eval",
+      "Health",
+      "Actions"
+    ],
+    "rows": [
+      {
+        "teamId": "T1",
+        "search": "t1 dr. a 001 002",
+        "deadlines": "",
+        "health": "loading",
+        "titleStatus": "APPROVED",
+        "repoStatus": "ready",
+        "team": "T1001, 002",
+        "guide": "Dr. A",
+        "repo": {
+          "text": "Ready",
+          "label": "Repository URL recorded ? Repository available"
+        },
+        "title": "Approved",
+        "activity": "loading",
+        "reviews": [
+          "loading",
+          "loading"
+        ],
+        "guideEval": "loading",
+        "healthText": "loading",
+        "email": "mailto:guide%40example.com,one%40example.com,two%40example.com?subject=Capstone%20%E2%80%94%20Team%20T1"
+      },
+      {
+        "teamId": "T2",
+        "search": "t2 dr. b 003",
+        "deadlines": "",
+        "health": "loading",
+        "titleStatus": "NEEDS_REVIEW",
+        "repoStatus": "ready",
+        "team": "T2003",
+        "guide": "Dr. B",
+        "repo": {
+          "text": "Ready",
+          "label": "Repository URL recorded ? Repository available"
+        },
+        "title": "Review",
+        "activity": "loading",
+        "reviews": [
+          "loading",
+          "loading"
+        ],
+        "guideEval": "loading",
+        "healthText": "loading",
+        "email": "mailto:guide%40example.com,three%40example.com?subject=Capstone%20%E2%80%94%20Team%20T2"
+      },
+      {
+        "teamId": "T3",
+        "search": "t3 dr. c 004",
+        "deadlines": "",
+        "health": "loading",
+        "titleStatus": "NOT_SUBMITTED",
+        "repoStatus": "pending",
+        "team": "T3004",
+        "guide": "Dr. C",
+        "repo": {
+          "text": "Pending",
+          "label": "Pending ? Repository URL missing"
+        },
+        "title": "Pending",
+        "activity": "loading",
+        "reviews": [
+          "loading",
+          "loading"
+        ],
+        "guideEval": "loading",
+        "healthText": "loading",
+        "email": "mailto:guide%40example.com?subject=Capstone%20%E2%80%94%20Team%20T3"
+      },
+      {
+        "teamId": "T4",
+        "search": "t4 dr. d 005 006",
+        "deadlines": "",
+        "health": "loading",
+        "titleStatus": "REJECTED_BY_GUIDE",
+        "repoStatus": "ready",
+        "team": "T4005, 006",
+        "guide": "Dr. D",
+        "repo": {
+          "text": "Ready",
+          "label": "Repository URL recorded ? Repository available"
+        },
+        "title": "Rejected",
+        "activity": "loading",
+        "reviews": [
+          "loading",
+          "loading"
+        ],
+        "guideEval": "loading",
+        "healthText": "loading",
+        "email": "mailto:guide%40example.com,four%40example.com?subject=Capstone%20%E2%80%94%20Team%20T4"
+      },
+      {
+        "teamId": "T5",
+        "search": "t5 dr. e 007",
+        "deadlines": "",
+        "health": "loading",
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "repoStatus": "pending",
+        "team": "T5007",
+        "guide": "Dr. E",
+        "repo": {
+          "text": "Pending",
+          "label": "Pending ? Repository URL missing"
+        },
+        "title": "Pending",
+        "activity": "loading",
+        "reviews": [
+          "loading",
+          "loading"
+        ],
+        "guideEval": "loading",
+        "healthText": "loading",
+        "email": "mailto:guide%40example.com,five%40example.com?subject=Capstone%20%E2%80%94%20Team%20T5"
+      }
+    ]
+  },
+  "progress": {
+    "cards": [
+      {
+        "label": "Total Teams",
+        "value": "5",
+        "note": "Teams Roster",
+        "detail": "● Teams registered",
+        "tone": "complete",
+        "progress": false
+      },
+      {
+        "label": "Repositories Available",
+        "value": "3",
+        "note": "60% linked",
+        "detail": "3 / 5 recorded2 missing",
+        "tone": "warning",
+        "progress": false
+      },
+      {
+        "label": "Title Approved",
+        "value": "1",
+        "note": "20% validated",
+        "detail": "1 approved4 pending approval",
+        "tone": "danger",
+        "progress": false
+      },
+      {
+        "label": "Active This Week",
+        "value": "loading",
+        "note": "loading",
+        "detail": "Weekly repository activity",
+        "tone": "neutral",
+        "progress": false
+      },
+      {
+        "label": "Review 1 Completed",
+        "value": "2",
+        "note": "2 unavailable",
+        "detail": "Team review completion",
+        "tone": "neutral",
+        "progress": true
+      },
+      {
+        "label": "Review 2 Completed",
+        "value": "1",
+        "note": "2 unavailable",
+        "detail": "Team review completion",
+        "tone": "neutral",
+        "progress": true
+      },
+      {
+        "label": "Guide Evaluation Completed",
+        "value": "1",
+        "note": "20% evaluated",
+        "detail": "Guide assessment completion",
+        "tone": "danger",
+        "progress": true
+      },
+      {
+        "label": "Need Attention",
+        "value": "4",
+        "note": "80% of cohort",
+        "detail": "Teams with overdue requirements",
+        "tone": "danger",
+        "progress": true
+      }
+    ],
+    "heading": "Team Tracker (5 teams)",
+    "filters": [
+      {
+        "filter": "all",
+        "text": "All (5)",
+        "disabled": false
+      },
+      {
+        "filter": "attention",
+        "text": "Attention (4)",
+        "disabled": false
+      },
+      {
+        "filter": "ontrack",
+        "text": "On Track (0)",
+        "disabled": false
+      },
+      {
+        "filter": "deadline:formation",
+        "text": "Team Formation Pending (1) Overdue",
+        "disabled": false,
+        "title": "Due D-30"
+      },
+      {
+        "filter": "deadline:repository",
+        "text": "Repository URL Pending (2) Overdue",
+        "disabled": false,
+        "title": "Due D-20"
+      },
+      {
+        "filter": "deadline:title",
+        "text": "Title Pending (4) Overdue",
+        "disabled": false,
+        "title": "Due D-10"
+      },
+      {
+        "filter": "deadline:review1",
+        "text": "Review 1 Pending (1) Overdue",
+        "disabled": false,
+        "title": "Due D-3"
+      },
+      {
+        "filter": "deadline:weekly-logs",
+        "text": "Weekly Logs Pending (1)",
+        "disabled": false,
+        "title": "Due D2"
+      }
+    ],
+    "headers": [
+      "Team",
+      "Guide",
+      "Repo",
+      "Title",
+      "Weekly Activity",
+      "R1",
+      "R2",
+      "Guide Eval",
+      "Health",
+      "Actions"
+    ],
+    "rows": [
+      {
+        "teamId": "T1",
+        "search": "t1 dr. a 001 002",
+        "deadlines": "weekly-logs",
+        "health": "monitor",
+        "titleStatus": "APPROVED",
+        "repoStatus": "ready",
+        "team": "T1001, 002",
+        "guide": "Dr. A",
+        "repo": {
+          "text": "Ready",
+          "label": "Repository URL recorded ? Repository available"
+        },
+        "title": "Approved",
+        "activity": "loading",
+        "reviews": [
+          "Completed",
+          "Pending"
+        ],
+        "guideEval": "Completed",
+        "healthText": "Monitor",
+        "email": "mailto:guide%40example.com,one%40example.com,two%40example.com?subject=Capstone%20%E2%80%94%20Team%20T1"
+      },
+      {
+        "teamId": "T2",
+        "search": "t2 dr. b 003",
+        "deadlines": "title review1",
+        "health": "attention",
+        "titleStatus": "NEEDS_REVIEW",
+        "repoStatus": "ready",
+        "team": "T2003",
+        "guide": "Dr. B",
+        "repo": {
+          "text": "Ready",
+          "label": "Repository URL recorded ? Repository available"
+        },
+        "title": "Review",
+        "activity": "loading",
+        "reviews": [
+          "Pending",
+          "Pending"
+        ],
+        "guideEval": "Pending",
+        "healthText": "Needs attention",
+        "email": "mailto:guide%40example.com,three%40example.com?subject=Capstone%20%E2%80%94%20Team%20T2"
+      },
+      {
+        "teamId": "T3",
+        "search": "t3 dr. c 004",
+        "deadlines": "formation repository title",
+        "health": "attention",
+        "titleStatus": "NOT_SUBMITTED",
+        "repoStatus": "pending",
+        "team": "T3004",
+        "guide": "Dr. C",
+        "repo": {
+          "text": "Pending",
+          "label": "Pending ? Repository URL missing"
+        },
+        "title": "Pending",
+        "activity": "loading",
+        "reviews": [
+          "Unavailable",
+          "Unavailable"
+        ],
+        "guideEval": "Pending",
+        "healthText": "Needs attention",
+        "email": "mailto:guide%40example.com?subject=Capstone%20%E2%80%94%20Team%20T3"
+      },
+      {
+        "teamId": "T4",
+        "search": "t4 dr. d 005 006",
+        "deadlines": "title",
+        "health": "attention",
+        "titleStatus": "REJECTED_BY_GUIDE",
+        "repoStatus": "ready",
+        "team": "T4005, 006",
+        "guide": "Dr. D",
+        "repo": {
+          "text": "Ready",
+          "label": "Repository URL recorded ? Repository available"
+        },
+        "title": "Rejected",
+        "activity": "loading",
+        "reviews": [
+          "Completed",
+          "Completed"
+        ],
+        "guideEval": "Pending",
+        "healthText": "Needs attention",
+        "email": "mailto:guide%40example.com,four%40example.com?subject=Capstone%20%E2%80%94%20Team%20T4"
+      },
+      {
+        "teamId": "T5",
+        "search": "t5 dr. e 007",
+        "deadlines": "repository title",
+        "health": "attention",
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "repoStatus": "pending",
+        "team": "T5007",
+        "guide": "Dr. E",
+        "repo": {
+          "text": "Pending",
+          "label": "Pending ? Repository URL missing"
+        },
+        "title": "Pending",
+        "activity": "loading",
+        "reviews": [
+          "Unavailable",
+          "Unavailable"
+        ],
+        "guideEval": "Pending",
+        "healthText": "Needs attention",
+        "email": "mailto:guide%40example.com,five%40example.com?subject=Capstone%20%E2%80%94%20Team%20T5"
+      }
+    ]
+  },
+  "noReviews": {
+    "cards": [
+      {
+        "label": "Total Teams",
+        "value": "5",
+        "note": "Teams Roster",
+        "detail": "● Teams registered",
+        "tone": "complete",
+        "progress": false
+      },
+      {
+        "label": "Repositories Available",
+        "value": "3",
+        "note": "60% linked",
+        "detail": "3 / 5 recorded2 missing",
+        "tone": "warning",
+        "progress": false
+      },
+      {
+        "label": "Title Approved",
+        "value": "1",
+        "note": "20% validated",
+        "detail": "1 approved4 pending approval",
+        "tone": "danger",
+        "progress": false
+      },
+      {
+        "label": "Active This Week",
+        "value": "loading",
+        "note": "loading",
+        "detail": "Weekly repository activity",
+        "tone": "neutral",
+        "progress": false
+      },
+      {
+        "label": "Guide Evaluation Completed",
+        "value": "1",
+        "note": "20% evaluated",
+        "detail": "Guide assessment completion",
+        "tone": "danger",
+        "progress": true
+      },
+      {
+        "label": "Need Attention",
+        "value": "4",
+        "note": "80% of cohort",
+        "detail": "Teams with overdue requirements",
+        "tone": "danger",
+        "progress": true
+      }
+    ],
+    "heading": "Team Tracker (5 teams)",
+    "filters": [
+      {
+        "filter": "all",
+        "text": "All (5)",
+        "disabled": false
+      },
+      {
+        "filter": "attention",
+        "text": "Attention (4)",
+        "disabled": false
+      },
+      {
+        "filter": "ontrack",
+        "text": "On Track (0)",
+        "disabled": false
+      },
+      {
+        "filter": "deadline:formation",
+        "text": "Team Formation Pending (1) Overdue",
+        "disabled": false,
+        "title": "Due D-30"
+      },
+      {
+        "filter": "deadline:repository",
+        "text": "Repository URL Pending (2) Overdue",
+        "disabled": false,
+        "title": "Due D-20"
+      },
+      {
+        "filter": "deadline:title",
+        "text": "Title Pending (4) Overdue",
+        "disabled": false,
+        "title": "Due D-10"
+      },
+      {
+        "filter": "deadline:weekly-logs",
+        "text": "Weekly Logs Pending (1)",
+        "disabled": false,
+        "title": "Due D2"
+      }
+    ],
+    "headers": [
+      "Team",
+      "Guide",
+      "Repo",
+      "Title",
+      "Weekly Activity",
+      "Guide Eval",
+      "Health",
+      "Actions"
+    ],
+    "rows": [
+      {
+        "teamId": "T1",
+        "search": "t1 dr. a 001 002",
+        "deadlines": "weekly-logs",
+        "health": "monitor",
+        "titleStatus": "APPROVED",
+        "repoStatus": "ready",
+        "team": "T1001, 002",
+        "guide": "Dr. A",
+        "repo": {
+          "text": "Ready",
+          "label": "Repository URL recorded ? Repository available"
+        },
+        "title": "Approved",
+        "activity": "loading",
+        "reviews": [],
+        "guideEval": "Completed",
+        "healthText": "Monitor",
+        "email": "mailto:guide%40example.com,one%40example.com,two%40example.com?subject=Capstone%20%E2%80%94%20Team%20T1"
+      },
+      {
+        "teamId": "T2",
+        "search": "t2 dr. b 003",
+        "deadlines": "title",
+        "health": "attention",
+        "titleStatus": "NEEDS_REVIEW",
+        "repoStatus": "ready",
+        "team": "T2003",
+        "guide": "Dr. B",
+        "repo": {
+          "text": "Ready",
+          "label": "Repository URL recorded ? Repository available"
+        },
+        "title": "Review",
+        "activity": "loading",
+        "reviews": [],
+        "guideEval": "Pending",
+        "healthText": "Needs attention",
+        "email": "mailto:guide%40example.com,three%40example.com?subject=Capstone%20%E2%80%94%20Team%20T2"
+      },
+      {
+        "teamId": "T3",
+        "search": "t3 dr. c 004",
+        "deadlines": "formation repository title",
+        "health": "attention",
+        "titleStatus": "NOT_SUBMITTED",
+        "repoStatus": "pending",
+        "team": "T3004",
+        "guide": "Dr. C",
+        "repo": {
+          "text": "Pending",
+          "label": "Pending ? Repository URL missing"
+        },
+        "title": "Pending",
+        "activity": "loading",
+        "reviews": [],
+        "guideEval": "Pending",
+        "healthText": "Needs attention",
+        "email": "mailto:guide%40example.com?subject=Capstone%20%E2%80%94%20Team%20T3"
+      },
+      {
+        "teamId": "T4",
+        "search": "t4 dr. d 005 006",
+        "deadlines": "title",
+        "health": "attention",
+        "titleStatus": "REJECTED_BY_GUIDE",
+        "repoStatus": "ready",
+        "team": "T4005, 006",
+        "guide": "Dr. D",
+        "repo": {
+          "text": "Ready",
+          "label": "Repository URL recorded ? Repository available"
+        },
+        "title": "Rejected",
+        "activity": "loading",
+        "reviews": [],
+        "guideEval": "Pending",
+        "healthText": "Needs attention",
+        "email": "mailto:guide%40example.com,four%40example.com?subject=Capstone%20%E2%80%94%20Team%20T4"
+      },
+      {
+        "teamId": "T5",
+        "search": "t5 dr. e 007",
+        "deadlines": "repository title",
+        "health": "attention",
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "repoStatus": "pending",
+        "team": "T5007",
+        "guide": "Dr. E",
+        "repo": {
+          "text": "Pending",
+          "label": "Pending ? Repository URL missing"
+        },
+        "title": "Pending",
+        "activity": "loading",
+        "reviews": [],
+        "guideEval": "Pending",
+        "healthText": "Needs attention",
+        "email": "mailto:guide%40example.com,five%40example.com?subject=Capstone%20%E2%80%94%20Team%20T5"
+      }
+    ]
+  }
+}

@@ -359,14 +359,6 @@ test('SEE rejects all Review marking and publication requests without modifying 
  assert.equal(JSON.stringify(f.tables),before);assert.equal(f.extra.Assessment_see,undefined);
 });
 
-test('SEE Coordinator progress is conditional and never displays completion or pending counts',()=>{
- const f=seeSetup(),c=f.c;vm.runInContext(fs.readFileSync('coordinator-dashboard.js','utf8'),c);
- const stages={setup:{},titleApproval:{},guideEval:{completed:0,pending:1},...Object.fromEntries(['review1','review2','review3'].map(key=>[key,{completed:0,pending:1}]))};
- const html=c.buildTeamCompletionProgress(stages)+c.buildAssessmentProgress(stages);
- assert.equal((html.match(/Evaluated outside this app/g)||[]).length,2);assert.match(html,/End Review \(SEE\)/i);
- f.rows.pop();assert.doesNotMatch(c.buildTeamCompletionProgress(stages)+c.buildAssessmentProgress(stages),/End Review|Evaluated outside/i);
-});
-
 
 test('rubric and storage readiness are independent and errors preserve original sheet rows',()=>{
  const f=coordinatorStorageSetup(),c=f.c;f.actor('coord@x');c.prepareReviewAssessmentStorage();
