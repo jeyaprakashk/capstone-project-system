@@ -33,7 +33,7 @@ test('weekly status uses spreadsheet calendar days and changes to danger after t
  const f=fixture(),deadline='2026-10-02T17:00:00+05:30';
  for(const [now,tone] of [['2026-09-30T23:59:59+05:30','success'],['2026-10-01T00:00:00+05:30','warning'],['2026-10-02T17:00:00+05:30','warning'],['2026-10-02T17:00:00.001+05:30','danger']]) {
   f.data.checkedAt=now;f.data.actions[0].deadline=deadline;f.load();f.reply();f.form();
-  assert.equal(f.host.querySelector('.weekly-state').dataset.tone,tone);
+  assert.equal(f.host.querySelector('[data-weekly-state] [data-tone]').dataset.tone,tone);
  }
  assert.equal(f.c.weeklyStatusTone('SUBMITTED ON TIME',deadline,'Asia/Kolkata',Date.parse('2026-10-03')), 'success');
  assert.equal(f.c.weeklyStatusTone('LATE',deadline,'Asia/Kolkata',Date.parse('2026-10-03')), 'danger');
@@ -55,8 +55,8 @@ test('submitted summary supports prefilled editing, cancel confirmation, and sav
  const f=fixture();f.data.history=[{weekId:'W1',entryStatus:'SUBMITTED',timeliness:'ON_TIME',workCompleted:'Saved\ntext',guideDiscussion:'<script>Discussion</script>',blockers:'None',nextAction:'Next'}];
  f.load();f.reply();
  assert.equal(f.host.querySelector('form'),null);
- assert.equal(f.host.querySelector('.weekly-submission-summary').querySelectorAll('section').length,4);
- assert.equal(f.host.querySelector('.weekly-submission-summary script'),null);
+ assert.equal(f.host.querySelector('[data-submission-summary]').querySelectorAll('section').length,4);
+ assert.equal(f.host.querySelector('[data-submission-summary] script'),null);
  f.c.editWeeklySubmission(f.host.querySelector('[data-weekly-edit]'));let form=f.form();
  assert.equal(form.elements.workCompleted.value,'Saved\ntext');
  form.elements.workCompleted.value='New draft';
@@ -71,8 +71,8 @@ test('submitted summary supports prefilled editing, cancel confirmation, and sav
  f.c.submitWeeklyProgress({preventDefault(){}},form);f.requests.at(-1).failure(Error('offline'));
  assert.equal(f.host.querySelector('form'),form);assert.equal(form.elements.workCompleted.value,'Updated');
  f.c.submitWeeklyProgress({preventDefault(){}},form);f.requests.at(-1).success({weekId:'W1',entryStatus:'REVISED',timeliness:'ON_TIME',message:'Saved'});
- assert.equal(f.host.querySelector('form'),null);assert.match(f.host.querySelector('.weekly-submission-summary').textContent,/Updated/);
- f.requests.at(-1).failure(Error('refresh offline'));assert.match(f.host.querySelector('.weekly-submission-summary').textContent,/Updated/);
+ assert.equal(f.host.querySelector('form'),null);assert.match(f.host.querySelector('[data-submission-summary]').textContent,/Updated/);
+ f.requests.at(-1).failure(Error('refresh offline'));assert.match(f.host.querySelector('[data-submission-summary]').textContent,/Updated/);
 });
 
 test('saved summaries stay readable while evidence and deadline restrictions prevent editing',()=>{
@@ -83,7 +83,7 @@ test('saved summaries stay readable while evidence and deadline restrictions pre
   if(restriction==='evidence')f.data.evidence=[{weekId:'W1',state:'available',count:0,commits:[]}];
   if(restriction==='readiness')f.data.ready=false;
   f.load();f.reply();assert.equal(f.host.querySelector('form'),null);
-  assert.match(f.host.querySelector('.weekly-submission-summary').textContent,/Saved answer/);
+  assert.match(f.host.querySelector('[data-submission-summary]').textContent,/Saved answer/);
   assert.equal(f.host.querySelector('[data-weekly-edit]'),null);
  }
 });
@@ -96,7 +96,7 @@ test('deadline expiry preserves the edit draft and permits returning to the save
  assert.equal(form.querySelector('[type="submit"]').hidden,true);
  assert.equal(form.querySelector('[data-weekly-cancel]').disabled,false);
  await f.c.cancelWeeklyEdit(form.querySelector('[data-weekly-cancel]'));
- assert.equal(f.host.querySelector('form'),null);assert.match(f.host.querySelector('.weekly-submission-summary').textContent,/Saved/);
+ assert.equal(f.host.querySelector('form'),null);assert.match(f.host.querySelector('[data-submission-summary]').textContent,/Saved/);
  assert.equal(f.host.querySelector('[data-weekly-edit]'),null);
 });
 
@@ -273,7 +273,7 @@ test('recent logs own submission history and open details in the shared drawer',
  f.data.allWeeks=[{weekId:'W1',opens:'2026-01-01T00:00:00Z',deadline:'2026-01-05T00:00:00Z'},{weekId:'W2',opens:'2026-01-08T00:00:00Z',deadline:'2026-01-12T00:00:00Z'}];
  f.data.history=[{weekId:'W1',entryStatus:'SUBMITTED',timeliness:'ON_TIME',recordedAt:'2026-01-02T00:00:00Z',workCompleted:'<script>unsafe</script>'},{weekId:'W1',entryStatus:'REVISED',timeliness:'ON_TIME',recordedAt:'2026-01-02T12:00:00Z',workCompleted:'Revised work'}];
  f.load();f.reply();
- assert.equal(recent.querySelectorAll('.student-activity-row').length,1);
+ assert.equal(recent.querySelectorAll('[data-activity-row]').length,1);
  assert.match(recent.textContent,/Submitted on time/);
  assert.equal(f.host.querySelector('[data-weekly-history]'),null);
  let content;f.c.openContentDrawer=(title,html)=>{assert.equal(title,'All weekly logs');content=html;};f.c.openWeeklyActivity();
@@ -281,7 +281,7 @@ test('recent logs own submission history and open details in the shared drawer',
  assert.equal(document.querySelectorAll('details').length,2);
  assert.match(document.querySelector('details').textContent,/Revised work/);
  assert.match(document.querySelector('details').textContent,/Project work/);
- assert.match(document.querySelector('.is-future').textContent,/Week 02/);
+ assert.match(document.querySelector('[data-future]').textContent,/Week 02/);
  assert.equal(document.querySelector('script'),null);
  const saved=recent.innerHTML;f.load();f.requests.at(-1).failure(Error('offline'));assert.equal(recent.innerHTML,saved);
 });

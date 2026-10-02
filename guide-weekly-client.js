@@ -166,7 +166,7 @@ function guideWeeklyBrowser_() {
     const date=Number.isFinite(week?.deadlineAt)?new Date(week.deadlineAt):null;
     const label=date?date.toLocaleDateString('en-GB',{timeZone:node.data.timezone,day:'numeric',month:'short',year:'numeric'}).replace(/\bSept\b/g,'Sep'):'Date unavailable';
     const full=date?date.toLocaleString('en-IN',{timeZone:node.data.timezone,timeZoneName:'short',hour12:true}):'Submission deadline unavailable';
-    return '<div class="guide-weekly-deadline">'+submissionBadge(entry.timeliness,entry.firstSubmittedAt,week?.deadlineAt,node.data.timezone)+'<small title="'+esc(full)+'">Due: '+esc(label)+'</small></div>';
+    return '<div data-weekly-deadline>'+submissionBadge(entry.timeliness,entry.firstSubmittedAt,week?.deadlineAt,node.data.timezone)+'<small title="'+esc(full)+'">Due: '+esc(label)+'</small></div>';
   }
   function qualityScore(value) {
     const score=(typeof value==='number' || (typeof value==='string' && value.trim()!==''))?Number(value):NaN;
@@ -189,19 +189,19 @@ function guideWeeklyBrowser_() {
     return (start.toLocaleDateString('en-GB',options)+' – '+end.toLocaleDateString('en-GB',options)).replace(/\bSept\b/g,'Sep');
   }
   function weeklyAnswers(entry) {
-    return '<div class="guide-weekly-fields">'+[['workCompleted','Work completed'],['guideDiscussion','Guide discussion / decision'],['blockers','Problems / blockers'],['nextAction','Next week plan']].map(([key,label])=>{
+    return '<div>'+[['workCompleted','Work completed'],['guideDiscussion','Guide discussion / decision'],['blockers','Problems / blockers'],['nextAction','Next week plan']].map(([key,label])=>{
       const answer=String(entry[key] || '').replace(/\r\n?/g,'\n').trim().replace(/(?:^|\s)Next\s*(?:…|\.{3})\s*$/i,'').trim()
         .split(/\n\s*\n/).map(paragraph=>paragraph.split('\n').reduce((text,line)=>text+(text ? (/^\s*(?:[-*•]|\d+[.)])\s/.test(line)?'\n':' ') : '')+line.trim(),'')).join('\n\n');
-      return '<p class="weekly-log-answer" data-answer="'+key+'"><strong class="guide-question'+(key==='blockers'?' guide-question-blockers':key==='nextAction'?' guide-question-next':'')+'">'+label+'</strong>'+esc(answer || 'No response recorded.')+'</p>';
+      return '<p data-answer="'+key+'"><strong>'+label+'</strong>'+esc(answer || 'No response recorded.')+'</p>';
     }).join('')+'</div>';
   }
   function weeklyEvidence(entry,timeZone) {
     const evidence=entry.evidence,commits=Array.isArray(evidence?.commits)?evidence.commits:[];
     const available=evidence?.state==='available';
-    const github=available ? (commits.length ? '<ul class="guide-commit-list">'+commits.map(commit=>'<li><a href="'+esc(commit.url)+'" target="_blank" rel="noopener noreferrer"><code>'+esc(commit.shortSha)+'</code></a><span>'+esc(commit.message)+'</span><time datetime="'+esc(commit.timestamp)+'">'+esc(new Date(commit.timestamp).toLocaleString('en-IN',{timeZone,day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true}))+'</time></li>').join('')+'</ul>' : '<p>No qualifying GitHub commits recorded for this student in this week.</p>') : '<p>'+esc(evidence?.message || 'GitHub evidence unavailable. Use dashboard Refresh to retry.')+'</p>';
+    const github=available ? (commits.length ? '<ul data-commit-list>'+commits.map(commit=>'<li><a href="'+esc(commit.url)+'" target="_blank" rel="noopener noreferrer"><code>'+esc(commit.shortSha)+'</code></a><span>'+esc(commit.message)+'</span><time datetime="'+esc(commit.timestamp)+'">'+esc(new Date(commit.timestamp).toLocaleString('en-IN',{timeZone,day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true}))+'</time></li>').join('')+'</ul>' : '<p>No qualifying GitHub commits recorded for this student in this week.</p>') : '<p>'+esc(evidence?.message || 'GitHub evidence unavailable. Use dashboard Refresh to retry.')+'</p>';
     const analysis=entry.analysis;
     const ai=analysis ? '<p>'+esc(analysis.comment)+'</p><dl>'+[['technical_substance','Technical substance'],['specificity','Specificity'],['outcome','Outcome'],['next_action','Next action'],['github_support','GitHub support']].map(([key,label])=>'<dt>'+label+'</dt><dd>'+esc(analysis[key] || '—')+'</dd>').join('')+'</dl>' : '<p>Not scored yet.</p>';
-    return '<div class="guide-weekly-evidence"><section><h4>GitHub evidence (auto-collected)'+(available?' · '+commits.length+(commits.length===1?' commit':' commits'):'')+'</h4>'+github+'</section><section><h4>AI analysis</h4>'+ai+'</section></div>';
+    return '<div data-weekly-evidence><section><h4>GitHub evidence (auto-collected)'+(available?' · '+commits.length+(commits.length===1?' commit':' commits'):'')+'</h4>'+github+'</section><section><h4>AI analysis</h4>'+ai+'</section></div>';
   }
   let actionBarObserver=null, resizeActionBars=null;
   function reserveActionBarSpace(node) {
@@ -247,12 +247,12 @@ function guideWeeklyBrowser_() {
       : {tone:'blue',label:total === null ? 'Submitted' : completed+'/'+total+' required submitted'};
     const weekSummary=(total === null ? submitted+' submitted' : completed+'/'+total+' required submitted')+' · '+pending+' awaiting decision';
     const weekIndex=node.data.weeks.indexOf(node.week);
-    target.innerHTML='<nav class="guide-week-navigation" aria-label="Select weekly progress week">'+
+    target.innerHTML='<nav aria-label="Select weekly progress week">'+
       '<button type="button" class="btn btn-outline" data-week-step="1" data-week-boundary="'+(weekIndex===node.data.weeks.length-1)+'" '+(weekIndex===node.data.weeks.length-1?'disabled':'')+' title="'+(weekIndex===node.data.weeks.length-1?'First project week. No more previous weeks':'Previous week')+'" aria-label="Previous week">&#8249; Previous</button>'+
-      '<span class="guide-week-label" aria-live="polite">'+esc(weekDateRange(node))+'</span>'+
+      '<span aria-live="polite">'+esc(weekDateRange(node))+'</span>'+
       '<button type="button" class="btn btn-outline" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' title="'+(weekIndex===0?'Latest available project week. No more next weeks':'Next week')+'" aria-label="Next week">Next &#8250;</button>'+
-      '<span class="'+badgeClass(weekStatus.tone)+' guide-week-status" data-week-status role="status" title="'+esc(weekSummary)+'">'+weekStatus.label+'</span></nav>'+
-      (entries.length ? entries.map(entry=>'<article class="guide-weekly-card" data-weekly-card><div data-entry="'+esc(entry.entryId)+'" class="guide-weekly-summary" data-weekly-summary><header class="guide-weekly-student-header" data-weekly-student-header><div><strong>'+esc(entry.student)+'</strong><small>'+esc(entry.regNo)+'</small></div><span class="guide-weekly-score">AI Quality '+qualityScore(entry.score)+'</span>'+submissionDeadline(node,entry)+'</header>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div><div class="guide-weekly-actions" data-weekly-actions data-sign-entry="'+esc(entry.entryId)+'"><span>Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="btn btn-sm '+(status==='DISCUSSED'?'btn-primary':'btn-outline')+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></article>').join(''):'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
+      '<span class="'+badgeClass(weekStatus.tone)+'" data-week-status role="status" title="'+esc(weekSummary)+'">'+weekStatus.label+'</span></nav>'+
+      (entries.length ? entries.map(entry=>'<article class="guide-weekly-card" data-weekly-card><div data-entry="'+esc(entry.entryId)+'" data-weekly-summary><header data-weekly-student-header><div><strong>'+esc(entry.student)+'</strong><small>'+esc(entry.regNo)+'</small></div><span>AI Quality '+qualityScore(entry.score)+'</span>'+submissionDeadline(node,entry)+'</header>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div><div class="guide-weekly-actions" data-weekly-actions data-sign-entry="'+esc(entry.entryId)+'"><span>Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="btn btn-sm '+(status==='DISCUSSED'?'btn-primary':'btn-outline')+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></article>').join(''):'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
     target.querySelectorAll('[data-week-step]').forEach(button=>button.onclick=()=>{if(node.busy || button.disabled)return;const next=node.data.weeks[weekIndex+Number(button.dataset.weekStep)];if(next){node.week=next;render(node);}});
     target.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>sign(node,button));
     reserveActionBarSpace(node);
@@ -321,7 +321,7 @@ function weeklyPhase2SetupBrowser_() {
       settle();if(!current(node))return;
       const target=node.querySelector('[data-weekly-setup-read]');target.textContent='';
       const summary=document.createElement('p');summary.textContent='Storage: '+(report.storageReady?'Ready':'Needs setup')+' · AI schedule: '+(report.triggerReady===true?'Ready':report.triggerReady===null?'Check with trigger owner':'Needs setup');target.appendChild(summary);
-      const actions=document.createElement('div');actions.className='assessment-storage-controls';target.appendChild(actions);
+      const actions=document.createElement('div');actions.className='';target.appendChild(actions);
       [['storage',report.storageReady,report.canSetupStorage,'Create weekly progress storage'],['triggers',report.triggerReady!==false,report.canSetupTriggers,'Create weekly AI schedule']].forEach(([kind,ready,allowed,label])=>{
         if(ready)return;
         const button=document.createElement('button');button.type='button';button.className='btn btn-primary';button.textContent=label;button.dataset.allowed=String(allowed);button.disabled=!allowed;button.onclick=()=>setup(node,kind);actions.appendChild(button);

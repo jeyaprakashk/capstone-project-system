@@ -105,9 +105,9 @@ function buildGuideTimingExplanation_(state, timestamp, deadline, schedule, acti
     const daysLate=state==='late' && schedule && Number.isFinite(timestamp) && Number.isFinite(deadline) ? projectDay_(new Date(timestamp),schedule.timezone)-deadline : 0;
     const label=daysLate>0 ? daysLate+' day'+(daysLate===1?'':'s')+' late' : '';
     const tooltipId='guideTimingTooltip'+(++guideTimingTooltipSequence_);
-    return '<span class="guide-timing-compact tooltip"><span tabindex="0" aria-describedby="'+tooltipId+'">'+(date?'<small>'+escapeHtml(date)+'</small>':'')+buildGuideTimingBadge_(state,explanation,false,label)+'</span><span class="tooltip-text" id="'+tooltipId+'" role="tooltip">'+escapeHtml(explanation)+'</span></span>';
+    return '<span class="tooltip"><span tabindex="0" aria-describedby="'+tooltipId+'">'+(date?'<small>'+escapeHtml(date)+'</small>':'')+buildGuideTimingBadge_(state,explanation,false,label)+'</span><span class="tooltip-text" id="'+tooltipId+'" role="tooltip">'+escapeHtml(explanation)+'</span></span>';
   }
-  return '<span class="guide-timing-detail">'+buildGuideTimingBadge_(state,explanation)+'<small>'+escapeHtml(explanation)+'</small></span>';
+  return '<span>'+buildGuideTimingBadge_(state,explanation)+'<small>'+escapeHtml(explanation)+'</small></span>';
 }
 
 function buildGuideGithubTiming_(member, schedule, clock) {
@@ -122,10 +122,10 @@ function buildGuideGithubTiming_(member, schedule, clock) {
 
 function buildGuideApprovalDetails_(row, TS, approvals, timing) {
   const key=normalizeText_(row[TS.TEAM_ID]);
-  return `<div class="guide-approval-details"><p><strong>Approved title:</strong> ${escapeHtml(row[TS.TITLE])}</p>
+  return `<div><p><strong>Approved title:</strong> ${escapeHtml(row[TS.TITLE])}</p>
     <p><strong>Scope:</strong> Not recorded separately.${row[TS.WORK_BREAKDOWN_LINK] ? ' See <a href="'+escapeHtml(row[TS.WORK_BREAKDOWN_LINK])+'" target="_blank" rel="noopener">Work Breakdown</a>.' : ''}</p>
     <p><strong>Approved by:</strong> ${escapeHtml(row[TS.TITLE_APPROVED_BY] || 'Not recorded')}</p>
-    <p class="guide-approved-on"><strong>Approved on:</strong> ${escapeHtml(approvals && approvals[key] || 'Date unavailable')} ${timing ? buildGuideTitleTiming_('APPROVED',timing.approvalTimes?.[key],timing.schedule,timing.clock,true,'guideTitleTiming-'+encodeURIComponent(key)) : ''}</p>
+    <p><strong>Approved on:</strong> ${escapeHtml(approvals && approvals[key] || 'Date unavailable')} ${timing ? buildGuideTitleTiming_('APPROVED',timing.approvalTimes?.[key],timing.schedule,timing.clock,true,'guideTitleTiming-'+encodeURIComponent(key)) : ''}</p>
     <p><strong>Reviewer comment:</strong> ${escapeHtml(row[TS.REVIEWER_NOTES] || 'No comment recorded')}</p></div>`;
 }
 
@@ -163,16 +163,16 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
   const title = r[TS.TITLE] ? escapeHtml(r[TS.TITLE]) : '<em>No title submitted yet</em>';
 
   const top = `
-    <div class="card-accent ${badge.cls}"></div>
+    <div class=" ${badge.cls}"></div>
     <div class="card-body">
-      <div class="card-top-row">
-        <span class="${guideBadgeClass_(badge.cls)}">${renderLucideIcon_('tag', '', 'icon-leading')}${badge.text}</span>
-        <span class="team-chip">Team ${teamId}</span>
+      <div>
+        <span class="${guideBadgeClass_(badge.cls)}">${renderLucideIcon_('tag')}${badge.text}</span>
+        <span>Team ${teamId}</span>
       </div>
-      <h3 class="card-title">${title}</h3>
-      <p class="card-sub">${renderLucideIcon_('users', '', 'icon-leading')}${names}</p>
-      ${logWeeks && logWeeks.missing ? `<p class="flag">${logWeeks.missing} student weekly log(s) overdue</p>` : ''}
-      ${status !== 'APPROVED' ? `<p class="card-sub">Title approval due ${formatProjectDay_(schedule.title)}${clock.today > schedule.title ? ' · Overdue' : ''}</p>` : ''}`;
+      <h3>${title}</h3>
+      <p>${renderLucideIcon_('users')}${names}</p>
+      ${logWeeks && logWeeks.missing ? `<p>${logWeeks.missing} student weekly log(s) overdue</p>` : ''}
+      ${status !== 'APPROVED' ? `<p>Title approval due ${formatProjectDay_(schedule.title)}${clock.today > schedule.title ? ' · Overdue' : ''}</p>` : ''}`;
 
 
   if (status === 'NOT_SUBMITTED') {
@@ -183,20 +183,20 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
 
   if (status === 'NEEDS_REVIEW') {
     return `<div class="event-card card" id="card-${teamId}">${top}
-      ${textEquals_(r[TS.REVIEWER_DECISION], 'Revise') ? `<p class="flag">Reviewer requested revision: ${escapeHtml(r[TS.REVIEWER_NOTES])}</p>` : ''}
-      <label for="title-${teamId}" class="field-label">Title (editable)</label>
-      <input type="text" id="title-${teamId}" value="${escapeHtml(r[TS.TITLE])}" class="title-input">
+      ${textEquals_(r[TS.REVIEWER_DECISION], 'Revise') ? `<p>Reviewer requested revision: ${escapeHtml(r[TS.REVIEWER_NOTES])}</p>` : ''}
+      <label for="title-${teamId}">Title (editable)</label>
+      <input type="text" id="title-${teamId}" value="${escapeHtml(r[TS.TITLE])}">
       ${buildProblemBlock(teamId, r[TS.PROBLEM])}
       ${buildDocumentLinks(r)}
       ${buildRepoLine(repoUrl)}
-      ${r[TS.SIMILARITY_FLAG] ? `<p class="flag">${escapeHtml(r[TS.SIMILARITY_FLAG])}</p>` : ''}
+      ${r[TS.SIMILARITY_FLAG] ? `<p>${escapeHtml(r[TS.SIMILARITY_FLAG])}</p>` : ''}
       <textarea id="notes-${teamId}" placeholder="Notes (optional, required if rejecting)"></textarea>
       <p class="status" id="status-${teamId}"></p>
-      <div class="card-divider"></div>
-      <div class="card-footer-row">
-        <div class="footer-actions">
-          <button class="mini revise btn btn-sm btn-outline" onclick="decide('${teamId}', 'Rejected')">Reject</button>
-          <button class="mini approve btn btn-sm btn-primary" onclick="decide('${teamId}', 'Approved')">Approve</button>
+      <div></div>
+      <div>
+        <div>
+          <button class="revise btn btn-sm btn-outline" onclick="decide('${teamId}', 'Rejected')">Reject</button>
+          <button class="approve btn btn-sm btn-primary" onclick="decide('${teamId}', 'Approved')">Approve</button>
         </div>
       </div>
     </div></div>`;
@@ -207,7 +207,7 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
       ${buildProblemBlock(teamId, r[TS.PROBLEM])}
       ${buildDocumentLinks(r)}
       ${buildRepoLine(repoUrl)}
-      <p class="status-label">You approved — awaiting Reviewer.</p>
+      <p>You approved — awaiting Reviewer.</p>
     </div></div>`;
   }
 
@@ -225,8 +225,8 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
       ${buildProblemBlock(teamId, r[TS.PROBLEM])}
       ${buildDocumentLinks(r)}
       ${buildRepoLine(repoUrl)}
-      <p class="card-sub"><strong>Your note:</strong> ${escapeHtml(r[TS.GUIDE_NOTES]) || '(none)'}</p>
-      <p class="status-label">Waiting on the team to resubmit.</p>
+      <p><strong>Your note:</strong> ${escapeHtml(r[TS.GUIDE_NOTES]) || '(none)'}</p>
+      <p>Waiting on the team to resubmit.</p>
     </div></div>`;
   }
 
@@ -235,8 +235,8 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
       ${buildProblemBlock(teamId, r[TS.PROBLEM])}
       ${buildDocumentLinks(r)}
       ${buildRepoLine(repoUrl)}
-      <p class="card-sub"><strong>Reviewer's note:</strong> ${escapeHtml(r[TS.REVIEWER_NOTES]) || '(none)'}</p>
-      <p class="status-label">Waiting for the team to resubmit — nothing for you to do until they do.</p>
+      <p><strong>Reviewer's note:</strong> ${escapeHtml(r[TS.REVIEWER_NOTES]) || '(none)'}</p>
+      <p>Waiting for the team to resubmit — nothing for you to do until they do.</p>
     </div></div>`;
   }
 }
@@ -244,12 +244,12 @@ function buildTeamCard(r, status, repoUrl, logWeeks, timing) {
 function buildProblemBlock(teamId, problemText, maxLen) {
   const full = String(problemText || '');
   if (!full) return '';
-  return `<div class="card-desc">${renderLucideIcon_('file-text', '', 'icon-leading')}${renderExpandableText_(full, maxLen || 130)}</div>`;
+  return `<div>${renderLucideIcon_('file-text')}${renderExpandableText_(full, maxLen || 130)}</div>`;
 }
 
 function buildRepoLine(repoUrl) {
   if (!repoUrl) return '';
-  return `<p class="card-sub">${renderLucideIcon_('link', '', 'icon-leading')}<a href="${escapeHtml(repoUrl)}" target="_blank" rel="noopener">${escapeHtml(repoUrl)}</a></p>`;
+  return `<p>${renderLucideIcon_('link')}<a href="${escapeHtml(repoUrl)}" target="_blank" rel="noopener">${escapeHtml(repoUrl)}</a></p>`;
 }
 
 function buildDocumentLinks(r, listView) {
@@ -260,15 +260,15 @@ function buildDocumentLinks(r, listView) {
     { label: 'Chapter 1 (LaTeX)', url: r[TS.CHAPTER1_LATEX_LINK] },
   ].filter(d => d.url);
   if (docs.length === 0) return '';
-  if (listView) return '<ul class="guide-document-list">'+docs.map(d=>`<li><strong>${d.label}</strong><a class="btn btn-sm btn-outline" href="${escapeHtml(d.url)}" target="_blank" rel="noopener">Open document</a></li>`).join('')+'</ul>';
+  if (listView) return '<ul>'+docs.map(d=>`<li><strong>${d.label}</strong><a class="btn btn-sm btn-outline" href="${escapeHtml(d.url)}" target="_blank" rel="noopener">Open document</a></li>`).join('')+'</ul>';
   const links = docs.map(d => `<a href="${escapeHtml(d.url)}" target="_blank" rel="noopener">${d.label}</a>`).join(' &middot; ');
-  return `<p class="card-sub">${renderLucideIcon_('file-text', '', 'icon-leading')}${links}</p>`;
+  return `<p>${renderLucideIcon_('file-text')}${links}</p>`;
 }
 
 function buildDashboardContent(email, data) {
   const { teams } = data;
   const teamCards = buildGuideWorkspace_(teams, data)
-    || '<p class="empty">You have no teams assigned.</p>';
+    || '<p>You have no teams assigned.</p>';
 
   return `
   ${buildDashboardContainerHeader_('Guide Dashboard', 'guide')}
@@ -291,7 +291,7 @@ function buildGuideEvaluationTab_(schedule, clock) {
   const evaluationOpens = definition ? definition.opens : null;
   const evaluationEnabled = evaluationOpens !== null && clock.today >= evaluationOpens;
   const evaluationNotice = evaluationOpens === null ? 'Guide Evaluation is not configured in AssessmentDefinitions.' : 'Available from ' + formatProjectDay_(evaluationOpens) + '.';
-  return `<button type="button" class="tile" data-guide-tab="evaluation" aria-pressed="false" ${evaluationEnabled ? 'onclick="GuideWeekly.selectView(\'evaluation\')"' : 'disabled title="'+escapeHtml(evaluationNotice)+'"'}><strong class="${evaluationEnabled ? '' : 'disabled-button-label'}">${evaluationEnabled ? renderLucideIcon_('graduation-cap', '', 'icon-leading') : renderLucideIcon_('lock-keyhole', '', 'icon-leading')}Guide Evaluation</strong><span class="${evaluationEnabled ? '' : 'disabled-button-caption'}">${evaluationEnabled ? 'Individual assessment' : escapeHtml(evaluationNotice)}</span></button>`;
+  return `<button type="button" class="tile" data-guide-tab="evaluation" aria-pressed="false" ${evaluationEnabled ? 'onclick="GuideWeekly.selectView(\'evaluation\')"' : 'disabled title="'+escapeHtml(evaluationNotice)+'"'}><strong>${evaluationEnabled ? renderLucideIcon_('graduation-cap') : renderLucideIcon_('lock-keyhole')}Guide Evaluation</strong><span>${evaluationEnabled ? 'Individual assessment' : escapeHtml(evaluationNotice)}</span></button>`;
 }
 
 function buildGuideWorkspace_(teams, data) {
@@ -305,10 +305,10 @@ function buildGuideWorkspace_(teams, data) {
   const selectors = teams.map((t, index) => {
     const r = t.row, id = escapeHtml(r[TS.TEAM_ID]);
     const count = [r[TS.S1_NAME],r[TS.S2_NAME],r[TS.S3_NAME],r[TS.S4_NAME]].filter(Boolean).length;
-    return `<button type="button" class="guide-team-option tile${index === 0 ? ' tile--selected marker-accent' : ''}" data-guide-select="${id}" data-title-attention="${t.status === 'NEEDS_REVIEW'}" data-documents-attention="${[r[TS.WORK_BREAKDOWN_LINK],r[TS.NEED_ANALYSIS_LINK],r[TS.CHAPTER1_LATEX_LINK]].filter(Boolean).length}" aria-pressed="${index === 0}" onclick="GuideWeekly.selectTeam(this.dataset.guideSelect)">
-      <span class="guide-team-option-top"><strong>Team ${id}</strong><span data-team-attention role="status">${t.status === 'NEEDS_REVIEW' ? '<span class="badge badge--warning">Title review &middot; 1</span>' : getSkeletonMarkup_('inline','Checking team actions')}</span></span>
-      <span class="guide-team-option-title">${escapeHtml(r[TS.TITLE] || 'No title submitted yet')}</span>
-      <span class="guide-team-option-meta">${renderLucideIcon_('users', '', 'icon-leading')}${count} member${count === 1 ? '' : 's'}</span>
+    return `<button type="button" class="tile${index === 0 ? ' tile--selected marker-accent' : ''}" data-guide-select="${id}" data-title-attention="${t.status === 'NEEDS_REVIEW'}" data-documents-attention="${[r[TS.WORK_BREAKDOWN_LINK],r[TS.NEED_ANALYSIS_LINK],r[TS.CHAPTER1_LATEX_LINK]].filter(Boolean).length}" aria-pressed="${index === 0}" onclick="GuideWeekly.selectTeam(this.dataset.guideSelect)">
+      <span><strong>Team ${id}</strong><span data-team-attention role="status">${t.status === 'NEEDS_REVIEW' ? '<span class="badge badge--warning">Title review &middot; 1</span>' : getSkeletonMarkup_('inline','Checking team actions')}</span></span>
+      <span>${escapeHtml(r[TS.TITLE] || 'No title submitted yet')}</span>
+      <span>${renderLucideIcon_('users')}${count} member${count === 1 ? '' : 's'}</span>
     </button>`;
   }).join('');
   const panels = teams.map((t,index) => {
@@ -316,163 +316,48 @@ function buildGuideWorkspace_(teams, data) {
     const students=[r[TS.S1_REGNO],r[TS.S2_REGNO],r[TS.S3_REGNO],r[TS.S4_REGNO]].filter(Boolean).map(String);
     // Reuse every existing form, field ID, decision handler and evaluation gate.
     const card=buildTeamCard(r,t.status,t.repoUrl,t.logWeeks,data)
-      .replace(/<div class="card-top-row">[\s\S]*?<h3 class="card-title">[\s\S]*?<\/h3>/, '')
-      .replace(`<p class="card-sub">${renderLucideIcon_('users', '', 'icon-leading')}${buildGuideMemberNames_(r, TS)}</p>`, '')
-      .replace(buildProblemBlock(escapeHtml(r[TS.TEAM_ID]), r[TS.PROBLEM]), r[TS.PROBLEM] ? `<div class="card-desc guide-problem-statement"><strong>Problem statement:</strong> <span class="guide-problem-desktop">${escapeHtml(String(r[TS.PROBLEM]))}</span><div class="guide-problem-mobile">${renderExpandableText_(String(r[TS.PROBLEM]),130)}</div></div>` : '')
+      .replace(/<div>[\s\S]*?<h3>[\s\S]*?<\/h3>/, '')
+      .replace(`<p>${renderLucideIcon_('users')}${buildGuideMemberNames_(r, TS)}</p>`, '')
+      .replace(buildProblemBlock(escapeHtml(r[TS.TEAM_ID]), r[TS.PROBLEM]), r[TS.PROBLEM] ? `<div class="guide-problem-statement"><strong>Problem statement:</strong> <span class="guide-problem-desktop">${escapeHtml(String(r[TS.PROBLEM]))}</span><div class="guide-problem-mobile">${renderExpandableText_(String(r[TS.PROBLEM]),130)}</div></div>` : '')
       .replace(buildDocumentLinks(r), '')
       .replace(buildRepoLine(t.repoUrl), '')
-      .replace('<div class="card-body">', `<div class="card-body"><div class="card-top-row guide-title-status"><h3 class="guide-title-review-heading">Title approval</h3><span class="${guideBadgeClass_(STATUS_LABEL[t.status].cls)}">Team ${escapeHtml(r[TS.TEAM_ID])} · ${STATUS_LABEL[t.status].text}</span>${t.status === 'APPROVED' ? '' : buildGuideTitleTiming_(t.status,data.approvalTimes?.[normalizeText_(r[TS.TEAM_ID])],data.schedule,data.clock)}</div>`);
+      .replace('<div class="card-body">', `<div class="card-body"><div><h3>Title approval</h3><span class="${guideBadgeClass_(STATUS_LABEL[t.status].cls)}">Team ${escapeHtml(r[TS.TEAM_ID])} · ${STATUS_LABEL[t.status].text}</span>${t.status === 'APPROVED' ? '' : buildGuideTitleTiming_(t.status,data.approvalTimes?.[normalizeText_(r[TS.TEAM_ID])],data.schedule,data.clock)}</div>`);
     const docs=buildDocumentLinks(r,true);
     const roster=[1,2,3,4].map(n=>({email:r[TS['S'+n+'_EMAIL']],regno:r[TS['S'+n+'_REGNO']],name:r[TS['S'+n+'_NAME']]}));
     const github=githubByTeam && githubByTeam[normalizeText_(r[TS.TEAM_ID])];
     const githubTone=!github || github.verificationUnavailable || github.accessError || github.members.some(member=>member.access==='unavailable') ? 'gray'
       : github.members.some(member=>!member.githubId) ? 'red'
       : github.members.length && github.members.every(member=>member.status==='valid' && member.access==='active') ? 'green' : 'orange';
-    const githubCard=`<aside class="guide-title-github"><div class="card-accent ${githubTone}"></div><div class="guide-title-github-body"><div class="guide-github-heading"><h3>GitHub status</h3><p class="card-sub">Due: ${Number.isFinite(data.schedule?.git) ? escapeHtml(formatProjectDay_(data.schedule.git)) : 'Date unavailable'}</p></div>${github ? '<ul class="github-team-status" aria-label="Team GitHub status">'+buildGithubMemberRows_(roster,github.members,'',true,member=>buildGuideGithubTiming_(member,data.schedule,data.clock))+'</ul>' : '<p role="status">GitHub status unavailable. Refresh the dashboard to retry.</p>'}${buildGithubRepositoryLine_(t.repoUrl,true)}</div></aside>`;
+    const githubCard=`<aside class="guide-title-github"><div class=" ${githubTone}"></div><div><div><h3>GitHub status</h3><p>Due: ${Number.isFinite(data.schedule?.git) ? escapeHtml(formatProjectDay_(data.schedule.git)) : 'Date unavailable'}</p></div>${github ? '<ul aria-label="Team GitHub status">'+buildGithubMemberRows_(roster,github.members,'',true,member=>buildGuideGithubTiming_(member,data.schedule,data.clock))+'</ul>' : '<p role="status">GitHub status unavailable. Refresh the dashboard to retry.</p>'}${buildGithubRepositoryLine_(t.repoUrl,true)}</div></aside>`;
 
     return `<section data-guide-team="${escapeHtml(r[TS.TEAM_ID])}" data-guide-students="${escapeHtml(JSON.stringify(students))}" ${index ? 'hidden' : ''}>
-      <div data-guide-view="title" class="guide-title-columns">${githubCard}<div class="guide-title-review">${card}</div></div>
-      <div data-guide-view="documents" class="guide-documents" hidden><h3>Team documents</h3>${docs || '<p>No documents submitted yet.</p><p>Last document submission: '+escapeHtml(data.documentSubmissions?.[normalizeText_(r[TS.TEAM_ID])] || 'None recorded')+'</p>'}<p class="card-sub">Open the submitted files to review the team’s work.</p></div>
+      <div data-guide-view="title">${githubCard}<div>${card}</div></div>
+      <div data-guide-view="documents" hidden><h3>Team documents</h3>${docs || '<p>No documents submitted yet.</p><p>Last document submission: '+escapeHtml(data.documentSubmissions?.[normalizeText_(r[TS.TEAM_ID])] || 'None recorded')+'</p>'}<p>Open the submitted files to review the team’s work.</p></div>
     </section>`;
   }).join('');
-  const headers=teams.map((t,index)=>`<header class="guide-team-heading" data-guide-heading="${escapeHtml(t.row[TS.TEAM_ID])}" ${index ? 'hidden' : ''}>
+  const headers=teams.map((t,index)=>`<header data-guide-heading="${escapeHtml(t.row[TS.TEAM_ID])}" ${index ? 'hidden' : ''}>
     <h3>${escapeHtml(t.row[TS.TITLE] || 'No title submitted yet')}</h3>
-    <div class="guide-heading-meta"><span>${renderLucideIcon_('users', '', 'icon-leading')}${buildGuideMemberNames_(t.row, TS)}</span>
+    <div><span>${renderLucideIcon_('users')}${buildGuideMemberNames_(t.row, TS)}</span>
     <a class="btn btn-sm btn-outline" href="mailto:${escapeHtml([t.row[TS.S1_EMAIL],t.row[TS.S2_EMAIL],t.row[TS.S3_EMAIL],t.row[TS.S4_EMAIL]].filter(Boolean).join(','))}?subject=${encodeURIComponent('Team '+t.row[TS.TEAM_ID]+' — Capstone Project')}">Email Team</a></div>
   </header>`).join('');
-  return `<div class="guide-workspace" data-guide-workspace>
-    <aside class="guide-team-list" aria-label="My teams"><div class="guide-list-heading"><h3>My teams</h3><span>${teams.length} teams</span></div>${selectors}</aside>
-    <div class="guide-team-main">${headers}
+  return `<div data-guide-workspace>
+    <aside aria-label="My teams"><div><h3>My teams</h3><span>${teams.length} teams</span></div>${selectors}</aside>
+    <div>${headers}
       <nav class="guide-view-nav" aria-label="Team workspace">
-        <button type="button" class="tile tile--selected" data-guide-tab="title" aria-pressed="true" onclick="GuideWeekly.selectView('title')"><strong>${renderLucideIcon_('tag', '', 'icon-leading')}Title review</strong><span>Submission &amp; decision</span></button>
-        <button type="button" class="tile" data-guide-tab="weekly" aria-pressed="false" onclick="GuideWeekly.selectView('weekly')"><strong>${renderLucideIcon_('trending-up', '', 'icon-leading')}Weekly progress</strong><span>Student updates &amp; discussion</span></button>
-        <button type="button" class="tile" data-guide-tab="documents" aria-pressed="false" onclick="GuideWeekly.selectView('documents')"><strong>${renderLucideIcon_('file-text', '', 'icon-leading')}Documents</strong><span>Submitted files</span></button>
+        <button type="button" class="tile tile--selected" data-guide-tab="title" aria-pressed="true" onclick="GuideWeekly.selectView('title')"><strong>${renderLucideIcon_('tag')}Title review</strong><span>Submission &amp; decision</span></button>
+        <button type="button" class="tile" data-guide-tab="weekly" aria-pressed="false" onclick="GuideWeekly.selectView('weekly')"><strong>${renderLucideIcon_('trending-up')}Weekly progress</strong><span>Student updates &amp; discussion</span></button>
+        <button type="button" class="tile" data-guide-tab="documents" aria-pressed="false" onclick="GuideWeekly.selectView('documents')"><strong>${renderLucideIcon_('file-text')}Documents</strong><span>Submitted files</span></button>
         ${buildGuideEvaluationTab_(data.schedule, data.clock)}
       </nav>
       ${panels}
-      <section id="guideWeeklyProgress" data-guide-weeks="${escapeHtml(JSON.stringify(getWeeklySubmissionWindows_().map(w=>({weekId:w.weekId,opensAt:w.opens_at,deadlineAt:w.deadline_at}))))}" class="assessment-section card" hidden aria-label="Weekly progress confirmation">
-        <div class="tab-header"><div><h2>Weekly Progress</h2></div></div>
+      <section id="guideWeeklyProgress" data-guide-weeks="${escapeHtml(JSON.stringify(getWeeklySubmissionWindows_().map(w=>({weekId:w.weekId,opensAt:w.opens_at,deadlineAt:w.deadline_at}))))}" class="card" hidden aria-label="Weekly progress confirmation">
+        <div><div><h2>Weekly Progress</h2></div></div>
         <p data-guide-weekly-status role="status"></p>
         <div data-guide-weekly-read>${getSkeletonMarkup_('panel','Reading weekly progress')}</div>
       </section>
-  <section id="guideEvaluationEditor" class="assessment-section card" hidden aria-label="Guide evaluation editor"></section>
+  <section id="guideEvaluationEditor" class="card" hidden aria-label="Guide evaluation editor"></section>
     </div>
   </div>`;
-}
-
-function getGuideStyles() {
-  return `${getBaseStyles()}
-${getStatCardStyles()}
-${getCardStyles()}
-${getButtonStyles()}
-${getFormElementStyles()}
-body[data-dashboard-theme="editorial"] .guide-workspace { display:grid; grid-template-columns:minmax(210px,270px) minmax(0,1fr); gap:var(--space-6); align-items:start; }
-body[data-dashboard-theme="editorial"] .guide-workspace [hidden] { display:none !important; }
-body[data-dashboard-theme="editorial"] .guide-workspace .guide-title-status { justify-content:space-between; gap:var(--space-3); flex-wrap:wrap; }
-body[data-dashboard-theme="editorial"] .guide-title-review-heading { margin:0; }
-body[data-dashboard-theme="editorial"] .guide-problem-desktop { white-space:pre-wrap; overflow-wrap:anywhere; }
-body[data-dashboard-theme="editorial"] .guide-problem-mobile { display:none; }
-@media(max-width:760px) {
-  body[data-dashboard-theme="editorial"] .guide-problem-desktop { display:none; }
-  body[data-dashboard-theme="editorial"] .guide-problem-mobile { display:inline; }
-}
-body[data-dashboard-theme="editorial"] .guide-title-columns { display:grid; grid-template-columns:minmax(320px,.85fr) minmax(0,1.45fr); gap:var(--space-4); align-items:stretch; }
-body[data-dashboard-theme="editorial"] .guide-title-columns > * { min-width:0; }
-body[data-dashboard-theme="editorial"] .guide-title-github { background:var(--paper); border:1px solid var(--border); border-radius:var(--radius-card); overflow:hidden; }
-body[data-dashboard-theme="editorial"] .guide-title-github-body { padding:var(--space-4); }
-body[data-dashboard-theme="editorial"] .guide-title-review { display:flex; }
-body[data-dashboard-theme="editorial"] .guide-title-review > .event-card { flex:1; min-width:0; }
-body[data-dashboard-theme="editorial"] .guide-title-timing-popover { position:fixed; inset:auto; margin:0; width:360px; max-height:calc(100dvh - 16px); overflow:auto; box-sizing:border-box; max-width:min(360px,calc(100vw - 32px)); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--radius-btn); background:var(--paper); color:var(--text); font:var(--fs-body)/var(--lh-body) var(--font); box-shadow:var(--shadow-card); overflow-wrap:anywhere; }
-body[data-dashboard-theme="editorial"] .guide-approved-on .btn { vertical-align:middle; }
-body[data-dashboard-theme="editorial"] .guide-approved-on :is(.badge,.chip) { margin-left:6px; vertical-align:middle; }
-body[data-dashboard-theme="editorial"] .guide-approval-details p { white-space:pre-wrap; overflow-wrap:anywhere; }
-body[data-dashboard-theme="editorial"] .guide-title-github .github-member-register { overflow-wrap:anywhere; }
-body[data-dashboard-theme="editorial"] .guide-timing-detail { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-body[data-dashboard-theme="editorial"] .guide-timing-detail small { display:block; flex-basis:100%; font-size:var(--fs-meta); line-height:var(--lh-body); color:var(--text); }
-body[data-dashboard-theme="editorial"] .github-member-timing { grid-column:1 / -1; }
-body[data-dashboard-theme="editorial"] .guide-github-heading { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px var(--space-3); margin-bottom:var(--space-3); }
-body[data-dashboard-theme="editorial"] .guide-github-heading h3,body[data-dashboard-theme="editorial"] .guide-github-heading .card-sub { margin:0; }
-body[data-dashboard-theme="editorial"] .guide-github-heading .card-sub { margin-left:auto; }
-body[data-dashboard-theme="editorial"] .guide-title-github .github-member-status { display:flex; flex-wrap:wrap; align-items:center; gap:5px var(--space-2); padding:var(--space-2) 0; }
-body[data-dashboard-theme="editorial"] .guide-title-github .github-member-register { flex-basis:100%; }
-body[data-dashboard-theme="editorial"] .guide-title-github .github-member-state { font-size:var(--fs-meta); gap:var(--space-1); }
-body[data-dashboard-theme="editorial"] .guide-title-github .github-member-timing { margin-left:auto; }
-body[data-dashboard-theme="editorial"] .guide-timing-compact { display:inline-flex; align-items:center; gap:6px; }
-body[data-dashboard-theme="editorial"] .guide-timing-compact small { font-size:var(--fs-meta); white-space:nowrap; color:var(--text); }
-body[data-dashboard-theme="editorial"] .guide-title-github .github-team-repository a { white-space:normal; overflow:visible; overflow-wrap:anywhere; text-overflow:clip; }
-@media(max-width:1100px) { body[data-dashboard-theme="editorial"] .guide-title-columns { grid-template-columns:minmax(0,1fr); align-items:start; } body[data-dashboard-theme="editorial"] .guide-title-review { display:block; } }
-body[data-dashboard-theme="editorial"] .guide-team-main { min-width:0; overflow-wrap:anywhere; }
-body[data-dashboard-theme="editorial"] .guide-list-heading { display:flex; justify-content:space-between; align-items:center; gap:var(--space-3); margin-bottom:var(--space-3); }
-body[data-dashboard-theme="editorial"] .guide-list-heading h3 { margin:0; }
-body[data-dashboard-theme="editorial"] .guide-team-option { display:block; width:100%; margin:0 0 10px; text-align:left; cursor:pointer; }
-body[data-dashboard-theme="editorial"] .guide-team-option-top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--space-2); }
-body[data-dashboard-theme="editorial"] .guide-team-option-title { display:block; white-space:normal; overflow-wrap:anywhere; margin:10px 0; line-height:var(--lh-body); }
-body[data-dashboard-theme="editorial"] .guide-team-option-meta,body[data-dashboard-theme="editorial"] .guide-view-nav span,body[data-dashboard-theme="editorial"] .guide-list-heading > span { font-size:var(--fs-meta); color:var(--text); }
-body[data-dashboard-theme="editorial"] .guide-heading-meta { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:var(--space-3); }
-body[data-dashboard-theme="editorial"] .guide-heading-meta > span { min-width:0; overflow-wrap:anywhere; }
-body[data-dashboard-theme="editorial"] .guide-heading-meta > a { justify-self:end; }
-body[data-dashboard-theme="editorial"] .guide-team-heading h3 { font-family:var(--font); font-size:var(--fs-h3); font-weight:var(--fw-semibold); line-height:var(--lh-heading); margin:var(--space-3) 0; }
-body[data-dashboard-theme="editorial"] .guide-view-nav { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:var(--space-5) 0; }
-body[data-dashboard-theme="editorial"] .guide-view-nav button { display:flex; flex-direction:column; gap:5px; text-align:left; cursor:pointer; }
-body[data-dashboard-theme="editorial"] .guide-view-nav [data-guide-tab-attention] { display:inline-flex; font-size:var(--fs-meta); }
-body[data-dashboard-theme="editorial"] .guide-view-nav [data-guide-tab-attention][hidden] { display:none; }
-body[data-dashboard-theme="editorial"] .guide-view-nav button > strong { display:flex; align-items:center; gap:6px; }
-body[data-dashboard-theme="editorial"] .guide-view-nav button > strong .lucide-icon { width:16px; height:16px; flex:none; margin:0; }
-body[data-dashboard-theme="editorial"] .guide-workspace :is(.guide-team-option,.guide-view-nav button):focus-visible { outline:3px solid var(--primary); outline-offset:3px; }
-body[data-dashboard-theme="editorial"] .guide-document-list { list-style:none; padding:0; margin:0; }
-body[data-dashboard-theme="editorial"] .guide-document-list li { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-4) 0; border-bottom:1px solid var(--border); }
-body[data-dashboard-theme="editorial"] .guide-documents { padding:var(--space-5); border:1px solid var(--border); border-radius:var(--radius-card); background:var(--paper); }
-body[data-dashboard-theme="editorial"] .guide-workspace .card-footer-row { justify-content:flex-end; }
-body[data-dashboard-theme="editorial"] .guide-workspace .event-card { margin:0; }
-body[data-dashboard-theme="editorial"] .guide-workspace .assessment-section { margin-top:0; }
-body[data-dashboard-theme="editorial"] .guide-week-navigation { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); margin:var(--space-3) 0; }
-body[data-dashboard-theme="editorial"] .guide-week-status { margin-left:auto; }
-body[data-dashboard-theme="editorial"] .guide-week-label { padding:var(--space-2) var(--space-4); border:1px solid var(--border); border-radius:var(--radius-badge); font-weight:var(--fw-semibold); font-variant-numeric:tabular-nums; background:var(--paper); }
-body[data-dashboard-theme="editorial"] .guide-weekly-card { margin:18px 0; border:1px solid var(--border); border-top:3px solid var(--primary); border-radius:var(--radius-card); background:var(--paper); overflow:visible; position:relative; }
-body[data-dashboard-theme="editorial"] .guide-weekly-summary { padding:var(--space-4) var(--space-4) calc(var(--space-4) + var(--guide-action-reserve,0px)); }
-body[data-dashboard-theme="editorial"] .guide-weekly-student-header { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:var(--space-3); margin:-var(--space-4) -var(--space-4) 14px; padding:14px var(--space-4); background:var(--tint); border-bottom:1px solid var(--border); }
-body[data-dashboard-theme="editorial"] .guide-weekly-student-header > div { min-width:0; overflow-wrap:anywhere; }
-body[data-dashboard-theme="editorial"] .guide-weekly-summary small { display:block; color:var(--muted); }
-body[data-dashboard-theme="editorial"] .guide-weekly-summary > .weekly-log-answer { margin:0; }
-body[data-dashboard-theme="editorial"] .guide-weekly-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-4) var(--space-6); }
-body[data-dashboard-theme="editorial"] .guide-weekly-fields p { margin:0; white-space:pre-line; overflow-wrap:anywhere; }
-body[data-dashboard-theme="editorial"] .guide-weekly-student-header > .guide-weekly-deadline { justify-self:end; text-align:right; }
-body[data-dashboard-theme="editorial"] .guide-weekly-score { text-align:center; }
-body[data-dashboard-theme="editorial"] .guide-question { display:block; margin-bottom:6px; color:var(--primary-hover); font-size:var(--fs-meta); font-weight:var(--fw-bold); }
-body[data-dashboard-theme="editorial"] .guide-question-blockers { color:var(--warning); }
-body[data-dashboard-theme="editorial"] .guide-question-next { color:var(--primary); }
-body[data-dashboard-theme="editorial"] .guide-weekly-evidence { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:var(--space-5); border-top:1px solid var(--border); margin-top:22px; padding-top:var(--space-4); }
-body[data-dashboard-theme="editorial"] .guide-weekly-evidence > section { min-width:0; overflow-wrap:anywhere; }
-body[data-dashboard-theme="editorial"] .guide-weekly-evidence > section + section { border-left:1px solid var(--border); padding-left:var(--space-5); }
-body[data-dashboard-theme="editorial"] .guide-weekly-evidence h4 { margin:0 0 10px; font:var(--fw-semibold) var(--fs-meta) var(--font); }
-body[data-dashboard-theme="editorial"] .guide-weekly-evidence dl { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px var(--space-3); }
-body[data-dashboard-theme="editorial"] .guide-weekly-evidence dd { margin:0; }
-body[data-dashboard-theme="editorial"] .guide-commit-list { list-style:none; margin:0; padding:0; }
-body[data-dashboard-theme="editorial"] .guide-commit-list li { display:grid; grid-template-columns:auto minmax(0,1fr); gap:var(--space-1) 10px; padding:7px 0; }
-body[data-dashboard-theme="editorial"] .guide-commit-list code { font-family:var(--font-mono); font-size:var(--fs-badge); background:var(--canvas); border-radius:var(--radius-badge); padding:2px 6px; }
-body[data-dashboard-theme="editorial"] .guide-commit-list time { grid-column:2; font-size:var(--fs-meta); color:var(--muted); }
-@media(max-width:800px) {
-  body[data-dashboard-theme="editorial"] .guide-weekly-evidence { grid-template-columns:minmax(0,1fr); }
-  body[data-dashboard-theme="editorial"] .guide-weekly-evidence > section + section { border-left:0; border-top:1px solid var(--border); padding:var(--space-4) 0 0; }
-  body[data-dashboard-theme="editorial"] .guide-weekly-student-header { grid-template-columns:minmax(0,1fr) auto; }
-  body[data-dashboard-theme="editorial"] .guide-weekly-score { grid-column:1; grid-row:2; text-align:left; }
-  body[data-dashboard-theme="editorial"] .guide-weekly-student-header > .guide-weekly-deadline { grid-column:2; grid-row:1 / 3; }
-}
-body[data-dashboard-theme="editorial"] .guide-weekly-actions { position:relative; bottom:0; z-index:var(--z-sticky); border-radius:0 0 var(--radius-btn) var(--radius-btn); display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:10px; padding:14px var(--space-4); border-top:1px solid var(--border); background:var(--canvas); }
-body[data-dashboard-theme="editorial"] .guide-weekly-card[data-sticky-decision="true"] .guide-weekly-actions { position:sticky; }
-body[data-dashboard-theme="editorial"] .guide-weekly-actions > span { flex:1; }
-@media(max-width:900px) {
-  body[data-dashboard-theme="editorial"] .guide-workspace { grid-template-columns:minmax(0,1fr); gap:var(--space-4); }
-  body[data-dashboard-theme="editorial"] .guide-team-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-  body[data-dashboard-theme="editorial"] .guide-list-heading { grid-column:1/-1; }
-  body[data-dashboard-theme="editorial"] .guide-team-option { margin:0; }
-}
-@media(max-width:540px) {
-  body[data-dashboard-theme="editorial"] .guide-team-list,body[data-dashboard-theme="editorial"] .guide-weekly-fields { grid-template-columns:minmax(0,1fr); }
-  body[data-dashboard-theme="editorial"] .guide-view-nav { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
-  body[data-dashboard-theme="editorial"] .guide-view-nav span { display:none; }
-}
-body { max-width: 720px; margin: 28px auto; padding: 0 var(--space-4); }`;
 }
 
 function buildDashboardPage(email, data) {

@@ -10,9 +10,9 @@ function renderExpandableText_(value, maxLen = 130) {
   const escape = text => text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   if (full.length <= maxLen) return escape(full);
   return '<details class="expandable-text"><summary><span class="expandable-text-preview">' +
-    escape(full.slice(0, maxLen).trim()) + '&hellip; <em class="expand-hint">more</em></span>' +
+    escape(full.slice(0, maxLen).trim()) + '&hellip; <em>more</em></span>' +
     '<span class="expandable-text-full">' + escape(full) +
-    ' <em class="expand-hint">less</em></span></summary></details>';
+    ' <em>less</em></span></summary></details>';
 }
 
 /** Shared confirmation, notice and short-text dialog using the framework modal. */
@@ -250,8 +250,8 @@ const DashboardUI = (function() {
     const next = milestones.findIndex(m => m.day >= data.today);
     const start = Math.max(0, (next < 0 ? milestones.length : next) - 2);
     const finish = next < 0 ? milestones.length : Math.min(milestones.length, next + 3);
-    target.innerHTML = '<div class="timeline-heading"><h2>Project timeline</h2>' +
-      (milestones.length ? '<button type="button" class="timeline-toggle btn btn-sm btn-outline" data-timeline-toggle aria-expanded="false" aria-controls="projectTimelineMilestones">View full timeline</button>' : '') + '</div>' +
+    target.innerHTML = '<div><h2>Project timeline</h2>' +
+      (milestones.length ? '<button type="button" class="btn btn-sm btn-outline" data-timeline-toggle aria-expanded="false" aria-controls="projectTimelineMilestones">View full timeline</button>' : '') + '</div>' +
       (!milestones.length ? '<p class="timeline-empty">No project milestones scheduled</p>' : '') +
       '<ol id="projectTimelineMilestones" class="timeline-track" data-timeline-track style="--timeline-stops:' + (finish-start) + '">' + milestones.map(function(m,index) {
         const past = m.day < data.today, current = index === next;
@@ -260,11 +260,11 @@ const DashboardUI = (function() {
         const days = m.day - data.today;
         const timing = current ? 'CURRENT · ' + (days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : 'Due in ' + days + ' days')
           : !past ? (days === 0 ? 'Due today' : 'In ' + days + (days === 1 ? ' day' : ' days')) : '';
-        return '<li data-timeline-stop class="timeline-stop timeline-' + (past ? 'past' : current ? 'current' : 'future') + '" data-timeline-mobile="' + mobileContext + '" data-timeline-context="' + (index >= start && index < finish) + '"' + (index < start || index >= finish ? ' hidden' : '') + (current ? ' aria-current="step"' : '') + '>' +
-          '<span class="stage-dot circle" aria-hidden="true">' + (past ? renderLucideIcon_('check') : current ? '<span class="timeline-node-core circle"></span>' : '') + '</span>' +
+        return '<li data-timeline-stop class="timeline-stop" data-timeline-state="' + (past ? 'past' : current ? 'current' : 'future') + '" data-timeline-mobile="' + mobileContext + '" data-timeline-context="' + (index >= start && index < finish) + '"' + (index < start || index >= finish ? ' hidden' : '') + (current ? ' aria-current="step"' : '') + '>' +
+          '<span class="circle" aria-hidden="true">' + (past ? renderLucideIcon_('check') : current ? '<span class="circle"></span>' : '') + '</span>' +
           '<strong>' + escapeClientHtml(m.label) + '</strong>' +
-          '<span class="timeline-date" title="' + escapeClientHtml(description) + '" aria-label="' + escapeClientHtml(description) + '">' + escapeClientHtml(m.date) + '</span>' +
-          (timing ? '<span class="timeline-timing">' + timing + '</span>' : '') + '</li>';
+          '<span data-timeline-date title="' + escapeClientHtml(description) + '" aria-label="' + escapeClientHtml(description) + '">' + escapeClientHtml(m.date) + '</span>' +
+          (timing ? '<span data-timeline-timing>' + timing + '</span>' : '') + '</li>';
       }).join('') + '</ol>';
     const toggle = target.querySelector('[data-timeline-toggle]');
     if (toggle) toggle.addEventListener('click', function() {
@@ -304,7 +304,7 @@ const DashboardUI = (function() {
         timelineRequest = null;
         if (target) {
           target.setAttribute('aria-busy', 'false');
-          target.innerHTML = '<div class="timeline-heading"><h2>Project timeline</h2><span role="status">Schedule unavailable</span><button type="button" class="timeline-retry btn btn-sm btn-outline" data-timeline-retry>Retry</button></div>';
+          target.innerHTML = '<div><h2>Project timeline</h2><span role="status">Schedule unavailable</span><button type="button" class="btn btn-sm btn-outline" data-timeline-retry>Retry</button></div>';
           target.querySelector('[data-timeline-retry]').addEventListener('click', function() { loadSharedTimeline().catch(function() {}); });
         }
         reject(err);
@@ -330,9 +330,9 @@ const DashboardUI = (function() {
     rubricsRequest = new Promise(function(resolve, reject) {
       dashboardRun().withSuccessHandler(function(data) {
         try {
-          target.innerHTML = '<div class="rubric-assessments">' + data.assessments.map(function(item) {
-            const desktopCard = '<button type="button" class="rubric-assessment tile' + (item.available ? '' : ' tile--locked') + '" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span class="rubric-header"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-weight">' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span class="rubric-footer"><span class="rubric-metadata">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span class="rubric-action"><span class="rubric-mobile-hidden">View rubric</span> '+renderLucideIcon_('arrow-right')+'</span>' : '') + '</span></button>';
-            const mobileRow = '<div class="rubric-mobile-row"><div class="rubric-mobile-details"><div class="rubric-mobile-title"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-mobile-weight" aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span class="rubric-mobile-meta">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="rubric-view-button btn btn-sm btn-outline" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
+          target.innerHTML = '<div>' + data.assessments.map(function(item) {
+            const desktopCard = '<button type="button" class="rubric-assessment tile' + (item.available ? '' : ' tile--locked') + '" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span><strong>' + escapeClientHtml(item.label) + '</strong><span>' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span><span>' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span><span class="rubric-mobile-hidden">View rubric</span> '+renderLucideIcon_('arrow-right')+'</span>' : '') + '</span></button>';
+            const mobileRow = '<div class="rubric-mobile-row"><div><div><strong>' + escapeClientHtml(item.label) + '</strong><span aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span>' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="btn btn-sm btn-outline" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
             return desktopCard + mobileRow;
           }).join('') + '</div>' + (data.assessments.length ? '' : '<p>No graded assessments configured.</p>');
           sharedRubrics = data;
@@ -359,8 +359,8 @@ const DashboardUI = (function() {
     if (!item || !item.available || !drawer) return;
     closeCoordinatorTeamDrawer();
     byId('rubricDrawerTitle').textContent = item.label;
-    byId('rubricDrawerContent').innerHTML = '<div class="drawer-section"><div class="drawer-section-title">Assessment contribution</div><div class="drawer-project-title">' + escapeClientHtml(item.weight) + '% of overall assessment</div><p class="drawer-person-meta">' + escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks</p>' + (item.evaluationNotice ? '<p class="drawer-person-meta">'+escapeClientHtml(item.evaluator)+' · '+escapeClientHtml(item.evaluationNotice)+'</p>' : '') + '</div>' + item.criteria.map(function(c) {
-      return '<section class="drawer-section"><div class="drawer-section-title">' + escapeClientHtml(c.pi) + ' · ' + escapeClientHtml(c.co) + ' · ' + escapeClientHtml(c.type) + ' · ' + escapeClientHtml(c.maxMarks) + ' marks</div><h3 class="drawer-project-title">' + escapeClientHtml(c.name) + '</h3><dl class="rubric-levels">' + c.descriptors.map(function(text, level) {
+    byId('rubricDrawerContent').innerHTML = '<div><div>Assessment contribution</div><div>' + escapeClientHtml(item.weight) + '% of overall assessment</div><p>' + escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks</p>' + (item.evaluationNotice ? '<p>'+escapeClientHtml(item.evaluator)+' · '+escapeClientHtml(item.evaluationNotice)+'</p>' : '') + '</div>' + item.criteria.map(function(c) {
+      return '<section><div>' + escapeClientHtml(c.pi) + ' · ' + escapeClientHtml(c.co) + ' · ' + escapeClientHtml(c.type) + ' · ' + escapeClientHtml(c.maxMarks) + ' marks</div><h3>' + escapeClientHtml(c.name) + '</h3><dl>' + c.descriptors.map(function(text, level) {
         return text ? '<dt>Level ' + level + '</dt><dd>' + escapeClientHtml(text) + '</dd>' : '';
       }).join('') + '</dl></section>';
     }).join('');
@@ -490,12 +490,12 @@ const DashboardUI = (function() {
         finishLoading();
         loadingRoleTabs[activeKey] = false;
         if (onError) { onError(err); return; }
-        if (refreshButton) { refreshButton.disabled = false; refreshButton.innerHTML = renderLucideIcon_('refresh-cw', '', 'icon-leading') + 'Refresh'; }
+        if (refreshButton) { refreshButton.disabled = false; refreshButton.innerHTML = renderLucideIcon_('refresh-cw') + 'Refresh'; }
         if (hadContent) {
           setText(activeKey + 'RefreshStatus', 'Could not refresh: ' + errorMessage(err) + '. Previous content is still shown.');
           return;
         }
-        target.innerHTML = '<div class="role-load-error">Unable to load this dashboard: ' +
+        target.innerHTML = '<div>Unable to load this dashboard: ' +
           escapeClientHtml(errorMessage(err)) + '</div>';
       })
       .loadDashboardRoleContent(activeKey);
@@ -576,12 +576,12 @@ const DashboardUI = (function() {
         announcementsState.loaded = hadContent;
         target.setAttribute('aria-busy', 'false');
         if (hadContent) {
-          if (refreshButton) { refreshButton.disabled = false; refreshButton.innerHTML = renderLucideIcon_('refresh-cw', '', 'icon-leading') + 'Refresh'; }
+          if (refreshButton) { refreshButton.disabled = false; refreshButton.innerHTML = renderLucideIcon_('refresh-cw') + 'Refresh'; }
           if (status) status.textContent = 'Could not refresh. Your previous announcements are still shown. Try again.';
           return;
         }
-        target.innerHTML = '<div class="role-load-error">Unable to load announcements: ' +
-          escapeClientHtml(errorMessage(err)) + '<button type="button" class="announcement-refresh-btn btn btn-sm btn-outline" data-refresh-button onclick="refreshAnnouncements()">Try again</button></div>';
+        target.innerHTML = '<div>Unable to load announcements: ' +
+          escapeClientHtml(errorMessage(err)) + '<button type="button" class="btn btn-sm btn-outline" data-refresh-button onclick="refreshAnnouncements()">Try again</button></div>';
       })
       .loadAnnouncementsForCurrentUser();
   }
@@ -625,7 +625,7 @@ const DashboardUI = (function() {
       systemStatusState.loading = false;
       systemStatusState.loaded = true;
       target.setAttribute('aria-busy', 'false');
-      if (button) { button.disabled = false; button.innerHTML = renderLucideIcon_('refresh-cw', '', 'icon-leading') + 'Refresh'; }
+      if (button) { button.disabled = false; button.innerHTML = renderLucideIcon_('refresh-cw') + 'Refresh'; }
       setText('systemStatusMessage', '');
       setText('systemStatusUpdated', updatedLabel());
       reviewConfigurationValid = false;
@@ -637,7 +637,7 @@ const DashboardUI = (function() {
       finishCards.forEach(function(finish) { finish(); });
       systemStatusState.loading = false;
       target.setAttribute('aria-busy', 'false');
-      if (button) { button.disabled = false; button.innerHTML = renderLucideIcon_('refresh-cw', '', 'icon-leading') + 'Refresh'; }
+      if (button) { button.disabled = false; button.innerHTML = renderLucideIcon_('refresh-cw') + 'Refresh'; }
       buttons.forEach(function(item) { item.el.disabled = item.disabled; });
       if (!systemStatusState.loaded) target.textContent = 'System status is unavailable.';
       setText('systemStatusMessage', 'Unable to load system status: ' + errorMessage(err) + '. Select Refresh to retry.');
@@ -698,7 +698,6 @@ const DashboardUI = (function() {
   }
 
   function showRoleTab(activeKey) {
-    document.body.setAttribute('data-dashboard-theme', 'editorial');
     activeRole = activeKey;
     const timeline = byId('sharedProjectTimeline');
     if (timeline) timeline.hidden = activeKey !== 'rubrics';
@@ -968,8 +967,8 @@ const DashboardUI = (function() {
       const btn = document.createElement('button');btn.className='page-link';
       btn.type = 'button';
       btn.textContent = label;
-      if (label === 'Previous') btn.innerHTML = renderLucideIcon_('chevron-left', '', 'icon-leading') + 'Previous';
-      if (label === 'Next') btn.innerHTML = 'Next' + renderLucideIcon_('chevron-right', '', 'icon-trailing');
+      if (label === 'Previous') btn.innerHTML = renderLucideIcon_('chevron-left') + 'Previous';
+      if (label === 'Next') btn.innerHTML = 'Next' + renderLucideIcon_('chevron-right');
       btn.disabled = !!disabled;
       if (active) { btn.classList.add('active'); btn.setAttribute('aria-current', 'page'); }
       btn.addEventListener('click', function() {
@@ -991,7 +990,7 @@ const DashboardUI = (function() {
       addButton('1', 1, false, state.page === 1);
       if (firstPage > 2) {
         const dots = document.createElement('span');
-        dots.className = 'pagination-ellipsis';
+        dots.className = '';
         dots.textContent = '…';
         buttons.appendChild(dots);
       }
@@ -1004,7 +1003,7 @@ const DashboardUI = (function() {
     if (lastPage < totalPages) {
       if (lastPage < totalPages - 1) {
         const dots = document.createElement('span');
-        dots.className = 'pagination-ellipsis';
+        dots.className = '';
         dots.textContent = '…';
         buttons.appendChild(dots);
       }
@@ -1093,11 +1092,11 @@ const DashboardUI = (function() {
     const studentsHtml = data.students && data.students.length
       ? data.students.map(function(student) {
           return (
-            '<div class="drawer-person">' +
-              '<div class="drawer-person-name">' +
+            '<div>' +
+              '<div>' +
                 escapeDrawerHtml(student.name || 'Student') +
               '</div>' +
-              '<div class="drawer-person-meta">' +
+              '<div>' +
                 escapeDrawerHtml(student.regNo || '') +
                 (student.regNo && student.email ? ' · ' : '') +
                 escapeDrawerHtml(student.email || '') +
@@ -1105,72 +1104,72 @@ const DashboardUI = (function() {
             '</div>'
           );
         }).join('')
-      : '<div class="drawer-person-meta">No student details available.</div>';
+      : '<div>No student details available.</div>';
 
     const reviewersHtml = data.reviewers && data.reviewers.length
       ? data.reviewers.map(function(reviewer) {
           return (
-            '<div class="drawer-person">' +
-              '<div class="drawer-person-name">' +
+            '<div>' +
+              '<div>' +
                 escapeDrawerHtml(reviewer.name || 'Reviewer') +
               '</div>' +
-              '<div class="drawer-person-meta">' +
+              '<div>' +
                 escapeDrawerHtml(reviewer.email || '') +
               '</div>' +
             '</div>'
           );
         }).join('')
-      : '<div class="drawer-person-meta">Committee details not available.</div>';
+      : '<div>Committee details not available.</div>';
 
     const repoHtml = data.repoUrl
-      ? '<a class="drawer-repo-link btn btn-outline" href="' +
+      ? '<a class="btn btn-outline" href="' +
           escapeDrawerHtml(data.repoUrl) +
           '" target="_blank" rel="noopener">' +
           escapeDrawerHtml(data.repoUrl) +
         '</a>'
-      : '<span class="drawer-status-warn">Pending</span>';
+      : '<span>Pending</span>';
 
     const sections = [
-      '<div class="drawer-section">' +
-        '<div class="drawer-section-title">Project</div>' +
-        '<div class="drawer-project-title">' +
+      '<div>' +
+        '<div>Project</div>' +
+        '<div>' +
           escapeDrawerHtml(data.title || '(Title not submitted)') +
         '</div>' +
         (
           data.problem
-            ? '<div class="drawer-problem">' +
+            ? '<div>' +
                 renderExpandableText(data.problem) +
               '</div>'
             : ''
         ) +
       '</div>',
 
-      '<div class="drawer-section">' +
-        '<div class="drawer-section-title">Guide</div>' +
-        '<div class="drawer-info-grid">' +
-          '<div class="drawer-info-card card">' +
-            '<div class="drawer-info-label">Guide</div>' +
-            '<div class="drawer-info-value">' +
+      '<div>' +
+        '<div>Guide</div>' +
+        '<div>' +
+          '<div class="card">' +
+            '<div>Guide</div>' +
+            '<div>' +
               escapeDrawerHtml(data.guideName || '—') +
             '</div>' +
           '</div>' +
 
-          '<div class="drawer-info-card card">' +
-            '<div class="drawer-info-label">Email</div>' +
-            '<div class="drawer-info-value">' +
+          '<div class="card">' +
+            '<div>Email</div>' +
+            '<div>' +
               escapeDrawerHtml(data.guideEmail || '—') +
             '</div>' +
           '</div>' +
         '</div>' +
       '</div>',
 
-      '<div class="drawer-section">' +
-        '<div class="drawer-section-title">Students</div>' +
+      '<div>' +
+        '<div>Students</div>' +
         studentsHtml +
       '</div>',
 
-      '<div class="drawer-section">' +
-        '<div class="drawer-section-title">' +
+      '<div>' +
+        '<div>' +
           'Review Committee' +
           (
             data.committeeNumber
@@ -1181,72 +1180,72 @@ const DashboardUI = (function() {
         reviewersHtml +
       '</div>',
 
-      '<div class="drawer-section">' +
-        '<div class="drawer-section-title">Progress</div>' +
+      '<div>' +
+        '<div>Progress</div>' +
 
-        '<div class="drawer-status-row">' +
-          '<span class="drawer-status-label">Title Status</span>' +
-          '<span class="drawer-status-value">' +
+        '<div>' +
+          '<span>Title Status</span>' +
+          '<span>' +
             escapeDrawerHtml(data.titleStatus || '—') +
           '</span>' +
         '</div>' +
 
-        '<div class="drawer-status-row">' +
-          '<span class="drawer-status-label">Guide Decision</span>' +
-          '<span class="drawer-status-value">' +
+        '<div>' +
+          '<span>Guide Decision</span>' +
+          '<span>' +
             escapeDrawerHtml(data.guideDecision || '—') +
           '</span>' +
         '</div>' +
 
-        '<div class="drawer-status-row">' +
-          '<span class="drawer-status-label">Reviewer Decision</span>' +
-          '<span class="drawer-status-value">' +
+        '<div>' +
+          '<span>Reviewer Decision</span>' +
+          '<span>' +
             escapeDrawerHtml(data.reviewerDecision || '—') +
           '</span>' +
         '</div>' +
 
-        '<div class="drawer-status-row">' +
-          '<span class="drawer-status-label">Repository</span>' +
-          '<span class="drawer-status-value">' +
+        '<div>' +
+          '<span>Repository</span>' +
+          '<span>' +
             escapeDrawerHtml(data.repoStatus || 'Pending') +
           '</span>' +
         '</div>' +
 
         (data.reviews || []).map(function(review) {
-          return '<div class="drawer-status-row"><span class="drawer-status-label">' + escapeDrawerHtml(review.label) +
-            '</span><span class="drawer-status-value ' + (review.completed ? 'drawer-status-good' : 'drawer-status-warn') + '">' + (review.available === false ? 'Unavailable' : review.completed ? 'Completed' : 'Pending') + '</span></div>';
+          return '<div><span>' + escapeDrawerHtml(review.label) +
+            '</span><span class="badge badge--' + (review.completed ? 'success' : 'warning') + '">' + (review.available === false ? 'Unavailable' : review.completed ? 'Completed' : 'Pending') + '</span></div>';
         }).join('') +
 
-        '<div class="drawer-status-row">' +
-          '<span class="drawer-status-label">Overall Health</span>' +
-          '<span class="drawer-status-value ' + getHealthClass(data.health) + '">' +
+        '<div>' +
+          '<span>Overall Health</span>' +
+          '<span class="' + getHealthClass(data.health) + '">' +
             escapeDrawerHtml(getHealthLabel(data.health)) +
           '</span>' +
         '</div>' +
       '</div>',
 
-      '<div class="drawer-section">' +
-        '<div class="drawer-section-title">This Week</div>' +
+      '<div>' +
+        '<div>This Week</div>' +
 
-        '<div class="drawer-info-grid">' +
-          '<div class="drawer-info-card card">' +
-            '<div class="drawer-info-label">Daily Logs</div>' +
-            '<div class="drawer-info-value">' +
+        '<div>' +
+          '<div class="card">' +
+            '<div>Daily Logs</div>' +
+            '<div>' +
               escapeDrawerHtml(data.weekLogs) +
             '</div>' +
           '</div>' +
 
-          '<div class="drawer-info-card card">' +
-            '<div class="drawer-info-label">GitHub Commits</div>' +
-            '<div class="drawer-info-value">' +
+          '<div class="card">' +
+            '<div>GitHub Commits</div>' +
+            '<div>' +
               escapeDrawerHtml(data.weekCommits) +
             '</div>' +
           '</div>' +
         '</div>' +
       '</div>',
 
-      '<div class="drawer-section">' +
-        '<div class="drawer-section-title">Repository</div>' +
+      '<div>' +
+        '<div>Repository</div>' +
         repoHtml +
       '</div>'
     ];
@@ -1271,7 +1270,7 @@ const DashboardUI = (function() {
 
     content.innerHTML = ['basic','progress','activity'].map(function(section) {
       const labels = section === 'basic' ? ['Project','Guide','Students','Review Committee','Repository'] : [section === 'progress' ? 'Progress' : 'This Week'];
-      return '<div id="drawerSection-' + section + '" aria-busy="true">' + labels.map(function(label) { return '<div class="drawer-section"><div class="drawer-section-title">' + label + '</div>' + renderSkeleton('panel', 'Loading ' + label) + '</div>'; }).join('') + '</div>';
+      return '<div id="drawerSection-' + section + '" aria-busy="true">' + labels.map(function(label) { return '<div><div>' + label + '</div>' + renderSkeleton('panel', 'Loading ' + label) + '</div>'; }).join('') + '</div>';
     }).join('');
 
     openSharedDrawer('teamDrawer', 'teamDrawerBackdrop', document.activeElement);
@@ -1287,7 +1286,7 @@ const DashboardUI = (function() {
       if (retryButton) retryButton.disabled = true;
       function current() { return request === coordinatorDrawerRequest && drawer.dataset.open === 'true' && target === byId('drawerSection-' + section); }
       function showRetry(message) {
-        const note = document.createElement('div');note.className = 'drawer-error';note.textContent = message + ' ';
+        const note = document.createElement('div');note.className = '';note.textContent = message + ' ';
         const button = document.createElement('button');button.className='btn btn-sm btn-outline';button.type = 'button';button.textContent = 'Retry';
         button.addEventListener('click', function() { loadSection(section); });
         note.appendChild(button);target.appendChild(note);
@@ -1800,9 +1799,9 @@ const DashboardUI = (function() {
     const label = weeklyStateLabel({...action,state},data.timezone);
     host.querySelector('[data-weekly-heading]').textContent = weeklyHeading(host,action);
     const dates = host.querySelector('[data-weekly-dates]');
-    dates.innerHTML = '<span>Due ' + esc(weeklyDate(action.deadline,data.timezone)) + '</span><span class="weekly-late-date">Late submission until ' + esc(weeklyDate(action.cutoff,data.timezone)) + '</span>';
+    dates.innerHTML = '<span>Due ' + esc(weeklyDate(action.deadline,data.timezone)) + '</span><span>Late submission until ' + esc(weeklyDate(action.cutoff,data.timezone)) + '</span>';
     dates.hidden = !dates.textContent;
-    host.querySelector('[data-weekly-state]').innerHTML = '<span class="weekly-state" data-tone="' + weeklyStatusTone(state,action.deadline,data.timezone,data.checkedAt ? Date.parse(data.checkedAt) : Date.now()) + '" data-state="' + esc(state) + '">' + esc(label) + '</span>';
+    host.querySelector('[data-weekly-state]').innerHTML = '<span data-tone="' + weeklyStatusTone(state,action.deadline,data.timezone,data.checkedAt ? Date.parse(data.checkedAt) : Date.now()) + '" data-state="' + esc(state) + '">' + esc(label) + '</span>';
     if (form && form.dataset.week === action.weekId) form.querySelector('[type="submit"]').textContent = (latest ? 'Update ' : 'Submit ') + weeklyWeekLabel(action.weekId) + ' Progress';
   }
   function openWeeklyActivity(trigger) {
@@ -1815,7 +1814,7 @@ const DashboardUI = (function() {
       const entries=data.history.filter(entry=>entry.weekId===week.weekId).slice().reverse();
       const evidence=(data.evidence || []).find(item=>item.weekId===week.weekId);
       const github=evidence?.state==='available' ? (evidence.count ? '<ul>'+evidence.commits.map(commit=>'<li>'+esc(weeklyDate(commit.timestamp,data.timezone))+' | '+esc(commit.message)+' | <a href="'+esc(commit.url)+'" target="_blank" rel="noopener noreferrer">'+esc(commit.shortSha)+'</a></li>').join('')+'</ul>' : '<p>No qualifying GitHub activity recorded.</p>') : '<p>'+esc(evidence?.message || (evidence?.state==='unmapped' ? 'GitHub username mapping is unavailable.' : 'GitHub activity is unavailable.'))+'</p>';
-      return '<section class="drawer-section weekly-log-history'+(future?' is-future':'')+'"><h3>'+esc(weeklyWeekLabel(week.weekId))+(future?' · Upcoming':'')+'</h3><p>Opens '+esc(weeklyDate(week.opens,data.timezone))+'<br>Deadline '+esc(weeklyDate(week.deadline,data.timezone))+'</p>'+(entries.length ? entries.map(entry=>entry.entryStatus==='MISSED' ? '<p>Missed</p>' : '<details><summary>'+esc(weeklyDate(entry.recordedAt,data.timezone)+weeklySeparator+entry.entryStatus+weeklySeparator+entry.timeliness)+'</summary><p>First submitted: '+esc(weeklyDate(entry.firstSubmittedAt,data.timezone))+'</p>'+weeklyFields.map(field=>'<h4>'+esc(field[1])+'</h4><p class="weekly-log-answer">'+esc(entry[field[0]] || '')+'</p>').join('')+'<h4>Your GitHub activity</h4>'+github+'</details>').join('') : '<p>'+(future?'Not open yet':'No submission recorded')+'</p>')+'</section>';
+      return '<section'+(future?' data-future':'')+'><h3>'+esc(weeklyWeekLabel(week.weekId))+(future?' · Upcoming':'')+'</h3><p>Opens '+esc(weeklyDate(week.opens,data.timezone))+'<br>Deadline '+esc(weeklyDate(week.deadline,data.timezone))+'</p>'+(entries.length ? entries.map(entry=>entry.entryStatus==='MISSED' ? '<p>Missed</p>' : '<details><summary>'+esc(weeklyDate(entry.recordedAt,data.timezone)+weeklySeparator+entry.entryStatus+weeklySeparator+entry.timeliness)+'</summary><p>First submitted: '+esc(weeklyDate(entry.firstSubmittedAt,data.timezone))+'</p>'+weeklyFields.map(field=>'<h4>'+esc(field[1])+'</h4><p>'+esc(entry[field[0]] || '')+'</p>').join('')+'<h4>Your GitHub activity</h4>'+github+'</details>').join('') : '<p>'+(future?'Not open yet':'No submission recorded')+'</p>')+'</section>';
     }).join('');
     openContentDrawer('All weekly logs',content,trigger);
   }
@@ -1827,7 +1826,7 @@ const DashboardUI = (function() {
     let panel = host.querySelector('[data-weekly-github]');
     if (!panel) {
       panel = document.createElement('section'); panel.setAttribute('data-weekly-github','');
-      panel.className = 'weekly-github-activity';
+      panel.className = '';
     }
     // Keep the gate visible even when its form is hidden; never discard draft text.
     host.insertBefore(panel,host.querySelector('[data-weekly-form]'));
@@ -1835,8 +1834,8 @@ const DashboardUI = (function() {
     panel.hidden = !weekId;
     let header = host.querySelector('[data-weekly-header]');
     if (!header) {
-      header = document.createElement('header'); header.className = 'weekly-form-header heading-row'; header.setAttribute('data-weekly-header','');
-      header.innerHTML = '<h4 data-weekly-heading></h4><div class="weekly-status-strip" data-weekly-state role="status" aria-label="Submission status"></div><p class="weekly-dates" data-weekly-dates></p>';
+      header = document.createElement('header'); header.className = ''; header.setAttribute('data-weekly-header','');
+      header.innerHTML = '<h4 data-weekly-heading></h4><div data-weekly-state role="status" aria-label="Submission status"></div><p data-weekly-dates></p>';
     }
     host.insertBefore(header,panel);
     const week = data.weeks.find(w=>w.weekId === weekId);
@@ -1846,11 +1845,11 @@ const DashboardUI = (function() {
     let body = '<p>' + esc(evidence && evidence.message || 'GitHub activity is unavailable. Refresh GitHub Activity to retry.') + '</p>';
     if (evidence && evidence.state === 'unmapped') body = '<p>Your GitHub username mapping is unavailable or unverified. Complete GitHub setup, then refresh.</p>';
     if (evidence && evidence.state === 'available') {
-      body = evidence.count > 0 ? '<details class="weekly-commit-details"><summary>' + evidence.count + (evidence.count === 1 ? ' commit' : ' commits') + ' this week</summary><ul>' + evidence.commits.map(commit=>
+      body = evidence.count > 0 ? '<details><summary>' + evidence.count + (evidence.count === 1 ? ' commit' : ' commits') + ' this week</summary><ul>' + evidence.commits.map(commit=>
         '<li><time datetime="' + esc(commit.timestamp) + '">' + esc(weeklyDate(commit.timestamp,data.timezone)) + '</time><span>' + esc(commit.message) + '</span><a href="' + esc(commit.url) + '" target="_blank" rel="noopener noreferrer">' + esc(commit.shortSha) + '</a></li>').join('') + '</ul></details>'
         : '<p>No GitHub activity found for you this week. Commit your project work/evidence to the team repository, then refresh.</p>';
     }
-    panel.innerHTML = '<div class="heading-row"><h5>Your GitHub activity' + weeklySeparator + esc(weeklyWeekLabel(weekId)) + '</h5>' +
+    panel.innerHTML = '<div><h5>Your GitHub activity' + weeklySeparator + esc(weeklyWeekLabel(weekId)) + '</h5>' +
       '<button type="button" class="btn btn-sm btn-outline" data-weekly-github-refresh title="Refresh GitHub Activity" aria-label="Refresh GitHub Activity" onclick="DashboardUI.loadWeeklyProgress()">' + renderLucideIcon_('refresh-cw') + '</button></div>' + body;
   }
   function loadWeeklyProgress() {
@@ -1873,13 +1872,13 @@ const DashboardUI = (function() {
       if(recent) {
         const latest=new Map();
         data.history.slice().reverse().forEach(entry=>{if(!latest.has(entry.weekId))latest.set(entry.weekId,entry);});
-        recent.innerHTML=Array.from(latest.values()).slice(0,3).map(entry=>'<div class="student-activity-row"><strong>'+escapeClientHtml(weeklyWeekLabel(entry.weekId))+'</strong><span>'+escapeClientHtml(entry.entryStatus==='MISSED'?'Missed':entry.timeliness==='ON_TIME'?'Submitted on time':'Submitted late')+'</span><time>'+escapeClientHtml(weeklyDate(entry.recordedAt,data.timezone))+'</time></div>').join('') || '<p>No weekly submissions yet.</p>';
+        recent.innerHTML=Array.from(latest.values()).slice(0,3).map(entry=>'<div data-activity-row><strong>'+escapeClientHtml(weeklyWeekLabel(entry.weekId))+'</strong><span>'+escapeClientHtml(entry.entryStatus==='MISSED'?'Missed':entry.timeliness==='ON_TIME'?'Submitted on time':'Submitted late')+'</span><time>'+escapeClientHtml(weeklyDate(entry.recordedAt,data.timezone))+'</time></div>').join('') || '<p>No weekly submissions yet.</p>';
       }
       const esc = escapeClientHtml;
       target.innerHTML = (data.message && (!data.ready || !data.weeks.length) ? '<p>' + esc(data.message) + '</p>' : '') +
         data.weeks.filter(week=>week.weekId !== host.querySelector('form')?.dataset.week && !data.actions.some(action=>action.weekId === week.weekId)).map(function(week) {
-          return '<p class="weekly-closed-state">' + esc(weeklyWeekLabel(week.weekId) + weeklySeparator + weeklyStateLabel(week,data.timezone)) + '</p>';
-        }).join('') + (data.actions.length > 1 ? '<nav class="weekly-week-switcher" aria-label="Choose progress week">' +
+          return '<p>' + esc(weeklyWeekLabel(week.weekId) + weeklySeparator + weeklyStateLabel(week,data.timezone)) + '</p>';
+        }).join('') + (data.actions.length > 1 ? '<nav aria-label="Choose progress week">' +
         data.actions.map(function(action) { return '<button type="button" class="btn btn-sm btn-outline" data-week="' + esc(action.weekId) + '" onclick="DashboardUI.chooseWeeklyAction(this)">' +
           esc(weeklyWeekLabel(action.weekId)) + '</button>'; }).join(' ') + '</nav>' : '');
       const formContainer = host.querySelector('[data-weekly-form]');
@@ -1922,7 +1921,7 @@ const DashboardUI = (function() {
       const esc=escapeClientHtml;
       const editable=host.weeklyData.ready && hasWeeklyGithubEvidence(host,action.weekId) && host.weeklyData.actions.some(a=>a.weekId===action.weekId);
       container.hidden=false;
-      container.innerHTML='<div class="weekly-submission-summary">'+weeklyFields.map(field=>'<section><h5>'+esc(field[1])+'</h5><p>'+esc(saved[field[0]] || '')+'</p></section>').join('')+'</div>'+(editable?'<button type="button" class="btn btn-sm btn-outline" data-weekly-edit onclick="DashboardUI.editWeeklySubmission(this)">Edit submission</button>':'');
+      container.innerHTML='<div data-submission-summary>'+weeklyFields.map(field=>'<section><h5>'+esc(field[1])+'</h5><p>'+esc(saved[field[0]] || '')+'</p></section>').join('')+'</div>'+(editable?'<button type="button" class="btn btn-sm btn-outline" data-weekly-edit onclick="DashboardUI.editWeeklySubmission(this)">Edit submission</button>':'');
       renderWeeklyGithub(host,action.weekId);
       return;
     }
@@ -1936,8 +1935,8 @@ const DashboardUI = (function() {
     const data = host.weeklyData, esc = escapeClientHtml;
     const latest = data.history.filter(r=>r.weekId === action.weekId && r.entryStatus !== 'MISSED').slice(-1)[0] || {};
     host.querySelector('[data-weekly-form]').innerHTML = '<form class="weekly-progress-form" data-week="' + esc(action.weekId) + '" onsubmit="DashboardUI.submitWeeklyProgress(event,this)">' +
-      weeklyFields.map(function(field) { return '<div class="weekly-field"><label for="weekly-' + field[0] + '">' + esc(field[1]) + ' <span class="weekly-required" aria-hidden="true">*</span></label><textarea id="weekly-' + field[0] + '" name="' + field[0] + '" rows="3" required maxlength="10000" placeholder="' + esc(field[2]) + '">' + esc(latest[field[0]] || '') + '</textarea></div>'; }).join('') +
-      '<div class="weekly-form-actions"><button type="submit" class="workflow-btn btn btn-lg btn-primary"></button>' + (saved ? '<button type="button" class="btn btn-sm btn-outline" data-weekly-cancel onclick="DashboardUI.cancelWeeklyEdit(this)">Cancel</button>' : '') + '</div></form>';
+      weeklyFields.map(function(field) { return '<div><label for="weekly-' + field[0] + '">' + esc(field[1]) + ' <span aria-hidden="true">*</span></label><textarea id="weekly-' + field[0] + '" name="' + field[0] + '" rows="3" required maxlength="10000" placeholder="' + esc(field[2]) + '">' + esc(latest[field[0]] || '') + '</textarea></div>'; }).join('') +
+      '<div><button type="submit" class="btn btn-lg btn-primary"></button>' + (saved ? '<button type="button" class="btn btn-sm btn-outline" data-weekly-cancel onclick="DashboardUI.cancelWeeklyEdit(this)">Cancel</button>' : '') + '</div></form>';
     renderWeeklyGithub(host,action.weekId);
     host.querySelector('form').addEventListener('input',function() { this.weeklyDirty = true; });
   }
@@ -2050,7 +2049,7 @@ const DashboardUI = (function() {
       const account = result.account, esc = escapeClientHtml;
       panel.innerHTML = (account.avatarUrl ? '<img width="48" height="48" alt="" src="' + esc(account.avatarUrl) + '">' : '') +
         '<p><strong>' + esc(account.displayName || '') + '</strong> <a target="_blank" rel="noopener" href="' + esc(account.profileUrl) + '">@' + esc(account.username) + '</a></p>' +
-        '<p>Is this your GitHub account?</p><button type="button" class="workflow-btn btn btn-primary" data-confirm-account>Yes, this is my account</button> <button type="button" class="workflow-btn secondary btn btn-outline" data-change-account>No, change profile link</button>';
+        '<p>Is this your GitHub account?</p><button type="button" class="btn btn-primary" data-confirm-account>Yes, this is my account</button> <button type="button" class="secondary btn btn-outline" data-change-account>No, change profile link</button>';
       input.disabled = true;
       form.querySelector('button[type="submit"]').hidden = true;
       panel.querySelector('[data-confirm-account]').onclick = function() { confirmGithubAccount(form); };

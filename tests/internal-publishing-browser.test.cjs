@@ -116,7 +116,7 @@ test('action icons retain accessible names and use the shared focus tooltip',asy
 });
 
 test('publication details use shared tooltips without adding text below the status',async()=>{
-  const f=fixture();await f.load();const badge=f.host().querySelector('.publishing-badge');
+  const f=fixture();await f.load();const badge=f.host().querySelector('[data-state]');
   assert.equal(badge.parentNode.textContent,'Ready to publish');assert.equal(badge.getAttribute('data-tooltip'),'Publication permitted');assert.equal(badge.getAttribute('tabindex'),'0');assert.equal(badge.parentNode.querySelector('small'),null);
   f.window.HTMLElement.prototype.getBoundingClientRect=()=>({left:10,top:80,bottom:112,width:100,height:24});f.initTooltips();badge.dispatchEvent(new f.window.Event('focusin',{bubbles:true}));assert.equal(f.document.querySelector('#dashboardTooltip').textContent,'Publication permitted');
   const report=f.server.report();report.teams[0].students[0].publicationStatus='UPDATE_PENDING';report.teams[0].students[0].hasPublishedSnapshot=true;report.teams[0].students[0].needsPublication=true;
@@ -126,11 +126,11 @@ test('publication details use shared tooltips without adding text below the stat
 
 test('student result lines show name, bracketed register and the assessment-specific maximum',async()=>{
   for(const key of ['review1','review2','guide_eval']){
-    const f=fixture(key);await f.load();const lines=f.host().querySelectorAll('.publishing-registers .publishing-student-results li');assert.equal(lines.length,3);
-    assert.equal(lines[0].querySelector('.publishing-student-identity').textContent,'Alex One (s1)');assert.equal(f.host().querySelector('.publishing-results .publishing-score').textContent,key==='guide_eval'?'32 / 40':'80 / 100');
+    const f=fixture(key);await f.load();const lines=f.host().querySelectorAll('[data-registers] [data-student-results] li');assert.equal(lines.length,3);
+    assert.equal(lines[0].querySelector('[data-student-identity]').textContent,'Alex One (s1)');assert.equal(f.host().querySelector('[data-results] [data-student-score]').textContent,key==='guide_eval'?'32 / 40':'80 / 100');
     assert.equal(f.host().querySelector('[data-team]').firstElementChild.children.length,6);assert.equal(f.host().querySelector('[data-detail-row] td').getAttribute('colspan'),'6');
     const report=f.server.report();report.teams[0].students[0].total=null;report.teams[0].students[0].assessmentComplete=false;report.teams[0].students[1].total=0;
-    const pending=f.api.refresh(key);f.calls.at(-1).ok(report);await pending;const scores=f.host().querySelectorAll('.publishing-score');assert.equal(scores[0].textContent,'Pending');assert.match(scores[1].textContent,/^0 \/ /);
+    const pending=f.api.refresh(key);f.calls.at(-1).ok(report);await pending;const scores=f.host().querySelectorAll('[data-student-score]');assert.equal(scores[0].textContent,'Pending');assert.match(scores[1].textContent,/^0 \/ /);
   }
 });
 

@@ -8,21 +8,6 @@ function renderLucideIcon_(name, label, className) {
   return '<svg xmlns="http://www.w3.org/2000/svg" class="lucide-icon lucide-' + name + extraClass + '" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="' + (label ? 'true' : 'false') + '" ' + accessible + '>' + (label ? '<title>' + escape(label) + '</title>' : '') + nodes[name] + '</svg>';
 }
 
-function getLucideStyles_() {
-  return `
-  .lucide-icon { display:inline-block; width:16px; height:16px; flex-shrink:0; vertical-align:-3px; pointer-events:none; }
-  .lucide-icon[aria-label] { pointer-events:auto; }
-  .dashboard-tooltip { position:fixed; z-index:var(--z-tooltip); max-width:min(280px,calc(100vw - 16px)); padding:7px 10px; border-radius:var(--radius-badge); background:var(--text); color:var(--paper); font:var(--fs-meta)/var(--lh-heading) var(--font); box-shadow:var(--shadow-overlay); overflow-wrap:anywhere; pointer-events:none; }
-  .dashboard-tooltip[hidden] { display:none; }
-  .lucide-icon.icon-leading { margin-right:5px; }
-  .lucide-icon.icon-trailing { margin-left:5px; }
-  .lucide-icon.stat-icon { width:28px; height:28px; }
-  .team-action-icon .lucide-icon, .team-drawer-close .lucide-icon { width:18px; height:18px; }
-  .announcement-empty-icon .lucide-icon { width:24px; height:24px; }
-  .step-node .lucide-icon { width:16px; height:16px; }
-  `;
-}
-
 /** Body-mounted positioning is retained for icons inside clipped tables, drawers and scroll regions. */
 /** Delegated tooltip events also cover content replaced by asynchronous refreshes. */
 function initializeDashboardTooltips_() {

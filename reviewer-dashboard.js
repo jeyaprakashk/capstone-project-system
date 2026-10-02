@@ -51,19 +51,19 @@ function buildDocumentLinksCompact(r) {
   ].filter(d => d.url);
   if (docs.length === 0) return '';
   const links = docs.map(d => `<a href="${escapeHtml(d.url)}" target="_blank" rel="noopener">${d.label}</a>`).join(' &middot; ');
-  return `<div class="doc-links">${links}</div>`;
+  return `<div>${links}</div>`;
 }
 
 function buildReviewerTitleApproval_(r, TS, status) {
   const teamId=escapeHtml(r[TS.TEAM_ID]);
   const editable=String(r[TS.TITLE] || '').trim() && textEquals_(r[TS.GUIDE_DECISION],'Approved') && !textEquals_(r[TS.REVIEWER_DECISION],'Approved');
   const badgeClass=status[0] === 'green' ? 'badge badge--success' : status[0] === 'orange' ? 'badge badge--warning' : 'chip';
-  return `<details class="reviewer-title-approval"><summary><span class="${badgeClass}">${status[1]}</span> ${editable ? 'Review title' : 'Details'}</summary>
-    <div class="reviewer-title-content" id="reviewer-decision-${teamId}"><strong>${escapeHtml(r[TS.TITLE] || 'Not submitted')}</strong>
-    ${r[TS.SIMILARITY_FLAG] ? `<p class="flag-text">${renderLucideIcon_('triangle-alert','Similarity warning')} ${escapeHtml(r[TS.SIMILARITY_FLAG])}</p>` : ''}
+  return `<details><summary><span class="${badgeClass}">${status[1]}</span> ${editable ? 'Review title' : 'Details'}</summary>
+    <div id="reviewer-decision-${teamId}"><strong>${escapeHtml(r[TS.TITLE] || 'Not submitted')}</strong>
+    ${r[TS.SIMILARITY_FLAG] ? `<p>${renderLucideIcon_('triangle-alert','Similarity warning')} ${escapeHtml(r[TS.SIMILARITY_FLAG])}</p>` : ''}
     ${buildDocumentLinksCompact(r)}
-    ${r[TS.REVIEWER_NOTES] ? `<p class="reviewer-previous-notes">${escapeHtml(r[TS.REVIEWER_NOTES])}</p>` : ''}
-    ${editable ? `<label for="reviewer-notes-${teamId}">Reviewer notes</label><textarea id="reviewer-notes-${teamId}" rows="3" placeholder="Notes (required for Revise)"></textarea><div class="reviewer-title-actions"><button type="button" class="mini approve btn btn-sm btn-primary" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Approved')">Approve</button><button type="button" class="mini revise btn btn-sm btn-outline" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Revise')">Revise</button></div>` : ''}
+    ${r[TS.REVIEWER_NOTES] ? `<p>${escapeHtml(r[TS.REVIEWER_NOTES])}</p>` : ''}
+    ${editable ? `<label for="reviewer-notes-${teamId}">Reviewer notes</label><textarea id="reviewer-notes-${teamId}" rows="3" placeholder="Notes (required for Revise)"></textarea><div><button type="button" class="approve btn btn-sm btn-primary" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Approved')">Approve</button><button type="button" class="revise btn btn-sm btn-outline" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Revise')">Revise</button></div>` : ''}
     <p id="reviewer-status-${teamId}" role="status"></p></div></details>`;
 }
 
@@ -76,7 +76,7 @@ function buildReviewerReviewCells_(r, TS, progress) {
     const enabled=available && state.readable && ready;
     const hint=!available ? (state && state.error || 'Marks unavailable.') : state.reason || state.status;
     const label=state && ['Submitted','Published'].includes(state.status) ? 'View marks' : state && state.completed ? 'Edit marks' : 'Enter marks';
-    const cell=`<td class="reviewer-review-cell"><button type="button" class="btn-outline btn" ${enabled ? '' : 'disabled'} data-team="${escapeHtml(r[TS.TEAM_ID])}" data-review="${escapeHtml(review.key)}" onclick="DashboardUI.openReviewerMarks(this.dataset.team, this.dataset.review, this)">${renderLucideIcon_(enabled ? 'clipboard-check' : 'lock-keyhole')} ${label}</button><small>${hint ? escapeHtml(hint) : state.completed ? 'Completed' : state.markedStudents + '/' + state.totalStudents + ' students marked'}</small></td>`;
+    const cell=`<td><button type="button" class="btn-outline btn" ${enabled ? '' : 'disabled'} data-team="${escapeHtml(r[TS.TEAM_ID])}" data-review="${escapeHtml(review.key)}" onclick="DashboardUI.openReviewerMarks(this.dataset.team, this.dataset.review, this)">${renderLucideIcon_(enabled ? 'clipboard-check' : 'lock-keyhole')} ${label}</button><small>${hint ? escapeHtml(hint) : state.completed ? 'Completed' : state.markedStudents + '/' + state.totalStudents + ' students marked'}</small></td>`;
     return cell;
   }).join('');
 }
@@ -94,13 +94,13 @@ function buildReviewerAssignedTeams_(data) {
       : textEquals_(decision, 'Revise') ? ['orange', 'Revision requested']
       : textEquals_(r[TS.GUIDE_DECISION], 'Approved') ? ['orange', 'Pending review'] : ['gray', 'Awaiting guide'];
     const search = [r[TS.TEAM_ID], r[TS.GUIDE_NAME], ...registers, r[TS.TITLE], r[TS.COMMITTEE_NUMBER], status[1]].join(' ').toLowerCase();
-    return `<tr data-assigned-search="${escapeHtml(search)}"><td class="col-team"><strong>${escapeHtml(r[TS.TEAM_ID])}</strong></td><td class="col-guide">${escapeHtml(r[TS.GUIDE_NAME] || '—')}</td><td class="col-registers"><div class="tracker-registers">${registers.length ? registers.map(reg => `<span>${escapeHtml(reg)}</span>`).join('') : '—'}</div></td><td class="reviewer-assigned-title">${escapeHtml(title || 'Not submitted')}</td><td>${escapeHtml(r[TS.COMMITTEE_NUMBER] || '—')}</td><td class="reviewer-title-cell">${buildReviewerTitleApproval_(r,TS,status)}</td>${buildReviewerReviewCells_(r,TS,progress)}</tr>`;
+    return `<tr data-assigned-search="${escapeHtml(search)}"><td><strong>${escapeHtml(r[TS.TEAM_ID])}</strong></td><td>${escapeHtml(r[TS.GUIDE_NAME] || '—')}</td><td><div>${registers.length ? registers.map(reg => `<span>${escapeHtml(reg)}</span>`).join('') : '—'}</div></td><td>${escapeHtml(title || 'Not submitted')}</td><td>${escapeHtml(r[TS.COMMITTEE_NUMBER] || '—')}</td><td>${buildReviewerTitleApproval_(r,TS,status)}</td>${buildReviewerReviewCells_(r,TS,progress)}</tr>`;
   }).join('');
-  return `<section class="team-tracker-section reviewer-assigned-teams card" aria-labelledby="reviewerAssignedHeading">
-    <div class="tracker-header"><h3 class="assessment-title tracker-title" id="reviewerAssignedHeading">Assigned Teams (${assigned.length} teams)</h3></div>
-    <div class="tracker-search"><input type="search" id="reviewerAssignedSearch" aria-label="Search assigned teams" placeholder="Search team, guide, register number, or title…" oninput="DashboardUI.filterReviewerAssignedTeams()"></div>
-    <p class="reviewer-scroll-hint" id="reviewerAssignedScrollHint">Scroll horizontally if more review columns are off-screen.</p>
-    <div class="tracker-table-scroll table-wrap" data-tooltip-boundary role="region" aria-label="Assigned teams table, scroll horizontally for more columns" aria-describedby="reviewerAssignedScrollHint" tabindex="0"><table class="team-tracker-table table table--compact"><thead><tr><th scope="col">Team</th><th scope="col">Guide</th><th scope="col">Register Numbers</th><th scope="col">Project Title</th><th scope="col">Committee</th><th scope="col">Title Approval</th>${progress.reviews.map(review=>`<th scope="col">${escapeHtml(review.label)}</th>`).join('')}</tr></thead><tbody id="reviewerAssignedBody">${rows}<tr id="reviewerAssignedEmpty" ${assigned.length ? 'hidden' : ''}><td colspan="${6 + progress.reviews.length}">${assigned.length ? 'No teams match your search.' : 'No teams are assigned to you.'}</td></tr></tbody></table></div>
+  return `<section class="card" aria-labelledby="reviewerAssignedHeading">
+    <div class="tracker-header"><h3 id="reviewerAssignedHeading">Assigned Teams (${assigned.length} teams)</h3></div>
+    <div><input type="search" id="reviewerAssignedSearch" aria-label="Search assigned teams" placeholder="Search team, guide, register number, or title…" oninput="DashboardUI.filterReviewerAssignedTeams()"></div>
+    <p id="reviewerAssignedScrollHint">Scroll horizontally if more review columns are off-screen.</p>
+    <div class="tracker-table-scroll table-wrap" data-tooltip-boundary role="region" aria-label="Assigned teams table, scroll horizontally for more columns" aria-describedby="reviewerAssignedScrollHint" tabindex="0"><table class="table table--compact"><thead><tr><th scope="col">Team</th><th scope="col">Guide</th><th scope="col">Register Numbers</th><th scope="col">Project Title</th><th scope="col">Committee</th><th scope="col">Title Approval</th>${progress.reviews.map(review=>`<th scope="col">${escapeHtml(review.label)}</th>`).join('')}</tr></thead><tbody id="reviewerAssignedBody">${rows}<tr id="reviewerAssignedEmpty" ${assigned.length ? 'hidden' : ''}><td colspan="${6 + progress.reviews.length}">${assigned.length ? 'No teams match your search.' : 'No teams are assigned to you.'}</td></tr></tbody></table></div>
     ${buildTeamPagination_('reviewerAssigned', 'reviewer', assigned.length)}
   </section>`;
 }
@@ -113,55 +113,14 @@ function buildReviewerContent(email, data) {
     [notYetGuideApproved.length, 'gray', 'Not Yet Guide-Approved'],
     [total, 'blue', 'Total Assigned to You'],
   ].filter(([value]) => value > 0).map(([value, color, label]) =>
-    `<span class="coord-stat ${color}"><span class="coord-stat-num">${value}</span><span class="coord-stat-label">${label}</span></span>`
+    `<span class=" ${color}"><span>${value}</span><span>${label}</span></span>`
   ).join('');
   data.reviewProgress = getReviewerReviewProgress_(data.assigned);
   return `
   ${buildDashboardContainerHeader_('Reviewer Dashboard', 'reviewer')}
-  ${stats ? `<div class="coord-stats">${stats}</div>` : ''}
+  ${stats ? `<div>${stats}</div>` : ''}
   ${data.reviewProgress.error ? `<p role="status">Review marks are unavailable: ${escapeHtml(data.reviewProgress.error)}</p>` : ''}
   ${buildReviewerAssignedTeams_(data)}`;
-}
-
-function getReviewerStyles() {
-  return `${getBaseStyles()}
-${getStatCardStyles()}
-${getTableStyles()}
-${getButtonStyles()}
-${getFormElementStyles()}
-${getFilterTabStyles()}
-${getCollapsibleStyles()}
-body { max-width: 980px; margin: var(--space-6) auto; padding: 0 var(--space-4); }
-.coord-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-.coord-stat { flex: 1; min-width: 100px; text-align: center; padding: var(--space-3) 6px; border-radius:var(--radius-card); background: var(--paper); box-shadow:var(--shadow-card); }
-.coord-stat-num { display: block; font-size: var(--fs-hero); font-weight: var(--fw-bold); }
-.coord-stat-label { display: block; font-size: var(--fs-meta); margin-top: 3px; text-transform: uppercase; color: var(--muted); }
-.coord-stat.orange .coord-stat-num { color: var(--warning); }
-.coord-stat.green .coord-stat-num { color: var(--success); }
-.coord-stat.red .coord-stat-num { color: var(--danger); }
-.coord-stat.gray .coord-stat-num { color: var(--primary); }
-.coord-stat.blue .coord-stat-num { color: var(--primary); }
-.guide-cell { font-size:var(--fs-body); color: var(--primary); }
-.reviewer-assigned-teams { margin-bottom:var(--space-6); }
-.reviewer-assigned-teams [hidden] { display:none !important; }
-.reviewer-assigned-teams .team-tracker-table th,.reviewer-assigned-teams .team-tracker-table td { padding:10px var(--space-2); }
-.reviewer-assigned-teams .reviewer-assigned-title { min-width:150px; max-width:320px; white-space:normal; overflow-wrap:anywhere; }
-.reviewer-assigned-teams .col-team { width:36px; min-width:36px; }
-.reviewer-assigned-teams .col-guide { min-width:120px; }
-.reviewer-assigned-teams .col-registers { min-width:92px; }
-.reviewer-assigned-teams .tracker-registers { display:flex; flex-direction:column; gap:3px; margin:0; }
-.reviewer-assigned-teams .tracker-registers span { display:block; white-space:nowrap; overflow-wrap:normal; }
-.reviewer-scroll-hint { margin:0 0 var(--space-2); font-size:var(--fs-meta); color:var(--muted); }
-.reviewer-title-cell { min-width:140px; }
-.reviewer-title-approval summary { cursor:pointer; font-size:var(--fs-meta); }
-.reviewer-title-content { padding:var(--space-3) 0; min-width:0; }
-.reviewer-title-content label { display:block; margin-top:var(--space-3); }
-.reviewer-title-content textarea { width:100%; }
-.reviewer-title-actions { display:flex; gap:var(--space-2); margin-top:var(--space-2); }
-.reviewer-previous-notes { white-space:pre-wrap; }
-.reviewer-review-cell { min-width:120px; }
-.reviewer-review-cell small { display:block; margin-top:6px; color:var(--primary); }
-`;
 }
 
 function buildReviewerPage(email, data) {

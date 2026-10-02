@@ -1,0 +1,95 @@
+/* Browser module is serialized into the dashboard shell; no persistent browser storage. */
+function guideEvaluationBrowser_() {
+  let current=null, busy=false, generation=0, dirty=false, pending=null;
+  const el=id=>document.getElementById(id);
+  const escape=value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const requestId=()=>crypto.randomUUID().replace(/-/g,'');
+  function rpc(method,args,success,failure) {
+    DashboardUI.guideRun().withSuccessHandler(success).withFailureHandler(failure)[method](...args);
+  }
+  function message(text) { if(el('guideEvalMessage')) el('guideEvalMessage').textContent=text; }
+  function setBusy(value) {
+    busy=value;
+    const host=el('guideEvaluationEditor');
+    if(host) host.querySelectorAll('input,select,textarea,button').forEach(node=>node.disabled=value || node.dataset.locked==='true');
+  }
+  async function open(team,register) {
+    if(busy) return;
+    if(dirty && !await DashboardUI.ask('Discard unsaved evaluation changes?')) return;
+    let host=el('guideEvaluationEditor');
+    if(!host) return;
+    host.dataset.team=String(team);
+    if(typeof GuideWeekly!=='undefined')GuideWeekly.selectView('evaluation',true);
+    const version=++generation;
+    host.hidden=false;host.innerHTML=DashboardUI.renderSkeleton('panel', 'Loading guide evaluation');busy=true;
+    host.scrollIntoView({behavior:'smooth',block:'start'});
+    rpc('loadGuideEvaluation',[team,register || ''],data=>{
+      if(version!==generation)return;
+      busy=false;dirty=false;pending=null;current=data;render();if(typeof GuideWeekly!=='undefined')GuideWeekly.evaluationStatus(data.roster.team,data.statuses);
+    },err=>{if(version!==generation)return;busy=false;host.textContent='Unable to load: '+err.message;const retry=document.createElement('button');retry.className='btn btn-sm btn-outline';retry.textContent='Retry';retry.onclick=()=>open(team,register);host.appendChild(retry);});
+  }
+  function render() {
+    const d=current, old=d.evaluation;
+    const locked=old && old.status!=='Draft';
+    const config=locked ? old.config : d.config;
+    const same=old && JSON.stringify(old.config)===JSON.stringify(d.config);
+    const scores=old && (locked || same) ? old.scores : {};
+    const host=el('guideEvaluationEditor');
+    host.innerHTML='<h3>Guide Evaluation · '+escape(d.roster.team)+'</h3><label>Student <select id="guideEvalStudent">'+d.roster.students.map(s=>'<option value="'+escape(s.register)+'" '+(s.register===d.student.register?'selected':'')+'>'+escape(s.name+' ('+s.register+') · '+(d.statuses.find(item=>item.register===s.register)||{}).status)+'</option>').join('')+'</select></label><p>'+escape(old ? old.status : 'Not started')+' · Deadline: '+new Date(config.due*86400000).toISOString().slice(0,10)+' · '+(d.overdue?'Overdue; late submission is allowed.':'Late submissions are recorded.')+'</p>'+
+      (/^https:\/\//i.test(d.repository || '')?'<p><a href="'+escape(d.repository)+'" target="_blank" rel="noopener">Open team repository / commit history</a></p>':'')+
+      (!same && old && !locked?'<p>Rubric changed. Previous revisions are retained; enter scores against the current rubric.</p>':'')+
+      config.criteria.map(c=>{
+        const score=scores[c.pi]||{};
+        return '<fieldset class="guide-eval-criterion card" data-pi="'+escape(c.pi)+'"><legend>'+escape(c.pi+' · '+c.name+' · '+c.co+' · '+c.maxMarks+' marks')+'</legend><details><summary>Performance descriptors</summary>'+c.descriptors.map((text,i)=>'<p><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><label>Level <select data-level '+(locked?'disabled data-locked="true"':'')+'><option value="">Select</option>'+[0,1,2,3,4,5].map(i=>'<option '+(score.level===i?'selected':'')+'>'+i+'</option>').join('')+'</select></label> <label>Marks <input data-marks type="number" min="0" max="'+c.maxMarks+'" step="0.01" value="'+escape(score.marks??'')+'" '+(locked?'disabled data-locked="true"':'')+'></label><p data-range></p><label>Criterion feedback (required below Level 2)<textarea maxlength="2000" data-remark '+(locked?'disabled data-locked="true"':'')+'>'+escape(score.remark||'')+'</textarea></label></fieldset>';
+      }).join('')+'<p id="guideEvalTotal"></p><p id="guideEvalMessage" role="status"></p><button class="btn btn-outline" type="button" id="guideEvalDraft" '+(locked?'disabled data-locked="true"':'')+'>Save Draft</button> <button class="btn btn-lg btn-primary" type="button" id="guideEvalSubmit" '+(locked?'disabled data-locked="true"':'')+'>Submit Evaluation</button> <button class="btn btn-sm btn-outline" type="button" id="guideEvalReload">Reload</button> <button class="btn btn-outline" type="button" id="guideEvalClose">Close</button>';
+    el('guideEvalStudent').onchange=e=>{const selected=e.target.value;e.target.value=d.student.register;open(d.roster.team,selected);};
+    el('guideEvalReload').onclick=()=>open(d.roster.team,d.student.register);
+    el('guideEvalClose').onclick=async ()=>{if(!dirty || await DashboardUI.ask('Discard unsaved changes?')){host.hidden=true;dirty=false;delete host.dataset.team;if(typeof GuideWeekly!=='undefined')GuideWeekly.selectView('title');}};
+    el('guideEvalDraft').onclick=()=>save(false);el('guideEvalSubmit').onclick=()=>save(true);
+    host.querySelectorAll('fieldset').forEach((field,index)=>{
+      const update=()=>{
+        const level=field.querySelector('[data-level]').value, max=config.criteria[index].maxMarks;
+        const bands=[0,40,60,75,85,95,100];
+        field.querySelector('[data-range]').textContent=level===''?'Select a level to see the permitted marks.':'Permitted: '+(max*bands[Number(level)]/100).toFixed(2)+' ≤ marks '+(Number(level)===5?'≤':'<')+' '+(max*bands[Number(level)+1]/100).toFixed(2);
+        const total=Array.from(host.querySelectorAll('[data-marks]')).reduce((n,input)=>n+(Number(input.value)||0),0);
+        el('guideEvalTotal').textContent='Preview: '+total.toFixed(2)+' / '+config.maximum+' · '+(total/config.maximum*config.weight*100).toFixed(2)+' / '+(config.weight*100)+'. Validated on save.';
+      };
+      field.querySelectorAll('input,select,textarea').forEach(node=>node.oninput=()=>{dirty=true;pending=null;update();});update();
+    });
+    if(locked) message('Submitted scores are locked. Contact the coordinator for corrections.');
+  }
+  async function save(submit) {
+    if(busy)return;
+    if(submit && !await DashboardUI.ask('Submit this student’s evaluation? Scores will lock until the coordinator reopens it.'))return;
+    const method=submit?'submitGuideEvaluation':'saveGuideEvaluationDraft';
+    const scores={};el('guideEvaluationEditor').querySelectorAll('fieldset').forEach(field=>{
+      const level=field.querySelector('[data-level]').value;
+      scores[field.dataset.pi]={level:level===''?null:Number(level),marks:field.querySelector('[data-marks]').value,remark:field.querySelector('[data-remark]').value};
+    });
+    if(!pending || pending.method!==method)pending={method,input:{team:current.roster.team,student:current.student.register,revision:current.revision,token:current.token,scores,requestId:requestId()}};
+    setBusy(true);message('Saving…');
+    rpc(method,[pending.input],result=>{
+      setBusy(false);dirty=false;pending=null;
+      const team=current.roster.team,student=current.student.register;
+      open(team,student);
+    },err=>{setBusy(false);message(err.message+' Retry uses the same request ID unless you change the form.');});
+  }
+  function admin() { return InternalAssessmentPublishing.refresh('guide_eval'); }
+  let studentBusy=false;
+  function student() {
+    const host=el('studentGuideEvaluation');if(!host || studentBusy)return;
+    studentBusy=true;const finish=DashboardUI.beginContentLoading(host,'Loading guide evaluation results',{compact:true});
+    rpc('loadPublishedGuideEvaluation',[],result=>{
+      finish();studentBusy=false;if(el('studentGuideEvaluation')!==host)return;
+      if(!result){host.innerHTML='<div class="student-assessment-row"><strong>'+escape(host.dataset?.assessmentLabel || 'Guide Evaluation')+ '</strong><span class="step-badge locked">Not published</span></div>';return;}
+      host.innerHTML='<h3>'+escape(result.config.label)+'</h3>'+(result.identity?'<p>'+escape(result.identity.name+' ('+result.identity.register+')')+'</p>':'')+(result.underCorrection?'<p role="status">Under correction. These are the last published results.</p>':'')+'<p>'+result.total.toFixed(2)+' / '+result.config.maximum+' · Course contribution '+result.weighted.toFixed(2)+' / '+(result.config.weight*100)+'</p>'+result.config.criteria.map(c=>{
+        const score=result.scores[c.pi];return '<p><strong>'+escape(c.name)+'</strong>: '+score.marks+' / '+c.maxMarks+' · Level '+score.level+'</p><p>'+escape(score.remark)+'</p>';
+      }).join('');
+      const content=host.innerHTML;
+      host.innerHTML='<details class="student-assessment-result"><summary><strong>'+escape(result.config.label)+'</strong><span class="step-badge done">'+(result.underCorrection?'Under correction':'Published')+'</span><span class="student-view-marks">View marks</span></summary><div class="student-assessment-details">'+content+'</div></details>';
+    },err=>{finish();studentBusy=false;if(el('studentGuideEvaluation')!==host)return;const notice=document.createElement('p');notice.textContent='Guide evaluation unavailable. '+err.message+' ';const button=document.createElement('button');button.className='btn btn-sm btn-outline';button.textContent='Retry';button.onclick=()=>{notice.remove();student();};notice.appendChild(button);host.appendChild(notice);});
+  }
+  window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
+  return {open,admin,student};
+}
+function getGuideEvaluationClientScript() { return 'const GuideEvaluation = ('+guideEvaluationBrowser_.toString()+')();'; }

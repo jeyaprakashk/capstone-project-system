@@ -241,9 +241,9 @@ test('student setup gates weekly UI for every title state and keeps incomplete s
   const complete=githubReady&&titleStatus==='APPROVED';
   assert.equal(!!document.getElementById('studentWeeklyProgress'),titleStatus==='APPROVED');
   assert.equal(setup.tagName,complete?'DETAILS':'SECTION');assert.equal(setup.hasAttribute('open'),false);
-  assert.equal(setup.querySelectorAll('.step-row').length,2);
+  assert.equal(setup.querySelectorAll('[data-step-row]').length,2);
   if(complete){assert.match(setup.querySelector('summary').textContent,/✓ CompleteViewHide/);setup.setAttribute('open','');assert(setup.hasAttribute('open'));setup.removeAttribute('open');}
-  else {assert(setup.querySelector('.student-setup-pending'));if(!githubReady)assert.match(setup.textContent,/Step 1: Team member must accept/);if(titleStatus!=='APPROVED')assert.match(setup.textContent,/Step 2:/);}
+  else {assert(setup.querySelector('[data-setup-pending]'));if(!githubReady)assert.match(setup.textContent,/Step 1: Team member must accept/);if(titleStatus!=='APPROVED')assert.match(setup.textContent,/Step 2:/);}
   assert.equal(document.querySelectorAll('#studentGithubProfile').length,1); // No student ID in this fixture, independent of team readiness.
  }
 });
@@ -256,12 +256,12 @@ test('unregistered student card offers only account connection and hides reposit
     titleStatus:'NOT_SUBMITTED',title:'',rosterSlots:[],schedule,clock:clock('2026-09-23')};
   c.getStudentDashboardData=()=>data;
   const {document}=parseHTML(c.buildStudentContent('student@example.com','T1'));
-  const card=document.querySelector('.step-row');
+  const card=document.querySelector('[data-step-row]');
   assert.match(card.textContent,/Waiting for GitHub account connection/);
   assert.doesNotMatch(card.textContent,/valid username|Retry GitHub setup|could not verify/i);
   assert.match(card.textContent,/Submit GitHub Account/);
   assert.equal(card.querySelector('button[type="submit"]').textContent,'Continue');
-  assert.equal(card.querySelectorAll('button.workflow-btn:not(.secondary)').length,1);
+  assert.equal(card.querySelectorAll('button.btn-primary').length,1);
   data.githubNeedsUsername=false;data.githubAccount={githubId:'101',username:'student'};
   data.githubText='GitHub could not verify all teammates right now. Please try again shortly.';
   const connected=c.buildStudentContent('student@example.com','T1');
@@ -279,43 +279,43 @@ test('GitHub status rows use existing icons without a table; connected students 
     githubState:'waiting',githubText:'Team setup pending.',titleStatus:'NOT_SUBMITTED',title:'',
     rosterSlots:[{email:mine.email,regno:'R1'},{email:other.email,regno:'R2'},{email:missing.email,regno:'R3'},{email:'',regno:''}],schedule,clock:clock('2026-09-23')};
   c.getStudentDashboardData=()=>data;
-  const card=()=>parseHTML(c.buildStudentContent('student@example.com','T1')).document.querySelector('.step-row');
+  const card=()=>parseHTML(c.buildStudentContent('student@example.com','T1')).document.querySelector('[data-step-row]');
   let rendered=card();
   assert.equal(rendered.querySelector('table'),null);
-  assert.deepEqual([...rendered.querySelectorAll('.github-member-status')].map(row=>[row.querySelector('.github-member-register').textContent,row.querySelector('.github-member-state').textContent]),[
+  assert.deepEqual([...rendered.querySelectorAll('[data-member-status]')].map(row=>[row.querySelector('[data-member-register]').textContent,row.querySelector('[data-member-state]').textContent]),[
     ['R1','Accept Invitation Email'],['R2','Repository joined'],['R3','Submit GitHub Account']]);
-  assert(rendered.querySelector('.github-member-status .lucide-clock'));
-  assert(rendered.querySelector('.is-joined .lucide-check'));
-  assert(rendered.querySelector('.is-missing .lucide-triangle-alert'));
+  assert(rendered.querySelector('[data-member-status] .lucide-clock'));
+  assert(rendered.querySelector('[data-member-status="joined"] .lucide-check'));
+  assert(rendered.querySelector('[data-member-status="missing"] .lucide-triangle-alert'));
   assert.doesNotMatch(rendered.textContent,/Action required:|No action required:/);
   assert.equal((rendered.textContent.match(/GitHub setup due/g)||[]).length,1);
   const noActions=card=>{
     assert.equal(card.querySelectorAll('form,button,input,[data-github-confirmation],#githubSubmitStatus').length,0);
     assert.equal(card.querySelectorAll('a').length,1);
-    assert.deepEqual([...card.querySelector('.step-card').children].map(node=>node.className),['step-header','step-body']);
+    assert.deepEqual([...card.querySelector('[data-step-card]').children].map(node=>node.hasAttribute('data-step-header')?'step-header':node.hasAttribute('data-step-body')?'step-body':node.tagName),['step-header','step-body']);
     assert.doesNotMatch(card.innerHTML,/retryGithubSetup|\/invitations|Your GitHub setup is complete/);
   };
   noActions(rendered);
   assert.equal(rendered.querySelector('.github-team-repository a').getAttribute('href'),'https://github.com/org/repo');
   mine.access='active';other.access='invited';rendered=card();
-  assert.equal(rendered.querySelector('.github-member-state').textContent,'Repository joined');
+  assert.equal(rendered.querySelector('[data-member-state]').textContent,'Repository joined');
   noActions(rendered);
-  assert.equal(rendered.querySelector('a.workflow-btn'),null);assert.equal(rendered.querySelector('form'),null);
+  assert.equal(rendered.querySelector('a.btn-primary'),null);assert.equal(rendered.querySelector('form'),null);
   assert.doesNotMatch(rendered.textContent,/Retry GitHub setup/);
   // A teammate joining cannot supply this student's personal access status.
   mine.access='unchecked';other.access='active';rendered=card();
-  assert.equal(rendered.querySelector('.github-member-state').textContent,'Accept Invitation Email');
+  assert.equal(rendered.querySelector('[data-member-state]').textContent,'Accept Invitation Email');
   noActions(rendered);
   data.repoUrl='';rendered=card();assert.match(rendered.querySelector('.github-team-repository').textContent,/Not available yet/);
-  assert.equal(rendered.querySelectorAll('.github-member-status').length,3);
+  assert.equal(rendered.querySelectorAll('[data-member-status]').length,3);
   data.githubAccount={};mine.githubId='';rendered=card();
-  const jump=rendered.querySelector('.github-form-jump');
+  const jump=rendered.querySelector('[data-github-form-jump]');
   assert.equal(jump.textContent,'Submit GitHub Account');
   assert.equal(jump.getAttribute('type'),'button');
   assert.equal(jump.getAttribute('onclick'),'DashboardUI.focusGithubAccountForm(this)');
   assert.equal(jump.hasAttribute('href'),false);
   assert(rendered.querySelector('#studentGithubProfile'));
-  assert.equal(rendered.querySelectorAll('.github-form-jump').length,1);
+  assert.equal(rendered.querySelectorAll('[data-github-form-jump]').length,1);
 });
 
 test('weekly panel is independent of teammate setup while preserving repository and recorded work',()=>{
@@ -600,7 +600,7 @@ function renderedTimeline(offsets,extra=[]) {
  vm.runInContext(source.slice(source.indexOf('  function renderSharedTimeline('),source.indexOf('  function loadSharedTimeline()')),c);
  const data={today:100,todayLabel:'29 Sep 2026',milestones:offsets.map((offset,i)=>({key:'m'+i,label:'Milestone '+i,day:100+offset,date:'30 Sep 2026',openingDate:'20 Sep 2026'})).concat(extra)};
  const before=JSON.stringify(data);c.renderSharedTimeline(data,target);assert.equal(JSON.stringify(data),before);
- return {target,visible:()=>Array.from(target.querySelectorAll('.timeline-stop')).filter(el=>!el.hidden)};
+ return {target,visible:()=>Array.from(target.querySelectorAll('[data-timeline-stop]')).filter(el=>!el.hidden)};
 }
 
 test('compact timeline shows two past dates, nearest due milestone and two upcoming milestones',()=>{
@@ -608,13 +608,13 @@ test('compact timeline shows two past dates, nearest due milestone and two upcom
  assert.deepEqual(f.visible().map(el=>el.querySelector('strong').textContent),['Milestone 1','Milestone 2','Milestone 3','Milestone 4','Milestone 5']);
  const current=f.target.querySelector('[aria-current="step"]');
  assert.match(current.textContent,/Milestone 3.*CURRENT · Due today/);
- assert.equal(f.target.querySelectorAll('.timeline-current').length,1);
- assert.equal(f.target.querySelectorAll('.timeline-past svg').length,3);
- assert.equal(f.visible()[0].querySelector('.timeline-timing'),null);
+ assert.equal(f.target.querySelectorAll('[data-timeline-state="current"]').length,1);
+ assert.equal(f.target.querySelectorAll('[data-timeline-state="past"] svg').length,3);
+ assert.equal(f.visible()[0].querySelector('[data-timeline-timing]'),null);
  assert.doesNotMatch(f.target.textContent,/Date passed|Current phase:/);
- assert(f.target.querySelector('.timeline-heading .timeline-toggle'));
+ assert(f.target.querySelector('[data-timeline-toggle]'));
  assert.doesNotMatch(f.target.innerHTML,/Tomorrow|Up Next|timeline-navigation|timeline-scroll|milestones complete/);
- assert.match(current.querySelector('.timeline-date').title,/Opens 20 Sep 2026; due 30 Sep 2026/);
+ assert.match(current.querySelector('[data-timeline-date]').title,/Opens 20 Sep 2026; due 30 Sep 2026/);
 });
 
 test('mobile timeline selects previous current and next without shrinking desktop context',()=>{
@@ -622,7 +622,7 @@ test('mobile timeline selects previous current and next without shrinking deskto
   const f=renderedTimeline(offsets);
   assert.deepEqual(Array.from(f.target.querySelectorAll('[data-timeline-mobile="true"]')).map(el=>el.querySelector('strong').textContent),expected.map(i=>'Milestone '+i));
  }
- const css=fixture().c.getSharedTimelineStyles_();
+ const css=fixture().c.getFunctionalStyles_();
  assert.match(css,/\.timeline-track:not\(\.timeline-full\) \.timeline-stop\[data-timeline-mobile="false"\] \{ display:none/);
 });
 
@@ -637,24 +637,18 @@ test('current timeline handles tomorrow, before start, same-day dates, after end
 
 test('full timeline disclosure reveals lifecycle without mutating schedule or displaying weekly boundaries',()=>{
  const f=renderedTimeline([-10,-8,-5,-2,2,5,8,10],[{key:'week1',label:'Weekly logging starts',day:100,date:'29 Sep'},{key:'end',label:'Weekly logging ends',day:120,date:'19 Oct'}]);
- const button=f.target.querySelector('.timeline-toggle');assert.equal(f.visible().length,5);
+ const button=f.target.querySelector('[data-timeline-toggle]');assert.equal(f.visible().length,5);
  assert.equal(button.getAttribute('aria-expanded'),'false');assert.equal(button.textContent,'View full timeline');
  button.click();assert.equal(f.visible().length,8);assert.equal(button.getAttribute('aria-expanded'),'true');
- assert(f.target.querySelector('.timeline-track').classList.contains('timeline-full'));
+ assert(f.target.querySelector('[data-timeline-track]').classList.contains('timeline-full'));
  assert.doesNotMatch(f.target.textContent,/Weekly logging/);
  button.click();assert.equal(f.visible().length,5);assert.equal(button.getAttribute('aria-expanded'),'false');
 });
 
-test('timeline uses vertical mobile layout and has no carousel or animation styles',()=>{
- const {c}=fixture();const css=c.getSharedTimelineStyles_();
+test('timeline has no carousel or animation styles',()=>{
+ const {c}=fixture();const css=c.getFunctionalStyles_();
  assert.match(css,/@media\(max-width:760px\)/);
- assert.match(css,/\.timeline-track \{ grid-template-columns:1fr/);
- assert.match(css,/\.timeline-stop\[hidden\] \{ display:none/);
- assert.match(css,/repeat\(var\(--timeline-stops\),minmax\(0,1fr\)\)/);
- assert.match(css,/left:50%; right:-50%; top:11px; height:2px/);
- assert.match(css,/top:11px; height:100%; width:2px/);
- assert.doesNotMatch(css,/\.timeline-current \{|1\.5fr/);
- assert.doesNotMatch(css,/overflow-x|timeline-nav|animation:/);
+ assert.doesNotMatch(css,/\.timeline-current \{|timeline-nav|animation:/);
 });
 
 test('timeline errors are isolated and a subsequent retry succeeds',async()=>{
@@ -936,7 +930,7 @@ test('System Status is coordinator-only and its endpoint avoids marks and dashbo
 test('Coordinator tracking uses small cards without a separate progress panel',()=>{
  const {c}=fixture();
  const html=c.buildCoordinatorHeaderStats({total:62,titleApproved:6,reposReady:50,needsAttention:56,reviews:{review1:{completed:0,unavailable:4},review2:{completed:3}}});
- assert.equal((html.match(/class="stat-card stat-card-/g)||[]).length,8);
+ assert.equal((html.match(/data-stat-card/g)||[]).length,8);
  for(const label of ['Total Teams','Title Approved','Repositories Available','Active This Week','Review 1 Completed','Review 2 Completed','Need Attention']) assert(html.includes(label));
  assert(html.includes('4 unavailable'));
  const shell=c.buildCoordinatorAsyncShell_();

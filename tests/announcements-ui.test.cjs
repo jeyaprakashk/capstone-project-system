@@ -21,13 +21,13 @@ function fixture(coord=false){
  return {c,target,document,html};
 }
 test('announcement feed filters and expands locally',()=>{
- const f=fixture();const visible=()=>Array.from(f.target.querySelectorAll('.announcement-item')).filter(x=>!x.hidden);
+ const f=fixture();const visible=()=>Array.from(f.target.querySelectorAll('[data-announcement-item]')).filter(x=>!x.hidden);
  assert.equal(visible().length,5);
  f.target.querySelector('[data-announcement-more]').click();assert.equal(visible().length,8);
  f.target.querySelector('[data-announcement-audience="teams"]').click();assert.equal(visible().length,4);
  const search=f.target.querySelector('#announcementSearch');search.value='notice 6';search.dispatchEvent(new f.document.defaultView.Event('input'));assert.equal(visible().length,1);
- search.value='nothing';search.dispatchEvent(new f.document.defaultView.Event('input'));assert.equal(visible().length,0);assert.equal(f.target.querySelector('.announcement-no-results').hidden,false);
- assert.deepEqual(Array.from(f.target.querySelectorAll('.announcement-step-number')).map(x=>x.textContent),['1','2']);
+ search.value='nothing';search.dispatchEvent(new f.document.defaultView.Event('input'));assert.equal(visible().length,0);assert.equal(f.target.querySelector('[data-announcement-no-results]').hidden,false);
+ assert.deepEqual(Array.from(f.target.querySelectorAll('[data-step-number]')).map(x=>x.textContent),['1','2']);
  search.value='';search.dispatchEvent(new f.document.defaultView.Event('input'));
  f.target.querySelector('[data-announcement-audience="all"]').click();
  const type=f.target.querySelector('[data-announcement-type-filter]');

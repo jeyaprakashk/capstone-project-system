@@ -29,7 +29,7 @@ test('shared history preserves all drawer labels and fallback behavior',()=>{
   for(const [status,label] of Object.entries(statuses))assert(render([{previousStatus:status,resultingStatus:status}]).includes(label+' <span>changed to</span> '+label));
   assert.match(render([{decision:'unknown',at:'bad'}]),/Not assessed <span>changed to<\/span> Updated/);
   assert.doesNotMatch(render([{at:'bad'}]),/<time/);
-  assert.equal(render([{decision:'targetSubmit',previousStatus:'INCOMPLETE',resultingStatus:'COMPLETED',reason:'Updated date.',reviewer:'reviewer@example.test'}]),'<details class="review-history"><summary>Assessment history <span>1</span></summary><ol><li><div class="review-history-heading"><strong>Assessment completed</strong></div><div class="review-history-status">Incomplete <span>changed to</span> Completed</div><p>Updated date.</p><small>reviewer@example.test</small></li></ol></details>');
+  assert.equal(render([{decision:'targetSubmit',previousStatus:'INCOMPLETE',resultingStatus:'COMPLETED',reason:'Updated date.',reviewer:'reviewer@example.test'}]),'<details><summary>Assessment history <span>1</span></summary><ol><li><div><strong>Assessment completed</strong></div><div>Incomplete <span>changed to</span> Completed</div><p>Updated date.</p><small>reviewer@example.test</small></li></ol></details>');
 });
 test('Review publishing uses the exact shared history output and Guide does not gain history',()=>{
   for(const key of ['review1','review2']){

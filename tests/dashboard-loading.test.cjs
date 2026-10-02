@@ -171,19 +171,19 @@ test('common theme applies to all tabs immediately, cached content and late resp
  const query=doc.querySelector;
  doc.querySelector=selector=>selector.includes('data-role-content="student"')?student:query(selector);
  const theme=()=>doc.body.attrs['data-dashboard-theme'];
- f.click('student');assert.equal(theme(),'editorial');
- f.click('guide');assert.equal(theme(),'editorial');
- f.done('loadDashboardRoleContent','student content');assert.equal(theme(),'editorial');
+ f.click('student');assert.equal(theme(),undefined);
+ f.click('guide');assert.equal(theme(),undefined);
+ f.done('loadDashboardRoleContent','student content');assert.equal(theme(),undefined);
  f.done('loadDashboardRoleContent','guide content');
  const roleReads=()=>f.requests.filter(r=>r.key==='loadDashboardRoleContent').length;
  const count=roleReads();
- f.click('student');assert.equal(theme(),'editorial');
- f.click('guide');assert.equal(theme(),'editorial');assert.equal(roleReads(),count);
- f.click('student');f.click('announcements');assert.equal(theme(),'editorial');
- f.click('announcements');assert.equal(theme(),'editorial');
- f.click('guide');f.click('announcements');assert.equal(theme(),'editorial');
- f.click('student');f.click('system-status');assert.equal(theme(),'editorial');
- f.click('student');assert.equal(theme(),'editorial');
+ f.click('student');assert.equal(theme(),undefined);
+ f.click('guide');assert.equal(theme(),undefined);assert.equal(roleReads(),count);
+ f.click('student');f.click('announcements');assert.equal(theme(),undefined);
+ f.click('announcements');assert.equal(theme(),undefined);
+ f.click('guide');f.click('announcements');assert.equal(theme(),undefined);
+ f.click('student');f.click('system-status');assert.equal(theme(),undefined);
+ f.click('student');assert.equal(theme(),undefined);
 });
 
 test('project timeline appears only in Timeline and Rubrics across tab switches',()=>{
@@ -219,19 +219,19 @@ test('shell selects the common theme before scripts or fonts load',()=>{
  for(const name of ['getInternalAssessmentPublishingClientScript_','getDashboardClientScript','getGuideEvaluationClientScript','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_']) c[name]=()=>'';
  for(const key of ['student','guide','reviewer','coord']) {
   const html=c.buildDashboardShell('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
-  assert.match(html,/<body data-dashboard-theme="editorial">/);
+  assert.match(html,/<body>/);
   const {document}=require('linkedom').parseHTML(html);
   assert.equal(document.querySelectorAll('h1').length,1);
   assert.equal(document.querySelector('h1').textContent,'Dashboard');
   assert.equal(document.querySelector('#sharedRubricsHeading').tagName,'H2');
-  assert.equal(document.querySelector('.timeline-heading h2').textContent,'Project timeline');
-  assert(html.indexOf(c.getEditorialStyles_())<html.indexOf('</style>'));
+  assert.equal(document.querySelector('#sharedProjectTimeline h2').textContent,'Project timeline');
+  assert(html.indexOf(c.getFunctionalStyles_())<html.indexOf('</style>'));
   assert(html.indexOf('</style>')<html.indexOf('/* ====================================================================='));
   assert.match(html,/Source\+Sans\+3/);
   assert.doesNotMatch(html,/Source\+Serif\+4|Space\+Grotesk|JetBrains\+Mono|family=Inter/);
  }
  const html=c.buildDashboardShell('preview@example.test',[{key:'student',label:'My Team',contentId:'studentContent'},{key:'guide',label:'Guide',contentId:'guideContent'}]);
- assert.match(html,/<body data-dashboard-theme="editorial">/);
+ assert.match(html,/<body>/);
  assert.match(html,/data-role-tab="rubrics"/);
  assert.match(html,/id="sharedRubrics" hidden/);
  assert.match(html,/data-role-panel="student"/);
@@ -240,7 +240,7 @@ test('shell selects the common theme before scripts or fonts load',()=>{
 
 test('shared heading scale keeps content larger than cards and subsections',()=>{
  const c=vm.createContext({});vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
- const css=c.getEditorialStyles_(),sheet=fs.readFileSync('app-styles.html','utf8');
+ const sheet=fs.readFileSync('app-styles.html','utf8');
  const size=level=>{
   const token=sheet.match(new RegExp('--fs-'+level+':(\\d+)px'));
   assert(token,level);
@@ -248,20 +248,13 @@ test('shared heading scale keeps content larger than cards and subsections',()=>
  };
  assert(size('h1')>size('h2'));
  assert(size('h2')>size('h3'));
- for(const selector of ['.student-dashboard .dash-hero h2','.dashboard-body-surface .dashboard-container-header h2','.utility-body .utility-header :is(h1,h2)']) assert(css.includes(selector));
 });
 
-test('editorial rules stay opt-in and text palette pairs meet normal-text contrast',()=>{
+test('functional rules carry no appearance and text palette pairs meet normal-text contrast',()=>{
  const c=vm.createContext({});vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
- const css=c.getEditorialStyles_().replace(/\/\*[\s\S]*?\*\//g,'');
- for(const match of css.matchAll(/([^{}]+)\{/g)) {
-  const selector=match[1].trim();
-  assert(selector.startsWith('@media') || selector.startsWith('body[data-dashboard-theme="editorial"]'),selector);
-  if(!selector.startsWith('@media')) {
-   for(const line of selector.split('\n')) assert(line.trim().startsWith('body[data-dashboard-theme="editorial"]'),line);
-  }
- }
- assert(!css.includes('!important'));
+ const css=c.getFunctionalStyles_();
+ for(const match of css.matchAll(/([a-z-]+)\s*:[^;{}]*;/g)) assert.doesNotMatch(match[1],/^(color|background|border|box-shadow|padding|font|text-decoration|letter-spacing|transition|animation)/,match[0]);
+ assert.doesNotMatch(css,/#[0-9a-f]{3,8}\b|data-dashboard-theme/i);
  const palette=fs.readFileSync('app-styles.html','utf8');
  const token=name=>{
   const match=palette.match(new RegExp('--'+name+':(#[0-9a-f]{6}|var\\(--([a-z-]+)\\))','i'));
@@ -312,8 +305,8 @@ test('rubrics start alongside pending role and timeline, deduplicate and survive
  assert.match(f.nodes.sharedRubricsContent.innerHTML,/<span class="rubric-mobile-hidden">View rubric<\/span>/);
  const mobileRows=[...f.nodes.sharedRubricsContent.innerHTML.matchAll(/<div class="rubric-mobile-row">([\s\S]*?)<\/button><\/div>/g)];
  assert.equal(mobileRows.length,2);
- assert.match(mobileRows[0][1],/<strong>Review 1<\/strong><span class="rubric-mobile-weight"/);
- assert.match(mobileRows[0][1],/<button type="button" class="rubric-view-button[^"]*" data-rubric-key="review1"/);
+ assert.match(mobileRows[0][1],/<strong>Review 1<\/strong><span aria-label="[^"]*% weight">/);
+ assert.match(mobileRows[0][1],/<button type="button" class="btn btn-sm btn-outline" data-rubric-key="review1"/);
  assert.equal((mobileRows[0][1].match(/data-rubric-key=/g)||[]).length,1,'only the action button opens the mobile rubric');
  assert.match(mobileRows[1][1],/Rubric not configured/);
  assert.match(mobileRows[1][1],/ disabled>View rubric/);
@@ -325,7 +318,7 @@ test('rubrics appear only in their dedicated tab for every role and after async 
  f.click('guide');assert.equal(section.hidden,true);
  const pending=f.ui.loadSharedRubrics();
  f.done('loadSharedRubrics',f.data);await pending;
- assert.equal(section.hidden,true);assert.match(content.innerHTML,/rubric-assessments/);
+ assert.equal(section.hidden,true);assert.match(content.innerHTML,/data-rubric-key="review1"/);
  for(const role of ['student','guide','reviewer','coord','announcements','system-status']) {
   f.click('rubrics');assert.equal(section.hidden,false);
   f.click(role);assert.equal(section.hidden,true);
@@ -350,10 +343,8 @@ test('shared rubric shell follows timeline and reuses responsive drawer styles',
  const router=fs.readFileSync('dashboard-router.js','utf8'), coordinator=fs.readFileSync('coordinator-dashboard.js','utf8');
  assert(router.indexOf('id="sharedRubrics"')>router.indexOf('id="sharedProjectTimeline"'));
  assert(router.indexOf('id="sharedRubrics"')<router.indexOf('${rolePanels}'));
- assert.match(router,/id="rubricDrawer" class="team-drawer drawer" data-tooltip-boundary role="dialog"/);
+ assert.match(router,/id="rubricDrawer" class="drawer" data-tooltip-boundary role="dialog"/);
  assert.match(router,/id="rubricDrawerBackdrop" class="team-drawer-backdrop drawer-scrim" hidden/);
- assert.match(coordinator,/width: min\(520px, 92vw\)/);
- assert.match(coordinator,/@media \(max-width: 600px\)\s*\{\s*\.team-drawer\s*\{\s*width: 100%/);
  assert(!coordinator.includes('${buildRubricsStatusCard_()}'));
 });
 
@@ -458,7 +449,7 @@ test('Student background results finish before the next role and are not repeate
  f.click('guide');f.done('loadDashboardRoleContent');f.tick();
  f.done('loadDashboardRoleContent');f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
- assert.equal(doc.body.attrs['data-dashboard-theme'],'editorial');
+ assert.equal(doc.body.attrs['data-dashboard-theme'],undefined);
  f.done('loadPublishedGuideEvaluation');f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
  f.done('loadPublishedReviewEvaluation');f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');

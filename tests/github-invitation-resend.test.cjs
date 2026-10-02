@@ -82,7 +82,7 @@ test('204 responses require verified identity and write access',()=>{
 });
 
 function browser() {
-  const markup=fs.readFileSync('coordinator-dashboard.js','utf8').match(/<section class="system-status-card(?: card)?" id="studentInvitationResend">[\s\S]*?<\/section>/)[0];
+  const markup=fs.readFileSync('coordinator-dashboard.js','utf8').match(/<section(?: class="[^"]*")? id="studentInvitationResend">[\s\S]*?<\/section>/)[0];
   const helper=fs.readFileSync('common-helpers.js','utf8');
   const helperContext=vm.createContext({escapeHtml:x=>x});
   vm.runInContext(helper.slice(helper.indexOf('function buildTeamPagination_('),helper.indexOf('/** Presentation only:',helper.indexOf('function buildTeamPagination_('))),helperContext);
@@ -117,7 +117,7 @@ test('invitation log starts collapsed, uses shared pages and preserves expansion
   assert.equal(log.hidden,false);assert.equal(log.hasAttribute('open'),false);assert.equal(f.host.querySelectorAll('tbody tr').length,10);
   assert.match(f.host.textContent,/Showing 1 - 10 of 27 students/);
   log.setAttribute('open','');
-  Array.from(f.host.querySelectorAll('.pagination-buttons button')).find(b=>b.textContent==='Next').click();
+  Array.from(f.host.querySelectorAll('#studentInvitationsPaginationButtons button')).find(b=>b.textContent==='Next').click();
   assert.match(f.host.textContent,/Showing 11 - 20 of 27 students/);
   f.requests[1].success({results:[],nextCursor:null,stopped:false});assert.equal(log.hasAttribute('open'),true);assert.match(f.host.textContent,/Showing 11 - 20/);
   f.resize('25');assert.equal(f.host.querySelectorAll('tbody tr').length,25);assert.match(f.host.textContent,/Showing 1 - 25/);

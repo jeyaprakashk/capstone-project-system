@@ -25,7 +25,7 @@ test('guide list defaults latest week, escapes content, renders absent score and
   assert.equal(f.host.querySelector('[data-entry] b'),null);
   f.host.querySelectorAll('[data-sign],[data-details]').forEach(button=>assert.match(button.className,/\bbtn btn-sm\b/));
   f.host.querySelector('[data-week-step="1"]').onclick();
-  assert(f.host.querySelector('.guide-weekly-student-header > .guide-weekly-deadline'));
+  assert(f.host.querySelector('[data-weekly-student-header] > [data-weekly-deadline]'));
   assert.match(f.host.textContent,/0\/10/);assert.equal(f.host.querySelector('[data-sign="DISCUSSED"]').getAttribute('aria-pressed'),'true');
   assert.deepEqual(f.counts(),[1,1]);
 });
@@ -71,11 +71,11 @@ test('sticky decision bars reserve their measured height only on tall cards',()=
   f.c.window={innerHeight:600,addEventListener(){},removeEventListener(){}};
   f.c.ResizeObserver=class {constructor(callback){measure=callback;}observe(){}disconnect(){}};
   f.api.load();f.reply();
-  const card=f.host.querySelector('.guide-weekly-card');
-  card.querySelector('.guide-weekly-summary').getBoundingClientRect=()=>({height:contentHeight+Number(card.dataset.actionReserve || 0),bottom:900+Number(card.dataset.actionReserve || 0)});
-  card.querySelector('.guide-weekly-actions').getBoundingClientRect=()=>({height:barHeight});
+  const card=f.host.querySelector('[data-weekly-card]');
+  card.querySelector('[data-weekly-summary]').getBoundingClientRect=()=>({height:contentHeight+Number(card.dataset.actionReserve || 0),bottom:900+Number(card.dataset.actionReserve || 0)});
+  card.querySelector('[data-weekly-actions]').getBoundingClientRect=()=>({height:barHeight});
   let headerBottom=650;
-  card.querySelector('.guide-weekly-student-header').getBoundingClientRect=()=>({bottom:headerBottom});
+  card.querySelector('[data-weekly-student-header]').getBoundingClientRect=()=>({bottom:headerBottom});
   card.getBoundingClientRect=()=>({bottom:900});
   measure();assert.equal(card.style.getPropertyValue('--guide-action-reserve'),'70px');
   assert.equal(card.dataset.stickyDecision,'false');
@@ -143,7 +143,7 @@ test('full answers, AI ratings and commit date/message/SHA are visible without d
   assert.match(f.host.textContent,/Added plots/);assert.match(f.host.textContent,/2026/);assert.deepEqual(f.counts(),[1,1]);
   assert.equal(f.host.querySelectorAll('[data-answer] > strong').length,4);
   assert(!f.host.querySelector('[data-answer="guideDiscussion"]').textContent.includes('Next …'));
-  const link=f.host.querySelector('.guide-commit-list a');
+  const link=f.host.querySelector('[data-commit-list] a');
   assert.equal(link.textContent,'4fa7951');assert.equal(link.getAttribute('href'),url);
   assert.equal(link.getAttribute('target'),'_blank');assert.equal(link.getAttribute('rel'),'noopener noreferrer');
   assert(!f.host.textContent.includes(sha));
@@ -288,16 +288,16 @@ test('tab switches and failed refresh preserve full logs; successful refresh rep
   root.innerHTML='<section data-guide-team="A" data-guide-students=\'["001"]\'><div data-guide-view="title"></div><div data-guide-view="documents"></div></section>';
   f.document.body.appendChild(root);root.appendChild(f.host);
   f.api.load();f.reply();f.api.selectView('weekly');
-  const detail=f.host.querySelector('.guide-weekly-evidence');
+  const detail=f.host.querySelector('[data-weekly-evidence]');
   for(const view of ['title','documents','weekly'])f.api.selectView(view);
   assert.equal(f.requests.length,1);
-  assert.equal(f.host.querySelector('.guide-weekly-evidence'),detail);
+  assert.equal(f.host.querySelector('[data-weekly-evidence]'),detail);
   assert.equal(detail.hidden,false);
   f.api.load();f.requests.at(-1).failure('offline');
-  assert.equal(f.host.querySelector('.guide-weekly-evidence'),detail);assert.equal(detail.hidden,false);
+  assert.equal(f.host.querySelector('[data-weekly-evidence]'),detail);assert.equal(detail.hidden,false);
   f.api.selectView('title');f.api.selectView('weekly');assert.equal(f.requests.length,2);
   f.api.load();f.reply();
-  assert.notEqual(f.host.querySelector('.guide-weekly-evidence'),detail);
+  assert.notEqual(f.host.querySelector('[data-weekly-evidence]'),detail);
   assert.equal(f.requests.at(-1).method,'loadGuideWeeklyProgress');assert.equal(f.requests.length,3);
 });
 

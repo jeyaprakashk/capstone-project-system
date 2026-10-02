@@ -52,15 +52,15 @@ function reviewEvaluationBrowser_(reviewKey) {
   function criteriaTabs() {
     return '<div class="review-criteria-tabs tabs" role="tablist" aria-label="Assessment components">'+['team','individual'].map(component=>{
       const label=component==='team'?'Team Criteria':'Individual',max=model.config.criteria.filter(c=>c.type.toLowerCase()===component).reduce((sum,c)=>sum+c.maxMarks,0);
-      return '<button type="button" class="tab" role="tab" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-selected="'+(activeCriteria===component)+'" tabindex="'+(activeCriteria===component?'0':'-1')+'"><span class="review-tab-label">'+DashboardUI.renderIcon(component==='team'?'users':'user')+label+'</span><span class="review-tab-caption">'+max+' pts '+(component==='team'?'pool':'weight')+'</span></button>';
+      return '<button type="button" class="tab" role="tab" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-selected="'+(activeCriteria===component)+'" tabindex="'+(activeCriteria===component?'0':'-1')+'"><span>'+DashboardUI.renderIcon(component==='team'?'users':'user')+label+'</span><span>'+max+' pts '+(component==='team'?'pool':'weight')+'</span></button>';
     }).join('')+'</div>';
   }
   let gradingProgress={team:{graded:0,total:0},individual:{graded:0,total:0}},activeTeamPI=null,activeStudentPIs={};
   function piPillLabel(c) {
-    return '<span data-pi-icon>'+DashboardUI.renderIcon('clock')+'</span><span class="review-pi-label"><strong>'+escape(c.pi+'–'+c.co)+'</strong><small>0–'+escape(c.maxMarks)+'</small></span>';
+    return '<span data-pi-icon>'+DashboardUI.renderIcon('clock')+'</span><span><strong>'+escape(c.pi+'–'+c.co)+'</strong><small>0–'+escape(c.maxMarks)+'</small></span>';
   }
   function individualPills(owner) {
-    return '<div class="review-pi-pills segmented" data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators">'+model.config.criteria.map((c,index)=>{
+    return '<div class="segmented" data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators">'+model.config.criteria.map((c,index)=>{
       if(c.type!=='Individual' && !(targeted && targeted.index===owner && targeted.components.includes('team')))return '';
       return '<button type="button" data-select-individual-pi="'+index+'" data-student="'+owner+'" aria-pressed="false" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>';
     }).join('')+'</div>';
@@ -82,12 +82,12 @@ function reviewEvaluationBrowser_(reviewKey) {
   function teamPills() {
     const criteria=model.config.criteria.map((c,index)=>({c,index})).filter(({c})=>c.type==='Team');
     if(!criteria.some(({index})=>index===activeTeamPI))activeTeamPI=criteria.length?criteria[0].index:null;
-    return '<div class="review-pi-pills segmented" data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
+    return '<div class="segmented" data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
   }
   function updateTabProgress() {
     const row=drawer.querySelector('[data-tab-progress]');if(!row)return;
     const {graded,total}=gradingProgress[activeCriteria],status=total>0 && graded===total?'complete':graded>0?'partial':'empty';
-    row.innerHTML='<span>'+(activeCriteria==='team'?'Performance Indicators':'Students')+'</span><span class="review-graded-pill" data-completion="'+status+'">'+graded+' of '+total+' graded</span>';
+    row.innerHTML='<span>'+(activeCriteria==='team'?'Performance Indicators':'Students')+'</span><span data-completion="'+status+'">'+graded+' of '+total+' graded</span>';
   }
   function syncCriteriaTabs() {
     for(const component of ['team','individual']) {
@@ -133,14 +133,14 @@ function reviewEvaluationBrowser_(reviewKey) {
     if(group)revealCriterion(group);
   }
   function studentChips(students) {
-    return '<ul class="review-header-students" data-review-students aria-label="Select student">'+students.map((s,index)=>{
+    return '<ul data-review-students aria-label="Select student">'+students.map((s,index)=>{
       const words=String(s.name||s.register).trim().split(/\s+/),short=words[0]+(words.length>1?' '+words[words.length-1].charAt(0)+'.':'');
       const initials=words.map(w=>w.charAt(0)).slice(0,2).join('');
-      return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" class="tile'+(index===activeStudent?' tile--selected':'')+'" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" title="'+escape(s.name+' ('+s.register+')')+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'"><span class="avatar avatar-'+(index%3+1)+' review-avatar" aria-hidden="true">'+escape(initials)+'</span><span class="review-student-details">'+escape(short)+'</span><small class="review-student-register">'+escape(s.register)+'</small><span class="review-student-score" data-student-score="'+index+'">— / '+model.config.maximum+'</span></button></li>';
+      return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" class="tile'+(index===activeStudent?' tile--selected':'')+'" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" title="'+escape(s.name+' ('+s.register+')')+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'"><span class="avatar avatar-'+(index%3+1)+' review-avatar" aria-hidden="true">'+escape(initials)+'</span><span>'+escape(short)+'</span><small>'+escape(s.register)+'</small><span data-student-score="'+index+'">— / '+model.config.maximum+'</span></button></li>';
     }).join('')+'</ul>';
   }
   function assessmentSummaryCard(students) {
-    return '<section class="review-assessment-summary card" data-assessment-summary aria-live="polite" aria-label="Assessment Summary"><h3>Assessment Summary <small data-summary-unsaved hidden>Unsaved preview</small></h3>'+students.map((student,index)=>assessmentSummary(index)).join('')+'</section>';
+    return '<section class="card" data-assessment-summary aria-live="polite" aria-label="Assessment Summary"><h3>Assessment Summary <small data-summary-unsaved hidden>Unsaved preview</small></h3>'+students.map((student,index)=>assessmentSummary(index)).join('')+'</section>';
   }
   function assessmentSummary(index) {
     const student=savedStudent(index).assessment?savedStudent(index):(model.assessmentResults||[]).find(s=>s.register===model.roster.students[index].register)||{};
@@ -154,13 +154,13 @@ function reviewEvaluationBrowser_(reviewKey) {
     const labels={COMPLETED:'Completed',MAKEUP_PENDING:'Makeup Pending',INCOMPLETE:'Assessment Incomplete'};
     const cells=[['Team Mark',component(a.teamMark,a.teamState)+' / '+maximum('Team')],['Individual Mark',component(a.individualMark,a.individualState)+' / '+maximum('Individual')],['Review Total',(student.total==null?unresolved:mark(student.total))+' / '+model.config.maximum]];
     const tone=a.status==='COMPLETED'?'complete':a.status==='MAKEUP_PENDING'?'pending':'incomplete';
-    return cells.map(([label,value],index)=>'<div'+(index===2?' class="review-summary-total" data-resolved="'+(student.total!=null)+'"':'')+'><dt>'+label+'</dt><dd>'+escape(value)+'</dd></div>').join('')+'<div class="review-summary-status" data-tone="'+tone+'"><dt>Assessment Status</dt><dd>'+escape(labels[a.status]||'Assessment Incomplete')+'</dd></div>';
+    return cells.map(([label,value],index)=>'<div'+(index===2?' data-resolved="'+(student.total!=null)+'"':'')+'><dt>'+label+'</dt><dd>'+escape(value)+'</dd></div>').join('')+'<div data-tone="'+tone+'"><dt>Assessment Status</dt><dd>'+escape(labels[a.status]||'Assessment Incomplete')+'</dd></div>';
   }
   function canEditAbsence(index) {return !busy && !reading && !targeted && (model.availability.editable || correctionIndex===index);}
   const attendanceChoices=[['','Select attendance'],['NORMAL','Present'],['REVIEW_DAY_ABSENCE','Absent for Review'],['PROLONGED','Long Absent']];
   function attendancePicker(index,value) {
     const current=attendanceChoices.find(([key])=>key===value)||attendanceChoices[0];
-    return '<div class="review-attendance"><span id="'+reviewKey+'AttendanceLabel-'+index+'">Absence / exception</span><select data-fact="type" hidden aria-hidden="true" tabindex="-1">'+attendanceChoices.map(([key,label])=>'<option value="'+key+'"'+(key===current[0]?' selected':'')+'>'+label+'</option>').join('')+'</select><details class="review-attendance-picker" data-attendance-picker><summary aria-labelledby="'+reviewKey+'AttendanceLabel-'+index+' '+reviewKey+'AttendanceValue-'+index+'"><span data-attendance-label id="'+reviewKey+'AttendanceValue-'+index+'">'+current[1]+'</span>'+DashboardUI.renderIcon('chevron-down')+'</summary><div class="review-attendance-options" role="radiogroup" aria-labelledby="'+reviewKey+'AttendanceLabel-'+index+'">'+attendanceChoices.map(([key,label])=>'<label><input type="radio" name="'+reviewKey+'Attendance-'+index+'" data-attendance-option value="'+key+'"'+(key===current[0]?' checked':'')+'><span>'+label+'</span></label>').join('')+'</div></details></div>';
+    return '<div><span id="'+reviewKey+'AttendanceLabel-'+index+'">Absence / exception</span><select data-fact="type" hidden aria-hidden="true" tabindex="-1">'+attendanceChoices.map(([key,label])=>'<option value="'+key+'"'+(key===current[0]?' selected':'')+'>'+label+'</option>').join('')+'</select><details class="review-attendance-picker" data-attendance-picker><summary aria-labelledby="'+reviewKey+'AttendanceLabel-'+index+' '+reviewKey+'AttendanceValue-'+index+'"><span data-attendance-label id="'+reviewKey+'AttendanceValue-'+index+'">'+current[1]+'</span>'+DashboardUI.renderIcon('chevron-down')+'</summary><div role="radiogroup" aria-labelledby="'+reviewKey+'AttendanceLabel-'+index+'">'+attendanceChoices.map(([key,label])=>'<label><input type="radio" name="'+reviewKey+'Attendance-'+index+'" data-attendance-option value="'+key+'"'+(key===current[0]?' checked':'')+'><span>'+label+'</span></label>').join('')+'</div></details></div>';
   }
   function focusAttendance(host) {
     const summary=host.querySelector('[data-attendance-picker] > summary');
@@ -202,7 +202,7 @@ function reviewEvaluationBrowser_(reviewKey) {
 
   function absenceEvidenceFields(index,f) {
     const options={MEDICAL_DOCUMENT:'Medical document provided',APPROVAL_DOCUMENT:'Official approval/permission provided',OTHER:'Other supporting evidence'};
-    return '<div data-absence-evidence hidden><fieldset><legend>Supporting absence evidence (optional)</legend>'+Object.entries(options).map(([value,label])=>'<label class="review-absence-evidence-choice"><input type="checkbox" data-supporting-evidence value="'+value+'"'+((f.supportingEvidence||[]).includes(value)?' checked':'')+'> '+label+'</label>').join('')+'</fieldset><label data-other-evidence-label hidden>Describe other supporting evidence<textarea data-other-evidence maxlength="2000">'+escape(f.otherEvidenceText||'')+'</textarea></label></div>';
+    return '<div data-absence-evidence hidden><fieldset><legend>Supporting absence evidence (optional)</legend>'+Object.entries(options).map(([value,label])=>'<label><input type="checkbox" data-supporting-evidence value="'+value+'"'+((f.supportingEvidence||[]).includes(value)?' checked':'')+'> '+label+'</label>').join('')+'</fieldset><label data-other-evidence-label hidden>Describe other supporting evidence<textarea data-other-evidence maxlength="2000">'+escape(f.otherEvidenceText||'')+'</textarea></label></div>';
   }
 
   function absenceControl(index,student) {
@@ -219,7 +219,7 @@ function reviewEvaluationBrowser_(reviewKey) {
   }
   function ensure() {
     if (drawer) return;
-    drawer=document.createElement('dialog');drawer.className='team-drawer open review-drawer';drawer.setAttribute('data-tooltip-boundary','');
+    drawer=document.createElement('dialog');drawer.className='open review-drawer';drawer.setAttribute('data-tooltip-boundary','');
     drawer.setAttribute('aria-labelledby',reviewKey+'Heading');
     drawer.addEventListener('toggle',event=>{
       const group=event.target;
@@ -372,14 +372,14 @@ function reviewEvaluationBrowser_(reviewKey) {
     const timing=assessment && assessment.availability.timing || {tone:'neutral',label:''};
     const dateLabel=assessment?new Date(assessment.config.due*86400000).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}):'';
     const dateDetails=assessment?'Due '+day(assessment.config.due)+' · '+timing.label+' · '+assessment.status+' · Opens '+day(assessment.config.opens)+(assessment.availability.editable && assessment.availability.late?' · Late submissions allowed':''):'';
-    const meta=assessment?'<span class="review-header-due" data-timing="'+escape(timing.tone)+'" title="'+escape(dateDetails)+'">Due '+escape(dateLabel)+(timing.label?' · '+escape(timing.label):'')+'</span>':'';
+    const meta=assessment?'<span data-timing="'+escape(timing.tone)+'" title="'+escape(dateDetails)+'">Due '+escape(dateLabel)+(timing.label?' · '+escape(timing.label):'')+'</span>':'';
     const projectTitle=assessment?String(assessment.details.title||'Project title not provided'):'';
     const titleRow=assessment?'<details class="review-project-title-row"><summary title="'+escape(projectTitle)+'">'+DashboardUI.renderIcon('file-text')+'<span>'+escape(projectTitle)+'</span>'+DashboardUI.renderIcon('chevron-down','','review-title-chevron')+'</summary><p>'+escape(projectTitle)+'</p></details>':'';
-    const headerDetails=assessment?'<div class="review-project-meta-row"><p class="review-project-meta">Guide: '+escape(assessment.details.guideName)+'</p><p class="review-project-meta">Committee: '+escape(assessment.details.committee)+'</p></div>':'';
-    const navigation=assessment?'<div class="review-assessment-navigation">'+criteriaTabs()+'<div class="review-tab-progress" data-tab-progress aria-live="polite"></div>'+teamPills()+(students.length?studentChips(students):'')+'</div>':'';
+    const headerDetails=assessment?'<div><p>Guide: '+escape(assessment.details.guideName)+'</p><p>Committee: '+escape(assessment.details.committee)+'</p></div>':'';
+    const navigation=assessment?'<div>'+criteriaTabs()+'<div data-tab-progress aria-live="polite"></div>'+teamPills()+(students.length?studentChips(students):'')+'</div>':'';
     if(assessment && students.length)body=assessmentSummaryCard(students)+body;
     const statusMessage='<p class="review-message" data-message role="status" aria-live="polite"></p>';
-    return '<div class="team-drawer-header"><div class="review-heading-details"><div class="review-header-line"><h2 class="team-drawer-title" id="'+reviewKey+'Heading">'+escape(title)+'</h2><span class="review-header-review">'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review-progress" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="team-drawer-close btn btn-sm btn-outline" data-close data-drawer-close aria-label="Close '+escape(reviewLabel)+' drawer">'+DashboardUI.renderIcon('x')+'</button></div>'+navigation+'<div class="team-drawer-content" data-drawer-content>'+body+(footer?'':statusMessage)+'</div>'+(footer?'<div class="review-footer">'+statusMessage+footer+'</div>':'');
+    return '<div><div><div><h2 id="'+reviewKey+'Heading">'+escape(title)+'</h2><span>'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review-progress" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="btn btn-sm btn-outline" data-close data-drawer-close aria-label="Close '+escape(reviewLabel)+' drawer">'+DashboardUI.renderIcon('x')+'</button></div>'+navigation+'<div class="team-drawer-content" data-drawer-content>'+body+(footer?'':statusMessage)+'</div>'+(footer?'<div class="review-footer">'+statusMessage+footer+'</div>':'');
   }
 
   function open(team,button) {
@@ -406,10 +406,10 @@ function reviewEvaluationBrowser_(reviewKey) {
   }
   function control(c,index,owner,score) {
     score=score||{};
-    return '<fieldset class="guide-eval-criterion review-criterion '+(c.type==='Team'?'review-team-rubric':'review-individual-rubric')+' card" data-index="'+index+'" data-owner="'+owner+'"'+(focusedAssessment() && (!targeted || String(owner)!==String(targeted.index) || !targeted.components.includes(c.type==='Team'?'team':'individual'))?' hidden':'')+'><legend class="review-criterion-accessible-title">'+escape(c.name)+'</legend><div class="review-criterion-meta"><span>'+escape(c.pi+' · '+c.co)+'</span><span>Max '+c.maxMarks+' marks</span></div><h3 class="review-card-title">'+escape(c.name)+'</h3><p class="review-control-title">Proficiency level</p><select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select><div class="review-levels segmented" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+'" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div><div class="review-descriptor" data-descriptor aria-live="polite"></div><details><summary>View full rubric descriptors</summary>'+c.descriptors.map((text,i)=>'<p><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><div class="review-award"><div class="review-award-heading"><label for="reviewMarks-'+owner+'-'+index+'">Fine-tune mark</label><span data-range></span></div><div class="review-stepper"><button class="btn btn-sm btn-outline" type="button" data-step="-0.5" aria-label="Decrease marks">'+DashboardUI.renderIcon('minus')+'</button><input data-marks id="reviewMarks-'+owner+'-'+index+'" aria-describedby="reviewMarksError-'+owner+'-'+index+'" type="number" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button class="btn btn-sm btn-outline" type="button" data-step="0.5" aria-label="Increase marks">'+DashboardUI.renderIcon('plus')+'</button></div><input data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total" data-awarded-total></span><div class="review-slider-values" data-slider-values aria-label="Selectable marks"></div></div><p class="review-marks-error" data-marks-error id="reviewMarksError-'+owner+'-'+index+'" aria-live="polite" hidden></p><div class="review-feedback-heading"><div class="review-feedback-title"><strong>Criterion Feedback</strong><span data-feedback-required></span></div><span data-feedback-status></span></div><div class="review-feedback-options segmented" data-feedback-options aria-label="Feedback suggestions"></div><button type="button" class="review-other-feedback btn btn-sm btn-outline" data-other-feedback aria-pressed="false">Other remarks</button><label class="review-feedback-label" data-custom-feedback-label hidden>Other remarks<textarea data-custom-feedback maxlength="2000" rows="2" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden maxlength="2000">'+escape(score.remark||'')+'</textarea></fieldset>';
+    return '<fieldset class="review-criterion card" data-index="'+index+'" data-owner="'+owner+'"'+(focusedAssessment() && (!targeted || String(owner)!==String(targeted.index) || !targeted.components.includes(c.type==='Team'?'team':'individual'))?' hidden':'')+'><legend class="review-criterion-accessible-title">'+escape(c.name)+'</legend><div><span>'+escape(c.pi+' · '+c.co)+'</span><span>Max '+c.maxMarks+' marks</span></div><h3 class="review-card-title">'+escape(c.name)+'</h3><p>Proficiency level</p><select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select><div class="segmented" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+'" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div><div data-descriptor aria-live="polite"></div><details><summary>View full rubric descriptors</summary>'+c.descriptors.map((text,i)=>'<p><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><div><div><label for="reviewMarks-'+owner+'-'+index+'">Fine-tune mark</label><span data-range></span></div><div><button class="btn btn-sm btn-outline" type="button" data-step="-0.5" aria-label="Decrease marks">'+DashboardUI.renderIcon('minus')+'</button><input data-marks id="reviewMarks-'+owner+'-'+index+'" aria-describedby="reviewMarksError-'+owner+'-'+index+'" type="number" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button class="btn btn-sm btn-outline" type="button" data-step="0.5" aria-label="Increase marks">'+DashboardUI.renderIcon('plus')+'</button></div><input data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total" data-awarded-total></span><div data-slider-values aria-label="Selectable marks"></div></div><p data-marks-error id="reviewMarksError-'+owner+'-'+index+'" aria-live="polite" hidden></p><div><div><strong>Criterion Feedback</strong><span data-feedback-required></span></div><span data-feedback-status></span></div><div class="segmented" data-feedback-options aria-label="Feedback suggestions"></div><button type="button" class="btn btn-sm btn-outline" data-other-feedback aria-pressed="false">Other remarks</button><label data-custom-feedback-label hidden>Other remarks<textarea data-custom-feedback maxlength="2000" rows="2" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden maxlength="2000">'+escape(score.remark||'')+'</textarea></fieldset>';
   }
   function accordion(title,description,content) {
-    return '<details class="review-accordion" data-criteria-group="'+(title==='Team Criteria'?'team':'individual')+'" name="review-criteria" id="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-panel" role="tabpanel" aria-labelledby="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-tab"'+(focusedAssessment()?(title==='Team Criteria'?' hidden':' open'):'')+'><summary><strong>'+title+'</strong>'+(title==='Team Criteria'?'<span class="review-header-mark" data-team-mark aria-label="Common team score"></span>':'')+(description?'<span>'+description+'</span>':'')+'</summary><div class="review-accordion-content">'+content+'</div></details>';
+    return '<details class="review-accordion" data-criteria-group="'+(title==='Team Criteria'?'team':'individual')+'" name="review-criteria" id="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-panel" role="tabpanel" aria-labelledby="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-tab"'+(focusedAssessment()?(title==='Team Criteria'?' hidden':' open'):'')+'><summary><strong>'+title+'</strong>'+(title==='Team Criteria'?'<span data-team-mark aria-label="Common team score"></span>':'')+(description?'<span>'+description+'</span>':'')+'</summary><div>'+content+'</div></details>';
   }
   function validateClosingGroup(group) {
     if(!model.availability.editable)return true;
@@ -454,9 +454,9 @@ function reviewEvaluationBrowser_(reviewKey) {
     const teamFields=criteria.map((c,i)=>c.type==='Team'?control(c,i,'team',team[c.pi]):'').join('');
     const individual=d.roster.students.map((s,index)=>{
       const student=savedStudents.find(v=>v.register===s.register)||{},a=student.assessment||{},draft=a.makeupDraft||{},scores=targeted && targeted.index===index?(draft.scores||{}):!d.availability.editable && a.individualSource==='makeup'?(a.makeup?.scores||{}):(student.scores||{});
-      return '<details class="review-student-accordion" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary><span class="review-student-heading"><strong>'+escape(s.name)+'</strong><span class="review-header-mark" data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span class="review-student-subheading"><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div class="review-accordion-content">'+absenceControl(index,student)+individualPills(index)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
+      return '<details class="review-student-accordion" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary><span><strong>'+escape(s.name)+'</strong><span data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div>'+absenceControl(index,student)+individualPills(index)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
     }).join('');
-    drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div class="review-actions" data-review-actions>'+(d.availability.editable?'<button class="btn btn-outline" type="button" data-draft>Save Draft</button><button class="btn btn-lg btn-primary" type="button" data-submit>Submit Evaluation</button>':'')+'<button class="btn btn-sm btn-outline" type="button" data-reload>Reload</button><button class="btn btn-sm btn-outline" type="button" data-close>Close</button></div>');
+    drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div data-review-actions>'+(d.availability.editable?'<button class="btn btn-outline" type="button" data-draft>Save Draft</button><button class="btn btn-lg btn-primary" type="button" data-submit>Submit Evaluation</button>':'')+'<button class="btn btn-sm btn-outline" type="button" data-reload>Reload</button><button class="btn btn-sm btn-outline" type="button" data-close>Close</button></div>');
     if(targeted)drawer.querySelector('[data-review-actions]').innerHTML='<button class="btn btn-outline" type="button" data-target-draft>Save Makeup Draft</button><button class="btn btn-lg btn-primary" type="button" data-target-submit>Submit Makeup</button><button class="btn btn-sm btn-outline" type="button" data-reload>Cancel / Reload</button><button class="btn btn-sm btn-outline" type="button" data-close>Close</button>';
     drawer.querySelector('form').addEventListener('submit',event=>event.preventDefault());
     drawer.querySelectorAll('[data-absence] input,[data-absence] select,[data-absence] textarea').forEach(el=>el.disabled=!!targeted);
@@ -539,7 +539,7 @@ function reviewEvaluationBrowser_(reviewKey) {
         const values=field.querySelector('[data-slider-values]');
         if(values) {
           values.hidden=level==='' || range.max<range.min;
-          values.innerHTML=values.hidden?'':Array.from({length:Math.round((range.max-range.min)*2)+1},(_,i)=>{const value=range.min+i/2;return '<span'+(marks!=='' && Number(marks)===value?' class="is-selected"':'')+'>'+value+'</span>';}).join('');
+          values.innerHTML=values.hidden?'':Array.from({length:Math.round((range.max-range.min)*2)+1},(_,i)=>{const value=range.min+i/2;return '<span'+(marks!=='' && Number(marks)===value?' class="text-strong"':'')+'>'+value+'</span>';}).join('');
         }
         if(level!=='' && range.max<range.min)text.textContent='No whole or half mark fits this level. Choose another level or ask the coordinator to check the rubric.';
         field.querySelectorAll('[data-step]').forEach(button=>{button.disabled=slider.disabled;});
@@ -578,7 +578,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     updateTabProgress();
     const progress=drawer.querySelector('[data-evaluation-progress]');
     if(progress)progress.hidden=focusedAssessment() && !targeted;
-    if(progress)progress.innerHTML='<span class="review-progress-students">'+model.roster.students.length+' '+(model.roster.students.length===1?'student':'students')+'</span><div class="review-progress-completion"><span><strong>'+completed+' of '+count+'</strong> criteria evaluated</span><progress max="'+Math.max(1,count)+'" value="'+completed+'" aria-label="Evaluated criteria"></progress></div>';
+    if(progress)progress.innerHTML='<span>'+model.roster.students.length+' '+(model.roster.students.length===1?'student':'students')+'</span><div><span><strong>'+completed+' of '+count+'</strong> criteria evaluated</span><progress max="'+Math.max(1,count)+'" value="'+completed+'" aria-label="Evaluated criteria"></progress></div>';
     syncIndividualCards();
     updateAbsenceDisplay();
   }
@@ -749,14 +749,14 @@ function reviewEvaluationBrowser_(reviewKey) {
     rpc('loadPublishedReviewEvaluation',[reviewKey],result=>{
       finish();studentBusy=false;
       if(document.getElementById('studentAssessment-'+reviewKey)!==host)return;
-      if(!result){host.innerHTML='<div class="student-assessment-row"><strong>'+escape(reviewLabel)+ '</strong><span class="step-badge locked">Not published</span></div>';return;}
+      if(!result){host.innerHTML='<div><strong>'+escape(reviewLabel)+ '</strong><span>Not published</span></div>';return;}
       const a=result.assessment || {};
       host.innerHTML='<h3>'+escape(result.config.label)+'</h3>'+(result.identity?'<p>'+escape(result.identity.name+' ('+result.identity.register+')')+'</p>':'')+(result.underCorrection?'<p role="status">Under correction. These are the last published results.</p>':'')+'<p>Team Mark: '+mark(a.teamMark)+' &middot; Individual Mark: '+mark(a.individualMark)+' &middot; Review Total: '+mark(result.total)+' / '+result.config.maximum+' &middot; Course contribution '+mark(result.weighted)+' / '+(result.config.weight*100)+' &middot; Status: '+escape(a.status || 'Pending')+'</p>'+result.config.criteria.map(c=>{
         const score=result.scores[c.pi] || {},effective=a.effectiveScores && a.effectiveScores[c.pi] || score;
         return '<p><strong>'+escape(c.name)+'</strong>: '+mark(effective?effective.marks:score.marks)+' / '+c.maxMarks+'</p>'+(effective && effective.source==='policy'?'<p>Policy-assigned zero</p>':(effective && effective.source==='makeup'?'<p>Individual Makeup result</p>':'')+'<p>'+escape(score.remark)+'</p>');
       }).join('');
       const content=host.innerHTML;
-      host.innerHTML='<details class="student-assessment-result"><summary><strong>'+escape(result.config.label)+'</strong><span class="step-badge done">'+(result.underCorrection?'Under correction':'Published')+'</span><span class="student-view-marks">View marks</span></summary><div class="student-assessment-details">'+content+'</div></details>';
+      host.innerHTML='<details class="student-assessment-result"><summary><strong>'+escape(result.config.label)+'</strong><span>'+(result.underCorrection?'Under correction':'Published')+'</span><span>View marks</span></summary><div>'+content+'</div></details>';
     },error=>{
       finish();studentBusy=false;
       if(document.getElementById('studentAssessment-'+reviewKey)!==host)return;
@@ -769,219 +769,4 @@ function reviewEvaluationBrowser_(reviewKey) {
 }
 function getReviewEvaluationClientScript_() {
   return [reviewPolicyFacts_,reviewPolicyScoresComplete_,reviewPolicyCalculate_].map(f=>f.toString()).join('\n')+'\nconst ReviewAssessmentBrowser = '+reviewEvaluationBrowser_.toString()+'; const ReviewEvaluations = (()=>{const instances=new Map();const get=key=>{if(!instances.has(key))instances.set(key,ReviewAssessmentBrowser(key));return instances.get(key);};return {open:(team,key,button)=>get(key).open(team,button),student:key=>get(key).student(),admin:key=>get(key).admin()};})();';
-}
-function getReviewEvaluationStyles_() {
-  return `.review-drawer { inset:0 0 0 auto; margin:0; padding:0; border:0; max-width:100vw; max-height:100dvh; height:100dvh; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; font-size:var(--fs-body); line-height:var(--lh-body); }
-  .review-drawer .team-drawer-title { margin:0; font-family:inherit; font-size:var(--fs-h3); font-weight:var(--fw-bold); line-height:var(--lh-heading); text-transform:uppercase; }
-  .review-drawer .drawer-project-title { font-size:var(--fs-meta); }
-  .review-drawer .review-project-meta { font-size:var(--fs-meta); }
-  .review-project-meta-row { display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-1) var(--space-4); flex-wrap:wrap; margin:var(--space-2) 0 0; color:var(--muted); }
-  .review-project-meta-row .review-project-meta { margin:0; min-width:0; overflow-wrap:anywhere; }
-  .review-project-meta-row .review-project-meta:last-child { flex-shrink:0; text-align:right; }
-
-  .review-exception-summary { display:grid; gap:var(--space-4); margin:var(--space-4) 0; }
-  .review-exception-summary dt, .review-assessment-summary dt { font-size:var(--fs-meta); color:var(--muted); margin-bottom:var(--space-1); }
-  .review-exception-summary dd, .review-assessment-summary dd { margin:0; overflow-wrap:anywhere; }
-  .review-criterion .review-absence-choice { display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:var(--fw-regular); }
-  .review-criterion .review-absence-choice input { width:auto; margin:0; }
-  .review-criterion :is([data-review-day-fields],[data-contribution-fields],[data-absence-evidence]) fieldset { border:0; padding:0; margin:var(--space-3) 0; }
-  .review-assessment-summary dd { font-size:var(--fs-body); font-weight:var(--fw-semibold); }
-  .review-recorded-reason { white-space:pre-wrap; }
-  .review-criterion label.review-absence-evidence-choice { display:flex; align-items:center; gap:var(--space-2); margin:6px 0; }
-  .review-absence-evidence-choice input[type="checkbox"] { width:auto; flex:none; }
-  .review-drawer:not([open]) { display:none; }
-  .review-drawer.open { transform:none; transition:none; }
-  .review-drawer [hidden] { display:none !important; }
-  .review-drawer::backdrop { background:var(--scrim); }
-  .review-drawer .team-drawer-header { position:relative; display:block; flex-shrink:0; }
-  .review-heading-details { min-width:0; flex:1; }
-  .review-team-line { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2) var(--space-3); flex-wrap:wrap; }
-  .review-team-line .team-drawer-title { margin:0; }
-  .review-header-line { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-height:36px; padding-right:44px; margin-bottom:0; color:var(--text); font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-body); }
-  .review-header-line > span { white-space:nowrap; }
-  .review-header-review { padding:2px var(--space-2); border-radius:var(--radius-badge); background:var(--tint); color:var(--primary); font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
-  .review-header-line .review-header-due { padding:2px 6px; border:1px solid var(--control-border); border-radius:var(--radius-badge); background:var(--canvas); color:var(--text); font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
-  .review-header-line .review-header-due[data-timing="info"] { background:var(--info-tint); border-color:var(--info); color:var(--info); }
-  .review-header-line .review-header-due[data-timing="success"] { background:var(--success-tint); border-color:var(--success); color:var(--success); }
-  .review-header-line .review-header-due[data-timing="warning"] { background:var(--warning-tint); border-color:var(--warning); color:var(--warning); }
-  .review-header-line .review-header-due[data-timing="danger"] { background:var(--danger-tint); border-color:var(--danger); color:var(--danger); }
-  .review-header-line .review-header-due { white-space:normal; }
-  .review-heading-details > .review-progress { margin-top:var(--space-2); width:100%; box-sizing:border-box; }
-  .review-project-title-row { margin-top:var(--space-2); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
-  .review-project-title-row > summary { display:flex; align-items:center; gap:6px; padding:7px 0; list-style:none; cursor:pointer; color:var(--text); font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
-  .review-project-title-row > summary::-webkit-details-marker { display:none; }
-  .review-project-title-row > summary > span { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .review-project-title-row .lucide-icon { width:13px; height:13px; flex-shrink:0; color:var(--primary); }
-  .review-project-title-row .review-title-chevron { color:var(--muted); }
-  .review-project-title-row[open] .review-title-chevron { transform:rotate(180deg); }
-  .review-project-title-row > summary:focus-visible { outline:2px solid var(--primary); outline-offset:2px; border-radius:var(--radius-btn); }
-  .review-project-title-row > p { margin:0 0 var(--space-2); max-height:15dvh; overflow:auto; overflow-wrap:anywhere; font-size:var(--fs-body); color:var(--text); }
-  .review-assessment-navigation { flex:0 0 auto; padding:6px var(--space-5) var(--space-1); background:var(--canvas); border-bottom:1px solid var(--border); }
-  .review-tab-label { display:flex; align-items:center; justify-content:center; gap:5px; }
-  .review-tab-label .lucide-icon { width:14px; height:14px; color:var(--muted); }
-  .review-tab-caption { color:var(--muted); font-size:var(--fs-meta); font-weight:var(--fw-regular); }
-  .review-drawer .review-pi-pills { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:6px; margin-top:6px; }
-  .review-pi-pills[data-individual-pills] { margin:0 0 6px; }
-  .review-drawer .review-pi-pills button { display:flex; flex:0 0 auto; align-items:center; justify-content:flex-start; gap:5px; width:auto; min-width:0; max-width:100%; min-height:34px; box-sizing:border-box; margin:0; text-align:left; }
-  .review-pi-label { display:flex; flex-direction:column; align-items:flex-start; line-height:var(--lh-heading); overflow-wrap:anywhere; }
-  .review-pi-label strong { font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
-  .review-pi-label small { font-size:var(--fs-meta); font-weight:var(--fw-regular); }
-  .review-pi-pills [data-pi-icon] { display:flex; }
-  .review-pi-pills .lucide-icon { width:12px; height:12px; }
-  .review-card-title { display:none; }
-  .review-criterion[data-index] { position:relative; margin:0 0 var(--space-4); padding:var(--space-4); border:1px solid var(--border); border-top:5px solid var(--primary); border-radius:var(--radius-card); background:linear-gradient(110deg,var(--paper) 65%,var(--tint)); }
-  .review-individual-rubric[data-index] { border-top-color:var(--primary); background:linear-gradient(110deg,var(--paper) 65%,var(--tint)); }
-  .review-individual-rubric[data-index] .review-criterion-meta span:first-child { background:var(--tint); color:var(--primary); }
-  .review-criterion[data-index] > legend { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-  .review-criterion[data-index] .review-card-title { display:block; margin:var(--space-2) 0 14px; color:var(--text); font-size:var(--fs-body); line-height:var(--lh-heading); font-weight:var(--fw-bold); }
-  .review-criterion[data-index] .review-criterion-meta { margin-bottom:0; gap:6px; }
-  .review-criterion[data-index] .review-criterion-meta span { padding:3px 6px; font-size:var(--fs-meta); }
-  .review-criterion[data-index] .review-control-title { margin-top:10px; color:var(--muted); font-size:var(--fs-meta); text-transform:uppercase; }
-  .review-criterion[data-index] .review-feedback-heading { margin-top:14px; padding-top:var(--space-3); border-top:1px solid var(--border); }
-  .review-tab-progress { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); margin-top:var(--space-2); color:var(--muted); font-size:var(--fs-meta); }
-  .review-graded-pill { padding:2px 7px; border:1px solid var(--border); border-radius:var(--radius-badge); background:var(--soft); color:var(--muted); white-space:nowrap; }
-  .review-graded-pill[data-completion="partial"] { color:var(--primary); border-color:var(--border); background:var(--tint); }
-  .review-graded-pill[data-completion="complete"] { color:var(--success); border-color:var(--success); background:var(--success-tint); }
-  .review-header-students { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:6px; max-width:100%; list-style:none; padding:2px 0; margin:6px 0 0; color:var(--muted); font-size:var(--fs-meta); font-weight:var(--fw-regular); line-height:var(--lh-heading); }
-  .review-header-students li { min-width:0; }
-  .review-drawer .review-header-students button { display:grid; grid-template-columns:20px minmax(0,1fr); align-content:start; align-items:center; gap:var(--space-1); width:100%; height:100%; min-height:44px; box-sizing:border-box; text-align:left; cursor:pointer; }
-  .review-drawer .review-header-students button:focus-visible, .review-drawer .review-pi-pills[data-individual-pills] button:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
-  .review-header-students .review-student-details { font-weight:var(--fw-semibold); }
-  .review-student-register { grid-column:1 / -1; color:var(--muted); font-size:var(--fs-meta); overflow-wrap:anywhere; }
-  .review-header-students .review-student-score { grid-column:1 / -1; padding-top:3px; border-top:1px solid var(--border); font-size:var(--fs-meta); text-align:left; white-space:normal; overflow-wrap:anywhere; }
-
-  .review-student-details { min-width:0; overflow-wrap:anywhere; }
-  .review-student-score { flex-shrink:0; color:var(--primary); font-weight:var(--fw-semibold); font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
-  .review-header-students .review-student-score { color:var(--primary); border-top-color:var(--border); }
-  .review-drawer .team-drawer-close { position:absolute; top:18px; right:20px; }
-  .review-drawer form .drawer-section > h3 { margin:var(--space-5) 0 var(--space-3); padding:10px var(--space-3); border-left:4px solid var(--primary); border-radius:var(--radius-btn); background:var(--tint); color:var(--primary-hover); font-size:var(--fs-meta); line-height:var(--lh-body); overflow-wrap:anywhere; }
-  .review-drawer .team-drawer-content { background:var(--canvas); flex:1 1 auto; min-height:0; overflow-y:auto; padding-top:6px; }
-  .review-criterion { min-width:0; margin:14px 0; border:1px solid var(--border); border-radius:var(--radius-btn); padding:14px; background:var(--paper); }
-  .review-drawer .review-criterion[data-absence] { margin:0 0 14px; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
-  .review-criterion [data-absence-editor] > label:first-child { margin-top:0; }
-  .review-attendance > span { display:block; margin-bottom:var(--space-1); color:var(--text); font-weight:var(--fw-semibold); }
-  .review-criterion .review-attendance-picker { font-size:var(--fs-meta); color:var(--text); }
-  .review-attendance-picker > summary { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); min-height:34px; box-sizing:border-box; padding:6px var(--space-2); border:1px solid var(--control-border); border-radius:var(--radius-btn); background:var(--paper); list-style:none; cursor:pointer; }
-  .review-attendance-picker > summary::-webkit-details-marker { display:none; }
-  .review-attendance-picker > summary[aria-disabled="true"] { opacity:.6; cursor:default; }
-  .review-attendance-picker[open] > summary { border-color:var(--primary); }
-  .review-attendance-picker[open] > summary .lucide-icon { transform:rotate(180deg); }
-  .review-attendance-options { margin-top:var(--space-1); padding:var(--space-1); border:1px solid var(--border); border-radius:var(--radius-btn); background:var(--paper); }
-  .review-criterion .review-attendance-options label { display:flex; align-items:center; gap:var(--space-2); margin:0; padding:7px var(--space-2); border-radius:var(--radius-btn); color:var(--text); font-weight:var(--fw-regular); cursor:pointer; }
-  .review-criterion .review-attendance-options input { width:14px; height:14px; flex:0 0 14px; margin:0; padding:0; accent-color:var(--primary); }
-  .review-attendance-options label:hover, .review-attendance-options label:focus-within { background:var(--tint); }
-  .review-attendance-options input:checked + span { color:var(--primary); font-weight:var(--fw-semibold); }
-  .review-drawer .review-attendance-picker > summary:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
-  .review-criterion > legend { max-width:100%; box-sizing:border-box; padding:var(--space-1) var(--space-2); color:var(--text); font-size:var(--fs-meta); font-weight:var(--fw-bold); line-height:var(--lh-body); overflow-wrap:anywhere; }
-  .review-criterion label { display:block; margin-top:var(--space-3); color:var(--text); font-weight:var(--fw-semibold); }
-  .review-criterion :is(input,select,textarea) { display:block; width:100%; box-sizing:border-box; font:inherit; margin-top:var(--space-1); padding:5px 6px; border:1px solid var(--control-border); border-radius:var(--radius-btn); }
-  .review-criterion :is(input,select,textarea) { font-weight:var(--fw-regular); color:var(--text); background:var(--paper); }
-  .review-drawer button { cursor:pointer; }
-  .review-criterion [data-level][hidden] { display:none; }
-  .review-criterion-meta { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-2); margin-bottom:var(--space-5); }
-  .review-criterion-meta span { padding:5px 9px; border-radius:var(--radius-badge); background:var(--tint); color:var(--primary); font-size:var(--fs-meta); font-weight:var(--fw-bold); }
-  .review-criterion-meta span:last-child { background:var(--soft); color:var(--muted); }
-  .review-control-title { color:var(--muted); font-size:var(--fs-meta); font-weight:var(--fw-bold); text-transform:uppercase; }
-  .review-marks-error { margin:var(--space-2) 0 var(--space-3); padding:9px 11px; border:1px solid var(--danger); border-left:3px solid var(--danger); border-radius:var(--radius-btn); background:var(--danger-tint); color:var(--danger); font-size:var(--fs-body); font-weight:var(--fw-semibold); line-height:var(--lh-body); }
-  .review-criterion input[aria-invalid="true"] { border-color:var(--danger); background:var(--danger-tint); }
-  .review-drawer .review-levels { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:var(--space-1); }
-  .review-drawer .review-levels button { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:0; min-height:44px; }
-  .review-levels button strong { display:block; font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
-  .review-levels button small { display:block; margin:0; font-size:var(--fs-meta); font-weight:var(--fw-regular); line-height:var(--lh-heading); white-space:nowrap; }
-  .review-slider-values { grid-column:1 / -1; display:flex; justify-content:space-between; flex-wrap:wrap; gap:var(--space-1) var(--space-2); padding:0 6px; color:var(--muted); font-size:var(--fs-meta); font-variant-numeric:tabular-nums; }
-  .review-slider-values .is-selected { color:var(--primary); font-weight:var(--fw-bold); }
-  .review-levels button[aria-pressed="true"] strong { font-weight:var(--fw-bold); }
-  .review-descriptor { margin:14px 0 10px; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--radius-btn); background:var(--tint); color:var(--primary-hover); font-size:var(--fs-body); line-height:var(--lh-body); white-space:pre-wrap; }
-  .review-criterion details { font-size:var(--fs-body); color:var(--primary); }
-  .review-criterion summary { cursor:pointer; }
-  .review-accordion { margin:0; border:0; padding:0; background:transparent; }
-  .review-accordion > summary { cursor:pointer; padding:var(--space-3); border-left:4px solid var(--primary); border-radius:var(--radius-btn); background:var(--tint); color:var(--primary-hover); font-size:var(--fs-meta); }
-  .review-accordion > summary strong { font-weight:var(--fw-bold); }
-  .review-accordion > summary span { display:block; margin:var(--space-1) 0 0 var(--space-4); color:var(--muted); font-size:var(--fs-meta); line-height:var(--lh-body); }
-  .review-accordion > summary:focus-visible { outline:3px solid var(--primary); outline-offset:2px; }
-  .review-accordion[data-criteria-group] > summary { display:none; }
-  .review-accordion[data-criteria-group="individual"] > summary { border-left-color:var(--primary); background:var(--tint); color:var(--primary); }
-  .review-accordion[data-criteria-group="individual"] > summary:focus-visible { outline-color:var(--primary); }
-  .review-accordion[data-criteria-group="individual"] .drawer-section > h3 { border-left-color:var(--primary); background:var(--tint); color:var(--primary); }
-  .review-accordion-content { padding:0; }
-  .review-student-accordion { margin:0; border:0; padding:0; background:transparent; }
-  .review-student-accordion > summary { display:none; }
-  .review-assessment-summary { display:block; margin:0 0 var(--space-3); padding:var(--space-2) 10px; border:1px solid var(--border); border-radius:var(--radius-btn); background:var(--paper); color:var(--muted); font-size:var(--fs-body); }
-  .review-assessment-summary h3 { margin:0 0 6px; font-size:var(--fs-meta); color:var(--text); }
-  .review-assessment-summary dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px var(--space-3); margin:0; }
-  .review-assessment-summary dl > div { display:flex; align-items:baseline; flex-wrap:wrap; gap:3px 6px; }
-  .review-assessment-summary dt { margin:0; font-size:var(--fs-meta); color:var(--muted); }
-  .review-assessment-summary .review-summary-status { grid-column:1 / -1; }
-  .review-assessment-summary dd { color:var(--text); font-variant-numeric:tabular-nums; }
-  .review-assessment-summary .review-summary-total { border-left:2px solid var(--border); padding-left:var(--space-2); }
-  .review-assessment-summary .review-summary-total[data-resolved="true"] dd { color:var(--primary); font-weight:var(--fw-bold); }
-  .review-assessment-summary .review-summary-status dd { padding:2px 7px; border-radius:var(--radius-badge); background:var(--soft); color:var(--muted); font-size:var(--fs-body); }
-  .review-assessment-summary .review-summary-status[data-tone="complete"] dd { background:var(--success-tint); color:var(--success); }
-  .review-assessment-summary .review-summary-status[data-tone="pending"] dd { background:var(--warning-tint); color:var(--warning); }
-  .review-assessment-summary .review-summary-status[data-tone="exception"] dd { background:var(--danger-tint); color:var(--danger); }
-  .review-assessment-summary button, .review-summary-decision { margin-top:var(--space-2); }
-  .review-summary-decision > summary { cursor:pointer; color:var(--primary); font-weight:var(--fw-semibold); }
-  .review-summary-decision label { display:block; margin-top:var(--space-2); }
-  .review-assessment-summary [data-summary-unsaved] { display:inline-block; margin-left:6px; padding:1px 5px; border-radius:var(--radius-badge); background:var(--warning-tint); color:var(--warning); font-size:var(--fs-meta); font-weight:var(--fw-regular); }
-  .review-student-accordion > summary span { display:block; margin:3px 0 0 var(--space-4); color:var(--muted); font-size:var(--fs-meta); }
-  .review-accordion > summary .review-header-mark, .review-student-accordion > summary .review-header-mark { display:inline-flex; flex-shrink:0; margin:0 0 0 var(--space-2); padding:3px 9px; border:1px solid var(--border); border-radius:var(--radius-badge); background:var(--tint); color:var(--primary); font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-body); }
-  .review-accordion > summary > .review-header-mark { float:right; }
-  .review-student-accordion > summary .review-student-heading { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); margin:0; color:inherit; font-size:var(--fs-meta); }
-  .review-student-heading strong { min-width:0; overflow-wrap:anywhere; }
-  .review-student-accordion > summary .review-student-subheading { display:flex; justify-content:space-between; align-items:baseline; gap:var(--space-2); flex-wrap:wrap; margin:var(--space-1) 0 0; }
-  .review-student-accordion > summary .review-student-subheading > span { display:inline; margin:0; }
-  .review-student-accordion > summary [data-assessment-status] { margin-left:auto !important; text-align:right; }
-  .review-team-rubric { border-color:var(--border); border-left:4px solid var(--primary); }
-
-  .review-student-accordion > summary .review-header-mark { border-color:var(--border); background:var(--tint); color:var(--primary); }
-  .review-student-accordion > summary:focus-visible { outline:3px solid var(--primary); outline-offset:2px; }
-  .review-award { display:grid; grid-template-columns:minmax(0,1fr) 100px; align-items:center; gap:6px var(--space-2); margin:10px 0; padding:var(--space-2); border:1px solid var(--border); border-radius:var(--radius-btn); background:var(--canvas); }
-  .review-award-heading { display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
-  .review-award-heading label { margin:0; min-width:0; font-size:var(--fs-meta); font-weight:var(--fw-semibold); flex-shrink:0; }
-  .review-stepper { display:grid; grid-template-columns:26px minmax(0,1fr) 26px; align-items:stretch; gap:0; margin:0; padding:0; min-width:0; height:30px; box-sizing:border-box; border:1px solid var(--control-border); border-radius:var(--radius-btn); background:var(--paper); }
-  .review-stepper button { display:flex; align-items:center; justify-content:center; box-sizing:border-box; width:100%; min-width:0; height:28px; margin:0; padding:0; }
-  .review-criterion .review-stepper input { appearance:textfield; margin:0; padding:0 2px; border:0; border-left:1px solid var(--control-border); border-right:1px solid var(--control-border); border-radius:0; text-align:center; font-size:var(--fs-meta); font-weight:var(--fw-semibold); color:var(--primary); min-width:0; width:100%; height:28px; line-height:normal; }
-  .review-stepper input::-webkit-inner-spin-button,.review-stepper input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
-  .review-criterion [data-marks-slider] { grid-column:1 / -1; width:100%; min-width:0; padding:0; margin:0; accent-color:var(--primary); }
-  .review-award [data-range] { margin:0; padding:0; color:var(--muted); font-size:var(--fs-meta); font-weight:var(--fw-regular); line-height:var(--lh-heading); font-variant-numeric:tabular-nums; }
-  .review-awarded-total { display:none; }
-  .review-drawer .review-other-feedback { margin:var(--space-1) 0 0; }
-  .review-criterion:is([data-level="0"],[data-level="1"]) .review-award [data-range] { border-color:var(--warning); background:var(--warning-tint); color:var(--warning); }
-  .review-awarded-total { white-space:nowrap; font-size:var(--fs-meta); font-weight:var(--fw-semibold); color:var(--text); }
-  .review-feedback-heading { display:flex; justify-content:space-between; align-items:center; gap:var(--space-2); font-size:var(--fs-meta); }
-  .review-feedback-title { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
-  .review-feedback-title strong { color:var(--text); }
-  .review-feedback-heading [data-feedback-required] { padding:2px 5px; border-radius:var(--radius-badge); background:var(--warning-tint); color:var(--warning); font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-heading); white-space:nowrap; }
-  .review-feedback-heading [data-feedback-status] { flex-shrink:0; font-size:var(--fs-meta); color:var(--muted); }
-  .review-criterion:is([data-level="3"],[data-level="4"],[data-level="5"]) [data-feedback-status] { color:var(--success); background:var(--success-tint); border-radius:var(--radius-badge); padding:2px 6px; font-weight:var(--fw-semibold); line-height:var(--lh-heading); }
-  .review-criterion .review-feedback-options { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
-  .review-feedback-options button { max-width:100%; text-align:left; overflow-wrap:anywhere; }
-  .review-feedback-options button:focus-visible { outline:3px solid var(--primary); outline-offset:3px; }
-  @media(prefers-reduced-motion:reduce) { .review-feedback-options button { transition:none; } }
-  .review-criterion .review-feedback-label { font-size:var(--fs-meta); font-weight:var(--fw-regular); }
-  .review-criterion :is(textarea) { font-size:var(--fs-body); line-height:var(--lh-body); min-height:48px; resize:vertical; }
-  .review-criterion:is([data-level="0"],[data-level="1"]) .review-descriptor { background:var(--warning-tint); border-color:var(--warning); color:var(--warning); }
-  .review-criterion:is([data-level="0"],[data-level="1"]) [data-feedback-status] { color:var(--warning); }
-  .review-criterion:is([data-level="0"],[data-level="1"]) textarea { border-color:var(--warning); }
-  .review-progress { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:0; font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-body); color:var(--text); }
-  .review-progress-students { color:var(--primary); font-weight:var(--fw-semibold); white-space:nowrap; }
-  .review-progress-completion { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:var(--space-1) var(--space-2); min-width:0; margin-left:auto; }
-  .review-progress-students,.review-progress-completion > span { display:inline-flex; align-items:center; gap:var(--space-1); white-space:nowrap; }
-  .review-progress-students::before,.review-progress-completion > span::before { content:""; width:6px; height:6px; flex-shrink:0; margin-right:2px; border-radius:50%; background:var(--primary); }
-  .review-progress-completion > span::before { background:var(--warning); }
-  .review-progress progress::-webkit-progress-bar { background:var(--border); border-radius:var(--radius-badge); }
-  .review-progress progress::-webkit-progress-value { background:var(--primary); border-radius:var(--radius-badge); }
-  .review-progress progress::-moz-progress-bar { background:var(--primary); border-radius:var(--radius-badge); }
-  .review-progress progress { width:80px; max-width:100%; height:5px; accent-color:var(--primary); border:0; border-radius:var(--radius-badge); overflow:hidden; background:var(--border); }
-  @media(max-width:400px) { .review-criterion { padding:var(--space-3); } .review-drawer .team-drawer-content { padding:6px 14px 14px; } }
-  .review-drawer :is(button,input,select,textarea):focus-visible { outline:3px solid var(--primary); outline-offset:2px; }
-  .review-drawer .review-stepper :is(button,input):focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
-  .review-drawer [hidden] { display:none !important; }
-  .review-footer { flex:0 0 auto; min-width:0; max-height:45dvh; display:flex; flex-direction:column; background:var(--paper); border-top:1px solid var(--border); }
-  .review-message { margin:0; padding:10px 14px; color:var(--text); font-size:var(--fs-body); line-height:var(--lh-body); overflow-wrap:anywhere; }
-  .review-message:empty { padding:0; }
-  .review-footer .review-message { min-height:0; overflow-y:auto; }
-  .review-actions { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:var(--space-2); flex:0 0 auto; width:100%; box-sizing:border-box; z-index:var(--z-sticky); isolation:isolate; background:var(--paper); padding:var(--space-3) 14px; padding-bottom:max(var(--space-3),env(safe-area-inset-bottom)); border-top:1px solid var(--border); }
-  .review-drawer [data-target] { margin-right:var(--space-2); }
-  .review-drawer :disabled:not(button) { cursor:default; opacity:.7; }`;
 }

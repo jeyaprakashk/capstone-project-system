@@ -73,8 +73,7 @@ test('student step icons and expandable sections use the shared library', () => 
   assert.match(c.buildStepNode(1,'done'), /lucide-check/);
   assert.match(c.buildStepNode(2,'locked'), /lucide-lock-keyhole/);
   assert.match(c.buildStepNode(3,'active'), />3<\/div>/);
-  assert.match(c.getCollapsibleStyles(), /lucide-chevron-right/);
-  assert(!/[▸▾]/.test(c.getCollapsibleStyles()));
+  assert(!/[▸▾]/.test(c.getFunctionalStyles_()));
 });
 const events={}, appended=[];
 function node(attrs={}) {return {attrs,style:{},hidden:false,setAttribute(k,v){this.attrs[k]=v;},getAttribute(k){return this.attrs[k]??null;},removeAttribute(k){delete this.attrs[k];},closest(selector){return selector==='dialog[open]'?null:this;},contains(n){return n===this;},getBoundingClientRect(){return {left:50,top:50,bottom:70,width:40,height:20};}};}

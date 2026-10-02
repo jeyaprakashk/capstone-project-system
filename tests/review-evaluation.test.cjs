@@ -205,7 +205,7 @@ test('coordinator report lists team statuses and totals without requiring review
 });
 test('browser source is serializable and uses shared drawer layout',()=>{
   const c=vm.createContext({});vm.runInContext(fs.readFileSync('review-academic-policy.js','utf8'),c);vm.runInContext(fs.readFileSync('review-evaluation-client.js','utf8'),c);
-  new vm.Script(c.getReviewEvaluationClientScript_());assert.match(c.getReviewEvaluationClientScript_(),/team-drawer open review-drawer/);
+  new vm.Script(c.getReviewEvaluationClientScript_());assert.match(c.getReviewEvaluationClientScript_(),/className='open review-drawer'/);
 });
 
 test('Review 2 checks history on load and save, and reopening removes completion',()=>{
@@ -490,7 +490,7 @@ for(const key of ['review1','review2']) {
   test(key+': component tabs switch without reload, preserve entries and support arrow navigation',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
     assert(f.drawer.innerHTML.indexOf('review-project-title-row')<f.drawer.innerHTML.indexOf('role="tablist"'));
-    assert.match(f.drawer.innerHTML,/Team Criteria<\/span><span class="review-tab-caption">60 pts pool<\/span>/);assert.match(f.drawer.innerHTML,/Individual<\/span><span class="review-tab-caption">40 pts weight<\/span>/);
+    assert.match(f.drawer.innerHTML,/Team Criteria<\/span><span>60 pts pool<\/span>/);assert.match(f.drawer.innerHTML,/Individual<\/span><span>40 pts weight<\/span>/);
     const panels=Object.fromEntries(['team','individual'].map(name=>[name,{hidden:name!=='team',open:name==='team',querySelectorAll:()=>[]}]));
     const tabs=Object.fromEntries(['team','individual'].map(name=>[name,{dataset:{criteriaTab:name},attrs:{},hasAttribute:attr=>attr==='data-criteria-tab',setAttribute(k,v){this.attrs[k]=v;},focus(){this.focused=true;},closest(selector){return selector==='button'?this:null;}}]));
     const chips={},query=f.drawer.querySelector.bind(f.drawer);
@@ -511,9 +511,9 @@ for(const key of ['review1','review2']) {
     f.events.input();assert.equal(values.hidden,true);
     field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='48';f.events.input();
     assert.equal(values.hidden,false);assert.match(values.innerHTML,/<span>45<\/span>/);
-    assert.match(values.innerHTML,/<span class="is-selected">48<\/span>/);assert.match(values.innerHTML,/<span>50.5<\/span>/);
+    assert.match(values.innerHTML,/<span class="text-strong">48<\/span>/);assert.match(values.innerHTML,/<span>50.5<\/span>/);
     field.controls['[data-level]'].value='5';field.controls['[data-marks]'].value='60';f.events.input();
-    assert.match(values.innerHTML,/<span>57<\/span>/);assert.match(values.innerHTML,/<span class="is-selected">60<\/span>/);
+    assert.match(values.innerHTML,/<span>57<\/span>/);assert.match(values.innerHTML,/<span class="text-strong">60<\/span>/);
   });
   test(key+': compact student chips switch panels without RPC or losing unsaved entries',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
@@ -530,8 +530,7 @@ for(const key of ['review1','review2']) {
     f.events.click({target:chips[0]});assert.equal(panels[0].hidden,false);assert.equal(field.controls['[data-marks]'].value,'32');assert.equal(field.controls['[data-remark]'].value,'Unsaved feedback');assert.equal(f.requests.length,1);
     f.click('data-draft');f.events.click({target:chips[1]});assert.equal(panels[0].hidden,false);
     f.requests[1].failure({message:'Offline'});f.events.click({target:chips[1]});assert.equal(panels[1].hidden,false);
-    assert.match(f.context.getReviewEvaluationStyles_(),/\.review-header-students \{ display:grid;/);
-    assert.match(f.drawer.innerHTML,/class="review-student-register">s1<\/small>/);
+    assert.match(f.drawer.innerHTML,/<small>s1<\/small>/);
   });
   test(key+': individual rubric visibility follows attendance and preserves unsaved entries',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
@@ -623,7 +622,7 @@ for(const key of ['review2','review3','design_gate'])test(key+' browser passes i
   const f=browserFixture(true,key);f.api.open('T1',f.trigger);assert.equal(f.requests[0].name,'loadReviewEvaluation');
   assert.deepEqual(Array.from(f.requests[0].args),['T1',key]);
   f.data.config.key=key;f.data.config.label='Configured Review';f.requests[0].success(f.data);
-  assert.match(f.drawer.innerHTML,/<span class="review-header-review">Configured Review<\/span>/);
+  assert.match(f.drawer.innerHTML,/<span>Configured Review<\/span>/);
   f.click('data-draft');assert.equal(f.requests[1].name,'saveReviewEvaluationDraft');assert.equal(f.requests[1].args[0].assessmentId,key);
 });
 

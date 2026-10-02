@@ -23,13 +23,13 @@ function buildStudentPerfBox_() {
   if (!STUDENT_PERF_) return '';
   const rows = STUDENT_PERF_.measurements
     .filter(x => x.label !== 'buildStudentContent TOTAL')
-    .map(x => '<div style="display:flex;justify-content:space-between;gap:var(--space-6);padding:var(--space-1) 0;border-bottom:1px solid var(--border);"><span>' + escapeHtml(x.label) + '</span><strong style="font-family:var(--font);white-space:nowrap;">' + x.ms + ' ms</strong></div>')
+    .map(x => '<div class="row row--between py-1"><span>' + escapeHtml(x.label) + '</span><strong class="num">' + x.ms + ' ms</strong></div>')
     .join('');
   const total = Date.now() - STUDENT_PERF_.startedAt;
-  return '<div style="margin:var(--space-6) 0;padding:var(--space-4) 18px;border:2px dashed var(--warning);border-radius:var(--radius-card);background:var(--canvas);color:var(--text);font:var(--fs-meta) var(--font);">' +
-    '<div style="font-weight:var(--fw-bold);margin-bottom:10px;color:var(--warning);">TEMPORARY PERFORMANCE DIAGNOSTICS</div>' +
+  return '<div class="notice notice--warning mt-6 mb-6">' +
+    '<div class="text-label text-label--warning mb-2">TEMPORARY PERFORMANCE DIAGNOSTICS</div>' +
     rows +
-    '<div style="display:flex;justify-content:space-between;gap:var(--space-6);padding-top:9px;font-size:var(--fs-body);"><strong>TOTAL STUDENT SERVER TIME</strong><strong style="font-family:var(--font);white-space:nowrap;">' + total + ' ms</strong></div>' +
+    '<div class="row row--between mt-2"><strong>TOTAL STUDENT SERVER TIME</strong><strong class="num">' + total + ' ms</strong></div>' +
     '</div>';
 }
 
@@ -93,41 +93,41 @@ function buildTeamRoster(rosterSlots, myEmail) {
   const chips = rosterSlots.map((s, index) => {
     const isMe = emailsMatch(s.email, myEmail);
     return `
-      <div class="member-chip">
+      <div>
         <span class="avatar avatar-${index % 3 + 1}">${escapeHtml(initialsOf(s.name))}</span>
-        <div class="member-info">
-          <div class="member-name">${escapeHtml(s.name)}${isMe ? ' <span class="you-tag">you</span>' : ''}</div>
-          <div class="member-reg">${escapeHtml(s.regno)}</div>
+        <div>
+          <div>${escapeHtml(s.name)}${isMe ? ' <span>you</span>' : ''}</div>
+          <div>${escapeHtml(s.regno)}</div>
         </div>
       </div>`;
   }).join('');
 
-  return `<div class="team-roster">${chips}</div>`;
+  return `<div>${chips}</div>`;
 }
 
 function buildStepNode(stepNum, state) {
   const icon = state === 'done' ? renderLucideIcon_('check', 'Complete') : state === 'locked' ? renderLucideIcon_('lock-keyhole', 'Locked') : stepNum;
-  return `<div class="step-node circle step-node-${state}">${icon}</div>`;
+  return `<div class="circle">${icon}</div>`;
 }
 
 function buildStepCard(stepNum, title, state, bodyHtml, ctaHtml, isLast) {
-  const badge = state === 'done' ? '<span class="step-badge done">Done</span>'
-    : state === 'waiting' ? '<span class="step-badge waiting">Waiting</span>'
-    : state === 'locked' ? '<span class="step-badge locked">Locked</span>'
-    : '<span class="step-badge active">Action needed</span>';
+  const badge = state === 'done' ? '<span>Done</span>'
+    : state === 'waiting' ? '<span>Waiting</span>'
+    : state === 'locked' ? '<span>Locked</span>'
+    : '<span class="active">Action needed</span>';
 
   return `
-  <div class="step-row">
-    <div class="step-rail">
+  <div data-step-row>
+    <div>
       ${buildStepNode(stepNum, state)}
       ${isLast ? '' : '<div class="step-line"></div>'}
     </div>
-    <div class="step-card step-card-${state} card" data-step-card>
-      <div class="step-header">
+    <div class="card" data-step-card>
+      <div data-step-header>
         <h4>${escapeHtml(title)}</h4>
         ${badge}
       </div>
-      <div class="step-body">${bodyHtml}</div>
+      <div data-step-body>${bodyHtml}</div>
       ${ctaHtml || ''}
     </div>
   </div>`;
@@ -159,18 +159,18 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   const connected = !!account.githubId;
   const githubMembers = (d.githubSetup || {}).members || [];
   const githubRows = buildGithubMemberRows_(d.rosterSlots, githubMembers, !connected ? email : '');
-  const githubBody = `<p class="step-detail">GitHub setup due ${Number.isFinite(d.schedule.git) ? formatProjectDay_(d.schedule.git) : 'Date unavailable'} · ${escapeHtml(d.githubNeedsUsername && !connected ? 'Waiting for GitHub account connection.' : githubTiming.text)}</p>
-    <ul class="github-team-status" aria-label="Team GitHub status">${githubRows}</ul>
+  const githubBody = `<p>GitHub setup due ${Number.isFinite(d.schedule.git) ? formatProjectDay_(d.schedule.git) : 'Date unavailable'} · ${escapeHtml(d.githubNeedsUsername && !connected ? 'Waiting for GitHub account connection.' : githubTiming.text)}</p>
+    <ul aria-label="Team GitHub status">${githubRows}</ul>
     ${buildGithubRepositoryLine_(d.repoUrl)}`;
   const githubCta = !connected
-    ? `<form class="github-username-form" onsubmit="DashboardUI.previewGithubAccount(event, this)">
+    ? `<form onsubmit="DashboardUI.previewGithubAccount(event, this)">
         <label for="studentGithubProfile">Submit GitHub Account</label>
         <p>GitHub → <strong>Your profile</strong> → copy the profile URL and paste below.</p>
         <input id="studentGithubProfile" name="profileUrl" type="url" required maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://github.com/student123" aria-describedby="githubSubmitStatus"${d.githubCaptureReady ? '' : ' disabled'}>
-        <button class="workflow-btn btn btn-lg btn-primary" type="submit"${d.githubCaptureReady ? '' : ' disabled'}>Continue</button>
+        <button class="btn btn-lg btn-primary" type="submit"${d.githubCaptureReady ? '' : ' disabled'}>Continue</button>
         <div data-github-confirmation hidden></div>
         <p id="githubSubmitStatus" role="status" aria-live="polite"></p>
-        <button id="githubStatusRefresh" class="workflow-btn secondary btn btn-sm btn-outline" type="button" hidden onclick="DashboardUI.refreshGithubStatus(this)">Refresh GitHub status</button>
+        <button id="githubStatusRefresh" class="secondary btn btn-sm btn-outline" type="button" hidden onclick="DashboardUI.refreshGithubStatus(this)">Refresh GitHub status</button>
       </form>`
     : '';
 
@@ -210,7 +210,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
 
     if (d.title) {
       titleBody +=
-        `<p class="step-detail">
+        `<p>
            <strong>Current title:</strong>
            ${escapeHtml(d.title)}
          </p>`;
@@ -218,14 +218,14 @@ function buildStudentContent(email, teamId, teamStatusRow) {
 
     if (d.note) {
       titleBody +=
-        `<p class="step-detail note">
+        `<p>
            ${escapeHtml(d.note)}
          </p>`;
     }
 
     const titleCta =
       label.state === 'active'
-        ? `<a class="workflow-btn btn btn-primary"
+        ? `<a class="btn btn-primary"
               href="${escapeHtml(buildTeamIntakeLink(teamId))}"
               target="_blank"
               rel="noopener">
@@ -237,7 +237,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
       2,
       'Project title',
       label.state,
-      titleBody + `<p class="step-detail">Approval due ${formatProjectDay_(d.schedule.title)}${!titleApproved && d.clock.today > d.schedule.title ? ' · Overdue' : ''}</p>`,
+      titleBody + `<p>Approval due ${formatProjectDay_(d.schedule.title)}${!titleApproved && d.clock.today > d.schedule.title ? ' · Overdue' : ''}</p>`,
       titleCta,
       false
     );
@@ -248,9 +248,9 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   // WEEKLY PROGRESS LOG
   // ===============================================================
 
-  const logCard = titleApproved ? '<section class="student-weekly-card card">' +
+  const logCard = titleApproved ? '<section class="card">' +
     '<section id="studentWeeklyProgress" aria-label="Weekly progress">' +
-    '<div class="weekly-card-heading"><h3>Weekly progress</h3><button type="button" class="btn btn-sm btn-outline" data-weekly-refresh aria-label="Refresh weekly progress" onclick="DashboardUI.loadWeeklyProgress()">Refresh</button></div>' +
+    '<div><h3>Weekly progress</h3><button type="button" class="btn btn-sm btn-outline" data-weekly-refresh aria-label="Refresh weekly progress" onclick="DashboardUI.loadWeeklyProgress()">Refresh</button></div>' +
     '<div data-weekly-read>' + getSkeletonMarkup_('panel','Loading weekly progress') + '</div>' +
     '<p data-weekly-status role="status" aria-live="polite"></p>' +
     '<div data-weekly-form></div></section></section>' : '';
@@ -262,11 +262,11 @@ function buildStudentContent(email, teamId, teamStatusRow) {
     pendingSteps.push('Step 2: ' + label.text + '. ' + (!githubDone ? 'Finish GitHub setup first. ' : '') +
       (label.state === 'active' ? (d.title ? 'Your team must address the feedback below and resubmit the title.' : 'Your team must submit a project title for approval.') : 'Your team is waiting for approval; check the review status below.'));
   }
-  const setupHeader = '<h3 class="student-setup-title">Project Setup</h3><span class="step-badge ' + (setupComplete ? 'done' : 'active') + '">' + (setupComplete ? '&#10003; Complete' : 'Action needed') + '</span>';
+  const setupHeader = '<h3>Project Setup</h3><span class="badge badge--' + (setupComplete ? 'success' : 'info') + '">' + (setupComplete ? '&#10003; Complete' : 'Action needed') + '</span>';
   const setupBody = '<div class="student-setup-steps">' + githubCard + titleCard + '</div>';
   const setupCard = setupComplete
     ? '<details class="student-project-setup"><summary>' + setupHeader + '<span class="setup-view">View</span><span class="setup-hide">Hide</span></summary>' + setupBody + '</details>'
-    : '<section class="student-project-setup" aria-label="Project Setup"><header>' + setupHeader + '</header><div class="student-setup-pending">' + pendingSteps.map(text=>'<p>' + escapeHtml(text) + '</p>').join('') + '</div>' + setupBody + '</section>';
+    : '<section class="student-project-setup" aria-label="Project Setup"><header>' + setupHeader + '</header><div data-setup-pending>' + pendingSteps.map(text=>'<p>' + escapeHtml(text) + '</p>').join('') + '</div>' + setupBody + '</section>';
 
   // ===============================================================
   // REVIEW MARKS — ASYNCHRONOUS
@@ -280,33 +280,33 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   // ===============================================================
 
   return `
-  <div class="dashboard-body-surface student-dashboard">
+  <div>
 
-    <div class="dash-hero">
+    <div>
       <h2>
         Team
-        <span class="mono-tag">
+        <span>
           ${escapeHtml(teamId)}
         </span>
       </h2>
 
     </div>
 
-    <div class="student-team-overview">
+    <div>
     ${buildTeamRoster(d.rosterSlots, email)}
 
     ${setupCard}
     </div>
     ${logCard}
 
-    <div class="student-summary-grid">
-      <section class="student-summary-card card" aria-label="Recent logs">
-        <header class="heading-row"><h3>Recent logs</h3>${titleApproved ? '<a href="#studentWeeklyProgress" onclick="DashboardUI.openWeeklyActivity(this);return false;">View all logs</a>' : ''}</header>
+    <div>
+      <section class="card" aria-label="Recent logs">
+        <header><h3>Recent logs</h3>${titleApproved ? '<a href="#studentWeeklyProgress" onclick="DashboardUI.openWeeklyActivity(this);return false;">View all logs</a>' : ''}</header>
         <div id="studentRecentActivity">${titleApproved ? getSkeletonMarkup_('panel','Loading recent logs') : '<p>Weekly logs will appear after project setup.</p>'}</div>
       </section>
-      <section class="student-summary-card student-assessments-card card" aria-label="Assessments"><header><h3>Assessments</h3></header>
-    ${getAssessmentDefinitions_().filter(d=>d.type==='REVIEW').map(d=>'<section id="studentAssessment-'+escapeHtml(d.key)+'" data-review-result="'+escapeHtml(d.key)+'" data-assessment-label="'+escapeHtml(d.label)+'" class="assessment-section card" aria-live="polite">'+getSkeletonMarkup_('panel', 'Loading '+d.label+' results')+'</section>').join('')}
-    <section id="studentGuideEvaluation" data-assessment-label="${escapeHtml((getAssessmentDefinitions_().find(d=>d.type==='GUIDE_EVALUATION') || {}).label || 'Guide Evaluation')}" class="assessment-section card" aria-live="polite">${getSkeletonMarkup_('panel', 'Loading guide evaluation')}</section>
+      <section class="student-assessments-card card" aria-label="Assessments"><header><h3>Assessments</h3></header>
+    ${getAssessmentDefinitions_().filter(d=>d.type==='REVIEW').map(d=>'<section id="studentAssessment-'+escapeHtml(d.key)+'" data-review-result="'+escapeHtml(d.key)+'" data-assessment-label="'+escapeHtml(d.label)+'" class="card" aria-live="polite">'+getSkeletonMarkup_('panel', 'Loading '+d.label+' results')+'</section>').join('')}
+    <section id="studentGuideEvaluation" data-assessment-label="${escapeHtml((getAssessmentDefinitions_().find(d=>d.type==='GUIDE_EVALUATION') || {}).label || 'Guide Evaluation')}" class="card" aria-live="polite">${getSkeletonMarkup_('panel', 'Loading guide evaluation')}</section>
       </section>
     </div>
 
@@ -332,13 +332,13 @@ function buildGithubMemberRows_(roster, members, actionEmail, showNames, renderT
     const status = missing ? 'Submit GitHub Account' : joined ? 'Repository joined' : 'Accept Invitation Email';
     const icon = missing ? 'triangle-alert' : joined ? 'check' : 'clock';
     const statusText = missing && actionEmail && emailsMatch(student.email, actionEmail)
-      ? `<button type="button" class="github-form-jump btn btn-outline" onclick="DashboardUI.focusGithubAccountForm(this)">${escapeHtml(status)}</button>` : `<span>${escapeHtml(status)}</span>`;
-    return `<li class="github-member-status${missing ? ' is-missing' : joined ? ' is-joined' : ''}"><span class="github-member-register">${showNames && student.name ? '<strong>'+escapeHtml(student.name)+'</strong><br>' : ''}${escapeHtml(student.regno || '')}</span><span class="github-member-separator" aria-hidden="true">—</span><span class="github-member-state">${renderLucideIcon_(icon)}${statusText}</span>${renderTiming ? '<span class="github-member-timing">'+renderTiming(member)+'</span>' : ''}</li>`;
+      ? `<button type="button" class="btn btn-outline" data-github-form-jump onclick="DashboardUI.focusGithubAccountForm(this)">${escapeHtml(status)}</button>` : `<span>${escapeHtml(status)}</span>`;
+    return `<li data-member-status="${missing ? 'missing' : joined ? 'joined' : 'pending'}"><span data-member-register>${showNames && student.name ? '<strong>'+escapeHtml(student.name)+'</strong><br>' : ''}${escapeHtml(student.regno || '')}</span><span class="github-member-separator" aria-hidden="true">—</span><span data-member-state>${renderLucideIcon_(icon)}${statusText}</span>${renderTiming ? '<span>'+renderTiming(member)+'</span>' : ''}</li>`;
   }).join('');
 }
 
 function buildGithubRepositoryLine_(repoUrl, compact) {
   const match=String(repoUrl || '').match(/^https:\/\/github\.com\/([^/]+)\/([^/?#]+)/i);
-  if(compact && match)return `<div class="github-team-repository">${renderLucideIcon_('git-branch', 'Team repository')}<a class="link" href="${escapeHtml(repoUrl)}" title="${escapeHtml(match[1])}" target="_blank" rel="noopener">${escapeHtml(match[2])} ${renderLucideIcon_('external-link')}</a></div>`;
-  return `<div class="github-team-repository"><span class="github-repository-label">${renderLucideIcon_('git-branch', 'Team repository')}</span>${repoUrl ? `<a class="mono-detail link" href="${escapeHtml(repoUrl)}" target="_blank" rel="noopener">${escapeHtml(repoUrl)} ${renderLucideIcon_('external-link')}</a>` : '<span>Not available yet</span>'}</div>`;
+  if(compact && match)return `<div class="github-team-repository">${renderLucideIcon_('git-branch', 'Team repository')}<a href="${escapeHtml(repoUrl)}" title="${escapeHtml(match[1])}" target="_blank" rel="noopener">${escapeHtml(match[2])} ${renderLucideIcon_('external-link')}</a></div>`;
+  return `<div class="github-team-repository"><span>${renderLucideIcon_('git-branch', 'Team repository')}</span>${repoUrl ? `<a href="${escapeHtml(repoUrl)}" target="_blank" rel="noopener">${escapeHtml(repoUrl)} ${renderLucideIcon_('external-link')}</a>` : '<span>Not available yet</span>'}</div>`;
 }

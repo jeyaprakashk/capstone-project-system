@@ -511,20 +511,20 @@ function announcementPresentation_(a) {
 
 /** Shared tab header: title, successful-read timestamp, refresh action and divider. */
 function buildTabHeader_(title, key, action, updated) {
-  return `<div class="announcement-header dashboard-container-header tab-header"><div><h2>${escapeHtml(title)}</h2><p class="announcement-subtitle" id="${key}Updated">${escapeHtml(updated)}</p></div><button type="button" class="announcement-refresh-btn tab-refresh-btn btn btn-sm btn-outline" data-refresh-button id="${key}Refresh" aria-label="${escapeHtml('Refresh ' + title)}" onclick="${escapeHtml(action)}">${renderLucideIcon_('refresh-cw', '', 'icon-leading')}Refresh</button></div><p id="${key}RefreshStatus" class="announcement-status" data-refresh-status role="status" aria-live="polite"></p>`;
+  return `<div><div><h2>${escapeHtml(title)}</h2><p id="${key}Updated">${escapeHtml(updated)}</p></div><button type="button" class="tab-refresh-btn btn btn-sm btn-outline" data-refresh-button id="${key}Refresh" aria-label="${escapeHtml('Refresh ' + title)}" onclick="${escapeHtml(action)}">${renderLucideIcon_('refresh-cw')}Refresh</button></div><p id="${key}RefreshStatus" class="announcement-status" data-refresh-status role="status" aria-live="polite"></p>`;
 }
 
 function buildAnnouncementsTabContent_(announcements, isCoordinator) {
   const formUrl=isCoordinator?String(getConfig('ANNOUNCEMENTS_FORM_URL') || '').trim():'';
-  const addButton=isCoordinator && /^https?:\/\//i.test(formUrl)?`<a class="announcement-add-btn btn btn-primary" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener">${renderLucideIcon_('plus')}New announcement</a>`:'';
+  const addButton=isCoordinator && /^https?:\/\//i.test(formUrl)?`<a class="btn btn-primary" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener">${renderLucideIcon_('plus')}New announcement</a>`:'';
   const records=announcements.map(a=>({a,p:announcementPresentation_(a),date:formatAnnouncementTimestamp_(a.timestamp)}));
   const header=buildTabHeader_('Announcements', 'announcements', 'refreshAnnouncements()', dashboardUpdatedLabel_());
   function item(record,index) {
     const {a,p,date}=record;
     const audience=buildAnnouncementAudience_(a);
     const audiences=[a.studentVisible?'teams':'',a.guideVisible?'guides':'',a.reviewerVisible?'reviewers':''].filter(Boolean).join(' ');
-    const body=p.text!==p.title?`<details class="announcement-full"><summary>Read announcement</summary><p class="announcement-message">${escapeHtml(p.text)}</p></details>`:'';
-    return `<article id="announcement-${index}" class="announcement-item card" data-announcement-item data-announcement-type="${p.type}" data-announcement-audiences="${audiences}" data-announcement-search="${escapeHtml(p.message+' '+date+' '+audience+' '+p.type)}"><span class="announcement-row-icon" aria-hidden="true">${p.step!==null?'S'+p.step:renderLucideIcon_(p.type==='Form'?'file-text':'megaphone')}</span><div class="announcement-row-copy"><h3>${escapeHtml(p.title)}</h3><div class="announcement-meta">${p.type} · <span class="announcement-date">${escapeHtml(date || 'Date unavailable')}</span> · <span class="announcement-audience">${escapeHtml(audience)}</span></div>${body}</div><div class="announcement-row-actions">${p.link?`<a class="announcement-link btn btn-sm btn-outline" href="${escapeHtml(p.link)}" target="_blank" rel="noopener">${p.type==='Form'?'Open form':'Open'} ${renderLucideIcon_('external-link')}<span class="announcement-sr-only"> (opens in a new tab)</span></a>`:''}</div></article>`;
+    const body=p.text!==p.title?`<details><summary>Read announcement</summary><p>${escapeHtml(p.text)}</p></details>`:'';
+    return `<article id="announcement-${index}" class="card" data-announcement-item data-announcement-type="${p.type}" data-announcement-audiences="${audiences}" data-announcement-search="${escapeHtml(p.message+' '+date+' '+audience+' '+p.type)}"><span aria-hidden="true">${p.step!==null?'S'+p.step:renderLucideIcon_(p.type==='Form'?'file-text':'megaphone')}</span><div><h3>${escapeHtml(p.title)}</h3><div>${p.type} · <span>${escapeHtml(date || 'Date unavailable')}</span> · <span>${escapeHtml(audience)}</span></div>${body}</div><div>${p.link?`<a class="btn btn-sm btn-outline" href="${escapeHtml(p.link)}" target="_blank" rel="noopener">${p.type==='Form'?'Open form':'Open'} ${renderLucideIcon_('external-link')}<span class="announcement-sr-only"> (opens in a new tab)</span></a>`:''}</div></article>`;
   }
   const groups=new Map();
   records.forEach((r,i)=>{
@@ -532,15 +532,15 @@ function buildAnnouncementsTabContent_(announcements, isCoordinator) {
     if(!groups.has(day))groups.set(day,[]);
     groups.get(day).push(item(r,i));
   });
-  const feed=Array.from(groups,([day,items])=>`<section class="announcement-date-group" data-announcement-group><p class="announcement-group-heading">${escapeHtml(day)}</p>${items.join('')}</section>`).join('');
+  const feed=Array.from(groups,([day,items])=>`<section data-announcement-group><p>${escapeHtml(day)}</p>${items.join('')}</section>`).join('');
   const templates=[],seen=new Set();
   records.filter(r=>r.p.type==='Template' && r.p.step!==null && r.p.link).sort((a,b)=>a.p.step-b.p.step).forEach(r=>{
     if(seen.has(r.p.link))return;
-    seen.add(r.p.link);templates.push(`<li><a href="${escapeHtml(r.p.link)}" target="_blank" rel="noopener"><span class="announcement-step-number circle">${r.p.step}</span><span>${escapeHtml(r.p.title)}</span>${renderLucideIcon_('external-link')}</a></li>`);
+    seen.add(r.p.link);templates.push(`<li><a href="${escapeHtml(r.p.link)}" target="_blank" rel="noopener"><span class="circle" data-step-number>${r.p.step}</span><span>${escapeHtml(r.p.title)}</span>${renderLucideIcon_('external-link')}</a></li>`);
   });
-  return `<div class="announcement-tab-surface announcement-hub utility-body">${header}
-    <div class="announcement-toolbar"><div class="announcement-toolbar-filters"><label class="announcement-search-field"><span class="announcement-sr-only">Search announcements</span>${renderLucideIcon_('search')}<input id="announcementSearch" type="search" placeholder="Search titles, steps or dates" autocomplete="off" aria-controls="announcementList"></label><div class="announcement-audience-filters segmented" role="group" aria-label="Filter by audience">${[['all','All · '+announcements.length],['teams','Project Teams'],['guides','Guides'],['reviewers','Reviewers']].map(([key,label])=>`<button type="button" data-announcement-audience="${key}" aria-pressed="${key==='all'}">${label}</button>`).join('')}</div><label><span class="announcement-sr-only">Announcement type</span><select data-announcement-type-filter><option value="all">All types</option><option value="Template">Template</option><option value="Form">Form</option><option value="Notice">Notice</option></select></label></div>${addButton}</div>
-    <p class="announcement-results" data-announcement-results role="status" aria-live="polite"></p><div class="announcement-columns"><div class="announcement-feed-card"><div id="announcementList" class="announcement-list">${feed}</div><div class="announcement-no-results announcement-empty-state card" data-announcement-no-results hidden><h3>${announcements.length?'No matching announcements':"You're all caught up"}</h3><p>${announcements.length?'Try another search or filter.':'New announcements will appear here when posted.'}</p></div><div class="announcement-load-more"><button class="btn btn-outline" type="button" data-announcement-more>Show older announcements</button></div></div><aside class="announcement-templates"><h3>Step templates</h3><p>Every available template, in step order.</p>${templates.length?'<ol>'+templates.join('')+'</ol>':'<p>No step templates have been shared yet.</p>'}</aside></div></div>`;
+  return `<div>${header}
+    <div><div><label><span class="announcement-sr-only">Search announcements</span>${renderLucideIcon_('search')}<input id="announcementSearch" type="search" placeholder="Search titles, steps or dates" autocomplete="off" aria-controls="announcementList"></label><div class="segmented" role="group" aria-label="Filter by audience">${[['all','All · '+announcements.length],['teams','Project Teams'],['guides','Guides'],['reviewers','Reviewers']].map(([key,label])=>`<button type="button" data-announcement-audience="${key}" aria-pressed="${key==='all'}">${label}</button>`).join('')}</div><label><span class="announcement-sr-only">Announcement type</span><select data-announcement-type-filter><option value="all">All types</option><option value="Template">Template</option><option value="Form">Form</option><option value="Notice">Notice</option></select></label></div>${addButton}</div>
+    <p data-announcement-results role="status" aria-live="polite"></p><div><div><div id="announcementList">${feed}</div><div class="announcement-no-results card" data-announcement-no-results hidden><h3>${announcements.length?'No matching announcements':"You're all caught up"}</h3><p>${announcements.length?'Try another search or filter.':'New announcements will appear here when posted.'}</p></div><div><button class="btn btn-outline" type="button" data-announcement-more>Show older announcements</button></div></div><aside><h3>Step templates</h3><p>Every available template, in step order.</p>${templates.length?'<ol>'+templates.join('')+'</ol>':'<p>No step templates have been shared yet.</p>'}</aside></div></div>`;
 }
 
 /**
@@ -748,7 +748,7 @@ function buildDashboardContainerHeader_(title, key) {
 
 /** Shared controls for team tables; page state remains local to each table. */
 function buildTeamPagination_(prefix, tableKey, total, rowLabel = 'teams') {
-  return `<nav aria-label="Pagination" class="pagination"><span id="${prefix}PaginationInfo">Showing 0 - 0 of ${total} ${escapeHtml(rowLabel)}</span><label class="team-page-size" for="${prefix}PageSize">Rows per page <select id="${prefix}PageSize" onchange="DashboardUI.changeTeamPageSize('${tableKey}', this.value)"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="all">All</option></select></label><div id="${prefix}PaginationButtons" class="pagination-buttons" aria-label="${rowLabel === 'teams' ? 'Team' : escapeHtml(rowLabel)} table pages"></div></nav>`;
+  return `<nav aria-label="Pagination" class="pagination"><span id="${prefix}PaginationInfo">Showing 0 - 0 of ${total} ${escapeHtml(rowLabel)}</span><label for="${prefix}PageSize">Rows per page <select id="${prefix}PageSize" onchange="DashboardUI.changeTeamPageSize('${tableKey}', this.value)"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="all">All</option></select></label><div id="${prefix}PaginationButtons" aria-label="${rowLabel === 'teams' ? 'Team' : escapeHtml(rowLabel)} table pages"></div></nav>`;
 }
 
 /** Presentation only: preserves the Review drawer history labels and note filtering. */
@@ -758,11 +758,11 @@ function renderAssessmentHistory_(decisions) {
     const actions={exception:'Absence details updated',targetSubmit:'Assessment completed',targetDraft:'Assessment draft saved',MAKEUP_ALTERNATIVE_ASSESSMENT:'Assessment authorized',DEFERRED_ASSESSMENT:'Assessment deferred',TEAM_MARK_APPLICABLE:'Team mark approved',TEAM_MARK_NOT_APPLICABLE:'Team mark not applicable',OTHER:'Academic decision recorded'};
     const statuses={COMPLETED:'Completed',MAKEUP_PENDING:'Awaiting makeup',COMPLETED_AFTER_MAKEUP:'Completed after makeup',ABSENT_UNAPPROVED:'Unapproved absence',ACADEMIC_DECISION_PENDING:'Awaiting academic decision',NON_PARTICIPATION:'Non-participation',INCOMPLETE:'Incomplete'};
     const automaticReasons=['Prolonged absence source facts updated.','Review-day absence recorded as unapproved.'];
-    return '<details class="review-history"><summary>Assessment history <span>'+decisions.length+'</span></summary><ol>'+decisions.slice().reverse().map(d=>{
+    return '<details><summary>Assessment history <span>'+decisions.length+'</span></summary><ol>'+decisions.slice().reverse().map(d=>{
       const date=new Date(d.at),valid=Number.isFinite(date.getTime());
       const when=valid?date.toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
       const reason=String(d.reason||'');
       const note=reason && !automaticReasons.includes(reason) && !reason.startsWith('Absence details recorded: ')?'<p>'+escape(reason)+'</p>':'';
-      return '<li><div class="review-history-heading"><strong>'+escape(actions[d.decision]||'Assessment updated')+'</strong>'+(when?'<time datetime="'+escape(date.toISOString())+'">'+escape(when)+'</time>':'')+'</div><div class="review-history-status">'+escape(statuses[d.previousStatus]||'Not assessed')+' <span>changed to</span> '+escape(statuses[d.resultingStatus]||'Updated')+'</div>'+note+(d.reviewer?'<small>'+escape(d.reviewer)+'</small>':'')+'</li>';
+      return '<li><div><strong>'+escape(actions[d.decision]||'Assessment updated')+'</strong>'+(when?'<time datetime="'+escape(date.toISOString())+'">'+escape(when)+'</time>':'')+'</div><div>'+escape(statuses[d.previousStatus]||'Not assessed')+' <span>changed to</span> '+escape(statuses[d.resultingStatus]||'Updated')+'</div>'+note+(d.reviewer?'<small>'+escape(d.reviewer)+'</small>':'')+'</li>';
     }).join('')+'</ol></details>';
   }
