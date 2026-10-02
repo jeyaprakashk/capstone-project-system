@@ -19,8 +19,7 @@ avoid retaining empty space from setup actions.
 For tabs with a refresh action, render the header with
 `buildTabHeader_(title, key, action, updated)`; role dashboards use
 `buildDashboardContainerHeader_(title, key)`. Pass the tab's own refresh action
-and update its timestamp only after a successful read. Follow
-[UI-STYLING.md](UI-STYLING.md) for presentation.
+and update its timestamp only after a successful read.
 
 Use `DashboardUI.beginContentLoading(element, label)`. It covers the existing DOM
 with the shared skeleton, retains the content's height and event handlers, sets
@@ -56,7 +55,7 @@ the refresh trigger while pending and restore its label and enabled state when
 settled. Keep successful content on refresh failure; show a readable error and
 retry path. Do not overwrite unsaved form input as part of a background refresh.
 
-The loading state’s presentation belongs in the single stylesheet.
+The loading state’s presentation lives in the Tailwind source (`scripts/tailwind-input.css`).
 
 Mutation actions such as Save, Submit, Publish, and Sync retain their explicit
 action and result messages. Their subsequent data reads follow this convention.

@@ -27,6 +27,8 @@ One section per migrated endpoint, added with the dashboard that needs it:
 
 | Endpoint | Role | Request | `data` shape | Replaces |
 | --- | --- | --- | --- | --- |
+| `API_guide_getDashboard()` | Guide | none | `GuideDashboard` (below) | `buildDashboardContent` (removed) |
+| `API_guide_submitDecision(teamId, decision, notes, editedTitle)` | Guide | `decision` is `Approved` or `Rejected`; notes required for `Rejected` | `{message}` | `decide` in the old client |
 | `API_reviewer_getDashboard()` | Reviewer | none | `ReviewerDashboard` (below) | `buildReviewerContent` (removed) |
 | `API_reviewer_submitDecision(teamId, decision, notes)` | Reviewer | `decision` is `Approved` or `Revise`; notes required for `Revise` | `{message}` | `reviewerDecide` in the old client |
 
@@ -49,6 +51,26 @@ comparison against the output of the function it replaces.
 
 Only teams in the reviewer's committees are returned. `tone` is semantic; the view maps it to colours.
 Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invariants/snapshots/reviewer-*.json`).
+
+### GuideDashboard
+
+```
+{ teams:[{ teamId, title, status:{key,text,tone}, members:[{name,regno}], memberEmails:[string],
+           registerNumbers:[string], repoUrl, problem, documents:[{label,url}], lastDocumentSubmission,
+           overdueLogs:number, titleDue:{date,overdue}|null, titleTiming:{state,explanation}|null,
+           similarityFlag, guideNotes, reviewerNotes,
+           approval:{approvedBy, approvedOn, timing:{state,explanation}}|null,          // APPROVED only
+           github:{ tone, members:[{name,regno,state:'missing'|'joined'|'pending',
+                    timing:{state,explanation,date,daysLate}|null}] }|null }],          // null = status unavailable
+  githubDue:string|null,
+  evaluation:{enabled:boolean, notice:string},
+  weeks:[{weekId, opensAt, deadlineAt}] }       // epoch ms; consumed by GuideWeekly
+```
+
+Teams are ordered by title-review priority. `state` is one of `on-time`, `late`, `overdue`, `pending`,
+`unknown`; the view maps it to a label and colour. Workflow rejections returned as `{ok:false,message}` by
+the rules code reach the browser as `REJECTED` errors. Contract tests: `tests/guide-migration.test.cjs`
+(snapshot `tests/invariants/snapshots/guide-legacy-facts.json`, captured from the removed HTML).
 
 ## Rules
 

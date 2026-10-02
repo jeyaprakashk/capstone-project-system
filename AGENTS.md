@@ -37,33 +37,38 @@ Change a DTO only by updating that file, the endpoint, its contract test and the
 2. Add the DTO endpoint beside the existing one; keep the old one until verified.
 3. Render the view from the DTO through the bridge. Behaviour must be identical.
 4. Compare the DTO against the golden master and rewrite that dashboard's UI tests.
-5. Remove the old server HTML builder and legacy styles for that dashboard.
+5. Remove the old server HTML builder for that dashboard.
 
 Writes are not timed out or auto-retried by the bridge, because an Apps Script call
 cannot be cancelled and a retry could submit twice.
 
-## Tailwind during migration
+## Styling
 
-`npm run build:tailwind` compiles `scripts/tailwind-input.css` into the committed
-`tailwind-styles.html` (no runtime CDN); `npm run check:tailwind` verifies it is current.
-While legacy markup is still on the page, utilities are prefixed (`tw:px-4`), have no
-preflight and are `!important`, so they never clash with legacy class names. Add each
-migrated view file to an `@source` line in that input and rebuild. The final phase drops
-the prefix, `important` and the legacy stylesheet.
+Tailwind is the only styling system. `scripts/tailwind-input.css` is the single source:
+design tokens in `@theme` (colours, type scale, radii, shadows), shared components in
+`@layer components`, and the functional rules the dashboard scripts rely on (visibility
+toggles, loading overlay, drawers). `npm run build:tailwind` compiles it, plus every
+utility used in the root `.js` files, into the committed `tailwind-styles.html`
+(no runtime CDN); `npm run check:tailwind` verifies it is current. Rebuild after adding
+or removing any class. Do not add inline `<style>` blocks or hand-written CSS files.
 
-Migrated so far: **Reviewer** (`reviewer-api.js`, `reviewer-view.js`). Shared pieces:
+- New views use Tailwind utilities directly, with theme tokens (`bg-primary`, `text-muted`,
+  `rounded-card`, `border-edge`).
+- Remaining server-built markup (Student, Coordinator, announcements, drawers) still uses
+  the shared component classes (`btn`, `card`, `badge`, `table`, ...); inline them as
+  utilities when that dashboard moves to a DTO view.
+- Do not put a display utility (`flex`, `grid`, ...) on an element scripts toggle with `hidden`.
+- No preflight: the base rules in the input file are the dashboard's reset.
+
+Migrated so far: **Reviewer** (`reviewer-api.js`, `reviewer-view.js`) and **Guide**
+(`guide-api.js`, `guide-view.js`; the weekly-progress and evaluation panels inside it are
+still legacy modules and attach to the view through its `data-guide-*` markup). Shared pieces:
 `api-envelope.js` (server) and `data-bridge-client.js` (browser).
 
 ## Loading and refresh
 
 Follow [LOADING-UI.md](LOADING-UI.md): preserve existing content on a failed
 refresh and settle loading on every path. This lives in the bridge, not in views.
-
-## Legacy (until each dashboard is migrated)
-
-[UI-STYLING.md](UI-STYLING.md), [STYLE-MIGRATION-EXCEPTIONS.md](STYLE-MIGRATION-EXCEPTIONS.md)
-and `app-styles.html` still describe the not-yet-migrated dashboards. Do not use them
-for migrated ones, and do not extend them. They are deleted in the final phase.
 
 ## Tests
 

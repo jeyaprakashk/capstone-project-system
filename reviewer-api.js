@@ -79,7 +79,6 @@ function API_reviewer_getDashboard() {
 function API_reviewer_submitDecision(teamId, decision, notes) {
   return apiHandle_(() => {
     reviewerEmailOrThrow_();
-    const result = submitReviewerDecision(String(teamId || ''), String(decision || ''), String(notes || ''));
-    return {message:result && result.message ? String(result.message) : 'Decision saved.'};
+    return apiWorkflowResult_(submitReviewerDecision(String(teamId || ''), String(decision || ''), String(notes || '')), 'Decision saved.');
   });
 }

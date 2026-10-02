@@ -99,14 +99,8 @@ function loadDashboardRoleContent_(key) {
   // The reviewer role loads as a DTO through API_reviewer_getDashboard (reviewer-api.js).
   if (key === 'reviewer') throw new Error('The reviewer dashboard loads through its data endpoint.');
 
-  if (key === 'guide') {
-    const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS);
-    if (!rows.some(r => r[TS.TEAM_ID] && emailsMatch(r[TS.GUIDE_EMAIL], email))) {
-      throw new Error('You do not have Guide access.');
-    }
-    return buildDashboardContent(email, getGuideDashboardData(email));
-  }
+  // The guide role loads as a DTO through API_guide_getDashboard (guide-api.js).
+  if (key === 'guide') throw new Error('The guide dashboard loads through its data endpoint.');
 
   if (key === 'coord') {
     const coordinatorEmail = getCoordinatorEmail();
@@ -148,10 +142,9 @@ function buildDashboardShell(email, views) {
 <head>
 <meta charset="UTF-8">
 <base target="_top">
-<style>
-${getFunctionalStyles_()}
-</style>
-${HtmlService.createHtmlOutputFromFile('app-styles').getContent()}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
 ${HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent()}
 </head>
 <body>

@@ -83,5 +83,6 @@ function dataBridgeBrowser_() {
 /** Browser globals for views migrated to DTOs; must precede the dashboard client script. */
 function getMigratedViewsClientScript_() {
   return `const DataBridge = (${dataBridgeBrowser_.toString()})();
-const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI);`;
+const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI);
+const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => typeof GuideWeekly === 'undefined' ? null : GuideWeekly);`;
 }

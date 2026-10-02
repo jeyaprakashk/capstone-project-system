@@ -28,7 +28,7 @@ function fixture(overrides = {}, runtime = {}) {
       return new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'short',year:'numeric'}).format(date);
     }}
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
+  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','api-envelope.js','guide-api.js','data-bridge-client.js','reviewer-view.js','guide-view.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
   const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
@@ -57,21 +57,16 @@ test('Milestones read once per execution independently of legacy Config values',
 
 test('guide evaluation tab uses configured opening in the schedule timezone',()=>{
  const {c,schedule}=fixture();
- c.getColumnMap=()=>({TEAM_ID:0});
- c.buildRepoLine=()=>'';
  const due=c.projectDay_('2026-10-12',schedule.timezone);
  const configured={...schedule,guide_eval:due,assessments:[...schedule.assessments,{key:'guide_eval',type:'GUIDE_EVALUATION',day:due,opens:due-5}]};
- const render=(instant,plan=configured)=>c.buildGuideEvaluationTab_(plan,c.getProjectClock_(plan,new Date(instant)));
- const before=render('2026-10-06T18:29:59Z');
- assert.match(before, /disabled title="Available from 07 Oct 2026/);
- assert.doesNotMatch(before, /onclick="GuideWeekly.selectView/);
- for(const instant of ['2026-10-06T18:30:00Z','2026-10-12T12:00:00Z','2026-10-20T12:00:00Z']) {
-   const html=render(instant);
-   assert.match(html, /onclick="GuideWeekly.selectView/);
-   assert.doesNotMatch(html, /disabled/);
- }
- const missing=render('2026-10-07T12:00:00Z',schedule);
- assert.match(missing, /disabled title="Guide Evaluation is not configured in AssessmentDefinitions/);
+ const gate=(instant,plan=configured)=>c.guideEvaluationDto_(plan,c.getProjectClock_(plan,new Date(instant)));
+ const before=gate('2026-10-06T18:29:59Z');
+ assert.equal(before.enabled,false);
+ assert.match(before.notice,/^Available from 07 Oct 2026/);
+ for(const instant of ['2026-10-06T18:30:00Z','2026-10-12T12:00:00Z','2026-10-20T12:00:00Z']) assert.equal(gate(instant).enabled,true,instant);
+ const missing=gate('2026-10-07T12:00:00Z',schedule);
+ assert.equal(missing.enabled,false);
+ assert.match(missing.notice,/Guide Evaluation is not configured in AssessmentDefinitions/);
 });
 
 test('deadline pills open exactly five days before, stay overdue, and count only eligible incomplete teams',()=>{
@@ -457,7 +452,7 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   const document={readyState:'loading',addEventListener(){},getElementById:id=>elements[id],createElement:element,body:element()};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorDrawerSection(teamId,section){requests.push({...handlers,teamId,section});}};return chain;}};
   const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
-  for(const file of ['data-bridge-client.js','reviewer-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext("focusCoordinatorTeam('A'); focusCoordinatorTeam('B');",browser);
   assert.deepEqual(requests.map(r=>r.section),['basic','progress','activity','basic','progress','activity']);
   requests[3].success({title:'Team B project',students:[],reviewers:[]});
@@ -519,18 +514,18 @@ test('matched student records use one read and exclude nonmatching rows',()=>{
   assert.equal(reads,1);
 });
 
-test('role request shares authorization rows with rendering but rechecks the next request',()=>{
+test('guide request shares authorization rows with rendering but rechecks the next request',()=>{
   const {c}=fixture(); let reads=0, rendered=0;
   let guideEmail='guide@example.com';
   c.Session={getActiveUser:()=>({getEmail:()=> 'guide@example.com'})};
   c.getColumnMap=()=>({TEAM_ID:0,GUIDE_EMAIL:1});
   c.getSheet=()=>({getDataRange:()=>({getValues:()=>{reads++;return [['team','guide'],['T1',guideEmail]];}})});
   c.getGuideDashboardData=()=>({rows:c.getSheetRows('TeamStatus')});
-  c.buildDashboardContent=()=>{rendered++;return 'authorized content';};
-  assert.equal(c.loadDashboardRoleContent('guide'),'authorized content');
+  c.buildGuideDto_=()=>{rendered++;return {teams:[]};};
+  assert.deepEqual(JSON.parse(c.API_guide_getDashboard()).data,{teams:[]});
   assert.equal(reads,1); assert.equal(rendered,1);
   guideEmail='replacement@example.com';
-  assert.throws(()=>c.loadDashboardRoleContent('guide'),/do not have Guide access/);
+  assert.deepEqual(JSON.parse(c.API_guide_getDashboard()).error,{code:'UNAUTHORIZED',message:'You do not have Guide access.'});
   assert.equal(reads,2); assert.equal(rendered,1);
 });
 
@@ -564,11 +559,12 @@ function timelineBrowser() {
       loadSharedProjectTimeline(){requests.push({type:'timeline',...handlers});},
       loadDashboardRoleContent(role){requests.push({type:'role',role,...handlers});},
       // Migrated reviewer role answers through the data bridge with a response envelope.
-      API_reviewer_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'reviewer',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});}};
+      API_reviewer_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'reviewer',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
+      API_guide_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'guide',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});}};
     return chain;
   }};
   const browser=createSheetReadContext({window:{matchMedia:()=>({matches:false})},ResizeObserver:class {constructor(callback){this.callback=callback;} observe(){} disconnect(){}},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
-  for(const file of ['data-bridge-client.js','reviewer-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext('ReviewerView.render=(host,dto)=>{host.innerHTML=dto.html;}',browser);vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext('ReviewerView.render=GuideView.render=(host,dto)=>{host.innerHTML=dto.html;}',browser);vm.runInContext(c.getDashboardClientScript(),browser);
   return {c,browser,requests,timeline,guide,reviewer,initialize:()=>initialize()};
 }
 
@@ -578,6 +574,7 @@ test('timeline is single-flight and never blocks either role dashboard',async()=
   const ready=vm.runInContext('DashboardSchedule.ready()',f.browser);
   assert.equal(f.requests.length,2);
   f.requests[0].success('Guide loaded while timeline pending');
+  await new Promise(resolve => setImmediate(resolve));
   assert(f.guide.innerHTML.includes('Guide loaded'));
   vm.runInContext("showRoleTab('reviewer')",f.browser);
   assert.equal(f.requests[2].role,'reviewer');
@@ -624,8 +621,8 @@ test('mobile timeline selects previous current and next without shrinking deskto
   const f=renderedTimeline(offsets);
   assert.deepEqual(Array.from(f.target.querySelectorAll('[data-timeline-mobile="true"]')).map(el=>el.querySelector('strong').textContent),expected.map(i=>'Milestone '+i));
  }
- const css=fixture().c.getFunctionalStyles_();
- assert.match(css,/\.timeline-track:not\(\.timeline-full\) \.timeline-stop\[data-timeline-mobile="false"\] \{ display:none/);
+ const css=fs.readFileSync(path.join(__dirname,'..','tailwind-styles.html'),'utf8');
+ assert.match(css,/\.timeline-track:not\(\.timeline-full\) \.timeline-stop\[data-timeline-mobile=.?false.?\]\{display:none/);
 });
 
 test('current timeline handles tomorrow, before start, same-day dates, after end and empty lifecycle',()=>{
@@ -648,9 +645,9 @@ test('full timeline disclosure reveals lifecycle without mutating schedule or di
 });
 
 test('timeline has no carousel or animation styles',()=>{
- const {c}=fixture();const css=c.getFunctionalStyles_();
- assert.match(css,/@media\(max-width:760px\)/);
- assert.doesNotMatch(css,/\.timeline-current \{|timeline-nav|animation:/);
+ const css=fs.readFileSync(path.join(__dirname,'..','tailwind-styles.html'),'utf8');
+ assert.match(css,/@media \((max-width:760px|width<=760px)\)/);
+ assert.doesNotMatch(css,/\.timeline-current\{|timeline-nav|\.timeline[^{}]*\{[^}]*animation/);
 });
 
 test('timeline errors are isolated and a subsequent retry succeeds',async()=>{
@@ -661,6 +658,7 @@ test('timeline errors are isolated and a subsequent retry succeeds',async()=>{
   await rejected;
   assert(f.timeline.innerHTML.includes('Schedule unavailable'));
   f.requests[0].success('Guide still works');
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(f.guide.innerHTML,'Guide still works');
   const retry=vm.runInContext('DashboardSchedule.ready()',f.browser);
   assert.equal(f.requests[2].type,'timeline');
@@ -752,7 +750,7 @@ function coordinatorAsyncBrowser(fonts) {
   const document={fonts,readyState:'loading',addEventListener(){},getElementById:id=>elements[id]||null,querySelector:()=>null,querySelectorAll:()=>[],createElement:element};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorSection(section){requests.push({...handlers,section});},loadAllTeamsWeeklyActivity(){requests.push({...handlers,section:'activity'});}};return chain;}};
   const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console:{log(){}}});
-  for(const file of ['data-bridge-client.js','reviewer-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext('DashboardUI.initializeCoordinatorAsync()',browser);
   return {browser,requests,elements,element};
 }

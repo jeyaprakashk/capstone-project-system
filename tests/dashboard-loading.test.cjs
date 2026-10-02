@@ -158,13 +158,14 @@ function fixture(system=false) {
  querySelectorAll:selector=>selector==='[data-role-content]'?panels:[]};
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>{
   // Migrated reviewer role: log it like the role-content request, answering with an envelope.
-  if(key==='API_reviewer_getDashboard')return requests.push({key:'loadDashboardRoleContent',args:['reviewer'],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
+  const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide'}[key];
+  if(migrated)return requests.push({key:'loadDashboardRoleContent',args:[migrated],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   return requests.push({key,args,success,failure});}}); }
  const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').split('function renderAssessmentHistory_')[1].replace(/^/, 'function renderAssessmentHistory_'):fs.readFileSync(file,'utf8'),c);
  vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
- for(const file of ['data-bridge-client.js','reviewer-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
+ for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
  return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{const jobs=[...timers.values()];timers.clear();jobs.forEach(fn=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
 }
 
@@ -228,8 +229,9 @@ test('shell selects the common theme before scripts or fonts load',async()=>{
   assert.equal(document.querySelector('h1').textContent,'Dashboard');
   assert.equal(document.querySelector('#sharedRubricsHeading').tagName,'H2');
   assert.equal(document.querySelector('#sharedProjectTimeline h2').textContent,'Project timeline');
-  assert(html.indexOf(c.getFunctionalStyles_())<html.indexOf('</style>'));
-  assert(html.indexOf('</style>')<html.indexOf('/* ====================================================================='));
+  assert(html.indexOf('fonts.googleapis.com')<html.indexOf('<style>'),'fonts are linked before the compiled stylesheet');
+  assert.equal(html.split('tailwindcss v').length,2,'the Tailwind build is included exactly once');
+  assert.doesNotMatch(html,/app-styles|--fs-h1|--canvas:/);
   assert.match(html,/Source\+Sans\+3/);
   assert.doesNotMatch(html,/Source\+Serif\+4|Space\+Grotesk|JetBrains\+Mono|family=Inter/);
  }
@@ -242,10 +244,9 @@ test('shell selects the common theme before scripts or fonts load',async()=>{
 });
 
 test('shared heading scale keeps content larger than cards and subsections',async()=>{
- const c=vm.createContext({});vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
- const sheet=fs.readFileSync('app-styles.html','utf8');
+ const sheet=fs.readFileSync('scripts/tailwind-input.css','utf8');
  const size=level=>{
-  const token=sheet.match(new RegExp('--fs-'+level+':(\\d+)px'));
+  const token=sheet.match(new RegExp('--text-'+level+':\\s*(\\d+)px'));
   assert(token,level);
   return Number(token[1]);
  };
@@ -253,22 +254,18 @@ test('shared heading scale keeps content larger than cards and subsections',asyn
  assert(size('h2')>size('h3'));
 });
 
-test('functional rules carry no appearance and text palette pairs meet normal-text contrast',async()=>{
- const c=vm.createContext({});vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
- const css=c.getFunctionalStyles_();
- for(const match of css.matchAll(/([a-z-]+)\s*:[^;{}]*;/g)) assert.doesNotMatch(match[1],/^(color|background|border|box-shadow|padding|font|text-decoration|letter-spacing|transition|animation)/,match[0]);
- assert.doesNotMatch(css,/#[0-9a-f]{3,8}\b|data-dashboard-theme/i);
- const palette=fs.readFileSync('app-styles.html','utf8');
+test('text palette pairs meet normal-text contrast',async()=>{
+ const palette=fs.readFileSync('scripts/tailwind-input.css','utf8');
  const token=name=>{
-  const match=palette.match(new RegExp('--'+name+':(#[0-9a-f]{6}|var\\(--([a-z-]+)\\))','i'));
+  const match=palette.match(new RegExp('--color-'+name+':\\s*(#[0-9a-f]{6})','i'));
   assert(match,name);
-  return match[1].startsWith('#')?match[1]:token(match[2]);
+  return match[1];
  };
  const luminance=hex=>{
   const rgb=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
   return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;
  };
- for(const [foreground,background] of [['text','canvas'],['text','paper'],['muted','canvas'],['muted','paper'],['primary','tint'],['primary','paper'],['paper','primary'],['paper','primary-hover'],['success','success-tint'],['warning','warning-tint'],['danger','danger-tint'],['info','info-tint']]) {
+ for(const [foreground,background] of [['ink','canvas'],['ink','paper'],['muted','canvas'],['muted','paper'],['primary','tint'],['primary','paper'],['paper','primary'],['paper','primary-hover'],['success','success-tint'],['warning','warning-tint'],['danger','danger-tint'],['info','info-tint']]) {
   const values=[luminance(token(foreground)),luminance(token(background))].sort((a,b)=>a-b);
   assert((values[1]+.05)/(values[0]+.05)>=4.5,foreground+' on '+background);
  }
@@ -483,7 +480,7 @@ test('System Status follow-up reads do not block roles or reset their idle timer
  f.done('loadDashboardRoleContent');await f.settle();f.tick();assert.equal(f.requests.at(-1).args[0],'coord');
 });
 test('failed role can be retried by selecting it again',async()=>{
- const f=fixture();f.click('guide');f.requests[0].failure(new Error('offline'));f.click('guide');
+ const f=fixture();f.click('guide');f.requests[0].failure(new Error('offline'));await f.settle();f.click('guide');
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
 });
 

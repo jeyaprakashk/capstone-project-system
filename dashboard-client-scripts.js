@@ -450,7 +450,7 @@ const DashboardUI = (function() {
     loadRoleContent(key, false, true);
   }
   // Roles already on the DTO + view architecture: load() resolves a DTO, render() draws it.
-  const migratedRoles = { reviewer: ReviewerView };
+  const migratedRoles = { reviewer: ReviewerView, guide: GuideView };
   function loadRoleContent(activeKey, background, refresh, onLoaded, onError) {
     if ((!refresh && loadedRoleTabs[activeKey]) || loadingRoleTabs[activeKey]) {
       if (onError) onError(new Error('A dashboard refresh is already in progress. Please retry shortly.'));
@@ -752,42 +752,6 @@ const DashboardUI = (function() {
     shortEl.style.display = showingFull ? 'inline' : 'none';
   }
 
-  function decide(teamId, decision) {
-    const notesEl = byId('notes-' + teamId);
-    const titleEl = byId('title-' + teamId);
-    const card = byId('card-' + teamId);
-    const notes = notesEl ? notesEl.value : '';
-    const editedTitle = titleEl ? titleEl.value : '';
-    if (decision === 'Rejected' && !notes.trim()) {
-      setText('status-' + teamId, 'Please add a note explaining the rejection.');
-      return;
-    }
-    setButtonsDisabled(card, true);
-    setText('status-' + teamId, 'Submitting...');
-    dashboardRun()
-      .withSuccessHandler(function(result) {
-        if (result && result.ok) {
-          dashboardRun()
-            .withSuccessHandler(function(html) {
-              const target = byId('guideContent');
-              if (target) { target.innerHTML = html; if(typeof GuideWeekly !== 'undefined')GuideWeekly.load(); }
-            })
-            .withFailureHandler(function(err) {
-              setText('status-' + teamId, 'Refresh failed: ' + errorMessage(err));
-              setButtonsDisabled(card, false);
-            })
-            .refreshDashboardContent();
-        } else {
-          setText('status-' + teamId, result && result.message ? result.message : 'Unable to submit decision.');
-          setButtonsDisabled(card, false);
-        }
-      })
-      .withFailureHandler(function(err) {
-        setText('status-' + teamId, 'Error: ' + errorMessage(err));
-        setButtonsDisabled(card, false);
-      })
-      .submitGuideDecision(teamId, decision, notes, editedTitle);
-  }
 
   function toggleStudentMessage(idx) {
     const shortEl = byId('stumsg-short-' + idx);
@@ -2064,7 +2028,6 @@ const DashboardUI = (function() {
     renderExpandableText,
     renderIcon: renderLucideIcon_,
     renderIcon: renderLucideIcon_,
-    decide,
     run: dashboardRun,
     openReviewerMarks: function(team, review, button) { ReviewEvaluations.open(team, review, button); },
     changeTeamPageSize,
@@ -2097,7 +2060,6 @@ const DashboardSchedule = Object.freeze({
 function showRoleTab(key) { DashboardUI.showRoleTab(key); }
 function refreshAnnouncements() { DashboardUI.refreshAnnouncements(); }
 function toggleProblem(teamId) { DashboardUI.toggleProblem(teamId); }
-function decide(teamId, decision) { DashboardUI.decide(teamId, decision); }
 function toggleStudentMessage(idx) { DashboardUI.toggleStudentMessage(idx); }
 function filterTeamTracker(btn, type) { DashboardUI.filterTeamTracker(btn, type); }
 function filterTrackerSearch() { DashboardUI.filterTrackerSearch(); }

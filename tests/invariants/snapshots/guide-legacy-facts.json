@@ -1,0 +1,293 @@
+[
+  {
+    "teamId": "T2",
+    "selector": {
+      "title": "Needs review",
+      "members": "1 member",
+      "titleAttention": true,
+      "documentsAttention": 2
+    },
+    "heading": {
+      "title": "Needs review",
+      "members": "Three (003)",
+      "mailto": "three@example.com"
+    },
+    "students": [
+      "003"
+    ],
+    "github": {
+      "tone": "orange",
+      "due": "2026-01-08T00:00:00.000Z",
+      "members": [
+        {
+          "state": "pending",
+          "name": "Three",
+          "regno": "003",
+          "timing": null
+        }
+      ],
+      "repo": "https://github.com/org/team2"
+    },
+    "title": {
+      "status": "Team T2 · Needs Your Review",
+      "timing": {
+        "label": "Overdue",
+        "explanation": "Title approved is overdue. Deadline: 2026-01-10T00:00:00.000Z."
+      },
+      "paragraphs": [
+        "Title approval due 2026-01-10T00:00:00.000Z · Overdue",
+        "Similar to T9 (80%)"
+      ],
+      "form": {
+        "value": "Needs review"
+      },
+      "problem": "A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement."
+    },
+    "documents": {
+      "links": [
+        {
+          "label": "Work Breakdown",
+          "url": "https://example.com/w2"
+        },
+        {
+          "label": "Need Analysis",
+          "url": "https://example.com/n2"
+        }
+      ],
+      "last": null
+    }
+  },
+  {
+    "teamId": "T3",
+    "selector": {
+      "title": "No title submitted yet",
+      "members": "1 member",
+      "titleAttention": false,
+      "documentsAttention": 0
+    },
+    "heading": {
+      "title": "No title submitted yet",
+      "members": "Four (004)",
+      "mailto": "four@example.com"
+    },
+    "students": [
+      "004"
+    ],
+    "github": {
+      "tone": "red",
+      "due": "2026-01-08T00:00:00.000Z",
+      "members": [
+        {
+          "state": "missing",
+          "name": "Four",
+          "regno": "004",
+          "timing": null
+        }
+      ],
+      "repo": null
+    },
+    "title": {
+      "status": "Team T3 · Not Submitted",
+      "timing": {
+        "label": "Overdue",
+        "explanation": "Title approved is overdue. Deadline: 2026-01-10T00:00:00.000Z."
+      },
+      "paragraphs": [
+        "Title approval due 2026-01-10T00:00:00.000Z · Overdue"
+      ],
+      "form": null,
+      "problem": null
+    },
+    "documents": {
+      "links": [],
+      "last": "Date unavailable"
+    }
+  },
+  {
+    "teamId": "T5",
+    "selector": {
+      "title": "Rejected",
+      "members": "1 member",
+      "titleAttention": false,
+      "documentsAttention": 0
+    },
+    "heading": {
+      "title": "Rejected",
+      "members": "Seven (007)",
+      "mailto": "seven@example.com"
+    },
+    "students": [
+      "007"
+    ],
+    "github": {
+      "tone": "gray",
+      "due": "2026-01-08T00:00:00.000Z",
+      "members": [
+        {
+          "state": "pending",
+          "name": "Seven",
+          "regno": "007",
+          "timing": null
+        }
+      ],
+      "repo": null
+    },
+    "title": {
+      "status": "Team T5 · Rejected by You",
+      "timing": {
+        "label": "Overdue",
+        "explanation": "Title approved is overdue. Deadline: 2026-01-10T00:00:00.000Z."
+      },
+      "paragraphs": [
+        "Title approval due 2026-01-10T00:00:00.000Z · Overdue",
+        "Your note: Too broad",
+        "Waiting on the team to resubmit."
+      ],
+      "form": null,
+      "problem": null
+    },
+    "documents": {
+      "links": [],
+      "last": "Date unavailable"
+    }
+  },
+  {
+    "teamId": "T6",
+    "selector": {
+      "title": "Revise me",
+      "members": "1 member",
+      "titleAttention": false,
+      "documentsAttention": 0
+    },
+    "heading": {
+      "title": "Revise me",
+      "members": "Eight (008)",
+      "mailto": "eight@example.com"
+    },
+    "students": [
+      "008"
+    ],
+    "github": null,
+    "title": {
+      "status": "Team T6 · Awaiting Student Revision",
+      "timing": {
+        "label": "Overdue",
+        "explanation": "Title approved is overdue. Deadline: 2026-01-10T00:00:00.000Z."
+      },
+      "paragraphs": [
+        "Title approval due 2026-01-10T00:00:00.000Z · Overdue",
+        "Reviewer's note: Narrow it",
+        "Waiting for the team to resubmit — nothing for you to do until they do."
+      ],
+      "form": null,
+      "problem": null
+    },
+    "documents": {
+      "links": [],
+      "last": "Date unavailable"
+    }
+  },
+  {
+    "teamId": "T4",
+    "selector": {
+      "title": "Awaiting reviewer",
+      "members": "2 members",
+      "titleAttention": false,
+      "documentsAttention": 0
+    },
+    "heading": {
+      "title": "Awaiting reviewer",
+      "members": "Five (005), Six (006)",
+      "mailto": "five@example.com"
+    },
+    "students": [
+      "005",
+      "006"
+    ],
+    "github": null,
+    "title": {
+      "status": "Team T4 · Awaiting Reviewer",
+      "timing": {
+        "label": "Overdue",
+        "explanation": "Title approved is overdue. Deadline: 2026-01-10T00:00:00.000Z."
+      },
+      "paragraphs": [
+        "Title approval due 2026-01-10T00:00:00.000Z · Overdue",
+        "You approved — awaiting Reviewer."
+      ],
+      "form": null,
+      "problem": null
+    },
+    "documents": {
+      "links": [],
+      "last": "Date unavailable"
+    }
+  },
+  {
+    "teamId": "T1",
+    "selector": {
+      "title": "Approved <i>project</i>",
+      "members": "2 members",
+      "titleAttention": false,
+      "documentsAttention": 1
+    },
+    "heading": {
+      "title": "Approved <i>project</i>",
+      "members": "One (001), Two (002)",
+      "mailto": "one@example.com,two@example.com"
+    },
+    "students": [
+      "001",
+      "002"
+    ],
+    "github": {
+      "tone": "green",
+      "due": "2026-01-08T00:00:00.000Z",
+      "members": [
+        {
+          "state": "joined",
+          "name": "One",
+          "regno": "001",
+          "timing": {
+            "date": "7 Jan",
+            "label": "On time",
+            "explanation": "GitHub account submitted 2026-01-07T00:00:00.000Z, on or before the deadline (2026-01-08T00:00:00.000Z)."
+          }
+        },
+        {
+          "state": "joined",
+          "name": "Two",
+          "regno": "002",
+          "timing": {
+            "date": "9 Jan",
+            "label": "1 day late",
+            "explanation": "GitHub account submitted 2026-01-09T00:00:00.000Z, 1 day after the deadline (2026-01-08T00:00:00.000Z)."
+          }
+        }
+      ],
+      "repo": "https://github.com/org/team1"
+    },
+    "title": {
+      "status": "Team T1 · Approved",
+      "timing": null,
+      "paragraphs": [
+        "Approved title: Approved <i>project</i>",
+        "Scope: Not recorded separately. See Work Breakdown.",
+        "Approved by: rev@example.com",
+        "Approved on: Date unavailable Timing unavailable Recorded date unavailable. Deadline: 2026-01-10T00:00:00.000Z.",
+        "Reviewer comment: Solid scope"
+      ],
+      "form": null,
+      "problem": "Short problem"
+    },
+    "documents": {
+      "links": [
+        {
+          "label": "Work Breakdown",
+          "url": "https://example.com/wbs"
+        }
+      ],
+      "last": null
+    }
+  }
+]

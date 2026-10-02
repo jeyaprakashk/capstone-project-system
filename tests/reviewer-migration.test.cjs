@@ -95,7 +95,7 @@ test('dashboard shell compiles, defines the bridge before the dashboard script a
   const fs = require('node:fs');
   const files = ['common-styles.js', 'common-constants.js', 'common-helpers.js', 'guide-dashboard.js', 'coordinator-dashboard.js', 'student-dashboard.js', 'reviewer-dashboard.js',
     'lucide-icons.js', 'icon-renderer.js', 'review-evaluation-client.js', 'internal-assessment-publishing-client.js', 'guide-evaluation-client.js', 'guide-weekly-client.js',
-    'dashboard-client-scripts.js', 'review-academic-policy.js', 'data-bridge-client.js', 'reviewer-view.js', 'dashboard-router.js'];
+    'dashboard-client-scripts.js', 'review-academic-policy.js', 'data-bridge-client.js', 'reviewer-view.js', 'guide-view.js', 'dashboard-router.js'];
   const c = loadSources(files, { PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }) },
     HtmlService: { createHtmlOutputFromFile: name => ({ getContent: () => fs.readFileSync(name + '.html', 'utf8') }) } });
   const html = c.buildDashboardShell('r@example.com', [{ key: 'reviewer', label: 'Reviewer', contentId: 'reviewerContent' }]);
@@ -103,7 +103,15 @@ test('dashboard shell compiles, defines the bridge before the dashboard script a
   assert.doesNotThrow(() => new vm.Script(script));
   assert(script.indexOf('const DataBridge') >= 0 && script.indexOf('const DataBridge') < script.indexOf('const DashboardUI'));
   assert(script.indexOf('const ReviewerView') < script.indexOf('const DashboardUI'));
-  const utility = '.tw' + String.fromCharCode(92) + ':px-4';
-  assert(html.indexOf('tailwind-styles') < 0 && html.includes(utility), 'compiled Tailwind CSS is inlined');
-  assert(html.indexOf(utility) > html.indexOf('--canvas'), 'Tailwind utilities follow the legacy stylesheet');
+  assert(html.indexOf('tailwind-styles') < 0 && html.includes('.px-4{'), 'compiled Tailwind CSS is inlined');
+  assert(!html.includes('--fs-h1') && !html.includes('app-styles'), 'the legacy stylesheet is gone');
+});
+
+test('workflow rejections returned as {ok:false} are errors, never success', () => {
+  const f = serverFixture();
+  f.c.submitReviewerDecision = () => ({ ok: false, message: 'You are not an assigned reviewer for Team T1.' });
+  assert.deepEqual(JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Approved', '')),
+    { ok: false, error: { code: 'REJECTED', message: 'You are not an assigned reviewer for Team T1.' } });
+  f.c.submitReviewerDecision = () => ({ ok: true, message: 'Decision recorded for Team T1.' });
+  assert.deepEqual(JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Approved', '')).data, { message: 'Decision recorded for Team T1.' });
 });

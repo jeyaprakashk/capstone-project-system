@@ -36,3 +36,12 @@ function apiHandle_(body) {
     return apiError_('INTERNAL', 'Something went wrong. Please try again.');
   }
 }
+
+/**
+ * Workflow functions report business-rule failures as {ok:false, message} instead of
+ * throwing. Convert those to a REJECTED error so the browser never sees them as success.
+ */
+function apiWorkflowResult_(result, successMessage) {
+  if (result && result.ok === false) throw apiFail_('REJECTED', result.message || 'The request was not accepted.');
+  return {message: result && result.message ? String(result.message) : successMessage};
+}

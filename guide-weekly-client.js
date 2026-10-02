@@ -2,6 +2,7 @@
 function guideWeeklyBrowser_() {
   const host = ()=>document.getElementById('guideWeeklyProgress');
   const esc = value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const ATTENTION_BADGE='inline-flex items-center rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/20';
   const badgeClass = tone=>({green:'badge badge--success',orange:'badge badge--warning',blue:'badge badge--info',red:'badge badge--danger',gray:'chip'}[tone] || 'chip');
   const message = error=>typeof error === 'string' ? error : error?.message || 'Request failed.';
   function rpc(method,args,success,failure) {
@@ -39,14 +40,14 @@ function guideWeeklyBrowser_() {
         pill.innerHTML=DashboardUI.renderSkeleton('inline','Checking team actions');return;
       }
       pill.removeAttribute('aria-busy');
-      pill.hidden=!first;pill.className='badge badge--warning';
+      pill.hidden=!first;pill.className=ATTENTION_BADGE;
       pill.textContent=first?first.label+' · '+first.count:'';
       button.setAttribute('aria-description',actions.map(action=>action.label+' · '+action.count).join(', ')+(unknown?' · Some action statuses could not be checked.':''));
     });
     const actions=teamActions(selectedTeam);
     root.querySelectorAll('[data-guide-tab]').forEach(button=>{
       let badge=button.querySelector('[data-guide-tab-attention]');
-      if(!badge){badge=document.createElement('span');badge.dataset.guideTabAttention='';badge.className='badge badge--warning';(button.querySelector('strong') || button).appendChild(badge);}
+      if(!badge){badge=document.createElement('span');badge.dataset.guideTabAttention='';badge.className=ATTENTION_BADGE+' ml-1';(button.querySelector('strong') || button).appendChild(badge);}
       const action=actions.find(action=>action.key===button.dataset.guideTab);
       badge.hidden=!action;badge.textContent=action?String(action.count):'';
       badge.title=action?(action.key==='documents'?'Documents supporting pending title review':action.label+' requiring action')+': '+action.count:'';
@@ -99,7 +100,7 @@ function guideWeeklyBrowser_() {
     const previousTeam=selectedTeam;
     selectedTeam=teams.some(team=>team.dataset.guideTeam===String(index))?String(index):(teams[0]?.dataset.guideTeam || '');
     if(!preserveView)root.attentionLandingTeam=selectedTeam;
-    root.querySelectorAll('[data-guide-select]').forEach(button=>{const active=button.dataset.guideSelect===selectedTeam;button.setAttribute('aria-pressed',String(active));button.classList.toggle('tile--selected',active);button.classList.toggle('marker-accent',active);});
+    root.querySelectorAll('[data-guide-select]').forEach(button=>{const active=button.dataset.guideSelect===selectedTeam;button.setAttribute('aria-pressed',String(active));});
     root.querySelectorAll('[data-guide-heading]').forEach(heading=>{heading.hidden=heading.dataset.guideHeading!==selectedTeam;});
     teams.forEach(team=>{team.hidden=team.dataset.guideTeam!==selectedTeam || (selectedView==='weekly' || selectedView==='evaluation');});
     // Tab changes only toggle visibility; keep loaded details and disclosure state.
@@ -118,7 +119,7 @@ function guideWeeklyBrowser_() {
     }
     if(editor)editor.hidden=view!=='evaluation';
     selectedView=view;
-    root.querySelectorAll('[data-guide-tab]').forEach(button=>{const active=button.dataset.guideTab===view;button.setAttribute('aria-pressed',String(active));button.classList.toggle('tile--selected',active);});
+    root.querySelectorAll('[data-guide-tab]').forEach(button=>{const active=button.dataset.guideTab===view;button.setAttribute('aria-pressed',String(active));});
     root.querySelectorAll('[data-guide-view]').forEach(panel=>{panel.hidden=panel.dataset.guideView!==view;});
     host().hidden=view!=='weekly';
     selectTeam(selectedTeam,true);

@@ -57,19 +57,10 @@ test('escapes every interpolated value and never emits inline handlers', () => {
   assert.equal(f.host.querySelector('[data-team-id]').getAttribute('data-team-id'), 'T"1');
 });
 
-test('uses only Tailwind prefixed classes and no legacy class names', () => {
+test('uses only Tailwind utilities and every one is compiled into the stylesheet', () => {
+  const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
   const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
-  const classes = new Set(Array.from(f.host.querySelectorAll('[class]')).flatMap(n => n.getAttribute('class').split(/\s+/)));
-  assert([...classes].every(name => name.startsWith('tw:')), [...classes].filter(n => !n.startsWith('tw:')).join(','));
-});
-
-test('every Tailwind class the view uses exists in the compiled stylesheet', () => {
-  const css = fs.readFileSync('tailwind-styles.html', 'utf8');
-  const source = fs.readFileSync('reviewer-view.js', 'utf8');
-  const used = new Set(source.match(/tw:[a-z0-9:\/.\-\[\]]+/g));
-  const escapeSelector = name => '.' + name.replace(/([:\/.\[\]])/g, '\\$1');
-  const missing = [...used].filter(name => !css.includes(escapeSelector(name)));
-  assert.deepEqual(missing, []);
+  assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
 });
 
 test('search filters across team, guide, register number, title, committee and status', () => {

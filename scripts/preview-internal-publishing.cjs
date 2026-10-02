@@ -4,7 +4,7 @@
  * Add &narrow=1 for a 390px frame, or &details=1 for student details.
  */
 const http=require('node:http'),fs=require('node:fs'),vm=require('node:vm');
-const attachedStylesheet=fs.readFileSync('app-styles.html','utf8');
+const attachedStylesheet=fs.readFileSync('tailwind-styles.html','utf8');
 const {publishingFixture}=require('../tests/internal-publishing-fixture.cjs');
 const styles=vm.createContext({escapeHtml:value=>String(value)});vm.runInContext(fs.readFileSync('common-styles.js','utf8'),styles);
 vm.runInContext(fs.readFileSync('icon-renderer.js','utf8'),styles);
@@ -39,7 +39,7 @@ function page(url){
   const f=publishingFixture(key),report=reportFor(key);
   f.c.getSkeletonMarkup_=styles.getSkeletonMarkup_;
   f.c.escapeHtml=value=>String(value);
-  const css=styles.getFunctionalStyles_();
+  const css='';
   const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
   const begin=source.slice(source.indexOf('  function beginContentLoading('),source.indexOf('  function setText('));
   return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+report.config.title+' · Publishing preview</title><style>'+css+'</style></head><body><nav class="preview-nav"><a href="/?assessment=review1">Review 1</a><a href="/?assessment=review2">Review 2</a><a href="/?assessment=guide_eval">Guide Evaluation</a><a href="/?assessment='+key+'&narrow=1">Narrow</a><span>Synthetic data only</span></nav><main>'+f.c.buildInternalAssessmentPublishing_(key)+'</main><script>const previewReport='+JSON.stringify(report).replace(/</g,'\\u003c')+';const renderSkeleton='+styles.getSkeletonMarkup_.toString()+';function escapeHtml(s){return String(s).replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\\"":"&quot;"}[c]));}'+begin+`
