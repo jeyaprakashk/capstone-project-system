@@ -1,0 +1,6 @@
+/* Migration build: no preflight (legacy markup still on the page), prefixed and
+   !important so utilities win over the unlayered legacy stylesheet. Only the
+   listed migrated views are scanned. Final phase drops the prefix and important. */
+@import "tailwindcss/theme.css" layer(theme) prefix(tw);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(tw) important source(none);
+@source "../reviewer-view.js";

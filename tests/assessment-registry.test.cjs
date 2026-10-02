@@ -258,11 +258,9 @@ test('Reviewer dashboard shows configuration-required message for missing, empty
   if(state==='missing')delete f.extra.AssessmentDefinitions;
   if(state==='empty')f.rows.splice(1);
   if(state==='invalid')f.rows[1][8]='unsupported';
-  vm.runInContext(fs.readFileSync('reviewer-dashboard.js','utf8'),c);
-  c.buildDashboardContainerHeader_=()=>'';c.buildTeamPagination_=()=>'';c.renderLucideIcon_=()=>'';
-  const html=c.buildReviewerContent('reviewer@x',{pending:[],approved:[],notYetGuideApproved:[],total:0,assigned:[]});
-  assert.match(html,/Review marks are unavailable/);assert.match(html,/AssessmentDefinitions/i);
-  assert.doesNotMatch(html,/ReviewEvaluation.open/);
+  vm.runInContext(fs.readFileSync('reviewer-api.js','utf8'),c);
+  const dto=c.buildReviewerDto_({pending:[],approved:[],notYetGuideApproved:[],total:0,assigned:[]});
+  assert.match(dto.reviewError,/AssessmentDefinitions/i);assert.deepEqual(Array.from(dto.reviews),[]);assert.equal(dto.teams.length,0);
  }
 });
 

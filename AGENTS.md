@@ -42,6 +42,18 @@ Change a DTO only by updating that file, the endpoint, its contract test and the
 Writes are not timed out or auto-retried by the bridge, because an Apps Script call
 cannot be cancelled and a retry could submit twice.
 
+## Tailwind during migration
+
+`npm run build:tailwind` compiles `scripts/tailwind-input.css` into the committed
+`tailwind-styles.html` (no runtime CDN); `npm run check:tailwind` verifies it is current.
+While legacy markup is still on the page, utilities are prefixed (`tw:px-4`), have no
+preflight and are `!important`, so they never clash with legacy class names. Add each
+migrated view file to an `@source` line in that input and rebuild. The final phase drops
+the prefix, `important` and the legacy stylesheet.
+
+Migrated so far: **Reviewer** (`reviewer-api.js`, `reviewer-view.js`). Shared pieces:
+`api-envelope.js` (server) and `data-bridge-client.js` (browser).
+
 ## Loading and refresh
 
 Follow [LOADING-UI.md](LOADING-UI.md): preserve existing content on a failed
@@ -55,6 +67,6 @@ for migrated ones, and do not extend them. They are deleted in the final phase.
 
 ## Tests
 
-`npm test` runs everything. Known baseline failures at Version 127, unrelated to
+`npm test` runs everything; `npm run test:migration` runs the bridge, view and DTO tests. Known baseline failures at Version 127, unrelated to
 this migration: 7 tests in `tests/team-github-setup.test.cjs`. Do not hide them;
 fix them separately. No other test may regress.

@@ -1,0 +1,136 @@
+[
+  {
+    "teamId": "T1",
+    "guideName": "Dr. Guide",
+    "registerNumbers": [
+      "R1",
+      "R2"
+    ],
+    "title": "<script>alert(1)</script> Title",
+    "committee": "C1",
+    "statusLabel": "Pending review",
+    "canDecide": true,
+    "documents": [
+      {
+        "label": "WBS",
+        "url": "https://example.com/wbs"
+      },
+      {
+        "label": "Need Analysis",
+        "url": "https://example.com/need"
+      }
+    ],
+    "reviews": [
+      {
+        "key": "review1",
+        "enabled": false,
+        "actionLabel": "Enter marks",
+        "note": "Open"
+      },
+      {
+        "key": "review2",
+        "enabled": false,
+        "actionLabel": "Enter marks",
+        "note": "Storage missing"
+      }
+    ]
+  },
+  {
+    "teamId": "T2",
+    "guideName": "Dr. Guide",
+    "registerNumbers": [
+      "R3"
+    ],
+    "title": "Approved title",
+    "committee": "C1",
+    "statusLabel": "Approved",
+    "canDecide": false,
+    "documents": [],
+    "reviews": [
+      {
+        "key": "review1",
+        "enabled": true,
+        "actionLabel": "Enter marks",
+        "note": "Draft"
+      },
+      {
+        "key": "review2",
+        "enabled": true,
+        "actionLabel": "Enter marks",
+        "note": "1/3 students marked"
+      }
+    ]
+  },
+  {
+    "teamId": "T3",
+    "guideName": "",
+    "registerNumbers": [],
+    "title": "Revision title",
+    "committee": "C1",
+    "statusLabel": "Revision requested",
+    "canDecide": true,
+    "documents": [],
+    "reviews": [
+      {
+        "key": "review1",
+        "enabled": false,
+        "actionLabel": "View marks",
+        "note": "Submitted"
+      },
+      {
+        "key": "review2",
+        "enabled": false,
+        "actionLabel": "Enter marks",
+        "note": "Marks unavailable."
+      }
+    ]
+  },
+  {
+    "teamId": "T4",
+    "guideName": "",
+    "registerNumbers": [],
+    "title": "",
+    "committee": "C1",
+    "statusLabel": "Not submitted",
+    "canDecide": false,
+    "documents": [],
+    "reviews": [
+      {
+        "key": "review1",
+        "enabled": false,
+        "actionLabel": "Enter marks",
+        "note": "Marks unavailable."
+      },
+      {
+        "key": "review2",
+        "enabled": false,
+        "actionLabel": "Enter marks",
+        "note": "Marks unavailable."
+      }
+    ]
+  },
+  {
+    "teamId": "T5",
+    "guideName": "Guide 5",
+    "registerNumbers": [],
+    "title": "Submitted title",
+    "committee": "C1",
+    "statusLabel": "Awaiting guide",
+    "canDecide": false,
+    "documents": [],
+    "reviews": [
+      {
+        "key": "review1",
+        "enabled": false,
+        "actionLabel": "View marks",
+        "note": "Published"
+      },
+      {
+        "key": "review2",
+        "enabled": false,
+        "actionLabel": "Edit marks",
+        "note": "Completed"
+      }
+    ]
+  }
+]

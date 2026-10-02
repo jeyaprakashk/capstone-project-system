@@ -28,7 +28,7 @@ function fixture(overrides = {}, runtime = {}) {
       return new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'short',year:'numeric'}).format(date);
     }}
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
+  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
   const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
@@ -457,7 +457,7 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   const document={readyState:'loading',addEventListener(){},getElementById:id=>elements[id],createElement:element,body:element()};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorDrawerSection(teamId,section){requests.push({...handlers,teamId,section});}};return chain;}};
   const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
-  vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext("focusCoordinatorTeam('A'); focusCoordinatorTeam('B');",browser);
   assert.deepEqual(requests.map(r=>r.section),['basic','progress','activity','basic','progress','activity']);
   requests[3].success({title:'Team B project',students:[],reviewers:[]});
@@ -562,11 +562,13 @@ function timelineBrowser() {
     const handlers={};
     const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},
       loadSharedProjectTimeline(){requests.push({type:'timeline',...handlers});},
-      loadDashboardRoleContent(role){requests.push({type:'role',role,...handlers});}};
+      loadDashboardRoleContent(role){requests.push({type:'role',role,...handlers});},
+      // Migrated reviewer role answers through the data bridge with a response envelope.
+      API_reviewer_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'reviewer',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});}};
     return chain;
   }};
   const browser=createSheetReadContext({window:{matchMedia:()=>({matches:false})},ResizeObserver:class {constructor(callback){this.callback=callback;} observe(){} disconnect(){}},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
-  vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext('ReviewerView.render=(host,dto)=>{host.innerHTML=dto.html;}',browser);vm.runInContext(c.getDashboardClientScript(),browser);
   return {c,browser,requests,timeline,guide,reviewer,initialize:()=>initialize()};
 }
 
@@ -750,7 +752,7 @@ function coordinatorAsyncBrowser(fonts) {
   const document={fonts,readyState:'loading',addEventListener(){},getElementById:id=>elements[id]||null,querySelector:()=>null,querySelectorAll:()=>[],createElement:element};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorSection(section){requests.push({...handlers,section});},loadAllTeamsWeeklyActivity(){requests.push({...handlers,section:'activity'});}};return chain;}};
   const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console:{log(){}}});
-  vm.runInContext(c.getDashboardClientScript(),browser);
+  for(const file of ['data-bridge-client.js','reviewer-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext('DashboardUI.initializeCoordinatorAsync()',browser);
   return {browser,requests,elements,element};
 }

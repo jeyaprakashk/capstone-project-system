@@ -229,11 +229,11 @@ test('spreadsheet timezone midnight drives the exact seven-day boundary',()=>{
   f.today(clock.projectDay_(new Date('2026-10-04T18:30:00Z'),'Asia/Kolkata'));assert.equal(f.progress().readable,true);
 });
 test('reviewer dashboard shows opening reason and read-only action after submission',()=>{
-  const f=fixture();f.c.escapeHtml=v=>String(v);f.c.renderLucideIcon_=name=>name;
-  vm.runInContext(fs.readFileSync('reviewer-dashboard.js','utf8'),f.c);
-  const render=()=>f.c.buildReviewerReviewCells_(f.row,f.TS,{reviews:[f.reviews[0]],teams:{t1:{review1:f.progress()}}});
-  f.today(19999);assert.match(render(),/disabled/);assert.match(render(),/Opens/);
-  f.today(20000);assert.doesNotMatch(render(),/disabled/);f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});assert.match(render(),/View marks/);
+  const f=fixture();
+  vm.runInContext(fs.readFileSync('reviewer-api.js','utf8'),f.c);
+  const render=()=>f.c.reviewerReviewCellDto_(f.row,f.TS,f.reviews[0],{reviews:[f.reviews[0]],teams:{t1:{review1:f.progress()}}});
+  f.today(19999);assert.equal(render().enabled,false);assert.match(render().note,/Opens/);
+  f.today(20000);assert.equal(render().enabled,true);f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});assert.equal(render().actionLabel,'View marks');
 });
 
 function browserFixture(extended=false,key='review1') {
@@ -289,7 +289,7 @@ function browserFixture(extended=false,key='review1') {
   };
   const trigger={isConnected:true,focus(){focusCount++;}};
   function runner(success,failure){return new Proxy({},{get:(_,name)=>name==='withSuccessHandler'?fn=>runner(fn,failure):name==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({name,args,success,failure})});}
-  const c=vm.createContext({console,confirm:()=>discard,prompt:()=>extended?'Reviewed assessment':null,window:{crypto,addEventListener(){}},document:{createElement:()=>drawer,body:{appendChild(){},classList:{add(){},remove(){}}},getElementById:()=>null},DashboardUI:{ask:async ()=>discard,requestText:async ()=>extended?'Reviewed assessment':null,notify:async ()=>{},guideRun:()=>runner(),renderSkeleton:()=>'<p>Loading</p>',...(extended?{beginContentLoading(){loading.begun++;let settled=false;return()=>{if(!settled)loading.settled++;settled=true;};}}:{})}});
+  const c=vm.createContext({ReviewerView:{refresh:()=>Promise.resolve(true)},console,confirm:()=>discard,prompt:()=>extended?'Reviewed assessment':null,window:{crypto,addEventListener(){}},document:{createElement:()=>drawer,body:{appendChild(){},classList:{add(){},remove(){}}},getElementById:()=>null},DashboardUI:{ask:async ()=>discard,requestText:async ()=>extended?'Reviewed assessment':null,notify:async ()=>{},guideRun:()=>runner(),renderSkeleton:()=>'<p>Loading</p>',...(extended?{beginContentLoading(){loading.begun++;let settled=false;return()=>{if(!settled)loading.settled++;settled=true;};}}:{})}});
   vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
   for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js'])vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):fs.readFileSync(file,'utf8'),c);
   c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;

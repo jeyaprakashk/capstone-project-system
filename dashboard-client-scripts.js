@@ -232,11 +232,11 @@ const DashboardUI = (function() {
     }
     return wrap(google.script.run);
   }
+  if (typeof DataBridge !== 'undefined') DataBridge.useRunner(dashboardRun);
   function activateRole(key) {
     if (!loadedRoleTabs[key] || activatedRoles[key]) return;
     activatedRoles[key] = true;
     if (key === 'coord') initializeCoordinatorAsync();
-    if (key === 'reviewer') filterReviewerAssignedTeams();
     if (key === 'guide' && typeof GuideWeekly !== 'undefined') GuideWeekly.load();
     if (key === 'student') { loadWeeklyProgress(); GuideEvaluation.student(); if(typeof ReviewEvaluations!=='undefined')document.querySelectorAll('[data-review-result]').forEach(host=>ReviewEvaluations.student(host.dataset.reviewResult)); }
   }
@@ -449,6 +449,8 @@ const DashboardUI = (function() {
     }
     loadRoleContent(key, false, true);
   }
+  // Roles already on the DTO + view architecture: load() resolves a DTO, render() draws it.
+  const migratedRoles = { reviewer: ReviewerView };
   function loadRoleContent(activeKey, background, refresh, onLoaded, onError) {
     if ((!refresh && loadedRoleTabs[activeKey]) || loadingRoleTabs[activeKey]) {
       if (onError) onError(new Error('A dashboard refresh is already in progress. Please retry shortly.'));
@@ -470,10 +472,10 @@ const DashboardUI = (function() {
     attemptedRoles[activeKey] = true;
     const requestStarted = Date.now();
 
-    dashboardRun()
-      .withSuccessHandler(function(html) {
+    const migrated = migratedRoles[activeKey];
+    function onRoleLoaded(html) {
         finishLoading();
-        target.innerHTML = html;
+        if (migrated) migrated.render(target, html); else target.innerHTML = html;
         if (onLoaded) onLoaded();
         if (refresh) activatedRoles[activeKey] = false;
         if (activeKey === 'coord') console.log(JSON.stringify({event:'coordinator_core_render', durationMs:Date.now() - requestStarted, htmlCharacters:html.length}));
@@ -485,8 +487,9 @@ const DashboardUI = (function() {
           recordPerformance({event:'tab_core_ready', role:activeKey, durationMs:performance.now() - tabSelectedAt});
         }
         activateRole(activeKey);
-      })
-      .withFailureHandler(function(err) {
+    }
+    function onRoleFailed(err) {
+        if (err && err.superseded) { finishLoading(); loadingRoleTabs[activeKey] = false; return; }
         finishLoading();
         loadingRoleTabs[activeKey] = false;
         if (onError) { onError(err); return; }
@@ -497,8 +500,10 @@ const DashboardUI = (function() {
         }
         target.innerHTML = '<div>Unable to load this dashboard: ' +
           escapeClientHtml(errorMessage(err)) + '</div>';
-      })
-      .loadDashboardRoleContent(activeKey);
+    }
+    // Bridge promises settle after the runner hook, so resume queued preloads once handled.
+    if (migrated) migrated.load().then(onRoleLoaded).catch(onRoleFailed).then(schedulePreload);
+    else dashboardRun().withSuccessHandler(onRoleLoaded).withFailureHandler(onRoleFailed).loadDashboardRoleContent(activeKey);
   }
 
   const announcementsState = { loading:false, loaded:false, query:'', audience:'all', type:'all', page:1, pageSize:5 };
@@ -765,7 +770,7 @@ const DashboardUI = (function() {
           dashboardRun()
             .withSuccessHandler(function(html) {
               const target = byId('guideContent');
-              if (target) { target.innerHTML = html; filterReviewerAssignedTeams(); if(typeof GuideWeekly !== 'undefined')GuideWeekly.load(); }
+              if (target) { target.innerHTML = html; if(typeof GuideWeekly !== 'undefined')GuideWeekly.load(); }
             })
             .withFailureHandler(function(err) {
               setText('status-' + teamId, 'Refresh failed: ' + errorMessage(err));
@@ -782,59 +787,6 @@ const DashboardUI = (function() {
         setButtonsDisabled(card, false);
       })
       .submitGuideDecision(teamId, decision, notes, editedTitle);
-  }
-
-  const reviewerPagination = { page:1, size:10 };
-  function filterReviewerAssignedTeams(resetPage) {
-    const box = byId('reviewerAssignedSearch');
-    const body = byId('reviewerAssignedBody');
-    if (!box || !body) return;
-    const query = box.value.trim().toLowerCase();
-    const rows = Array.from(body.querySelectorAll('[data-assigned-search]'));
-    if (resetPage !== false) reviewerPagination.page = 1;
-    const matches = rows.filter(function(row) { return row.getAttribute('data-assigned-search').includes(query); });
-    const bounds = renderTeamPagination(matches.length, reviewerPagination, 'reviewerAssigned', function() { filterReviewerAssignedTeams(false); });
-    rows.forEach(function(row) { row.hidden = true; });
-    matches.slice(bounds.start, bounds.end).forEach(function(row) { row.hidden = false; });
-    byId('reviewerAssignedEmpty').hidden = matches.length > 0;
-  }
-
-  function reviewerDecide(teamId, decision) {
-    if (pendingRequests) return;
-    const notesEl = byId('reviewer-notes-' + teamId);
-    const notes = notesEl ? notesEl.value : '';
-    const row = byId('reviewer-decision-' + teamId);
-    if (decision === 'Revise' && !notes.trim()) {
-      setText('reviewer-status-' + teamId, 'Note required.');
-      return;
-    }
-    setButtonsDisabled(row, true);
-    setText('reviewer-status-' + teamId, 'Submitting…');
-    dashboardRun()
-      .withSuccessHandler(function(result) {
-        if (result && result.ok) {
-          const search = byId('reviewerAssignedSearch');
-          const query = search ? search.value : '';
-          dashboardRun()
-            .withSuccessHandler(function(html) {
-              const target = byId('reviewerContent');
-              if (target) { target.innerHTML = html; const box = byId('reviewerAssignedSearch'); if (box) box.value = query; filterReviewerAssignedTeams(false); }
-            })
-            .withFailureHandler(function(err) {
-              setText('reviewer-status-' + teamId, 'Refresh failed: ' + errorMessage(err));
-              setButtonsDisabled(row, false);
-            })
-            .refreshReviewerContentForCurrentUser();
-        } else {
-          setText('reviewer-status-' + teamId, result && result.message ? result.message : 'Unable to submit decision.');
-          setButtonsDisabled(row, false);
-        }
-      })
-      .withFailureHandler(function(err) {
-        setText('reviewer-status-' + teamId, 'Error: ' + errorMessage(err));
-        setButtonsDisabled(row, false);
-      })
-      .submitReviewerDecision(teamId, decision, notes);
   }
 
   function toggleStudentMessage(idx) {
@@ -1024,12 +976,11 @@ const DashboardUI = (function() {
       host.renderResendLog();
       return;
     }
-    const state = key === 'coord' ? trackerPagination : key === 'reviewer' ? reviewerPagination : null;
+    const state = key === 'coord' ? trackerPagination : null;
     if (!state) return;
     state.size = value === 'all' ? 'all' : Number(value);
     state.page = 1;
     if (key === 'coord') applyCoordinatorFilters(false);
-    else filterReviewerAssignedTeams(false);
   }
 
   function applyCoordinatorFilters(resetPage) {
@@ -2114,10 +2065,9 @@ const DashboardUI = (function() {
     renderIcon: renderLucideIcon_,
     renderIcon: renderLucideIcon_,
     decide,
+    run: dashboardRun,
     openReviewerMarks: function(team, review, button) { ReviewEvaluations.open(team, review, button); },
-    filterReviewerAssignedTeams,
     changeTeamPageSize,
-    reviewerDecide,
     toggleStudentMessage,
     filterTeamTracker,
     filterTrackerSearch,
@@ -2148,7 +2098,6 @@ function showRoleTab(key) { DashboardUI.showRoleTab(key); }
 function refreshAnnouncements() { DashboardUI.refreshAnnouncements(); }
 function toggleProblem(teamId) { DashboardUI.toggleProblem(teamId); }
 function decide(teamId, decision) { DashboardUI.decide(teamId, decision); }
-function reviewerDecide(teamId, decision) { DashboardUI.reviewerDecide(teamId, decision); }
 function toggleStudentMessage(idx) { DashboardUI.toggleStudentMessage(idx); }
 function filterTeamTracker(btn, type) { DashboardUI.filterTeamTracker(btn, type); }
 function filterTrackerSearch() { DashboardUI.filterTrackerSearch(); }

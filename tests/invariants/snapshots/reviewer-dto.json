@@ -1,0 +1,195 @@
+{
+  "summary": {
+    "pending": 2,
+    "approved": 1,
+    "awaitingGuide": 2,
+    "total": 5
+  },
+  "reviews": [
+    {
+      "key": "review1",
+      "label": "Review 1"
+    },
+    {
+      "key": "review2",
+      "label": "Review 2"
+    }
+  ],
+  "reviewError": null,
+  "teams": [
+    {
+      "teamId": "T1",
+      "guideName": "Dr. Guide",
+      "registerNumbers": [
+        "R1",
+        "R2"
+      ],
+      "title": "<script>alert(1)</script> Title",
+      "committee": "C1",
+      "titleApproval": {
+        "status": {
+          "tone": "warning",
+          "label": "Pending review"
+        },
+        "canDecide": true,
+        "submittedTitle": "<script>alert(1)</script> Title",
+        "similarityFlag": "Similar to T9",
+        "documents": [
+          {
+            "label": "WBS",
+            "url": "https://example.com/wbs"
+          },
+          {
+            "label": "Need Analysis",
+            "url": "https://example.com/need"
+          }
+        ],
+        "reviewerNotes": ""
+      },
+      "reviews": [
+        {
+          "key": "review1",
+          "enabled": false,
+          "actionLabel": "Enter marks",
+          "note": "Open"
+        },
+        {
+          "key": "review2",
+          "enabled": false,
+          "actionLabel": "Enter marks",
+          "note": "Storage missing"
+        }
+      ]
+    },
+    {
+      "teamId": "T2",
+      "guideName": "Dr. Guide",
+      "registerNumbers": [
+        "R3"
+      ],
+      "title": "Approved title",
+      "committee": "C1",
+      "titleApproval": {
+        "status": {
+          "tone": "success",
+          "label": "Approved"
+        },
+        "canDecide": false,
+        "submittedTitle": "Approved title",
+        "similarityFlag": "",
+        "documents": [],
+        "reviewerNotes": "Good scope"
+      },
+      "reviews": [
+        {
+          "key": "review1",
+          "enabled": true,
+          "actionLabel": "Enter marks",
+          "note": "Draft"
+        },
+        {
+          "key": "review2",
+          "enabled": true,
+          "actionLabel": "Enter marks",
+          "note": "1/3 students marked"
+        }
+      ]
+    },
+    {
+      "teamId": "T3",
+      "guideName": "",
+      "registerNumbers": [],
+      "title": "Revision title",
+      "committee": "C1",
+      "titleApproval": {
+        "status": {
+          "tone": "warning",
+          "label": "Revision requested"
+        },
+        "canDecide": true,
+        "submittedTitle": "Revision title",
+        "similarityFlag": "",
+        "documents": [],
+        "reviewerNotes": ""
+      },
+      "reviews": [
+        {
+          "key": "review1",
+          "enabled": false,
+          "actionLabel": "View marks",
+          "note": "Submitted"
+        },
+        {
+          "key": "review2",
+          "enabled": false,
+          "actionLabel": "Enter marks",
+          "note": "Marks unavailable."
+        }
+      ]
+    },
+    {
+      "teamId": "T4",
+      "guideName": "",
+      "registerNumbers": [],
+      "title": "",
+      "committee": "C1",
+      "titleApproval": {
+        "status": {
+          "tone": "neutral",
+          "label": "Not submitted"
+        },
+        "canDecide": false,
+        "submittedTitle": "   ",
+        "similarityFlag": "",
+        "documents": [],
+        "reviewerNotes": ""
+      },
+      "reviews": [
+        {
+          "key": "review1",
+          "enabled": false,
+          "actionLabel": "Enter marks",
+          "note": "Marks unavailable."
+        },
+        {
+          "key": "review2",
+          "enabled": false,
+          "actionLabel": "Enter marks",
+          "note": "Marks unavailable."
+        }
+      ]
+    },
+    {
+      "teamId": "T5",
+      "guideName": "Guide 5",
+      "registerNumbers": [],
+      "title": "Submitted title",
+      "committee": "C1",
+      "titleApproval": {
+        "status": {
+          "tone": "neutral",
+          "label": "Awaiting guide"
+        },
+        "canDecide": false,
+        "submittedTitle": "Submitted title",
+        "similarityFlag": "",
+        "documents": [],
+        "reviewerNotes": ""
+      },
+      "reviews": [
+        {
+          "key": "review1",
+          "enabled": false,
+          "actionLabel": "View marks",
+          "note": "Published"
+        },
+        {
+          "key": "review2",
+          "enabled": false,
+          "actionLabel": "Edit marks",
+          "note": "Completed"
+        }
+      ]
+    }
+  ]
+}

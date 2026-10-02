@@ -1,22 +1,27 @@
 {
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
     "@types/google-apps-script": "^2.0.13",
     "linkedom": "^0.18.13",
-    "lucide-static": "1.47.0"
+    "lucide-static": "1.47.0",
+    "tailwindcss": "^4.3.3"
   },
   "name": "capstone",
   "version": "1.0.0",
   "description": "",
   "main": "common-constants.js",
   "scripts": {
-    "test": "node --test tests/progress-eligibility.test.cjs tests/github-invitation-resend.test.cjs tests/github-identity.test.cjs tests/github-identity-browser.test.cjs tests/announcements-ui.test.cjs tests/publication-events.test.cjs tests/assessment-registry.test.cjs tests/review-academic-policy.test.cjs tests/sheet-reads.test.cjs tests/title-intake.test.cjs tests/milestone-config.test.cjs tests/guide-evaluation.test.cjs tests/dashboard-loading.test.cjs tests/project-schedule.test.cjs tests/review-completion.test.cjs tests/rubric-config.test.cjs tests/assessment-storage-setup.test.cjs tests/weekly-evidence.test.cjs tests/weekly-activity.test.cjs tests/commit-collection.test.cjs tests/weekly-progress.test.cjs tests/weekly-progress-phase2.test.cjs tests/guide-weekly-browser.test.cjs tests/weekly-progress-browser.test.cjs tests/lucide-icons.test.cjs tests/reviewer-evaluation.test.cjs tests/review-evaluation.test.cjs tests/student-github.test.cjs tests/team-github-setup.test.cjs tests/repo-academic-year.test.cjs tests/internal-assessment-publishing.test.cjs tests/internal-publishing-browser.test.cjs tests/invariants/schema-guard.test.cjs tests/invariants/academic-rules.test.cjs",
+    "test": "node --test tests/progress-eligibility.test.cjs tests/github-invitation-resend.test.cjs tests/github-identity.test.cjs tests/github-identity-browser.test.cjs tests/announcements-ui.test.cjs tests/publication-events.test.cjs tests/assessment-registry.test.cjs tests/review-academic-policy.test.cjs tests/sheet-reads.test.cjs tests/title-intake.test.cjs tests/milestone-config.test.cjs tests/guide-evaluation.test.cjs tests/dashboard-loading.test.cjs tests/project-schedule.test.cjs tests/review-completion.test.cjs tests/rubric-config.test.cjs tests/assessment-storage-setup.test.cjs tests/weekly-evidence.test.cjs tests/weekly-activity.test.cjs tests/commit-collection.test.cjs tests/weekly-progress.test.cjs tests/weekly-progress-phase2.test.cjs tests/guide-weekly-browser.test.cjs tests/weekly-progress-browser.test.cjs tests/lucide-icons.test.cjs tests/reviewer-evaluation.test.cjs tests/review-evaluation.test.cjs tests/student-github.test.cjs tests/team-github-setup.test.cjs tests/repo-academic-year.test.cjs tests/internal-assessment-publishing.test.cjs tests/internal-publishing-browser.test.cjs tests/invariants/schema-guard.test.cjs tests/invariants/academic-rules.test.cjs tests/reviewer-migration.test.cjs tests/data-bridge.test.cjs tests/reviewer-view.test.cjs",
     "pull": "npx @google/clasp pull",
     "push": "npx @google/clasp push",
     "watch": "npx @google/clasp push --watch",
     "build:icons": "node scripts/build-icons.cjs",
     "check:icons": "node scripts/build-icons.cjs --check",
     "deploy-staging": "npx @google/clasp push && node -e \"const { execSync } = require('child_process'); const out = execSync('npx @google/clasp version').toString(); const ver = out.match(/\\d+/)[0]; console.log('Deploying Version' + ver + '...'); execSync('npx @google/clasp deploy --deploymentId AKfycbwuH2J9dFnn7pKxUVYFm0_gy7HZPsdSHh_geKYcc7MY1suh7zD3ERHXi5Pw6IVENKY --versionNumber ' + ver + ' --description Version' + ver, { stdio: 'inherit' }); execSync('npx @google/clasp deployments', { stdio: 'inherit' }); console.log('Starting GitHub sync...'); execSync('git add .'); execSync('git commit -m \\\"Version ' + ver + '\\\"', { stdio: 'inherit' }); execSync('git push', { stdio: 'inherit' }); console.log('Successfully deployed and committed Version ' + ver + '!');\"",
-    "test:invariants": "node --test tests/invariants/schema-guard.test.cjs tests/invariants/academic-rules.test.cjs"
+    "test:invariants": "node --test tests/invariants/schema-guard.test.cjs tests/invariants/academic-rules.test.cjs",
+    "build:tailwind": "node scripts/build-tailwind.cjs",
+    "check:tailwind": "node scripts/build-tailwind.cjs --check",
+    "test:migration": "node --test tests/reviewer-migration.test.cjs tests/data-bridge.test.cjs tests/reviewer-view.test.cjs"
   },
   "keywords": [],
   "type": "commonjs"

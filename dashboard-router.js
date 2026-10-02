@@ -96,11 +96,8 @@ function loadDashboardRoleContent_(key) {
     return buildStudentContent(email, teamRow[TS.TEAM_ID], teamRow);
   }
 
-  if (key === 'reviewer') {
-    const committeeNumbers = getCommitteeNumbersForReviewer(email);
-    if (!committeeNumbers.length) throw new Error('You do not have Reviewer access.');
-    return buildReviewerContent(email, getReviewerDashboardData(email));
-  }
+  // The reviewer role loads as a DTO through API_reviewer_getDashboard (reviewer-api.js).
+  if (key === 'reviewer') throw new Error('The reviewer dashboard loads through its data endpoint.');
 
   if (key === 'guide') {
     const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
@@ -155,6 +152,7 @@ function buildDashboardShell(email, views) {
 ${getFunctionalStyles_()}
 </style>
 ${HtmlService.createHtmlOutputFromFile('app-styles').getContent()}
+${HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent()}
 </head>
 <body>
 <header>
@@ -180,6 +178,7 @@ ${systemPanel}
   <div class="drawer-footer" hidden></div>
 </aside>
 <script>
+${getMigratedViewsClientScript_()}
 ${getDashboardClientScript()}
 ${getInternalAssessmentPublishingClientScript_()}
 ${getGuideEvaluationClientScript()}

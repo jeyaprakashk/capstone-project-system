@@ -729,15 +729,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     },error=>{setBusy(false);message(error.message+' Your entries are retained. Retry uses the same request ID until you edit.');});
   }
   function refreshTable() {
-    const host=document.getElementById('reviewerContent');if(!host)return;
-    if(host.getAttribute('aria-busy')==='true')return;
-    const finish=DashboardUI.beginContentLoading(host,'Refreshing assigned teams',{compact:true});
-    const search=document.getElementById('reviewerAssignedSearch'),query=search?search.value:'';
-    rpc('refreshReviewerContentForCurrentUser',[],html=>{
-      finish();
-      host.innerHTML=html;const box=document.getElementById('reviewerAssignedSearch');if(box)box.value=query;
-      DashboardUI.filterReviewerAssignedTeams(false);
-    },()=>{finish();if(drawer.open)message('Evaluation saved. The assigned-team table could not refresh; reload to retry.');});
+    ReviewerView.refresh().then(refreshed=>{if(!refreshed&&drawer.open)message('Evaluation saved. The assigned-team table could not refresh; reload to retry.');});
   }
   function admin() { return InternalAssessmentPublishing.refresh(reviewKey); }
   let studentBusy=false;
