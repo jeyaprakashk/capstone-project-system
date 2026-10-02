@@ -57,8 +57,8 @@ function studentViewBrowser_(bridge, getUi) {
     const disabled = g.captureReady ? '' : ' disabled';
     return '<form data-github-form class="mt-4 flex flex-col gap-2"><label for="studentGithubProfile" class="text-sm font-semibold text-ink">Submit GitHub Account</label>' +
       '<p class="text-sm text-muted">GitHub → <strong>Your profile</strong> → copy the profile URL and paste below.</p>' +
-      '<input id="studentGithubProfile" name="profileUrl" type="url" required maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://github.com/student123" aria-describedby="githubSubmitStatus"' + disabled + ' class="w-full max-w-md rounded-md border border-control px-3 py-2 text-sm">' +
-      '<div><button class="' + PRIMARY + '" type="submit"' + disabled + '>Continue</button></div><div data-github-confirmation hidden></div>' +
+      '<input id="studentGithubProfile" name="profileUrl" type="url" required maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://github.com/student123" aria-describedby="githubSubmitStatus"' + disabled + ' class="w-full max-w-md scroll-mt-20 rounded-md border border-control px-3 py-2 text-sm">' +
+      '<div><button class="' + PRIMARY + '" type="submit"' + disabled + '>Continue</button></div><div data-github-confirmation hidden class="flex max-w-md flex-col gap-3 rounded-tile border border-edge bg-paper p-4"></div>' +
       '<p id="githubSubmitStatus" role="status" aria-live="polite" class="text-sm text-ink-2"></p>' +
       '<div><button id="githubStatusRefresh" class="' + BUTTON + '" type="button" hidden data-action="github-refresh">Refresh GitHub status</button></div></form>';
   }
@@ -81,13 +81,13 @@ function studentViewBrowser_(bridge, getUi) {
     const done = dto.setup.complete;
     const header = '<h3 class="text-base font-semibold text-ink">Project Setup</h3><span class="' + (done ? STEP_BADGE.done : STEP_BADGE.waiting) + '">' + (done ? '&#10003; Complete' : 'Action needed') + '</span>';
     const steps = '<div class="mt-3 flex flex-col gap-3">' + githubCard(dto) + titleCard(dto) + '</div>';
-    if (done) return '<details class="student-project-setup ' + CARD + ' p-4"><summary class="flex cursor-pointer items-center gap-3">' + header + '<span class="setup-view text-sm text-primary">View</span><span class="setup-hide text-sm text-primary">Hide</span></summary>' + steps + '</details>';
+    if (done) return '<details class="student-project-setup group ' + CARD + ' p-4"><summary class="flex cursor-pointer items-center gap-3 [&::-webkit-details-marker]:hidden">' + header + '<span class="setup-view text-sm text-primary group-open:hidden">View</span><span class="setup-hide hidden text-sm text-primary group-open:inline">Hide</span></summary>' + steps + '</details>';
     return '<section class="student-project-setup ' + CARD + ' p-4" aria-label="Project Setup"><header class="flex items-center gap-3">' + header + '</header><div data-setup-pending>' + dto.setup.pendingSteps.map(text => p(escape(text))).join('') + '</div>' + steps + '</section>';
   }
   function weeklyMarkup(ui) {
     return '<section class="mt-4 ' + CARD + ' p-4"><section id="studentWeeklyProgress" aria-label="Weekly progress"><div class="flex items-center justify-between gap-2"><h3 class="text-base font-semibold text-ink">Weekly progress</h3>' +
       '<button type="button" class="' + BUTTON + '" data-weekly-refresh aria-label="Refresh weekly progress" data-action="weekly-refresh">Refresh</button></div>' +
-      '<div data-weekly-read>' + ui.renderSkeleton('panel', 'Loading weekly progress') + '</div><p data-weekly-status role="status" aria-live="polite" class="text-sm text-ink-2"></p><div data-weekly-form></div></section></section>';
+      '<div data-weekly-read class="empty:hidden">' + ui.renderSkeleton('panel', 'Loading weekly progress') + '</div><p data-weekly-status role="status" aria-live="polite" class="text-sm text-ink-2 empty:hidden"></p><div data-weekly-form></div></section></section>';
   }
   function sideMarkup(dto, ui) {
     const a = dto.assessments;

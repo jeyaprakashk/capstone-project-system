@@ -42,7 +42,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
     return '<div class="rounded-card border border-edge border-l-4 bg-paper p-4 shadow-card ' + CARD_TONE[c.tone] + '" data-stat-card' + (c.progress ? ' data-progress-stat' : '') + ' data-completion-tone="' + c.tone + '">' +
       '<div class="flex items-center justify-between gap-2 text-sm font-semibold text-ink-2"><span>' + c.label + '</span>' + icon(c.icon) + '</div>' +
       '<div class="mt-2 flex items-baseline gap-2"><div class="text-kpi font-semibold tabular-nums text-ink" data-stat-value' + (c.ids ? ' id="coordinatorActiveTeams"' : '') + '>' + c.value + '</div>' +
-      '<div class="stat-pct text-sm text-muted"' + (c.ids ? ' id="coordinatorActiveTeamsPct"' : '') + '>' + c.note + '</div></div><div class="mt-2 text-xs text-muted">' + c.detail + '</div></div>';
+      '<div class="stat-pct text-sm text-muted empty:hidden"' + (c.ids ? ' id="coordinatorActiveTeamsPct"' : '') + '>' + c.note + '</div></div><div class="mt-2 text-xs text-muted">' + c.detail + '</div></div>';
   }
   function progressBar(value, total, left, right) {
     return '<div class="h-2 overflow-hidden rounded bg-tint" aria-hidden="true"><span class="block h-full rounded bg-primary" style="width:' + pct(value, total) + '%"></span></div>' +
@@ -199,16 +199,16 @@ function coordinatorViewBrowser_(bridge, getUi) {
       '<div class="mt-3 inline-flex flex-wrap gap-1 rounded-xl bg-tint p-1" data-tracker-filters></div>' +
       '<div class="mt-2"><button class="' + BUTTON + '" type="button" id="weeklyActivityRetry" data-action="activity-retry" hidden>Retry activity</button><p id="weeklyActivityStatus" class="text-xs text-muted" role="status" aria-live="polite"></p></div>' +
       '<div class="mt-3 flex flex-wrap gap-2"><input type="text" id="trackerSearch" class="w-full max-w-md rounded-md border border-control px-3 py-2 text-sm" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" data-action="search"><button class="' + BUTTON + '" type="button" data-action="reset">Reset</button></div>' +
-      '<div class="tracker-table-scroll mt-3 rounded-tile border border-edge" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="w-full border-collapse text-sm"><thead class="bg-soft"></thead><tbody id="trackerBody"></tbody></table></div><div data-tracker-pagination></div></div>';
+      '<div class="tracker-table-scroll max-w-full overflow-x-auto overscroll-x-contain mt-3 rounded-tile border border-edge" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="w-full border-collapse text-sm"><thead class="bg-soft"></thead><tbody id="trackerBody"></tbody></table></div><div data-tracker-pagination></div></div>';
   }
 
   // ---- frame ----
   function drawerMarkup() {
-    return '<div id="teamDrawerBackdrop" class="drawer-scrim" hidden></div>' +
-      '<aside id="teamDrawer" class="drawer" data-tooltip-boundary role="dialog" aria-modal="true" aria-labelledby="teamDrawerTitle" aria-hidden="true" inert hidden>' +
-      '<div class="drawer-header"><div><div class="text-xs font-bold tracking-wider text-muted">TEAM DETAILS</div><div id="teamDrawerTitle" class="text-base font-semibold">Team</div></div>' +
+    return '<div id="teamDrawerBackdrop" class="fixed inset-0 z-40 bg-scrim animate-[fade-in_.15s_cubic-bezier(.2,0,0,1)]" hidden></div>' +
+      '<aside id="teamDrawer" class="fixed inset-y-0 right-0 z-40 flex w-full max-w-[420px] flex-col bg-paper shadow-overlay animate-[slide-in-right_.25s_cubic-bezier(.2,0,0,1)]" data-tooltip-boundary role="dialog" aria-modal="true" aria-labelledby="teamDrawerTitle" aria-hidden="true" inert hidden>' +
+      '<div class="flex items-center justify-between gap-3 border-b border-edge px-5 py-4"><div><div class="text-xs font-bold tracking-wider text-muted">TEAM DETAILS</div><div id="teamDrawerTitle" class="text-base font-semibold">Team</div></div>' +
       '<button type="button" class="' + SMALL + '" data-drawer-close data-action="close-drawer" aria-label="Close">' + icon('x') + '</button></div>' +
-      '<div id="teamDrawerContent" class="team-drawer-content drawer-body" data-drawer-content></div><div class="drawer-footer" hidden></div></aside>';
+      '<div id="teamDrawerContent" class="team-drawer-content flex-1 overflow-auto p-5" data-drawer-content></div><div class="flex justify-end gap-2 border-t border-edge px-5 py-3" hidden></div></aside>';
   }
   function headerMarkup() {
     return '<div class="flex items-start justify-between gap-4"><div><h2 class="text-lg font-semibold text-ink">Coordinator Dashboard</h2><p id="coordUpdated" class="text-sm text-muted">Waiting for data…</p></div>' +

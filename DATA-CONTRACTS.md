@@ -46,6 +46,10 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_coordinator_getCommitteeConfiguration()` / `API_coordinator_getReviewConfiguration()` | Coordinator | none | the existing readiness reports (`valid, state, summary, issues, links, checkedAt`, plus `committees` or `storage`) | `getCoordinatorCommitteeConfiguration` / `getCoordinatorReviewConfiguration` called directly |
 | `API_coordinator_createDefinitions()` / `API_coordinator_prepareStorage()` | Coordinator | none | `{created}` / `{journals:[{label,journal,created,initialized}]}` | `createAssessmentDefinitions` / `prepareReviewAssessmentStorage` called directly |
 | `API_coordinator_syncGithub()` / `API_coordinator_resendInvitations(cursor)` | Coordinator | `cursor` is `''` for the first batch, then the returned `nextCursor` | the existing sync summary / `{results, nextCursor, stopped}` | `syncCoordinatorGithubAccess` / `resendExpiredStudentInvitations` called directly |
+| `API_publishing_get(assessmentId)` / `API_publishing_run(method, input)` | Coordinator | `method` is `publishInternalAssessment` or `reopenInternalAssessment`; `input` carries `requestId`, so a retry is safe | the existing publication report (`ready, config, teams, error`) / the existing publish or reopen result | `loadInternalAssessmentPublishing` / `publishInternalAssessment` / `reopenInternalAssessment` called directly |
+| `API_student_previewGithub(profileUrl)` / `API_student_confirmGithub(token)` / `API_student_completeGithubSetup()` | Student | profile URL; the signed `token` returned by the preview | `{token, account:{githubId, username, displayName, profileUrl, avatarUrl}}` / `{ok, message}` / `{message}` | `previewStudentGithubAccount` / `confirmStudentGithubAccount` / `completeStudentGithubSetup` called directly |
+| `API_shared_getTimeline()` / `API_shared_getRubrics()` | Any dashboard role | none | the existing project timeline (`schedule, milestones …`) / shared rubrics (`assessments …`) | `loadSharedProjectTimeline` / `loadSharedRubrics` called directly |
+| `API_coordinator_getTeamDrawer(teamId, section)` | Coordinator | `section` is `basic`, `progress` or `activity` | the existing team detail for that section (the drawer markup is built in the browser) | `loadCoordinatorDrawerSection` called directly |
 
 For each endpoint record: required role, request fields and validation, the exact
 `data` fields and types, and which server HTML builder it replaces. Each endpoint has
@@ -117,7 +121,7 @@ Contract tests: `tests/system-status-view.test.cjs` and the System Status cases 
 
 Weekly progress, recent logs, assessment results and the GitHub account connection are separate modules that attach to
 placeholders in the view (`#studentWeeklyProgress`, `#studentRecentActivity`, `#studentAssessment-<key>`,
-`#studentGuideEvaluation`, `#studentGithubProfile`); they still call the server directly and are migrated separately.
+`#studentGuideEvaluation`, `#studentGithubProfile`); the GitHub connection uses the endpoints above through the bridge.
 Contract tests: `tests/student-migration.test.cjs` (snapshot `tests/invariants/snapshots/student-legacy-facts.json`,
 captured from the removed HTML for eight states).
 

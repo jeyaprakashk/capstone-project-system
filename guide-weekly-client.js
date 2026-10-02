@@ -7,10 +7,6 @@ function guideWeeklyBrowser_(bridge) {
   const badgeClass = tone=>BADGE+({green:'bg-success-tint text-success ring-success/20',orange:'bg-warning-tint text-warning ring-warning/20',blue:'bg-info-tint text-info ring-info/20',red:'bg-danger-tint text-danger ring-danger/20',gray:'bg-soft text-ink-2 ring-control/20'}[tone] || 'bg-soft text-ink-2 ring-control/20');
   const SMALL='border-0 rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50',SMALL_PRIMARY='border-0 rounded-md bg-primary px-2 py-1 text-xs font-semibold text-paper hover:bg-primary-hover disabled:opacity-50',NAV_BUTTON='border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const message = error=>typeof error === 'string' ? error : error?.message || 'Request failed.';
-  function rpc(method,args,success,failure) {
-    try { DashboardUI.guideRun().withSuccessHandler(success).withFailureHandler(failure)[method](...args); }
-    catch(error) { failure(error); }
-  }
   function current(node) { return node.isConnected && host() === node; }
   function controls(node,disabled) {
     node.querySelectorAll('button,select').forEach(control=>{control.disabled=disabled || control.dataset.weekBoundary==='true';});
@@ -257,9 +253,23 @@ function guideWeeklyBrowser_(bridge) {
       '<button type="button" class="'+NAV_BUTTON+'" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' title="'+(weekIndex===0?'Latest available project week. No more next weeks':'Next week')+'" aria-label="Next week">Next &#8250;</button>'+
       '<span class="'+badgeClass(weekStatus.tone)+'" data-week-status role="status" title="'+esc(weekSummary)+'">'+weekStatus.label+'</span></nav>'+
       (entries.length ? entries.map(entry=>'<article class="group relative mt-3 rounded-lg border border-edge bg-paper p-4" data-weekly-card><div data-entry="'+esc(entry.entryId)+'" data-weekly-summary><header data-weekly-student-header class="flex flex-wrap items-center justify-between gap-3"><div class="flex flex-col"><strong>'+esc(entry.student)+'</strong><small class="text-xs text-muted">'+esc(entry.regNo)+'</small></div><span class="text-sm">AI Quality '+qualityScore(entry.score)+'</span>'+submissionDeadline(node,entry)+'</header>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div><div class="relative bottom-0 z-10 mt-3 flex flex-wrap items-center gap-2 bg-paper py-2 group-data-[sticky-decision=true]:sticky" data-weekly-actions data-sign-entry="'+esc(entry.entryId)+'"><span class="text-sm">Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="'+(status==='DISCUSSED'?SMALL_PRIMARY:SMALL)+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></article>').join(''):'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
-    target.querySelectorAll('[data-week-step]').forEach(button=>button.onclick=()=>{if(node.busy || button.disabled)return;const next=node.data.weeks[weekIndex+Number(button.dataset.weekStep)];if(next){node.week=next;render(node);}});
-    target.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>sign(node,button));
+    attachActions(node);
     reserveActionBarSpace(node);
+  }
+  /** One delegated click listener per host: week navigation, sign-off and its Undo. */
+  function attachActions(node) {
+    if(node.actionsAttached)return;
+    node.actionsAttached=true;
+    node.addEventListener('click',event=>{
+      const button=event.target.closest && event.target.closest('button');
+      if(!button || !node.contains(button))return;
+      if(button.hasAttribute('data-week-step')){
+        if(node.busy || button.disabled)return;
+        const next=node.data.weeks[node.data.weeks.indexOf(node.week)+Number(button.dataset.weekStep)];
+        if(next){node.week=next;render(node);}
+      } else if(button.hasAttribute('data-sign'))sign(node,button);
+      else if(button.hasAttribute('data-sign-undo') && node.undoSign)node.undoSign();
+    });
   }
   function sign(node,button) {
     if(node.busy)return;
@@ -272,12 +282,13 @@ function guideWeeklyBrowser_(bridge) {
     undo.type='button';undo.className=SMALL;undo.textContent='Undo';undo.dataset.signUndo='';
     output.appendChild(undo);
     const timer=setTimeout(()=>{
+      node.undoSign=null;
       if(!current(node)){node.busy=false;return;}
       output.textContent='Saving guide confirmation…';
       saveSignoff(node,entryId,status,output);
     },5000);
-    undo.onclick=()=>{
-      clearTimeout(timer);node.busy=false;controls(node,false);
+    node.undoSign=()=>{
+      node.undoSign=null;clearTimeout(timer);node.busy=false;controls(node,false);
       output.textContent='Decision cancelled. No changes saved.';
       button.focus();
     };
@@ -314,8 +325,16 @@ function weeklyPhase2SetupBrowser_(bridge) {
   const LINE='m-0 mt-1 text-sm text-ink-2';
   function controls(node,disabled) { node.querySelectorAll('button').forEach(button=>{button.disabled=disabled || button.dataset.allowed!=='true';}); }
   function current(node) { return node.isConnected && host()===node; }
+  function attach(node) {
+    if(node.actionsAttached)return;
+    node.actionsAttached=true;
+    node.addEventListener('click',event=>{
+      const button=event.target.closest && event.target.closest('button[data-setup-kind]');
+      if(button && node.contains(button))setup(node,button.dataset.setupKind);
+    });
+  }
   function load() {
-    const node=host();if(!node || node.busy)return;
+    const node=host();if(!node)return;attach(node);if(node.busy)return;
     node.busy=true;controls(node,true);
     const finish=DashboardUI.beginContentLoading(node.querySelector('[data-weekly-setup-read]'),'Checking weekly progress setup',{compact:true,variant:'status'});
     function settle(){finish();node.busy=false;controls(node,false);}
@@ -326,7 +345,7 @@ function weeklyPhase2SetupBrowser_(bridge) {
       const actions=document.createElement('div');actions.className='mt-2 flex flex-wrap gap-2';target.appendChild(actions);
       [['storage',report.storageReady,report.canSetupStorage,'Create weekly progress storage'],['triggers',report.triggerReady!==false,report.canSetupTriggers,'Create weekly AI schedule']].forEach(([kind,ready,allowed,label])=>{
         if(ready)return;
-        const button=document.createElement('button');button.type='button';button.className=PRIMARY;button.textContent=label;button.dataset.allowed=String(allowed);button.disabled=!allowed;button.onclick=()=>setup(node,kind);actions.appendChild(button);
+        const button=document.createElement('button');button.type='button';button.className=PRIMARY;button.textContent=label;button.dataset.allowed=String(allowed);button.disabled=!allowed;button.dataset.setupKind=kind;actions.appendChild(button);
       });
       report.issues.forEach(issue=>{const line=document.createElement('p');line.className=LINE;line.textContent=issue;target.appendChild(line);});
       if(node.readError){node.querySelector('[data-weekly-setup-status]').textContent='';node.readError=false;}

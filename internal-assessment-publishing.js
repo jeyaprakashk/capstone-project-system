@@ -61,3 +61,17 @@ function loadInternalAssessmentPublishing(key) {
   });
   return {ready:true,config,teams,configurationError};
 }
+
+/** Publication card: reads and the publish / reopen requests the card sends. The existing functions authorize and validate. */
+const PUBLISHING_RUN_METHODS_ = {publishInternalAssessment:true, reopenInternalAssessment:true};
+
+function API_publishing_get(key) {
+  return apiHandle_(() => loadInternalAssessmentPublishing(String(key || '')));
+}
+
+function API_publishing_run(method, input) {
+  return apiHandle_(() => {
+    if (!Object.prototype.hasOwnProperty.call(PUBLISHING_RUN_METHODS_, String(method))) throw apiFail_('INVALID_INPUT', 'Unknown publication request.');
+    return globalThis[method](input);
+  });
+}

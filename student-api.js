@@ -97,3 +97,8 @@ function API_student_getReviewResult(key) {
 function API_student_getGuideResult() {
   return apiHandle_(() => loadPublishedGuideEvaluation());
 }
+
+/** GitHub account connection: the existing functions resolve the account, bind it to the student and provision access. */
+function API_student_previewGithub(profileUrl) { return apiHandle_(() => previewStudentGithubAccount(String(profileUrl || ''))); }
+function API_student_confirmGithub(token) { return apiHandle_(() => confirmStudentGithubAccount(String(token || ''))); }
+function API_student_completeGithubSetup() { return apiHandle_(() => completeStudentGithubSetup()); }

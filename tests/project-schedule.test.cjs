@@ -324,33 +324,36 @@ test('unavailable reviews do not produce overdue review alerts or on-track healt
   assert.equal(c.assessProjectTeam_(row,columns,'repo',[],reviews,schedule,now).health,'monitor');
 });
 
-test('drawer sections load independently, retry alone and ignore stale callbacks',()=>{
+test('drawer sections load independently, retry alone and ignore stale callbacks',async()=>{
+  const settle=()=>new Promise(resolve=>setImmediate(resolve));
   const {c}=fixture();const requests=[];
   const element=()=>{const classes=new Set();return {innerHTML:'',children:[],dataset:{},setAttribute(){},querySelector(){return null;},appendChild(child){this.children.push(child);},addEventListener(event,fn){this[event]=fn;},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}};};
   const elements=Object.fromEntries(['teamDrawer','teamDrawerBackdrop','teamDrawerContent','teamDrawerTitle','drawerSection-basic','drawerSection-progress','drawerSection-activity'].map(id=>[id,element()]));
   const document={readyState:'loading',addEventListener(){},getElementById:id=>elements[id],createElement:element,body:element()};
-  const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorDrawerSection(teamId,section){requests.push({...handlers,teamId,section});}};return chain;}};
+  const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},API_coordinator_getTeamDrawer(teamId,section){const {success}=handlers;requests.push({...handlers,success:data=>success(JSON.stringify({ok:true,data})),teamId,section});}};return chain;}};
   const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
   for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','system-status-view.js','student-weekly-view.js','student-results-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript(),browser);
   vm.runInContext("focusCoordinatorTeam('A'); focusCoordinatorTeam('B');",browser);
   assert.deepEqual(requests.map(r=>r.section),['basic','progress','activity','basic','progress','activity']);
-  requests[3].success({title:'Team B project',students:[],reviewers:[]});
+  requests[3].success({title:'Team B project',students:[],reviewers:[]});await settle();
   assert(elements['drawerSection-basic'].innerHTML.includes('Team B project'));
   assert(!elements['drawerSection-basic'].innerHTML.includes('Overall Health'));
-  requests[5].success({weekLogs:4,weekCommits:2});
+  requests[5].success({weekLogs:4,weekCommits:2});await settle();
   assert(elements['drawerSection-activity'].innerHTML.includes('This Week'));
   assert(!elements['drawerSection-activity'].innerHTML.includes('Project</div>'));
-  requests[4].failure({message:'marks unavailable'});
-  elements['drawerSection-progress'].children[0].children[0].click();
+  requests[4].failure({message:'marks unavailable'});await settle();
+  elements['drawerSection-progress'].children[0].children[0].click();await settle();
   assert.equal(requests.length,7);assert.equal(requests[6].section,'progress');
-  requests[6].success({reviews:[],health:'ontrack'});
+  requests[6].success({reviews:[],health:'ontrack'});await settle();
   assert(elements['drawerSection-progress'].innerHTML.includes('Overall Health'));
   const expected=elements['drawerSection-basic'].innerHTML;
-  requests[0].success(null);requests[0].failure({message:'A response'});
+  requests[0].success(null);await settle();requests[0].failure({message:'A response'});await settle();
   assert.equal(elements['drawerSection-basic'].innerHTML,expected);
   vm.runInContext('closeCoordinatorTeamDrawer()',browser);
-  requests[3].success(null);
+  requests[3].success(null);await settle();
   assert.equal(elements['drawerSection-basic'].innerHTML,expected);
+  // Release every held read so the bridge leaves no timers behind.
+  requests.forEach(request=>request.success(null));await settle();
 });
 
 test('each schedule request reads live Milestones without accessing shared caches',()=>{
@@ -435,7 +438,7 @@ function timelineBrowser() {
   const script={get run(){
     const handlers={};
     const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},
-      loadSharedProjectTimeline(){requests.push({type:'timeline',...handlers});},
+      API_shared_getTimeline(){const {success}=handlers;requests.push({type:'timeline',...handlers,success:data=>success(JSON.stringify({ok:true,data}))});},
       loadDashboardRoleContent(role){requests.push({type:'role',role,...handlers});},
       // Migrated reviewer role answers through the data bridge with a response envelope.
       API_reviewer_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'reviewer',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
@@ -502,8 +505,11 @@ test('mobile timeline selects previous current and next without shrinking deskto
   const f=renderedTimeline(offsets);
   assert.deepEqual(Array.from(f.target.querySelectorAll('[data-timeline-mobile="true"]')).map(el=>el.querySelector('strong').textContent),expected.map(i=>'Milestone '+i));
  }
- const css=fs.readFileSync(path.join(__dirname,'..','tailwind-styles.html'),'utf8');
- assert.match(css,/\.timeline-track:not\(\.timeline-full\) \.timeline-stop\[data-timeline-mobile=.?false.?\]\{display:none/);
+ const f=renderedTimeline([-9,-6,-3,0,1,5,9]);
+ const hidden=Array.from(f.target.querySelectorAll('[data-timeline-stop]')).filter(el=>el.getAttribute('class').includes('max-[760px]:hidden'));
+ assert.equal(hidden.length,f.target.querySelectorAll('[data-timeline-mobile="false"]').length);
+ assert(hidden.every(el=>el.dataset.timelineMobile==='false'));
+ assert(require('./compiled-css.cjs').compiled('max-[760px]:hidden'));
 });
 
 test('current timeline handles tomorrow, before start, same-day dates, after end and empty lifecycle',()=>{
@@ -527,7 +533,7 @@ test('full timeline disclosure reveals lifecycle without mutating schedule or di
 
 test('timeline has no carousel or animation styles',()=>{
  const css=fs.readFileSync(path.join(__dirname,'..','tailwind-styles.html'),'utf8');
- assert.match(css,/@media \((max-width:760px|width<=760px)\)/);
+ assert.match(css,/@media (\((max-width:760px|width<=760px|width<760px)\)|not all and \(min-width:760px\))/);
  assert.doesNotMatch(css,/\.timeline-current\{|timeline-nav|\.timeline[^{}]*\{[^}]*animation/);
 });
 
@@ -554,6 +560,19 @@ test('timeline endpoint rejects users without dashboard access',()=>{
   assert.throws(()=>c.loadSharedProjectTimeline(),/Dashboard access/);
   c.getDashboardRoleViews_=()=>[{key:'guide'}];
   assert.equal(c.loadSharedProjectTimeline().milestones.length,7);
+});
+
+test('shared timeline, rubrics and drawer endpoints return the existing data with the existing access messages',()=>{
+  const {c}=fixture();
+  c.Session={getActiveUser:()=>({getEmail:()=> 'outsider@example.com'})};
+  c.getDashboardRoleViews_=()=>[];
+  assert.deepEqual(JSON.parse(c.API_shared_getTimeline()).error,{code:'REJECTED',message:'Dashboard access is required.'});
+  c.getDashboardRoleViews_=()=>[{key:'guide'}];
+  assert.equal(JSON.parse(c.API_shared_getTimeline()).data.milestones.length,7);
+  c.loadSharedRubrics=()=>({assessments:[]});
+  assert.deepEqual(JSON.parse(c.API_shared_getRubrics()).data,{assessments:[]});
+  c.loadCoordinatorDrawerSection=(team,section)=>({team,section});
+  assert.deepEqual(JSON.parse(c.API_coordinator_getTeamDrawer('T1','basic')).data,{team:'T1',section:'basic'});
 });
 
 test('normalization handles whitespace, case, numeric IDs and literal search metacharacters',()=>{
@@ -612,12 +631,12 @@ test('roster synchronization does not duplicate mixed-case or numeric IDs or fla
   assert(messages.includes('Orphaned: (none)'));
 });
 
-test('the legacy role route no longer builds coordinator content; the overview endpoint reads no marks or logs',()=>{
+test('the legacy role route is gone; the overview endpoint reads no marks or logs',()=>{
   const {c}=fixture();
   c.Session={getActiveUser:()=>({getEmail:()=> 'coord@example.com'})};
   c.getCoordinatorEmail=()=> 'coord@example.com';
   c.getConfig=()=> '';
-  assert.throws(()=>c.loadDashboardRoleContent('coord'),/data endpoints/);
+  assert.equal(typeof c.loadDashboardRoleContent,'undefined');
   c.activityIsCoordinator_=()=>true;
   c.console={log(){},error(){}};
   c.getCoordinatorDashboardData_=(defer)=>{if(!defer)throw Error('Overview must not aggregate progress');return {stats:{loading:true,total:0,reviews:{},guideEvaluation:null},teamTrackerData:[],deadlinePills:[]};};

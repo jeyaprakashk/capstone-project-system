@@ -127,7 +127,7 @@ its local snapshot. Config writes invalidate the relevant execution-local values
 Loaded tabs and the shared timeline retain their current page-session behavior:
 switching tabs reuses loaded content, and sequential preloading remains enabled.
 Reloading the page discards that browser state and fetches fresh data. System
-Status and Announcements also retain their explicit Refresh controls.
+Status also retains its explicit Refresh control.
 
 ## Lifecycle and assessment configuration
 
@@ -194,7 +194,7 @@ within the team; absent or ambiguous mappings return null, not a fabricated zero
 Counts represent stored commit records, not unique SHAs (the current collector
 does not store a SHA). Freshness also depends on the commit-import schedule.
 
-Read-only shell, role and announcement endpoints opt into `withDashboardRead_()`.
+Read-only shell and role endpoints opt into `withDashboardRead_()`.
 Authorization and rendering reuse sheet rows within that scope. The scope is
 released in `finally`, including on errors. Write workflows retain live row reads.
 Spreadsheet/sheet handles and column maps are reused within an execution.
@@ -220,10 +220,9 @@ progress and weekly activity, and Student marks, before the next role starts.
 Requests within a role retain their existing concurrency. Drawers and administrative
 actions remain user-triggered. Background rendering does not select a tab or move focus.
 
-Announcements starts alongside the first role. Once its initial request settles
-(success or failure), System Status starts if available. These utility requests
+System Status starts alongside the first role, if available. This utility request
 and callback-triggered follow-up reads do not block the role sequence or reset its
-idle timer. Announcements failure retains its retry action without blocking Status.
+idle timer.
 
 Clicking an unloaded tab starts its request immediately; selecting a pending tab
 reuses its request. The remaining role queue survives tab changes and resumes in
@@ -325,8 +324,8 @@ before reading data. GitHub access/sync, the committee directory, assessment
 readiness, and assessment storage initialization live together in this tab. The Coordinator
 progress dashboard retains summaries, assessments, completion, and the tracker.
 
-System Status loads on first click, or once in the background immediately after
-the initial Announcements request settles, independently of role loading.
+System Status loads on first click, or once in the background alongside the first
+role, independently of role loading.
 Automatic loading respects page visibility and
 `DashboardPerformance.setPreloading(false)`. It does not require opening the
 Coordinator role first. Failed background attempts do not retry automatically;

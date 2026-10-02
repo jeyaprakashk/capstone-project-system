@@ -28,7 +28,11 @@ function fixture(key='review1') {
     guideRun:()=>runner(),ask:async text=>{questions.push(text);return approve;},requestText:async text=>{questions.push(text);return approve?'Correction':null;},
     beginContentLoading:host=>{loading.begun++;host.setAttribute('aria-busy','true');let done=false;return ()=>{if(done)return;done=true;loading.settled++;host.removeAttribute('aria-busy');};}
   }});
-  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js','internal-assessment-publishing-client.js'])vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):fs.readFileSync(file,'utf8'),c);c.DashboardUI.renderIcon=c.renderLucideIcon_;c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;const api=c.internalAssessmentPublishingBrowser_();
+  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js','internal-assessment-publishing-client.js'])vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):fs.readFileSync(file,'utf8'),c);c.DashboardUI.renderIcon=c.renderLucideIcon_;c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;const { Sync } = require('./sync-promise.cjs');
+  const record = (method, args) => { const p = new Sync(); calls.push({ method, args, ok: v => p.resolve(v), fail: e => p.reject(e) }); return p; };
+  const bridge = { read: (key, endpoint, args, options) => { assert.equal(endpoint, 'API_publishing_get'); assert.equal(options.timeoutMs, 120000); return record('loadInternalAssessmentPublishing', args); },
+    write: (endpoint, args) => { assert.equal(endpoint, 'API_publishing_run'); return record(args[0], [args[1]]); } };
+  const api=c.internalAssessmentPublishingBrowser_(bridge);
   const section=()=>document.querySelector('[data-publishing]'),host=()=>document.querySelector('[data-publishing-content]');
   async function load(){const promise=api.refresh(key);calls.at(-1).ok(server.report());await promise;}
   async function settleMutation(call,fail){if(fail)call.fail({message:fail});else {server.report();call.ok(server.c[call.method](call.args[0]));}await flush();}
@@ -146,4 +150,15 @@ test('publishing cards start collapsed and disclosure survives refresh for every
   await f.load();assert.equal(body.hidden,true);assert.equal(toggle.getAttribute('aria-expanded'),'false');
   f.api.toggle(key);assert.equal(body.hidden,false);assert.equal(f.calls.filter(call=>call.method==='loadInternalAssessmentPublishing').length,2);
  }
+});
+
+test('publication card markup uses only compiled Tailwind utilities, no legacy component classes',async()=>{
+  const {missingClasses,renderedClasses}=require('./compiled-css.cjs');
+  const f=fixture();await f.load();
+  f.host().querySelector('[data-details]').click();
+  const used=renderedClasses(f.section()).filter(c=>!/^lucide|^publishing-/.test(c));
+  assert.deepEqual(missingClasses(used),[]);
+  assert.equal(f.section().querySelector('.btn,.table,.table-wrap,.notice,.card'),null);
+  const src=fs.readFileSync('internal-assessment-publishing-client.js','utf8');
+  assert.deepEqual(missingClasses([...src.matchAll(/\b(?:FIELD|SMALL|ICON|ICON_PRIMARY|WRAP|TABLE|BADGE)='([^']+)'/g)].flatMap(m=>m[1].split(/\s+/))),[]);
 });

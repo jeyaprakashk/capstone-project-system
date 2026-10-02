@@ -148,3 +148,14 @@ test('common markup uses compact rows, escapes data, separates permission, and e
   s.open.add('g18');assert.match(api.markup(report,s),/aria-expanded="true"/);
   s.outcomes.set('g18',[{input:{team:'g18'},outcome:'uncertain',error:'Offline'}]);assert.match(api.markup(report,s),/data-state="PARTIAL_OR_EXCEPTION"/);
 });
+
+test('publication endpoints delegate to the existing functions, keep their rules and reject unknown methods',()=>{
+  const f=publishingFixture();f.submit();vm.runInContext(fs.readFileSync('api-envelope.js','utf8'),f.c);
+  f.report();const read=JSON.parse(f.c.API_publishing_get('review1'));assert.equal(read.ok,true);assert.deepEqual(plain(read.data),plain(f.report()));
+  const team=f.report().teams[0],input={assessmentId:'review1',team:team.team,revision:team.revision,requestId:crypto.randomUUID()};
+  const published=JSON.parse(f.c.API_publishing_run('publishInternalAssessment',input));assert.equal(published.ok,true);
+  const stale=JSON.parse(f.c.API_publishing_run('publishInternalAssessment',{...input,requestId:crypto.randomUUID()}));
+  assert.equal(stale.ok,false);assert.equal(stale.error.code,'REJECTED');assert.match(stale.error.message,/changed/);
+  for(const name of ['publishGuideEvaluation','constructor','toString'])assert.equal(JSON.parse(f.c.API_publishing_run(name,input)).error.code,'INVALID_INPUT');
+  f.actor('one@x');assert.match(JSON.parse(f.c.API_publishing_get('review1')).error.message,/Coordinator/);
+});

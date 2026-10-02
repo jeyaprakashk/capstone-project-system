@@ -11,11 +11,11 @@ test('shared sorting handles natural IDs, numeric pairs, missing data and access
  c.initializeTableSorting(table,{state});
  const buttons=table.querySelectorAll('button'), ids=()=>Array.from(table.querySelectorAll('tbody tr')).map(r=>r.firstElementChild.textContent);
  assert.equal(buttons.length,2);
- buttons[0].onclick();assert.deepEqual(ids(),['T1','T2','T3','T10']);
+ buttons[0].click();assert.deepEqual(ids(),['T1','T2','T3','T10']);
  assert.equal(table.querySelector('th').getAttribute('aria-sort'),'ascending');
- buttons[0].onclick();assert.deepEqual(ids(),['T10','T3','T2','T1']);
- buttons[1].onclick();assert.deepEqual(ids(),['T2','T10','T1','T3']);
- buttons[1].onclick();assert.deepEqual(ids(),['T1','T10','T2','T3']);
+ buttons[0].click();assert.deepEqual(ids(),['T10','T3','T2','T1']);
+ buttons[1].click();assert.deepEqual(ids(),['T2','T10','T1','T3']);
+ buttons[1].click();assert.deepEqual(ids(),['T1','T10','T2','T3']);
  assert.equal(table.querySelector('th').getAttribute('aria-sort'),'none');
  assert.match(buttons[1].getAttribute('aria-label'),/ascending/);
  const replacement=table.cloneNode(true);c.initializeTableSorting(replacement,{state});
@@ -28,22 +28,22 @@ function dialogFixture() {
  window.HTMLElement.prototype.focus=function(){document.activeElement=this;};
  const c=vm.createContext({document});
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
- return {document,api:c.dashboardDialogsBrowser_(),overlay:()=>document.querySelector('.overlay')};
+ return {document,api:c.dashboardDialogsBrowser_(),overlay:()=>document.querySelector('[data-dialog-overlay]')};
 }
 test('framework modal queues confirmations, preserves literal text and returns focus',async()=>{
  const f=dialogFixture(),previous=f.document.activeElement;
  const result=f.api.ask('<b>Discard?</b>');
- assert.equal(f.overlay().querySelector('.modal').getAttribute('role'),'dialog');
- assert.equal(f.overlay().querySelector('.modal').getAttribute('aria-modal'),'true');
- assert.equal(f.overlay().querySelector('.modal-body').textContent,'<b>Discard?</b>');
+ assert.equal(f.overlay().querySelector('[data-dialog-modal]').getAttribute('role'),'dialog');
+ assert.equal(f.overlay().querySelector('[data-dialog-modal]').getAttribute('aria-modal'),'true');
+ assert.equal(f.overlay().querySelector('[data-dialog-body]').textContent,'<b>Discard?</b>');
  const queued=f.api.ask('Duplicate');
  assert.doesNotMatch(f.overlay().textContent,/Duplicate/);
- f.overlay().querySelector('.modal-footer button').click();
+ f.overlay().querySelector('[data-dialog-footer] button').click();
  assert.equal(await result,false);await Promise.resolve();
  assert.match(f.overlay().textContent,/Duplicate/);
- f.overlay().querySelector('.modal-footer button').click();assert.equal(await queued,false);
+ f.overlay().querySelector('[data-dialog-footer] button').click();assert.equal(await queued,false);
  assert.equal(f.overlay(),null);assert.equal(f.document.activeElement,previous);
- const next=f.api.ask('Submit?');f.overlay().querySelector('.modal-footer button:last-child').click();assert.equal(await next,true);
+ const next=f.api.ask('Submit?');f.overlay().querySelector('[data-dialog-footer] button:last-child').click();assert.equal(await next,true);
 });
 test('framework modal traps focus and Escape cancels',async()=>{
  const f=dialogFixture(),result=f.api.ask('Close drawer?'),overlay=f.overlay();
@@ -57,25 +57,25 @@ test('framework modal traps focus and Escape cancels',async()=>{
 test('framework prompt validates blank remarks and returns trimmed input',async()=>{
  const f=dialogFixture(),result=f.api.requestText('Reason');
  const input=f.overlay().querySelector('textarea');input.value='   ';
- f.overlay().querySelector('.modal-footer button:last-child').click();
+ f.overlay().querySelector('[data-dialog-footer] button:last-child').click();
  assert.equal(f.overlay().querySelector('[role="alert"]').textContent,'Please enter a remark.');
- input.value=' Evidence ';f.overlay().querySelector('.modal-footer button:last-child').click();
+ input.value=' Evidence ';f.overlay().querySelector('[data-dialog-footer] button:last-child').click();
  assert.equal(await result,'Evidence');
- const cancelled=f.api.requestText('Reason');f.overlay().querySelector('.modal-footer button').click();assert.equal(await cancelled,null);
+ const cancelled=f.api.requestText('Reason');f.overlay().querySelector('[data-dialog-footer] button').click();assert.equal(await cancelled,null);
 });
 test('framework confirmation works without a remote dialog library',async()=>{
  const f=dialogFixture(),result=f.api.ask('Publish?');
  assert.equal(f.document.querySelector('script[src*="sweetalert"]'),null);
- f.overlay().querySelector('.modal-footer button:last-child').click();assert.equal(await result,true);
+ f.overlay().querySelector('[data-dialog-footer] button:last-child').click();assert.equal(await result,true);
 });
 test('danger confirmation uses framework notice, inerts the page and cancels on scrim click',async()=>{
  const f=dialogFixture(),previous=f.document.getElementById('previous');
  const result=f.api.confirmDialog({title:'Delete item',body:'This action removes the item.',confirmText:'Delete',cancelText:'Keep',tone:'danger'});
  const overlay=f.overlay();
- assert.equal(overlay.querySelector('.modal-header h2').textContent,'Delete item');
- assert.match(overlay.querySelector('.notice--danger').textContent,/removes the item/);
- assert.equal(overlay.querySelector('.btn-outline').textContent,'Keep');
- assert.equal(overlay.querySelector('.btn-primary').textContent,'Delete');
+ assert.equal(overlay.querySelector('[data-dialog-header] h2').textContent,'Delete item');
+ assert.match(overlay.querySelector('.bg-danger-tint').textContent,/removes the item/);
+ assert.equal(overlay.querySelector('[data-dialog-cancel]').textContent,'Keep');
+ assert.equal(overlay.querySelector('[data-dialog-confirm]').textContent,'Delete');
  assert.equal(previous.inert,true);
  overlay.click();assert.equal(await result,false);
  assert.notEqual(previous.inert,true);assert.equal(f.document.activeElement,previous);
@@ -83,9 +83,9 @@ test('danger confirmation uses framework notice, inerts the page and cancels on 
 test('notifications wait for an existing confirmation',async()=>{
  const f=dialogFixture(),decision=f.api.ask('Discard?'),notice=f.api.notify('Sync completed','success');
  assert.match(f.overlay().textContent,/Discard/);
- f.overlay().querySelector('.modal-footer button').click();await decision;await Promise.resolve();
+ f.overlay().querySelector('[data-dialog-footer] button').click();await decision;await Promise.resolve();
  assert.match(f.overlay().textContent,/Sync completed/);
- f.overlay().querySelector('.modal-footer button').click();await notice;
+ f.overlay().querySelector('[data-dialog-footer] button').click();await notice;
 });
 test('Coordinator storage setup displays journals, blocks duplicates and retries failures',async()=>{
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body>'+['reviewConfigurationCard','createAssessmentDefinitionsButton','reviewDefinitionsLink','reviewAssessmentReadiness','reviewConfigurationRecheck','initializeAssessmentStorageButton','reviewConfigurationSummary','reviewConfigurationIssues','reviewConfigurationCheckedAt','reviewConfigLink','reviewRubricsLink','assessmentStorageStatus','assessmentStorageResults'].map(id=>'<div id="'+id+'"></div>').join('')+'</body></html>');
@@ -133,19 +133,18 @@ test('Reviewer dashboard opens the shared Review UI directly for arbitrary asses
  assert.deepEqual(calls,[['T1','design_gate',button]]);assert.equal(f.requests.length,0);
 });
 function fixture(system=false) {
- const loadingNode=()=>({attrs:{},children:[],inert:false,setAttribute(k,v){this.attrs[k]=v;},classList:{add(){},remove(){},toggle(){}},appendChild(node){this.children.push(node);node.remove=()=>{this.children=this.children.filter(child=>child!==node);};}});
+ const loadingNode=()=>({attrs:{},children:[],inert:false,setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},classList:{add(){},remove(){},toggle(){}},appendChild(node){this.children.push(node);node.remove=()=>{this.children=this.children.filter(child=>child!==node);};}});
  const requests=[], timers=new Map(), listeners={}; let id=0;
  const panels=['guide','reviewer','coord'].map(key=>({...loadingNode(),innerHTML:'',getAttribute:()=>key}));
- const announcement={...loadingNode(),innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[]};
  const systemContent={...loadingNode(),innerHTML:'',querySelectorAll:()=>[]};
  const systemMessage={textContent:''}, systemRefresh={disabled:false};
- const document={body:loadingNode(),createElement:loadingNode,hidden:false,readyState:'loading',addEventListener(name,fn){(listeners[name] ||= []).push(fn);},getElementById:id=>id==='announcementsContent'?announcement:system?({systemStatusContent:systemContent,systemStatusMessage:systemMessage,systemStatusRefresh:systemRefresh}[id]||null):null,
+ const document={body:loadingNode(),createElement:loadingNode,hidden:false,readyState:'loading',addEventListener(name,fn){(listeners[name] ||= []).push(fn);},getElementById:id=>system?({systemStatusContent:systemContent,systemStatusMessage:systemMessage,systemStatusRefresh:systemRefresh}[id]||null):null,
  querySelector:selector=>panels.find(p=>selector.includes('"'+p.getAttribute()+'"'))||null,
  querySelectorAll:selector=>selector==='[data-role-content]'?panels:[]};
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>{
   // Migrated reviewer role: log it like the role-content request, answering with an envelope.
   if(key==='API_coordinator_getSystemStatus')return requests.push({key:'loadCoordinatorSystemStatus',args,success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
-  const legacy={API_coordinator_getCommitteeConfiguration:'getCoordinatorCommitteeConfiguration',API_coordinator_getReviewConfiguration:'getCoordinatorReviewConfiguration',API_coordinator_createDefinitions:'createAssessmentDefinitions',API_coordinator_prepareStorage:'prepareReviewAssessmentStorage',API_coordinator_syncGithub:'syncCoordinatorGithubAccess',API_coordinator_resendInvitations:'resendExpiredStudentInvitations'}[key];
+  const legacy={API_coordinator_getCommitteeConfiguration:'getCoordinatorCommitteeConfiguration',API_coordinator_getReviewConfiguration:'getCoordinatorReviewConfiguration',API_coordinator_createDefinitions:'createAssessmentDefinitions',API_coordinator_prepareStorage:'prepareReviewAssessmentStorage',API_coordinator_syncGithub:'syncCoordinatorGithubAccess',API_coordinator_resendInvitations:'resendExpiredStudentInvitations',API_shared_getTimeline:'loadSharedProjectTimeline',API_shared_getRubrics:'loadSharedRubrics',API_coordinator_getTeamDrawer:'loadCoordinatorDrawerSection'}[key];
   if(legacy)return requests.push({key:legacy,args,success:value=>success(JSON.stringify({ok:true,data:value})),failure});
   const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getDashboard:'student',API_coordinator_getOverview:'coord'}[key];
   if(migrated)return requests.push({key:'loadDashboardRoleContent',args:[migrated],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
@@ -172,9 +171,9 @@ test('common theme applies to all tabs immediately, cached content and late resp
  const count=roleReads();
  f.click('student');assert.equal(theme(),undefined);
  f.click('guide');assert.equal(theme(),undefined);assert.equal(roleReads(),count);
- f.click('student');f.click('announcements');assert.equal(theme(),undefined);
- f.click('announcements');assert.equal(theme(),undefined);
- f.click('guide');f.click('announcements');assert.equal(theme(),undefined);
+ f.click('student');f.click('rubrics');assert.equal(theme(),undefined);
+ f.click('rubrics');assert.equal(theme(),undefined);
+ f.click('guide');f.click('rubrics');assert.equal(theme(),undefined);
  f.click('student');f.click('system-status');assert.equal(theme(),undefined);
  f.click('student');assert.equal(theme(),undefined);
 });
@@ -184,7 +183,7 @@ test('project timeline appears only in Timeline and Rubrics across tab switches'
  f.c.document.getElementById=id=>id==='sharedProjectTimeline'?timeline:original(id);
  for(const role of ['student','guide','reviewer','coord']) {
   f.click(role);assert.equal(timeline.hidden,true);
-  for(const utility of ['rubrics','announcements','system-status']) {
+  for(const utility of ['rubrics','system-status']) {
    f.click(utility);assert.equal(timeline.hidden,utility !== 'rubrics');
    f.click(role);assert.equal(timeline.hidden,true);
   }
@@ -212,7 +211,7 @@ test('shell selects the common theme before scripts or fonts load',async()=>{
  for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript','getGuideEvaluationClientScript','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_']) c[name]=()=>'';
  for(const key of ['student','guide','reviewer','coord']) {
   const html=c.buildDashboardShell('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
-  assert.match(html,/<body>/);
+  assert.match(html,/<body class="[^"]*">/);
   const {document}=require('linkedom').parseHTML(html);
   assert.equal(document.querySelectorAll('h1').length,1);
   assert.equal(document.querySelector('h1').textContent,'Dashboard');
@@ -225,7 +224,7 @@ test('shell selects the common theme before scripts or fonts load',async()=>{
   assert.doesNotMatch(html,/Source\+Serif\+4|Space\+Grotesk|JetBrains\+Mono|family=Inter/);
  }
  const html=c.buildDashboardShell('preview@example.test',[{key:'student',label:'My Team',contentId:'studentContent'},{key:'guide',label:'Guide',contentId:'guideContent'}]);
- assert.match(html,/<body>/);
+ assert.match(html,/<body class="[^"]*">/);
  assert.match(html,/data-role-tab="rubrics"/);
  assert.match(html,/id="sharedRubrics" hidden/);
  assert.match(html,/data-role-panel="student"/);
@@ -292,10 +291,10 @@ test('rubrics start alongside pending role and timeline, deduplicate and survive
  assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
  assert.match(f.nodes.sharedRubricsContent.innerHTML,/12.5%<span class="rubric-mobile-hidden"> weight<\/span>/);
  assert.match(f.nodes.sharedRubricsContent.innerHTML,/<span class="rubric-mobile-hidden">View rubric<\/span>/);
- const mobileRows=[...f.nodes.sharedRubricsContent.innerHTML.matchAll(/<div class="rubric-mobile-row">([\s\S]*?)<\/button><\/div>/g)];
+ const mobileRows=[...f.nodes.sharedRubricsContent.innerHTML.matchAll(/<div class="rubric-mobile-row[^"]*">([\s\S]*?)<\/button><\/div>/g)];
  assert.equal(mobileRows.length,2);
  assert.match(mobileRows[0][1],/<strong>Review 1<\/strong><span aria-label="[^"]*% weight">/);
- assert.match(mobileRows[0][1],/<button type="button" class="btn btn-sm btn-outline" data-rubric-key="review1"/);
+ assert.match(mobileRows[0][1],/<button type="button" class="[^"]*" data-rubric-key="review1"/);
  assert.equal((mobileRows[0][1].match(/data-rubric-key=/g)||[]).length,1,'only the action button opens the mobile rubric');
  assert.match(mobileRows[1][1],/Rubric not configured/);
  assert.match(mobileRows[1][1],/ disabled>View rubric/);
@@ -308,7 +307,7 @@ test('rubrics appear only in their dedicated tab for every role and after async 
  const pending=f.ui.loadSharedRubrics();
  f.done('loadSharedRubrics',f.data);await pending;
  assert.equal(section.hidden,true);assert.match(content.innerHTML,/data-rubric-key="review1"/);
- for(const role of ['student','guide','reviewer','coord','announcements','system-status']) {
+ for(const role of ['student','guide','reviewer','coord','system-status']) {
   f.click('rubrics');assert.equal(section.hidden,false);
   f.click(role);assert.equal(section.hidden,true);
  }
@@ -332,8 +331,8 @@ test('shared rubric shell follows timeline and reuses responsive drawer styles',
  const router=fs.readFileSync('dashboard-router.js','utf8'), coordinator=fs.readFileSync('coordinator-dashboard.js','utf8');
  assert(router.indexOf('id="sharedRubrics"')>router.indexOf('id="sharedProjectTimeline"'));
  assert(router.indexOf('id="sharedRubrics"')<router.indexOf('${rolePanels}'));
- assert.match(router,/id="rubricDrawer" class="drawer" data-tooltip-boundary role="dialog"/);
- assert.match(router,/id="rubricDrawerBackdrop" class="team-drawer-backdrop drawer-scrim" hidden/);
+ assert.match(router,/id="rubricDrawer" class="[^"]*" data-tooltip-boundary role="dialog"/);
+ assert.match(router,/id="rubricDrawerBackdrop" class="team-drawer-backdrop [^"]*" hidden/);
  assert(!coordinator.includes('${buildRubricsStatusCard_()}'));
 });
 
@@ -372,10 +371,10 @@ test('coordinator drawer shares focus trap, Escape and trigger focus return',asy
  const source=fs.readFileSync('coordinator-view.js','utf8');
  assert.match(source,/id="teamDrawer"[\s\S]*?role="dialog" aria-modal="true" aria-labelledby="teamDrawerTitle"/);
 });
-test('all roles preload in order while announcements remain pending, and are reused',async()=>{
+test('all roles preload in order and are reused',async()=>{
  const f=fixture();f.click('guide');vm.runInContext('DashboardUI.initializeLoading()',f.c);
- assert.deepEqual(f.requests.map(r=>r.key),['loadDashboardRoleContent','loadAnnouncementsForCurrentUser']);
- f.tick();assert.equal(f.requests.length,2);
+ assert.deepEqual(f.requests.map(r=>r.key),['loadDashboardRoleContent']);
+ f.tick();assert.equal(f.requests.length,1);
  f.done('loadDashboardRoleContent');await f.settle();f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
  f.done('loadDashboardRoleContent');await f.settle();f.tick();
  assert.equal(f.requests.at(-1).args[0],'coord');
@@ -393,7 +392,7 @@ test('clicking a pending preload does not duplicate the request; hidden page ski
 test('diagnostics record errors and preloading can be disabled for baseline measurements',async()=>{
  const f=fixture();f.c.window.DashboardPerformance.setPreloading(false);f.click('guide');
  vm.runInContext('DashboardUI.initializeLoading()',f.c);
- f.done('loadDashboardRoleContent');await f.settle();f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));f.tick();
+ f.requests.find(r=>r.key==='loadDashboardRoleContent').failure(new Error('offline'));await f.settle();f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
  assert(f.c.window.DashboardPerformance.snapshot().some(e=>e.event==='request'&&!e.ok));
 });
@@ -429,7 +428,7 @@ test('Student background results finish before the next role and are not repeate
  doc.querySelectorAll=selector=>selector==='[data-role-content]'?[queryAll(selector)[0],student,queryAll(selector)[1]]:
   selector==='[data-review-result]'?[{dataset:{reviewResult:'review1'}}]:queryAll(selector);
  const ui=vm.runInContext('DashboardUI',f.c);
- vm.runInContext("StudentResults.all=()=>{DashboardUI.guideRun().withSuccessHandler(()=>{}).loadPublishedGuideEvaluation();DashboardUI.guideRun().withSuccessHandler(()=>{}).loadPublishedReviewEvaluation('review1');}",f.c);
+ vm.runInContext("StudentResults.all=()=>{DashboardUI.run().withSuccessHandler(()=>{}).loadPublishedGuideEvaluation();DashboardUI.run().withSuccessHandler(()=>{}).loadPublishedReviewEvaluation('review1');}",f.c);
  f.click('guide');f.done('loadDashboardRoleContent');await f.settle();f.tick();
  f.done('loadDashboardRoleContent');await f.settle();f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
@@ -443,7 +442,7 @@ test('Student background results finish before the next role and are not repeate
 
 test('utilities and role queue resume after visibility and preload setting changes',async()=>{
  const f=fixture(true);f.click('guide');vm.runInContext('DashboardUI.initializeLoading()',f.c);
- f.c.document.hidden=true;f.done('loadAnnouncementsForCurrentUser');f.done('loadDashboardRoleContent');await f.settle();f.tick();
+ f.c.document.hidden=true;f.done('loadDashboardRoleContent');await f.settle();f.tick();
  assert.equal(f.requests.length,2);
  f.c.window.DashboardPerformance.setPreloading(false);f.c.document.hidden=false;f.fire('visibilitychange');f.tick();
  assert.equal(f.requests.length,2);
@@ -455,10 +454,10 @@ test('utilities and role queue resume after visibility and preload setting chang
 test('System Status follow-up reads do not block roles or reset their idle timer',async()=>{
  const f=fixture(true);const ui=vm.runInContext('DashboardUI',f.c);
  f.systemContent.querySelectorAll=selector=>selector==='[data-publishing]'?[{dataset:{publishing:'review1'}}]:[];
- f.c.InternalAssessmentPublishing={refresh:()=>ui.guideRun().withSuccessHandler(()=>{
-  ui.guideRun().withSuccessHandler(()=>{}).utilityFollowup();
+ f.c.InternalAssessmentPublishing={refresh:()=>ui.run().withSuccessHandler(()=>{
+  ui.run().withSuccessHandler(()=>{}).utilityFollowup();
  }).publishingRead()};
- f.click('guide');ui.initializeLoading();f.done('loadAnnouncementsForCurrentUser');
+ f.click('guide');ui.initializeLoading();
  f.done('loadCoordinatorSystemStatus');f.done('loadDashboardRoleContent');await f.settle();
  f.done('publishingRead');f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
  f.done('loadDashboardRoleContent');await f.settle();f.tick();assert.equal(f.requests.at(-1).args[0],'coord');
@@ -477,12 +476,12 @@ test('hidden preloaded panels use full skeletons while visible short controls st
  for(const [initialHeight,compact,variant] of [[0,false,'panel'],[60,false,'inline'],[180,false,'panel'],[60,true,'panel']]) {
   height=initialHeight;
   const finish=ui.beginContentLoading(host,'Loading tab',{compact});
-  const overlay=host.querySelector('.app-loading-overlay');
+  const overlay=host.querySelector('[data-loading-overlay]');
   assert(overlay.querySelector('.app-skeleton--'+variant));
   assert.equal(overlay.querySelectorAll('.sr-only').length,1);
   assert.equal(overlay.querySelector('.sr-only').textContent,'Loading');
   assert.equal(overlay.querySelector('.app-skeleton').getAttribute('aria-busy'),'true');
-  assert(overlay.querySelector(variant==='inline'?'.spinner--sm':'.skeleton[aria-hidden="true"]'));
+  assert(overlay.querySelector(variant==='inline'?'.app-skeleton--inline [aria-hidden="true"]':'[data-skeleton]'));
   assert.equal(button.inert,true);
   if(initialHeight===0){height=180;assert.equal(overlay.querySelectorAll('.app-skeleton-lines > span').length,3);}
   finish();finish();assert.equal(host.children.length,1);assert.equal(host.firstElementChild,button);
@@ -498,12 +497,12 @@ test('compact refresh uses the initial skeleton and restores the original conten
  const finish=vm.runInContext('DashboardUI',f.c).beginContentLoading(host,'Refreshing assigned teams',{compact:true});
  const rows=host.querySelectorAll('.app-skeleton-lines > span');
  assert.equal(rows.length,3);
- assert(host.classList.contains('app-content-loading--compact'));
+ assert(host.hasAttribute('data-loading-compact'));
  assert.equal(host.firstElementChild,button);assert.equal(button.inert,true);
  finish();finish();
  assert.equal(host.children.length,1);assert.equal(host.firstElementChild,button);
  assert.equal(host.getAttribute('aria-busy'),'false');
- assert(!host.classList.contains('app-content-loading--compact'));
+ assert(!host.hasAttribute('data-loading-compact'));
 });
 
 test('GitHub status refresh uses compact student loading and restores content after failure',async()=>{
@@ -516,13 +515,13 @@ test('GitHub status refresh uses compact student loading and restores content af
  const ui=vm.runInContext('DashboardUI',f.c);
  ui.refreshGithubStatus();ui.refreshGithubStatus();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
- assert(host.classList.contains('app-content-loading--compact'));
+ assert(host.hasAttribute('data-loading-compact'));
  assert.equal(host.querySelectorAll('.app-skeleton-lines > span').length,3);
  assert.equal(button.inert,true);
  const request=f.requests.at(-1);request.done=true;request.failure(new Error('offline'));await f.settle();
  assert.equal(host.firstElementChild,button);assert(!button.inert);
  assert.equal(host.getAttribute('aria-busy'),'false');
- assert(!host.classList.contains('app-content-loading--compact'));
+ assert(!host.hasAttribute('data-loading-compact'));
  ui.refreshGithubStatus();f.done('loadDashboardRoleContent','Updated student');await f.settle();
  assert.equal(host.innerHTML,'Updated student');
  assert.equal(host.getAttribute('aria-busy'),'false');
@@ -542,11 +541,9 @@ test('shared loading preserves live children and restores interaction on repeate
  assert.equal(host.attrs['aria-busy'],'false');assert.equal(host.children.length,2);
 });
 
-test('System Status starts after announcements settle while the role is still pending',async()=>{
+test('System Status starts in the utility lane while the role is still pending',async()=>{
  const f=fixture(true);f.click('guide');vm.runInContext('DashboardUI.initializeLoading()',f.c);f.tick();
- assert(!f.requests.some(r=>r.key==='loadCoordinatorSystemStatus'));
- f.requests.find(r=>r.key==='loadAnnouncementsForCurrentUser').failure(new Error('offline'));
- assert.equal(f.requests.at(-1).key,'loadCoordinatorSystemStatus');
+ assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,1);assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
  f.done('loadDashboardRoleContent');await f.settle();f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
  f.click('system-status');assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,1);
  f.done('loadCoordinatorSystemStatus','system cards');await f.settle();f.click('system-status');
@@ -736,4 +733,12 @@ test('configuration grids share columns across unequal counts and observer clean
  const c=vm.createContext({byId:id=>grids[id],ResizeObserver:class{constructor(fn){callback=fn;}observe(){}disconnect(){disconnected++;}}});vm.runInContext(helper,c);
  for(const count of [0,1,3,5,6,20]){grids.committeeReadinessGrid.children=Array(count);grids.reviewAssessmentReadiness.children=Array(count+2);c.arrangeAssessmentReadiness();assert.equal(grids.committeeReadinessGrid.style.gridTemplateColumns,'repeat(3, minmax(0, 1fr))');assert.equal(grids.committeeReadinessGrid.style.gridTemplateColumns,grids.reviewAssessmentReadiness.style.gridTemplateColumns);}
  grids.reviewAssessmentReadiness.clientWidth=400;callback();assert.equal(grids.committeeReadinessGrid.style.gridTemplateColumns,'repeat(1, minmax(0, 1fr))');c.disconnectConfigurationGrids();assert.equal(disconnected,6);
+});
+
+test('the shell markup has no inline handlers and no legacy component classes; actions are delegated',()=>{
+  const router=fs.readFileSync('dashboard-router.js','utf8'),helpers=fs.readFileSync('common-helpers.js','utf8'),client=fs.readFileSync('dashboard-client-scripts.js','utf8');
+  for(const [name,src] of [['router',router],['helpers',helpers]])assert.doesNotMatch(src,/\son(click|change|input|keydown|submit)=/i,name);
+  assert.doesNotMatch(router,/class="(?:[^"]*\s)?(tab|tabs|tabpanel|card|drawer|drawer-header|drawer-body|drawer-footer|drawer-scrim)(?:\s[^"]*)?"/);
+  for(const hook of ["closest('[data-role-tab]')","closest('#roleMenuToggle')","closest('#rubricDrawerClose')","closest('[data-shell-refresh]')"])assert(client.includes(hook),hook);
+  assert(helpers.includes('data-shell-refresh="${escapeHtml(key)}"'));
 });

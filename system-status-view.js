@@ -8,7 +8,7 @@
 function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
   'use strict';
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const icon = (name, label) => getUi().renderIcon(name, label);
+  const icon = (name, label, extra) => getUi().renderIcon(name, label, extra);
   const skeleton = (variant, label) => getUi().renderSkeleton(variant, label);
 
   const CARD = 'rounded-card border border-edge bg-paper p-4 shadow-card';
@@ -31,7 +31,7 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
       '<div class="mt-3"><button type="button" class="' + PRIMARY + '" data-action="resend">Resend expired student invitations</button></div>' +
       '<p data-resend-status role="status" aria-live="polite" class="mt-2 text-sm text-ink-2"></p>' +
       '<details data-resend-log hidden class="mt-2"><summary class="cursor-pointer text-sm font-semibold">View student invitation log</summary>' +
-      '<div data-resend-results data-tooltip-boundary class="tracker-table-scroll mt-2 rounded-tile border border-edge" role="region" aria-label="Student invitation results" tabindex="0"></div>' +
+      '<div data-resend-results data-tooltip-boundary class="tracker-table-scroll max-w-full overflow-x-auto overscroll-x-contain mt-2 rounded-tile border border-edge" role="region" aria-label="Student invitation results" tabindex="0"></div>' +
       '<nav aria-label="Pagination" class="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-muted"><span id="studentInvitationsPaginationInfo">Showing 0 - 0 of 0 students</span>' +
       '<label class="flex items-center gap-2">Rows per page <select id="studentInvitationsPageSize" data-action="resend-size" class="rounded-md border border-control px-2 py-1"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="all">All</option></select></label>' +
       '<div id="studentInvitationsPaginationButtons" class="flex items-center gap-1" aria-label="Student table pages"></div></nav></details></section>';
@@ -39,7 +39,7 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
   function publishingCard(item) {
     const key = escape(item.key), title = escape(item.title);
     return '<section class="' + CARD + '" data-publishing="' + key + '" aria-labelledby="' + key + 'PublishingHeading"><header class="flex items-center justify-between gap-3"><h3 id="' + key + 'PublishingHeading" class="text-base font-semibold text-ink">' + title + '</h3>' +
-      '<button type="button" class="publishing-toggle ' + BUTTON + '" data-publishing-toggle aria-expanded="false" aria-controls="' + key + 'PublishingBody" aria-label="Expand ' + title + ' publishing" data-action="publishing-toggle" data-key="' + key + '">' + icon('chevron-down') + '</button></header>' +
+      '<button type="button" class="publishing-toggle group ' + BUTTON + '" data-publishing-toggle aria-expanded="false" aria-controls="' + key + 'PublishingBody" aria-label="Expand ' + title + ' publishing" data-action="publishing-toggle" data-key="' + key + '">' + icon('chevron-down', '', 'group-aria-expanded:rotate-180') + '</button></header>' +
       '<div id="' + key + 'PublishingBody" data-publishing-body hidden><div class="mt-3 flex flex-wrap items-center gap-3"><p class="text-sm text-ink-2">Publish internal assessment results using the assessment\'s existing publication rules.</p>' +
       '<button class="' + BUTTON + '" type="button" data-refresh data-action="publishing-refresh" data-key="' + key + '">Refresh evaluations</button></div>' +
       '<div data-notice role="status" aria-live="polite"></div><div data-publishing-content>' + skeleton('panel', 'Reading ' + item.title + ' publication status') + '</div></div></section>';
@@ -58,11 +58,11 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
       '<ul id="reviewConfigurationIssues" hidden class="mt-2 list-disc pl-5 text-sm text-danger"></ul>' +
       '<div class="mt-2"><button class="' + BUTTON + '" type="button" id="createAssessmentDefinitionsButton" hidden disabled data-action="bootstrap-definitions">Create assessment definitions tab</button></div>' +
       note('First create the definitions schema, then use Assessment definitions to enter the academic configuration. Setup never supplies assessment instances or policy choices.') +
-      '<ul id="reviewAssessmentReadiness" aria-label="Readiness by assessment" class="list mt-2 grid gap-2"></ul>' +
+      '<ul id="reviewAssessmentReadiness" aria-label="Readiness by assessment" class="m-0 mt-2 grid list-none gap-2 p-0"></ul>' +
       note('Storage readiness is separate from team entry availability, which also checks reviewer assignment, opening dates and prerequisites.') +
       '<div id="assessmentStorageSetup" class="mt-3"><div>' + note('Prepare configured assessment journals. Existing assessment data stays unchanged.') +
       '<div class="mt-2"><button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="' + PRIMARY + '" data-action="storage-init">Create missing assessment storage</button></div></div>' +
-      '<p id="assessmentStorageStatus" role="status" aria-live="polite" class="mt-2 text-sm text-ink-2"></p><ul id="assessmentStorageResults" class="mt-1 text-sm"></ul></div>' +
+      '<p id="assessmentStorageStatus" role="status" aria-live="polite" class="mt-2 text-sm text-ink-2 empty:hidden"></p><ul id="assessmentStorageResults" class="mt-1 text-sm empty:hidden"></ul></div>' +
       '<div id="weeklyPhase2Setup" class="mt-4"><h4 class="m-0 text-sm font-semibold text-ink">Weekly progress setup</h4><div data-weekly-setup-read>' + skeleton('status', 'Checking weekly progress setup') + '</div>' +
       '<p data-weekly-setup-status role="status" aria-live="polite" class="text-sm text-ink-2"></p></div>' +
       '<div class="mt-3 flex flex-wrap items-center gap-3">' + link('reviewDefinitionsLink', 'Assessment definitions') + link('reviewConfigLink', 'Milestones') + link('reviewRubricsLink', 'Rubric criteria') + '<span id="reviewConfigurationCheckedAt" class="text-xs text-muted"></span></div></section>';
@@ -75,8 +75,8 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
         ? committee.members.map((m, i) => '<li class="flex items-center gap-2 py-1"><span class="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold text-paper ' + AVATAR[i % 3] + '" aria-hidden="true">' + escape((m.name || m.email).slice(0, 1).toUpperCase()) + '</span>' +
           '<div class="flex flex-col"><strong>' + escape(m.name || 'Name not provided') + '</strong><span class="text-xs text-muted">' + escape(m.email || 'Email not provided') + '</span></div></li>').join('')
         : '<li class="py-1 text-sm text-muted">No reviewers assigned.</li>';
-      return '<details class="committee-item rounded-tile border border-edge bg-paper px-4 py-3" data-committee-key="' + escape(String(committee.number ?? '').trim().toLowerCase()) + '">' +
-        '<summary class="flex cursor-pointer items-center justify-between gap-2"><span class="flex flex-col font-semibold">Committee ' + escape(committee.number) + '<small class="text-xs font-normal text-muted">' + committee.members.length + ' reviewers · ' + committee.teams.length + ' teams</small></span><span aria-hidden="true" class="committee-chevron">' + icon('chevron-down') + '</span></summary>' +
+      return '<details class="committee-item group overflow-hidden rounded-tile border border-edge bg-paper px-4 py-3" data-committee-key="' + escape(String(committee.number ?? '').trim().toLowerCase()) + '">' +
+        '<summary class="flex cursor-pointer items-center justify-between gap-2 [&::-webkit-details-marker]:hidden"><span class="flex flex-col font-semibold">Committee ' + escape(committee.number) + '<small class="text-xs font-normal text-muted">' + committee.members.length + ' reviewers · ' + committee.teams.length + ' teams</small></span><span aria-hidden="true" class="committee-chevron group-open:rotate-180">' + icon('chevron-down') + '</span></summary>' +
         '<div class="mt-2"><ul class="m-0 list-none p-0 text-sm">' + members + '</ul><div class="mt-2 text-sm"><span class="font-semibold text-ink-2">Assigned teams</span><div class="mt-1 flex flex-wrap gap-1">' +
         (committee.teams.length ? committee.teams.map(team => '<span class="rounded-md bg-tint px-2 py-0.5 text-xs font-semibold text-primary">' + escape(team) + '</span>').join('') : 'No teams assigned') + '</div></div></div></details>';
     }).join('');

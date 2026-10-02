@@ -206,7 +206,7 @@ test('coordinator report lists team statuses and totals without requiring review
 });
 test('browser source is serializable and uses shared drawer layout',()=>{
   const c=vm.createContext({});vm.runInContext(fs.readFileSync('review-academic-policy.js','utf8'),c);vm.runInContext(fs.readFileSync('review-evaluation-client.js','utf8'),c);
-  new vm.Script(c.getReviewEvaluationClientScript_());assert.match(c.getReviewEvaluationClientScript_(),/className='open review-drawer'/);
+  new vm.Script(c.getReviewEvaluationClientScript_());assert.match(c.getReviewEvaluationClientScript_(),/className='open review-drawer[^']*'/);
 });
 
 test('Review 2 checks history on load and save, and reopening removes completion',()=>{

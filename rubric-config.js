@@ -168,3 +168,5 @@ function getAssessmentRubricReadiness_(rows, definitions) {
   });
   return {reports,structure:Object.freeze(structure),issues};
 }
+
+function API_shared_getRubrics() { return apiHandle_(() => loadSharedRubrics()); }

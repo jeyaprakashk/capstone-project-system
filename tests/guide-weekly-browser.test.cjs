@@ -27,7 +27,7 @@ test('guide list defaults latest week, escapes content, renders absent score and
   assert.match(f.host.textContent,/—/);assert.equal(f.host.querySelector('[data-decision-status]'),null);assert.equal(f.host.querySelector('script'),null);
   assert.equal(f.host.querySelector('[data-entry] b'),null);
   f.host.querySelectorAll('[data-sign],[data-details]').forEach(button=>assert.match(button.className,/\btext-xs\b.*\bpx-2\b|\bpx-2\b.*\btext-xs\b/));
-  f.host.querySelector('[data-week-step="1"]').onclick();
+  f.host.querySelector('[data-week-step="1"]').click();
   assert(f.host.querySelector('[data-weekly-student-header] > [data-weekly-deadline]'));
   assert.match(f.host.textContent,/0\/10/);assert.equal(f.host.querySelector('[data-sign="DISCUSSED"]').getAttribute('aria-pressed'),'true');
   assert.deepEqual(f.counts(),[1,1]);
@@ -38,7 +38,7 @@ test('guide required counts exclude ineligible and voluntary students without hi
  f.data.entries.push({...f.data.entries[0],entryId:'voluntary',regNo:'002',student:'Voluntary student',status:'DISCUSSED'});
  f.api.load();f.reply();assert.match(f.host.querySelector('[data-week-status]').title,/1\/1 required submitted/);
  assert.equal(f.host.querySelectorAll('[data-entry]').length,2);
- f.host.querySelector('[data-week-step="1"]').onclick();assert.match(f.host.querySelector('[data-week-status]').title,/0\/0 required submitted/);
+ f.host.querySelector('[data-week-step="1"]').click();assert.match(f.host.querySelector('[data-week-status]').title,/0\/0 required submitted/);
 });
 
 test('weekly timeliness badges use recorded status and shared semantic colors',()=>{
@@ -117,10 +117,10 @@ test('initial read failure retries and detached responses do not update the scre
 
 test('guide sign-off blocks duplicates, retains choice on failure and displays successful confirmation',()=>{
   const f=fixture();f.api.load();f.reply();let button=f.host.querySelector('[data-sign="NOT_DISCUSSED"]');
-  button.onclick();button.onclick();assert.equal(f.requests.length,1);f.flush();assert.equal(f.requests.length,2);assert.equal(f.requests[1].method,'submitWeeklyGuideSignoff');
+  button.click();button.click();assert.equal(f.requests.length,1);f.flush();assert.equal(f.requests.length,2);assert.equal(f.requests[1].method,'submitWeeklyGuideSignoff');
   assert.deepEqual(Array.from(f.requests[1].args),['e2','NOT_DISCUSSED']);
   f.requests[1].failure(Error('stale entry'));assert.equal(f.host.busy,false);assert.match(f.host.textContent,/stale entry/);
-  button.onclick();f.flush();f.requests[2].success({status:'NOT_DISCUSSED',message:'Saved; revisions frozen.'});
+  button.click();f.flush();f.requests[2].success({status:'NOT_DISCUSSED',message:'Saved; revisions frozen.'});
   button=f.host.querySelector('[data-sign="NOT_DISCUSSED"]');assert.equal(button.getAttribute('aria-pressed'),'true');assert.match(f.host.textContent,/revisions frozen/);assert.equal(f.host.querySelector('[data-decision-status]'),null);
 });
 
@@ -129,12 +129,12 @@ test('undo cancels before persistence and releases controls; detached notices ne
   const discussed=f.host.querySelector('[data-sign="DISCUSSED"]');
   assert.match(discussed.className,/\bbg-primary\b/);
   assert.match(f.host.querySelector('[data-sign="NOT_DISCUSSED"]').className,/\bring-line\b/);
-  discussed.onclick();assert.match(f.host.textContent,/will save in 5 seconds/);
+  discussed.click();assert.match(f.host.textContent,/will save in 5 seconds/);
   f.api.load();assert.equal(f.requests.length,1);
-  f.host.querySelector('[data-sign-undo]').onclick();f.flush();
+  f.host.querySelector('[data-sign-undo]').click();f.flush();
   assert.equal(f.requests.length,1);assert.equal(f.host.busy,false);assert.equal(discussed.disabled,false);
   assert.equal(f.data.entries[0].status,'PENDING');assert.match(f.host.textContent,/No changes saved/);
-  discussed.onclick();f.host.remove();f.flush();assert.equal(f.requests.length,1);
+  discussed.click();f.host.remove();f.flush();assert.equal(f.requests.length,1);
 });
 
 test('full answers, AI ratings and commit date/message/SHA are visible without disclosure buttons',()=>{
@@ -223,11 +223,11 @@ function setupFixture() {
 test('weekly setup hides each completed action and rechecks after setup without duplicate requests',()=>{
   const f=setupFixture();f.api.load();f.api.load();assert.equal(f.requests.length,1);f.requests[0].success(f.report);
   let buttons=f.host.querySelectorAll('button');assert.equal(buttons.length,2);assert.equal(buttons[0].disabled,false);assert.equal(buttons[1].disabled,true);
-  buttons[0].onclick();buttons[0].onclick();assert.equal(f.requests.length,2);assert.equal(f.requests[1].method,'API_coordinator_setupWeekly');assert.deepEqual(Array.from(f.requests[1].args),['storage']);
+  buttons[0].click();buttons[0].click();assert.equal(f.requests.length,2);assert.equal(f.requests[1].method,'API_coordinator_setupWeekly');assert.deepEqual(Array.from(f.requests[1].args),['storage']);
   f.requests[1].success({ok:true});assert.equal(f.requests[2].method,'API_coordinator_getWeeklySetup');
   f.requests[2].success({...f.report,storageReady:true,canSetupStorage:false,canSetupTriggers:true});
   buttons=f.host.querySelectorAll('button');assert.equal(buttons.length,1);assert.match(buttons[0].textContent,/schedule/);
-  buttons[0].onclick();assert.equal(f.requests[3].method,'API_coordinator_setupWeekly');assert.deepEqual(Array.from(f.requests[3].args),['triggers']);f.requests[3].success({ok:true});
+  buttons[0].click();assert.equal(f.requests[3].method,'API_coordinator_setupWeekly');assert.deepEqual(Array.from(f.requests[3].args),['triggers']);f.requests[3].success({ok:true});
   f.requests[4].success({...f.report,storageReady:true,triggerReady:true,canSetupStorage:false});assert.equal(f.host.querySelectorAll('button').length,0);
 });
 
@@ -235,7 +235,7 @@ test('weekly setup read failures preserve content; failed mutations settle and a
   const f=setupFixture();f.api.load();f.requests[0].success(f.report);const button=f.host.querySelector('button');
   f.api.load();f.requests[1].failure(Error('offline'));assert.equal(f.host.querySelector('button'),button);assert.equal(button.disabled,false);
   assert.match(f.host.textContent,/Recheck/);f.api.load();f.requests[2].success(f.report);assert(!f.host.textContent.includes('offline'));
-  f.host.querySelector('button').onclick();f.requests[3].failure(Error('denied'));f.requests[4].success(f.report);
+  f.host.querySelector('button').click();f.requests[3].failure(Error('denied'));f.requests[4].success(f.report);
   assert.match(f.host.textContent,/Setup stopped: denied/);assert.equal(f.host.querySelector('button').disabled,false);
 });
 
@@ -282,11 +282,11 @@ test('week arrows include empty configured weeks, exclude future weeks and retai
   assert.match(f.host.querySelector('[data-week-step="-1"]').title,/Latest available project week/);
   f.api.load();f.requests.at(-1).failure('offline');
   assert.equal(f.host.querySelector('[data-week-step="-1"]').disabled,true);
-  f.host.querySelector('[data-week-step="1"]').onclick();assert.equal(f.host.week,'W2');
-  f.host.querySelector('[data-week-step="1"]').onclick();assert.equal(f.host.week,'W1');
+  f.host.querySelector('[data-week-step="1"]').click();assert.equal(f.host.week,'W2');
+  f.host.querySelector('[data-week-step="1"]').click();assert.equal(f.host.week,'W1');
   assert.equal(f.host.querySelector('[data-week-step="1"]').disabled,true);
   assert.match(f.host.querySelector('[data-week-step="1"]').title,/First project week/);
-  f.host.querySelector('[data-week-step="-1"]').onclick();assert.equal(f.host.week,'W2');
+  f.host.querySelector('[data-week-step="-1"]').click();assert.equal(f.host.week,'W2');
 });
 
 
@@ -319,7 +319,7 @@ test('default week prioritizes oldest pending decision for the selected team, ot
   f.api.load();f.reply();assert.equal(f.host.week,'W1');
   f.api.selectTeam('B');assert.equal(f.host.week,'W3');
   f.api.selectTeam('A');assert.equal(f.host.week,'W1');
-  f.host.querySelector('[data-week-step="-1"]').onclick();assert.equal(f.host.week,'W2');
+  f.host.querySelector('[data-week-step="-1"]').click();assert.equal(f.host.week,'W2');
   f.api.selectView('documents');f.api.selectView('weekly');assert.equal(f.host.week,'W2');
   f.data.entries[1].status='NOT_DISCUSSED';f.api.load();f.reply();assert.equal(f.host.week,'W2');
   f.data.entries[0].status='DISCUSSED';f.api.load();f.reply();assert.equal(f.host.week,'W3');
@@ -352,7 +352,7 @@ test('team attention combines only guide actions, updates after decisions and di
   const tabBadge=key=>root.querySelector('[data-guide-tab="'+key+'"] [data-guide-tab-attention]');
   assert.equal(tabBadge('weekly').textContent,'1');assert.equal(tabBadge('documents').textContent,'2');
   assert.equal(root.querySelector('[data-guide-tab="title"]').getAttribute('aria-pressed'),'true');
-  f.host.querySelector('[data-sign="DISCUSSED"]').onclick();f.flush();f.requests.at(-1).success({status:'DISCUSSED',message:'Saved'});
+  f.host.querySelector('[data-sign="DISCUSSED"]').click();f.flush();f.requests.at(-1).success({status:'DISCUSSED',message:'Saved'});
   assert.equal(pill('A').textContent,'Title review · 1');assert.equal(tabBadge('weekly').hidden,true);
   root.querySelector('[data-guide-tab="evaluation"]').disabled=false;
   f.api.load();f.reply();

@@ -12,8 +12,7 @@
     "AIProgressAnalysis": "AIProgressAnalysis",
     "COMMITS": "Commits",
     "COMMIT_COLLECTION_STATUS": "CommitCollectionStatus",
-    "FLAGS": "Flags",
-    "ANNOUNCEMENTS": "Announcements"
+    "FLAGS": "Flags"
   },
   "FIELD_DEFINITIONS": {
     "GuideSignoff": {
@@ -130,15 +129,6 @@
       "REVIEWER3_EMAIL": "Reviewer 3 Email",
       "REVIEWER4_NAME": "Reviewer 4 Name",
       "REVIEWER4_EMAIL": "Reviewer 4 Email"
-    },
-    "ANNOUNCEMENTS": {
-      "TIMESTAMP": "Timestamp",
-      "EMAIL": "Email address",
-      "MESSAGE": "Message",
-      "FILE_LINK": "Document Link (if any to be shared - Optional field)",
-      "STUDENT_VISIBLE": "Visibility to [Project Teams]",
-      "GUIDE_VISIBLE": "Visibility to [Guides]",
-      "REVIEWER_VISIBLE": "Visibility to [Reviewers]"
     },
     "COMMITTEE_TAB": {
       "TEAM_ID": "Team ID",

@@ -14,7 +14,7 @@ const load = (register = 'S1', extra = {}) => ({
   revision: 0, token: 'tok', ...extra });
 
 function setup() {
-  const { document } = parseHTML('<html><body><section id="guideEvaluationEditor" hidden></section></body></html>');
+  const { document, window } = parseHTML('<html><body><section id="guideEvaluationEditor" hidden></section></body></html>');
   const host = document.getElementById('guideEvaluationEditor');
   host.scrollIntoView = () => {};
   const requests = [], asked = [], events = { weekly: [] };
@@ -29,14 +29,14 @@ function setup() {
   vm.runInContext(fs.readFileSync('guide-evaluation-client.js', 'utf8'), ctx);
   const api = ctx.guideEvaluationBrowser_(bridge);
   const flush = () => new Promise(r => setImmediate(r));
-  return { api, host, document, requests, asked, events, flush, setConfirm: v => { confirm = v; }, el: id => document.getElementById(id) };
+  return { api, host, document, window, requests, asked, events, flush, setConfirm: v => { confirm = v; }, el: id => document.getElementById(id) };
 }
 const fieldset = (f, pi) => f.host.querySelector('fieldset[data-pi="' + pi + '"]');
 // linkedom has no select.value setter; define the value the module reads.
 const setValue = (node, value) => Object.defineProperty(node, 'value', { value: String(value), writable: true, configurable: true });
 const fill = (f, pi, level, marks, remark) => {
   const fs_ = fieldset(f, pi); setValue(fs_.querySelector('[data-level]'), level); fs_.querySelector('[data-marks]').value = String(marks); fs_.querySelector('[data-remark]').value = remark;
-  fs_.querySelectorAll('input,select,textarea').forEach(n => n.oninput && n.oninput());
+  fs_.querySelectorAll('input,select,textarea').forEach(n => n.dispatchEvent(new f.window.Event('input', { bubbles: true })));
 };
 
 test('opening reads through the bridge, shows the editor and reports statuses to the weekly workspace', async () => {
@@ -74,7 +74,7 @@ test('level and marks update the permitted range and the total preview', async (
 test('draft save sends the form once, keeps the same request id until the form changes, and reloads on success', async () => {
   const f = setup(); f.api.open('T1', 'S1'); f.requests[0].ok(load('S1', { revision: 2 }));
   fill(f, 'G1', 3, 15, 'fine'); fill(f, 'G2', 2, 12, 'ok');
-  f.el('guideEvalDraft').onclick(); await f.flush();
+  f.el('guideEvalDraft').click(); await f.flush();
   const first = f.requests.at(-1);
   assert.equal(first.method, 'API_guide_saveEvaluationDraft'); assert.equal(first.input.team, 'T1'); assert.equal(first.input.student, 'S1'); assert.equal(first.input.revision, 2); assert.equal(first.input.token, 'tok');
   assert.deepEqual(JSON.parse(JSON.stringify(first.input.scores.G1)), { level: 3, marks: '15', remark: 'fine' });
@@ -82,10 +82,10 @@ test('draft save sends the form once, keeps the same request id until the form c
   first.fail({ message: 'network' }); await f.flush();
   assert.match(f.el('guideEvalMessage').textContent, /network.*same request ID/);
   assert.equal(f.el('guideEvalDraft').disabled, false); assert.equal(fieldset(f, 'G1').querySelector('[data-marks]').value, '15');
-  f.el('guideEvalDraft').onclick(); await f.flush();
+  f.el('guideEvalDraft').click(); await f.flush();
   assert.equal(f.requests.at(-1).input.requestId, first.input.requestId);
   f.requests.at(-1).fail({ message: 'again' }); await f.flush();
-  fill(f, 'G1', 4, 17, 'better'); f.el('guideEvalDraft').onclick(); await f.flush();
+  fill(f, 'G1', 4, 17, 'better'); f.el('guideEvalDraft').click(); await f.flush();
   const third = f.requests.at(-1); assert.notEqual(third.input.requestId, first.input.requestId);
   const before = f.requests.length; third.ok({ status: 'Draft' }); await f.flush();
   assert.equal(f.requests.length, before + 1); assert.equal(f.requests.at(-1).method, 'API_guide_getEvaluation');
@@ -94,9 +94,9 @@ test('draft save sends the form once, keeps the same request id until the form c
 test('submit asks for confirmation first and sends the submit endpoint', async () => {
   const f = setup(); f.api.open('T1', 'S1'); f.requests[0].ok(load());
   fill(f, 'G1', 3, 15, 'fine'); fill(f, 'G2', 2, 12, 'ok');
-  f.setConfirm(false); f.el('guideEvalSubmit').onclick(); await f.flush();
+  f.setConfirm(false); f.el('guideEvalSubmit').click(); await f.flush();
   assert.match(f.asked[0], /Submit this student/); assert.equal(f.requests.length, 1);
-  f.setConfirm(true); f.el('guideEvalSubmit').onclick(); await f.flush();
+  f.setConfirm(true); f.el('guideEvalSubmit').click(); await f.flush();
   assert.equal(f.requests.at(-1).method, 'API_guide_submitEvaluation');
 });
 
@@ -112,11 +112,11 @@ test('switching students or closing asks before discarding unsaved changes', asy
   const f = setup(); f.api.open('T1', 'S1'); f.requests[0].ok(load());
   fill(f, 'G1', 3, 15, 'fine');
   f.setConfirm(false);
-  setValue(f.el('guideEvalStudent'), 'S2'); f.el('guideEvalStudent').onchange({ target: f.el('guideEvalStudent') }); await f.flush();
+  setValue(f.el('guideEvalStudent'), 'S2'); f.el('guideEvalStudent').dispatchEvent(new f.window.Event('change', { bubbles: true })); await f.flush();
   assert.match(f.asked.at(-1), /Discard unsaved evaluation changes/); assert.equal(f.requests.length, 1);
-  f.el('guideEvalClose').onclick(); await f.flush();
+  f.el('guideEvalClose').click(); await f.flush();
   assert.equal(f.host.hidden, false);
-  f.setConfirm(true); f.el('guideEvalClose').onclick(); await f.flush();
+  f.setConfirm(true); f.el('guideEvalClose').click(); await f.flush();
   assert.equal(f.host.hidden, true); assert.equal(f.host.dataset.team, undefined);
   assert.deepEqual(f.events.weekly.at(-1), ['view', 'title']);
 });

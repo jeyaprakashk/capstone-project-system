@@ -466,113 +466,6 @@ function getCommitteeNumbersForReviewer(email) {
 }
 
 // ===================================================================
-// ANNOUNCEMENTS HELPERS
-// ===================================================================
-function getAllAnnouncements_() {
-  const ANN = getColumnMap(SHEET_NAMES.ANNOUNCEMENTS, FIELD_DEFINITIONS.ANNOUNCEMENTS);
-  return getSheetRows(SHEET_NAMES.ANNOUNCEMENTS)
-    .filter(r => String(r[ANN.MESSAGE] || '').trim())
-    .map(r => ({
-      message: r[ANN.MESSAGE],
-      fileLink: r[ANN.FILE_LINK],
-      timestamp: r[ANN.TIMESTAMP],
-      postedBy: r[ANN.EMAIL],
-      studentVisible: String(r[ANN.STUDENT_VISIBLE] || '').trim().toLowerCase() === 'yes',
-      guideVisible: String(r[ANN.GUIDE_VISIBLE] || '').trim().toLowerCase() === 'yes',
-      reviewerVisible: String(r[ANN.REVIEWER_VISIBLE] || '').trim().toLowerCase() === 'yes'
-    }))
-    .reverse();
-}
-
-function formatAnnouncementTimestamp_(value) {
-  if (!value) return '';
-  const d = value instanceof Date ? value : new Date(value);
-  if (isNaN(d.getTime())) return String(value);
-  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd MMM yyyy, hh:mm a');
-}
-
-function buildAnnouncementAudience_(a) {
-  const audiences = [];
-  if (a.studentVisible) audiences.push('Project Teams');
-  if (a.guideVisible) audiences.push('Guides');
-  if (a.reviewerVisible) audiences.push('Reviewers');
-  return audiences.length ? audiences.join(' • ') : 'No audience selected';
-}
-
-function announcementPresentation_(a) {
-  const message=String(a.message || '').trim();
-  const text=message;
-  const firstLine=text.split(/\r?\n/)[0] || 'Announcement';
-  const step=text.match(/\bstep\s*(\d+)\b/i);
-  const type=/\btemplate\b/i.test(text)?'Template':/\bform\b/i.test(text)?'Form':'Notice';
-  const link=/^https?:\/\//i.test(String(a.fileLink || '').trim())?String(a.fileLink).trim():'';
-  return {message,text,title:firstLine.length>140?firstLine.slice(0,137)+'…':firstLine,step:step?Number(step[1]):null,type,link};
-}
-
-/** Shared tab header: title, successful-read timestamp, refresh action and divider. */
-function buildTabHeader_(title, key, action, updated) {
-  return `<div><div><h2>${escapeHtml(title)}</h2><p id="${key}Updated">${escapeHtml(updated)}</p></div><button type="button" class="tab-refresh-btn btn btn-sm btn-outline" data-refresh-button id="${key}Refresh" aria-label="${escapeHtml('Refresh ' + title)}" onclick="${escapeHtml(action)}">${renderLucideIcon_('refresh-cw')}Refresh</button></div><p id="${key}RefreshStatus" class="announcement-status" data-refresh-status role="status" aria-live="polite"></p>`;
-}
-
-function buildAnnouncementsTabContent_(announcements, isCoordinator) {
-  const formUrl=isCoordinator?String(getConfig('ANNOUNCEMENTS_FORM_URL') || '').trim():'';
-  const addButton=isCoordinator && /^https?:\/\//i.test(formUrl)?`<a class="btn btn-primary" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener">${renderLucideIcon_('plus')}New announcement</a>`:'';
-  const records=announcements.map(a=>({a,p:announcementPresentation_(a),date:formatAnnouncementTimestamp_(a.timestamp)}));
-  const header=buildTabHeader_('Announcements', 'announcements', 'refreshAnnouncements()', dashboardUpdatedLabel_());
-  function item(record,index) {
-    const {a,p,date}=record;
-    const audience=buildAnnouncementAudience_(a);
-    const audiences=[a.studentVisible?'teams':'',a.guideVisible?'guides':'',a.reviewerVisible?'reviewers':''].filter(Boolean).join(' ');
-    const body=p.text!==p.title?`<details><summary>Read announcement</summary><p>${escapeHtml(p.text)}</p></details>`:'';
-    return `<article id="announcement-${index}" class="card" data-announcement-item data-announcement-type="${p.type}" data-announcement-audiences="${audiences}" data-announcement-search="${escapeHtml(p.message+' '+date+' '+audience+' '+p.type)}"><span aria-hidden="true">${p.step!==null?'S'+p.step:renderLucideIcon_(p.type==='Form'?'file-text':'megaphone')}</span><div><h3>${escapeHtml(p.title)}</h3><div>${p.type} · <span>${escapeHtml(date || 'Date unavailable')}</span> · <span>${escapeHtml(audience)}</span></div>${body}</div><div>${p.link?`<a class="btn btn-sm btn-outline" href="${escapeHtml(p.link)}" target="_blank" rel="noopener">${p.type==='Form'?'Open form':'Open'} ${renderLucideIcon_('external-link')}<span class="announcement-sr-only"> (opens in a new tab)</span></a>`:''}</div></article>`;
-  }
-  const groups=new Map();
-  records.forEach((r,i)=>{
-    const day=r.date.split(',')[0] || 'Earlier';
-    if(!groups.has(day))groups.set(day,[]);
-    groups.get(day).push(item(r,i));
-  });
-  const feed=Array.from(groups,([day,items])=>`<section data-announcement-group><p>${escapeHtml(day)}</p>${items.join('')}</section>`).join('');
-  const templates=[],seen=new Set();
-  records.filter(r=>r.p.type==='Template' && r.p.step!==null && r.p.link).sort((a,b)=>a.p.step-b.p.step).forEach(r=>{
-    if(seen.has(r.p.link))return;
-    seen.add(r.p.link);templates.push(`<li><a href="${escapeHtml(r.p.link)}" target="_blank" rel="noopener"><span class="circle" data-step-number>${r.p.step}</span><span>${escapeHtml(r.p.title)}</span>${renderLucideIcon_('external-link')}</a></li>`);
-  });
-  return `<div>${header}
-    <div><div><label><span class="announcement-sr-only">Search announcements</span>${renderLucideIcon_('search')}<input id="announcementSearch" type="search" placeholder="Search titles, steps or dates" autocomplete="off" aria-controls="announcementList"></label><div class="segmented" role="group" aria-label="Filter by audience">${[['all','All · '+announcements.length],['teams','Project Teams'],['guides','Guides'],['reviewers','Reviewers']].map(([key,label])=>`<button type="button" data-announcement-audience="${key}" aria-pressed="${key==='all'}">${label}</button>`).join('')}</div><label><span class="announcement-sr-only">Announcement type</span><select data-announcement-type-filter><option value="all">All types</option><option value="Template">Template</option><option value="Form">Form</option><option value="Notice">Notice</option></select></label></div>${addButton}</div>
-    <p data-announcement-results role="status" aria-live="polite"></p><div><div><div id="announcementList">${feed}</div><div class="announcement-no-results card" data-announcement-no-results hidden><h3>${announcements.length?'No matching announcements':"You're all caught up"}</h3><p>${announcements.length?'Try another search or filter.':'New announcements will appear here when posted.'}</p></div><div><button class="btn btn-outline" type="button" data-announcement-more>Show older announcements</button></div></div><aside><h3>Step templates</h3><p>Every available template, in step order.</p>${templates.length?'<ol>'+templates.join('')+'</ol>':'<p>No step templates have been shared yet.</p>'}</aside></div></div>`;
-}
-
-/**
- * Common Announcements tab endpoint.
- * It derives the signed-in user's complete role set server-side. Coordinator
- * sees every announcement; multi-role users see the union of their audiences.
- */
-function loadAnnouncementsForCurrentUser() {
-  return withDashboardRead_(() => loadAnnouncementsForCurrentUser_());
-}
-
-function loadAnnouncementsForCurrentUser_() {
-  const email = Session.getActiveUser().getEmail();
-  if (!email) throw new Error('Could not identify your account.');
-
-  const views = getDashboardRoleViews_(email);
-  if (!views.length) throw new Error('No dashboard role was found for this account.');
-
-  const roleKeys = new Set(views.map(v => v.key));
-  const isCoordinator = roleKeys.has('coord');
-  const all = getAllAnnouncements_();
-
-  const visible = isCoordinator ? all : all.filter(a =>
-    (roleKeys.has('student') && a.studentVisible) ||
-    (roleKeys.has('guide') && a.guideVisible) ||
-    (roleKeys.has('reviewer') && a.reviewerVisible)
-  );
-
-  return buildAnnouncementsTabContent_(visible, isCoordinator);
-}
-
-// ===================================================================
 // STUDENT ROSTER LOOKUP
 // ===================================================================
 function getStudentTeamId(email) {
@@ -736,19 +629,18 @@ function getTeamLogWeekSummary_(row, columns, logs, schedule, clock) {
     active:active.length > 0,week:current ? current.week : null,due:current ? current.due : null};
 }
 
+/** Shared tab header: title, successful-read timestamp, refresh action and divider. */
+function buildTabHeader_(title, key, updated) {
+  return `<div><div><h2>${escapeHtml(title)}</h2><p id="${key}Updated">${escapeHtml(updated)}</p></div><button type="button" class="tab-refresh-btn border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" data-refresh-button id="${key}Refresh" aria-label="${escapeHtml('Refresh ' + title)}" data-shell-refresh="${escapeHtml(key)}">${renderLucideIcon_('refresh-cw')}Refresh</button></div><p id="${key}RefreshStatus" class="tab-refresh-status empty:hidden" data-refresh-status role="status" aria-live="polite"></p>`;
+}
+
 /** Shared headers for refreshable, non-student dashboard containers. */
 function dashboardUpdatedLabel_() {
   return 'Last updated: ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) + ' IST';
 }
 
 function buildDashboardContainerHeader_(title, key) {
-  const action = key === 'systemStatus' ? 'DashboardUI.refreshSystemStatus()' : "DashboardUI.refreshRoleDashboard('" + key + "')";
-  return buildTabHeader_(title, key, action, key === 'coord' || key === 'systemStatus' ? 'Waiting for data…' : dashboardUpdatedLabel_());
-}
-
-/** Shared controls for team tables; page state remains local to each table. */
-function buildTeamPagination_(prefix, tableKey, total, rowLabel = 'teams') {
-  return `<nav aria-label="Pagination" class="pagination"><span id="${prefix}PaginationInfo">Showing 0 - 0 of ${total} ${escapeHtml(rowLabel)}</span><label for="${prefix}PageSize">Rows per page <select id="${prefix}PageSize" onchange="DashboardUI.changeTeamPageSize('${tableKey}', this.value)"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="all">All</option></select></label><div id="${prefix}PaginationButtons" aria-label="${rowLabel === 'teams' ? 'Team' : escapeHtml(rowLabel)} table pages"></div></nav>`;
+  return buildTabHeader_(title, key, key === 'coord' || key === 'systemStatus' ? 'Waiting for data…' : dashboardUpdatedLabel_());
 }
 
 /** Presentation only: preserves the Review drawer history labels and note filtering. */

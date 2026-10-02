@@ -13,7 +13,8 @@ function fixture() {
   const permissions=new Map([['one','write'],['two','write']]);
   let repository=true, outage='', failWrite=false, apiFailure=0;
   const norm=value=>String(value||'').trim().toLowerCase();
-  const c=createSheetReadContext({console,Date,
+  const properties=new Map();
+  const c=createSheetReadContext({console,Date,PropertiesService:{getScriptProperties:()=>({getProperty:key=>properties.has(key)?properties.get(key):null,setProperty:(key,value)=>properties.set(key,value),deleteProperty:key=>properties.delete(key)})},
     SHEET_NAMES:{TEAM_STATUS:'teams',TEAM_ROSTER:'roster',GITHUB_ACCOUNTS:'users',TEAM_INTAKE_RAW:'intake',RAW_LOG:'logs'},
     FIELD_DEFINITIONS:{TEAM_STATUS:{},TEAM_ROSTER:{}},
     getColumnMap:()=>columns,getSheetRows:name=>name==='teams'?[team]:name==='users'?usernames:[],
@@ -34,7 +35,8 @@ function fixture() {
   });
   const originalSheet=c.getSheet;
   c.getSheet=name=>name==='users'?{getLastColumn:()=>7,getLastRow:()=>usernames.length+1,getRange:(r,c,n)=>({getValues:()=>r===1?[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL']]:usernames})}:originalSheet(name);
-  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-provisioning.js','intake-approval-workflow.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-template.js','github-provisioning.js','intake-approval-workflow.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+  c.installGithubTemplate_=()=>({verified:true}); // Template installation has its own tests; setup only resumes it.
   c.weeklyStudents_=()=>[1,2].filter(n=>team[n+2]).map(n=>({teamId:team[0],email:team[n+2],regNo:team[n+7]}));
   c.refreshGithubAccountMetadata_=()=>{}; // Metadata persistence is exercised by account integration tests.
   c.updateTeamStatusRepoUrl_=(id,url)=>{if(failWrite)throw Error('Sheet write failed');team[7]=url;writes.push({id,url});};
@@ -72,7 +74,7 @@ function fixture() {
 test('bulk readiness batches 62 teams and preserves live access decisions',()=>{
   const f=fixture(), batches=[];
   const live=f.c.makeGithubRequest;
-  f.c.PropertiesService={getScriptProperties:()=>({getProperty:()=> 'test-token'})};
+  f.c.PropertiesService={getScriptProperties:()=>({getProperty:key=>key==='GITHUB_ADMIN_TOKEN'?'test-token':null})};
   f.c.UrlFetchApp={fetchAll:requests=>{
     batches.push(requests.length);
     return requests.map(request=>{

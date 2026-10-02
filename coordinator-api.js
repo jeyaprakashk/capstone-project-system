@@ -110,3 +110,6 @@ function API_coordinator_createDefinitions() { return apiHandle_(() => createAss
 function API_coordinator_prepareStorage() { return apiHandle_(() => prepareReviewAssessmentStorage()); }
 function API_coordinator_syncGithub() { return apiHandle_(() => syncCoordinatorGithubAccess()); }
 function API_coordinator_resendInvitations(cursor) { return apiHandle_(() => resendExpiredStudentInvitations(cursor === undefined || cursor === null ? '' : String(cursor))); }
+
+/** Team drawer sections (basic, progress, activity): the existing read, which authorizes and validates the section. */
+function API_coordinator_getTeamDrawer(teamId, section) { return apiHandle_(() => loadCoordinatorDrawerSection(String(teamId || ''), String(section || ''))); }

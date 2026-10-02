@@ -69,35 +69,8 @@ function getDashboardRoleViews_(email) {
   return views;
 }
 
-/**
- * Called asynchronously when a role tab is opened or selectively prefetched.
- * Authorization is rechecked server-side before returning content.
- */
-function loadDashboardRoleContent(key) {
-  return withDashboardRead_(() => loadDashboardRoleContent_(key));
-}
-
-function loadDashboardRoleContent_(key) {
-  const email = Session.getActiveUser().getEmail();
-  if (!email) throw new Error('Could not identify your account.');
-
-  // IMPORTANT: authorize only the requested role. The previous version called
-  // getDashboardRoleViews_() again, which needlessly checked every role and
-  // reread unrelated sheets before loading one tab.
-  // The student role loads as a DTO through API_student_getDashboard (student-api.js).
-  if (key === 'student') throw new Error('The student dashboard loads through its data endpoint.');
-
-  // The reviewer role loads as a DTO through API_reviewer_getDashboard (reviewer-api.js).
-  if (key === 'reviewer') throw new Error('The reviewer dashboard loads through its data endpoint.');
-
-  // The guide role loads as a DTO through API_guide_getDashboard (guide-api.js).
-  if (key === 'guide') throw new Error('The guide dashboard loads through its data endpoint.');
-
-  // The coordinator role loads as DTOs through API_coordinator_* (coordinator-api.js).
-  if (key === 'coord') throw new Error('The coordinator dashboard loads through its data endpoints.');
-
-  throw new Error('Unknown dashboard role.');
-}
+// Role dashboards load as data: API_student_getDashboard, API_reviewer_getDashboard, API_guide_getDashboard and
+// API_coordinator_* (see DATA-CONTRACTS.md). Each re-checks authorization on the server.
 function buildSingleRoleDashboardPage(email, key, label, contentId, html) {
   return buildDashboardShell(email, [{ key, label, contentId, html }]);
 }
@@ -105,22 +78,20 @@ function buildSingleRoleDashboardPage(email, key, label, contentId, html) {
 function buildDashboardShell(email, views) {
   const multiRole = views.length > 1;
 
-  // Role tabs are followed by one common utility tab. Announcements is not a role.
+  // Role tabs are followed by common utility tabs (Rubrics, System Status). They are not roles.
   const roleIcons = { student:'graduation-cap', guide:'book-open', reviewer:'clipboard-check', coord:'network' };
   const roleButtons = views.map((view, index) =>
-    `<button type="button" class="tab${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml(view.key)}" aria-controls="rolePanel-${escapeHtml(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml(view.key)}" onclick="showRoleTab('${escapeHtml(view.key)}')">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml(view.label)}</button>`
+    `<button type="button" class="border-x-0 border-t-0 -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-[3px] border-transparent bg-transparent px-4 py-3 text-sm text-muted hover:text-ink aria-selected:border-primary aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml(view.key)}" aria-controls="rolePanel-${escapeHtml(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml(view.key)}">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml(view.label)}</button>`
   ).join('');
-  const rubricsButton = `<button type="button" class="tab" role="tab" id="roleTab-rubrics" aria-controls="rolePanel-rubrics" aria-selected="false" tabindex="-1" data-role-tab="rubrics" onclick="showRoleTab('rubrics')">${renderLucideIcon_('book-open')}Timeline &amp; Rubrics</button>`;
+  const rubricsButton = `<button type="button" class="border-x-0 border-t-0 -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-[3px] border-transparent bg-transparent px-4 py-3 text-sm text-muted hover:text-ink aria-selected:border-primary aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50" role="tab" id="roleTab-rubrics" aria-controls="rolePanel-rubrics" aria-selected="false" tabindex="-1" data-role-tab="rubrics">${renderLucideIcon_('book-open')}Timeline &amp; Rubrics</button>`;
   const hasCoordinator = views.some(view => view.key === 'coord');
-  const systemButton = hasCoordinator ? `<button type="button" class="tab" role="tab" id="roleTab-system-status" aria-controls="rolePanel-system-status" aria-selected="false" tabindex="-1" data-role-tab="system-status" onclick="showRoleTab(&quot;system-status&quot;)">${renderLucideIcon_('activity')}System Status</button>` : '';
-  const systemPanel = hasCoordinator ? `<section class="role-panel tabpanel" id="rolePanel-system-status" role="tabpanel" aria-labelledby="roleTab-system-status" data-role-panel="system-status" hidden>${buildDashboardContainerHeader_('System Status', 'systemStatus')}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
-  const announcementsButton = `<button type="button" class="tab" role="tab" id="roleTab-announcements" aria-controls="rolePanel-announcements" aria-selected="false" tabindex="-1" data-role-tab="announcements" onclick="showRoleTab('announcements')">${renderLucideIcon_('megaphone')}Announcements</button>`;
+  const systemButton = hasCoordinator ? `<button type="button" class="border-x-0 border-t-0 -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-[3px] border-transparent bg-transparent px-4 py-3 text-sm text-muted hover:text-ink aria-selected:border-primary aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50" role="tab" id="roleTab-system-status" aria-controls="rolePanel-system-status" aria-selected="false" tabindex="-1" data-role-tab="system-status">${renderLucideIcon_('activity')}System Status</button>` : '';
+  const systemPanel = hasCoordinator ? `<section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-system-status" role="tabpanel" aria-labelledby="roleTab-system-status" data-role-panel="system-status" hidden>${buildDashboardContainerHeader_('System Status', 'systemStatus')}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
 
   const rolePanels = views.map((view, index) =>
-    `<section class="role-panel tabpanel${index === 0 ? ' active' : ''}" id="rolePanel-${escapeHtml(view.key)}" role="tabpanel" aria-labelledby="roleTab-${escapeHtml(view.key)}" data-role-panel="${escapeHtml(view.key)}"${index === 0 ? '' : ' hidden'}><div id="${escapeHtml(view.contentId)}" data-role-content="${escapeHtml(view.key)}">${getSkeletonMarkup_('panel', 'Loading ' + view.label)}</div></section>`
+    `<section class="role-panel hidden [&.active]:block pt-4${index === 0 ? ' active' : ''}" id="rolePanel-${escapeHtml(view.key)}" role="tabpanel" aria-labelledby="roleTab-${escapeHtml(view.key)}" data-role-panel="${escapeHtml(view.key)}"${index === 0 ? '' : ' hidden'}><div id="${escapeHtml(view.contentId)}" data-role-content="${escapeHtml(view.key)}">${getSkeletonMarkup_('panel', 'Loading ' + view.label)}</div></section>`
   ).join('');
 
-  const announcementsPanel = `<section class="role-panel tabpanel" id="rolePanel-announcements" role="tabpanel" aria-labelledby="roleTab-announcements" data-role-panel="announcements" hidden><div id="announcementsContent">${getSkeletonMarkup_('panel', 'Loading announcements')}</div></section>`;
 
   return `<!DOCTYPE html>
 <html>
@@ -132,28 +103,27 @@ function buildDashboardShell(email, views) {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
 ${HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent()}
 </head>
-<body>
-<header>
-<h1>Dashboard</h1>
-<p>Signed in as ${escapeHtml(email)}</p>
-<nav class="dashboard-navigation" id="dashboardNavigation" aria-label="Dashboard sections">
-<button type="button" class="role-menu-toggle btn btn-outline" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems" onclick="DashboardUI.toggleRoleMenu()"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span id="roleMenuLabel">${escapeHtml(views[0].label)}</span><span>Menu</span></button>
-<div class="role-tabs tabs" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}${rubricsButton}${announcementsButton}${systemButton}</div>
+<body class="mx-auto max-w-[1100px] px-4 pb-10 pt-6">
+<header class="mb-4">
+<h1 class="m-0 text-xl font-semibold text-ink">Dashboard</h1>
+<p class="m-0 mb-3 text-sm text-muted">Signed in as ${escapeHtml(email)}</p>
+<nav class="dashboard-navigation group/nav" id="dashboardNavigation" aria-label="Dashboard sections">
+<button type="button" class="role-menu-toggle hidden max-[1200px]:flex border-0 items-center gap-2 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span id="roleMenuLabel">${escapeHtml(views[0].label)}</span><span>Menu</span></button>
+<div class="role-tabs flex max-[1200px]:hidden max-[1200px]:group-[.menu-open]/nav:flex gap-1 overflow-x-auto overflow-y-hidden border-b border-edge" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}${rubricsButton}${systemButton}</div>
 </nav>
 </header>
-<section class="role-panel tabpanel" id="rolePanel-rubrics" role="tabpanel" aria-labelledby="roleTab-rubrics" data-role-panel="rubrics" hidden>
+<section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-rubrics" role="tabpanel" aria-labelledby="roleTab-rubrics" data-role-panel="rubrics" hidden>
 <section id="sharedProjectTimeline" hidden aria-label="Project timeline" aria-busy="true"><div><h2>Project timeline</h2></div>${getSkeletonMarkup_('timeline', 'Loading project timeline')}</section>
-<section id="sharedRubrics" hidden class="shared-rubrics card" aria-labelledby="sharedRubricsHeading" aria-busy="true"><div><h2 id="sharedRubricsHeading">Rubrics &amp; Guidelines</h2></div><div id="sharedRubricsContent">${getSkeletonMarkup_('panel', 'Loading assessment rubrics')}</div></section>
+<section id="sharedRubrics" hidden class="shared-rubrics @container/rubrics rounded-card border border-edge bg-paper shadow-card" aria-labelledby="sharedRubricsHeading" aria-busy="true"><div><h2 id="sharedRubricsHeading">Rubrics &amp; Guidelines</h2></div><div id="sharedRubricsContent">${getSkeletonMarkup_('panel', 'Loading assessment rubrics')}</div></section>
 </section>
 ${rolePanels}
-${announcementsPanel}
 ${systemPanel}
-<div id="rubricDrawerBackdrop" class="team-drawer-backdrop drawer-scrim" hidden aria-hidden="true"></div>
-<aside id="rubricDrawer" class="drawer" data-tooltip-boundary role="dialog" aria-modal="true" aria-labelledby="rubricDrawerTitle" aria-hidden="true" inert hidden>
-  <div class="drawer-header"><div><div>ASSESSMENT RUBRIC</div><h2 id="rubricDrawerTitle"></h2></div>
-  <button type="button" id="rubricDrawerClose" data-drawer-close class="btn btn-sm btn-outline" aria-label="Close rubric details" onclick="DashboardUI.closeRubricDrawer()">${renderLucideIcon_('x')}</button></div>
-  <div id="rubricDrawerContent" class="team-drawer-content drawer-body" data-drawer-content></div>
-  <div class="drawer-footer" hidden></div>
+<div id="rubricDrawerBackdrop" class="team-drawer-backdrop fixed inset-0 z-40 bg-scrim animate-[fade-in_.15s_cubic-bezier(.2,0,0,1)]" hidden aria-hidden="true"></div>
+<aside id="rubricDrawer" class="fixed inset-y-0 right-0 z-40 flex w-full max-w-[420px] flex-col bg-paper shadow-overlay animate-[slide-in-right_.25s_cubic-bezier(.2,0,0,1)]" data-tooltip-boundary role="dialog" aria-modal="true" aria-labelledby="rubricDrawerTitle" aria-hidden="true" inert hidden>
+  <div class="flex items-center justify-between gap-3 border-b border-edge px-5 py-4"><div><div>ASSESSMENT RUBRIC</div><h2 id="rubricDrawerTitle"></h2></div>
+  <button type="button" id="rubricDrawerClose" data-drawer-close class="border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" aria-label="Close rubric details">${renderLucideIcon_('x')}</button></div>
+  <div id="rubricDrawerContent" class="team-drawer-content flex-1 overflow-auto p-5" data-drawer-content></div>
+  <div class="flex justify-end gap-2 border-t border-edge px-5 py-3" hidden></div>
 </aside>
 <script>
 ${getMigratedViewsClientScript_()}
@@ -188,3 +158,6 @@ function getSharedProjectTimelineData_() {
     milestones:definitions.map(({key,label,day,opens,sequence}) => ({key,label,day,opens,sequence,date:formatProjectDay_(day),openingDate:Number.isFinite(opens)?formatProjectDay_(opens):null})).sort((a,b) => a.day - b.day)
   };
 }
+
+/** Shared Timeline and Rubrics tabs: the existing reads, returned as data. */
+function API_shared_getTimeline() { return apiHandle_(() => loadSharedProjectTimeline()); }

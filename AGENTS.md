@@ -44,29 +44,35 @@ cannot be cancelled and a retry could submit twice.
 
 ## Styling
 
-Tailwind is the only styling system. `scripts/tailwind-input.css` is the single source:
-design tokens in `@theme` (colours, type scale, radii, shadows), shared components in
-`@layer components`, and the functional rules the dashboard scripts rely on (visibility
-toggles, loading overlay, drawers). `npm run build:tailwind` compiles it, plus every
-utility used in the root `.js` files, into the committed `tailwind-styles.html`
-(no runtime CDN); `npm run check:tailwind` verifies it is current. Rebuild after adding
+Tailwind is the only styling system, and it is utilities only. `scripts/tailwind-input.css` holds
+design tokens in `@theme`, a small `@layer base` reset (page defaults, `[hidden]`, touch targets)
+and the keyframes. There is no component layer: dialogs, drawers, tabs, tables, loading overlays,
+responsive menus, `details` open states, `:empty` hiding and container queries are written as
+utility variants (`group-open:`, `empty:hidden`, `max-[1200px]:`, `@max-[480px]/rubrics:`,
+`[&::-webkit-details-marker]:hidden`). Classes a script adds at runtime are string constants in
+the module, so the build still sees them. Hook classes (`review-*`, `role-panel`, `timeline-stop`,
+...) only mark elements and carry no styles. `npm run build:tailwind` compiles the input plus every
+utility used in the root `.js` files into the committed `tailwind-styles.html` (no runtime CDN);
+`npm run check:tailwind` verifies it is current. Rebuild after adding
 or removing any class. Do not add inline `<style>` blocks or hand-written CSS files.
 
 - New views use Tailwind utilities directly, with theme tokens (`bg-primary`, `text-muted`,
   `rounded-card`, `border-edge`).
-- Remaining server-built markup (Student, Coordinator, announcements, drawers) still uses
-  the shared component classes (`btn`, `card`, `badge`, `table`, ...); inline them as
-  utilities when that dashboard moves to a DTO view.
+- Views, dialogs, drawers, tabs, tables and pagination all use utilities; there are no `btn`,
+  `card`, `badge`, `table`, `modal` or `drawer` component classes. Repeated strings live in
+  constants inside the module that renders them.
+- Interaction uses delegated listeners and `data-*` hooks. Markup has no inline `on*` handlers and
+  modules do not assign per-element `onclick`/`onchange`; each host gets one delegated listener.
+  Tests should find elements through `data-*` hooks, not styling classes.
 - Do not put a display utility (`flex`, `grid`, ...) on an element scripts toggle with `hidden`.
 - No preflight: the base rules in the input file are the dashboard's reset.
 
-Migrated so far: the **Review marking drawer** (`review-evaluation-client.js`, endpoints `API_review_getEvaluation` / `API_review_save`), **Guide Evaluation** (`guide-evaluation-client.js`) and the **student published-results panels** (`student-results-view.js`), the **System Status card actions** (committee/review configuration, definitions and storage setup, GitHub sync, invitation resend: `API_coordinator_*`), the **weekly setup card** (`weeklyPhase2SetupBrowser_`, endpoints `API_coordinator_getWeeklySetup` / `API_coordinator_setupWeekly`), the **weekly-progress screens** (`student-weekly-view.js`; `guide-weekly-client.js` inside the Guide view) read and save through the bridge, **Coordinator dashboard tab** (`coordinator-api.js`, `coordinator-view.js`) and **System Status frame** (`system-status-view.js`; the cards' own checks and the team drawer
-are still driven by their legacy modules), **Reviewer** (`reviewer-api.js`, `reviewer-view.js`), **Student**
-(`student-api.js`, `student-view.js`; its weekly-progress, assessment and GitHub-connection modules are
-still legacy and attach to placeholders) and **Guide**
-(`guide-api.js`, `guide-view.js`; the weekly-progress and evaluation panels inside it are
-still legacy modules and attach to the view through its `data-guide-*` markup). Shared pieces:
-`api-envelope.js` (server) and `data-bridge-client.js` (browser).
+Every dashboard, panel and card reads and writes through the bridge; no module calls
+`google.script.run` directly. Endpoints and DTOs are listed in [DATA-CONTRACTS.md](DATA-CONTRACTS.md):
+Reviewer, Guide, Student and Coordinator dashboards; the Review marking drawer; Guide
+Evaluation; weekly progress; published results; the System Status frame, card actions and
+weekly setup; publication cards; the student GitHub connection; the Timeline and Rubrics tabs;
+and the team drawer. Shared pieces: `api-envelope.js` (server) and `data-bridge-client.js` (browser).
 
 ## Loading and refresh
 

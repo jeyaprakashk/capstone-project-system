@@ -9,9 +9,9 @@ function renderExpandableText_(value, maxLen = 130) {
   const full = String(value || '');
   const escape = text => text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   if (full.length <= maxLen) return escape(full);
-  return '<details class="expandable-text"><summary><span class="expandable-text-preview">' +
+  return '<details class="expandable-text group"><summary class="[&::-webkit-details-marker]:hidden"><span class="expandable-text-preview group-open:hidden">' +
     escape(full.slice(0, maxLen).trim()) + '&hellip; <em>more</em></span>' +
-    '<span class="expandable-text-full">' + escape(full) +
+    '<span class="expandable-text-full hidden group-open:inline">' + escape(full) +
     ' <em>less</em></span></summary></details>';
 }
 
@@ -22,24 +22,24 @@ function dashboardDialogsBrowser_() {
     const previous=trigger;
     activeTrigger=trigger;
     const host=document.querySelector('dialog[open]') || document.body;
-    const overlay=document.createElement('div');overlay.className='overlay';overlay.setAttribute('data-dialog-overlay','');
-    const modal=document.createElement('section');modal.className='modal';
+    const overlay=document.createElement('div');overlay.className='fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4 animate-[fade-in_.15s_cubic-bezier(.2,0,0,1)]';overlay.setAttribute('data-dialog-overlay','');
+    const modal=document.createElement('section');modal.className='flex max-h-[calc(100vh-2rem)] w-full max-w-[520px] flex-col rounded-card bg-paper shadow-overlay animate-[scale-in_.25s_cubic-bezier(.2,0,0,1)]';
     modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
     const heading=document.createElement('h2');heading.id='dashboardDialogHeading';
     heading.textContent=options.title || (kind==='confirm'?'Please confirm':kind==='prompt'?'Add a remark':'Message');
-    modal.setAttribute('aria-labelledby',heading.id);
-    const header=document.createElement('div');header.className='modal-header';header.appendChild(heading);
-    const body=document.createElement('div');body.className='modal-body';
-    const message=document.createElement('p');message.className=options.tone==='danger'?'notice notice--danger student-text':'student-text';message.textContent=String(options.body || '');body.appendChild(message);
-    const footer=document.createElement('div');footer.className='modal-footer';
+    modal.setAttribute('data-dialog-modal','');modal.setAttribute('aria-labelledby',heading.id);
+    const header=document.createElement('div');header.className='flex items-center justify-between gap-3 border-b border-edge px-5 py-4';header.setAttribute('data-dialog-header','');header.appendChild(heading);
+    const body=document.createElement('div');body.className='overflow-auto p-5';
+    body.setAttribute('data-dialog-body','');const message=document.createElement('p');message.className=options.tone==='danger'?'rounded-md bg-danger-tint px-3 py-2 text-danger student-text whitespace-pre-line [overflow-wrap:anywhere]':'student-text whitespace-pre-line [overflow-wrap:anywhere]';message.textContent=String(options.body || '');body.appendChild(message);
+    const footer=document.createElement('div');footer.setAttribute('data-dialog-footer','');footer.className='flex justify-end gap-2 border-t border-edge px-5 py-3';
     let input=null,error=null;
     if(kind==='prompt') {
       input=document.createElement('textarea');input.maxLength=5000;
       input.setAttribute('aria-label',String(options.body || ''));body.appendChild(input);
       error=document.createElement('p');error.setAttribute('role','alert');error.hidden=true;body.appendChild(error);
     }
-    const cancel=document.createElement('button');cancel.type='button';cancel.className='btn btn-outline';cancel.textContent=options.cancelText || 'Cancel';
-    const confirm=document.createElement('button');confirm.type='button';confirm.className='btn btn-primary';confirm.textContent=options.confirmText || (kind==='alert'?'OK':'Continue');
+    const cancel=document.createElement('button');cancel.type='button';cancel.setAttribute('data-dialog-cancel','');cancel.className='border-0 inline-flex items-center rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline';cancel.textContent=options.cancelText || 'Cancel';
+    const confirm=document.createElement('button');confirm.type='button';confirm.setAttribute('data-dialog-confirm','');confirm.className='border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';confirm.textContent=options.confirmText || (kind==='alert'?'OK':'Continue');
     if(kind!=='alert')footer.appendChild(cancel);
     footer.appendChild(confirm);modal.appendChild(header);modal.appendChild(body);modal.appendChild(footer);overlay.appendChild(modal);
     const siblings=Array.from(host.children).filter(node=>node!==overlay).map(node=>({node:node,inert:node.inert}));
@@ -108,20 +108,24 @@ const DashboardUI = (function() {
 
   function byId(id) { return document.getElementById(id); }
   function setLoading(id, label) { const el = byId(id); if (el) el.innerHTML = renderSkeleton('inline', label); }
+  // While a read runs the live content stays in place but invisible, under a skeleton overlay.
+  const LOADING_CLASSES = ['relative!', 'overflow-hidden', '[&>:not([data-loading-overlay])]:invisible!'];
+  const LOADING_COMPACT_CLASSES = ['[&>:not([data-loading-overlay])]:hidden!'];
   // Preserve live DOM, layout and event handlers until a read finishes.
   function beginContentLoading(target, label, options) {
     if (!target) return function() {};
     const overlay = document.createElement('div');
-    overlay.className = 'app-loading-overlay';
     const compact = options && options.compact;
+    overlay.className = compact ? 'relative z-10 overflow-hidden' : 'absolute inset-0 z-10 overflow-hidden';
+    overlay.setAttribute('data-loading-overlay', '');
     // Hidden tabs measure zero during preloading; that is not a small control.
     const height = target.clientHeight;
     overlay.innerHTML = renderSkeleton(options && options.variant || (!compact && height > 0 && height < 120 ? 'inline' : 'panel'), label);
     const children = Array.from(target.children).map(function(child) { return {node:child, inert:child.inert}; });
     children.forEach(function(child) { child.node.inert = true; });
     target.setAttribute('aria-busy', 'true');
-    target.classList.add('app-content-loading');
-    if (compact) target.classList.add('app-content-loading--compact');
+    LOADING_CLASSES.forEach(function(name) { target.classList.add(name); });
+    if (compact) { target.setAttribute('data-loading-compact', ''); LOADING_COMPACT_CLASSES.forEach(function(name) { target.classList.add(name); }); }
     target.appendChild(overlay);
     let finished = false;
     return function() {
@@ -130,8 +134,8 @@ const DashboardUI = (function() {
       overlay.remove();
       children.forEach(function(child) { child.node.inert = child.inert; });
       target.setAttribute('aria-busy', 'false');
-      target.classList.remove('app-content-loading');
-      if (compact) target.classList.remove('app-content-loading--compact');
+      LOADING_CLASSES.forEach(function(name) { target.classList.remove(name); });
+      if (compact) { target.removeAttribute('data-loading-compact'); LOADING_COMPACT_CLASSES.forEach(function(name) { target.classList.remove(name); }); }
     };
   }
   function setText(id, text) { const el = byId(id); if (el) el.textContent = text; }
@@ -154,7 +158,6 @@ const DashboardUI = (function() {
   let activeRole = null;
   let tabSelectedAt = 0;
   let roleQueue = null;
-  let announcementsSettled = false;
   const attemptedRoles = Object.create(null);
   const preloadedRoles = Object.create(null);
   const activatedRoles = Object.create(null);
@@ -186,10 +189,9 @@ const DashboardUI = (function() {
   }
   function scheduleUtilities() {
     if (document.hidden || !window.DashboardPerformance.preloading) return;
-    if (announcementsSettled && byId('systemStatusContent') && !systemStatusState.attempted) ensureSystemStatusLoaded();
+    if (byId('systemStatusContent') && !systemStatusState.attempted) ensureSystemStatusLoaded();
   }
   function initializeLoading() {
-    ensureAnnouncementsLoaded();
     schedulePreload();
   }
   document.addEventListener('visibilitychange', schedulePreload);
@@ -203,7 +205,7 @@ const DashboardUI = (function() {
         return function() {
           const started = performance.now();
           // Follow-up reads started by utility callbacks stay in the utility lane.
-          const utility = utilityRequestContext || method === 'loadAnnouncementsForCurrentUser' || method === 'API_coordinator_getSystemStatus' || method === 'API_coordinator_getWeeklySetup';
+          const utility = utilityRequestContext || method === 'API_coordinator_getSystemStatus' || method === 'API_coordinator_getWeeklySetup';
           pendingRequests++;
           if (!utility) { pendingRoleRequests++; clearTimeout(preloadTimer); }
           let finished = false;
@@ -217,7 +219,6 @@ const DashboardUI = (function() {
               utilityRequestContext = previousContext;
               pendingRequests--;
               if (!utility) pendingRoleRequests--;
-              if (method === 'loadAnnouncementsForCurrentUser') announcementsSettled = true;
               recordPerformance({event:'request', method:String(method), ok:ok, durationMs:performance.now() - started});
               if (utility) scheduleUtilities();
               else schedulePreload();
@@ -250,17 +251,17 @@ const DashboardUI = (function() {
     const start = Math.max(0, (next < 0 ? milestones.length : next) - 2);
     const finish = next < 0 ? milestones.length : Math.min(milestones.length, next + 3);
     target.innerHTML = '<div><h2>Project timeline</h2>' +
-      (milestones.length ? '<button type="button" class="btn btn-sm btn-outline" data-timeline-toggle aria-expanded="false" aria-controls="projectTimelineMilestones">View full timeline</button>' : '') + '</div>' +
+      (milestones.length ? '<button type="button" class="border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" data-timeline-toggle aria-expanded="false" aria-controls="projectTimelineMilestones">View full timeline</button>' : '') + '</div>' +
       (!milestones.length ? '<p class="timeline-empty">No project milestones scheduled</p>' : '') +
-      '<ol id="projectTimelineMilestones" class="timeline-track" data-timeline-track style="--timeline-stops:' + (finish-start) + '">' + milestones.map(function(m,index) {
+      '<ol id="projectTimelineMilestones" class="timeline-track m-0 list-none p-0" data-timeline-track style="--timeline-stops:' + (finish-start) + '">' + milestones.map(function(m,index) {
         const past = m.day < data.today, current = index === next;
         const mobileContext = next < 0 ? index >= Math.max(0, milestones.length - 2) : Math.abs(index - next) <= 1;
         const description = m.openingDate ? 'Opens ' + m.openingDate + '; due ' + m.date : m.date;
         const days = m.day - data.today;
         const timing = current ? 'CURRENT · ' + (days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : 'Due in ' + days + ' days')
           : !past ? (days === 0 ? 'Due today' : 'In ' + days + (days === 1 ? ' day' : ' days')) : '';
-        return '<li data-timeline-stop class="timeline-stop" data-timeline-state="' + (past ? 'past' : current ? 'current' : 'future') + '" data-timeline-mobile="' + mobileContext + '" data-timeline-context="' + (index >= start && index < finish) + '"' + (index < start || index >= finish ? ' hidden' : '') + (current ? ' aria-current="step"' : '') + '>' +
-          '<span class="circle" aria-hidden="true">' + (past ? renderLucideIcon_('check') : current ? '<span class="circle"></span>' : '') + '</span>' +
+        return '<li data-timeline-stop class="timeline-stop' + (mobileContext ? '' : ' max-[760px]:hidden') + '" data-timeline-state="' + (past ? 'past' : current ? 'current' : 'future') + '" data-timeline-mobile="' + mobileContext + '" data-timeline-context="' + (index >= start && index < finish) + '"' + (index < start || index >= finish ? ' hidden' : '') + (current ? ' aria-current="step"' : '') + '>' +
+          '<span class="rounded-full" aria-hidden="true">' + (past ? renderLucideIcon_('check') : current ? '<span class="rounded-full"></span>' : '') + '</span>' +
           '<strong>' + escapeClientHtml(m.label) + '</strong>' +
           '<span data-timeline-date title="' + escapeClientHtml(description) + '" aria-label="' + escapeClientHtml(description) + '">' + escapeClientHtml(m.date) + '</span>' +
           (timing ? '<span data-timeline-timing>' + timing + '</span>' : '') + '</li>';
@@ -271,7 +272,10 @@ const DashboardUI = (function() {
       toggle.setAttribute('aria-expanded', String(expanded));
       toggle.textContent = expanded ? 'Show less' : 'View full timeline';
       target.querySelector('[data-timeline-track]').classList.toggle('timeline-full', expanded);
-      target.querySelectorAll('[data-timeline-stop]').forEach(item => { item.hidden = !expanded && item.dataset.timelineContext !== 'true'; });
+      target.querySelectorAll('[data-timeline-stop]').forEach(item => {
+        item.hidden = !expanded && item.dataset.timelineContext !== 'true';
+        item.classList.toggle('max-[760px]:hidden', !expanded && item.dataset.timelineMobile === 'false');
+      });
     });
   }
 
@@ -284,8 +288,8 @@ const DashboardUI = (function() {
       target.innerHTML = renderSkeleton('timeline', 'Loading project timeline');
     }
     timelineRequest = new Promise(function(resolve, reject) {
-      dashboardRun()
-        .withSuccessHandler(function(data) {
+      DataBridge.read('shared-timeline','API_shared_getTimeline',[],{timeoutMs:120000})
+        .then(function(data) {
           try {
             // Publish one immutable snapshot for optional browser-side consumers.
             Object.freeze(data.schedule);
@@ -296,14 +300,12 @@ const DashboardUI = (function() {
             if (target) target.setAttribute('aria-busy', 'false');
             resolve(sharedSchedule);
           } catch (err) { failed(err); }
-        })
-        .withFailureHandler(failed)
-        .loadSharedProjectTimeline();
+        }, failed);
       function failed(err) {
         timelineRequest = null;
         if (target) {
           target.setAttribute('aria-busy', 'false');
-          target.innerHTML = '<div><h2>Project timeline</h2><span role="status">Schedule unavailable</span><button type="button" class="btn btn-sm btn-outline" data-timeline-retry>Retry</button></div>';
+          target.innerHTML = '<div><h2>Project timeline</h2><span role="status">Schedule unavailable</span><button type="button" class="border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" data-timeline-retry>Retry</button></div>';
           target.querySelector('[data-timeline-retry]').addEventListener('click', function() { loadSharedTimeline().catch(function() {}); });
         }
         reject(err);
@@ -327,11 +329,11 @@ const DashboardUI = (function() {
     section.setAttribute('aria-busy', 'true');
     target.innerHTML = renderSkeleton('panel', 'Loading assessment rubrics');
     rubricsRequest = new Promise(function(resolve, reject) {
-      dashboardRun().withSuccessHandler(function(data) {
+      DataBridge.read('shared-rubrics','API_shared_getRubrics',[],{timeoutMs:120000}).then(function(data) {
         try {
           target.innerHTML = '<div>' + data.assessments.map(function(item) {
-            const desktopCard = '<button type="button" class="rubric-assessment tile' + (item.available ? '' : ' tile--locked') + '" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span><strong>' + escapeClientHtml(item.label) + '</strong><span>' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span><span>' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span><span class="rubric-mobile-hidden">View rubric</span> '+renderLucideIcon_('arrow-right')+'</span>' : '') + '</span></button>';
-            const mobileRow = '<div class="rubric-mobile-row"><div><div><strong>' + escapeClientHtml(item.label) + '</strong><span aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span>' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="btn btn-sm btn-outline" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
+            const desktopCard = '<button type="button" class="rubric-assessment @max-[480px]/rubrics:hidden rounded-tile border border-edge px-5 py-4 text-left ' + (item.available ? 'bg-paper' : 'bg-soft') + '" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span><strong>' + escapeClientHtml(item.label) + '</strong><span>' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span><span>' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span><span class="rubric-mobile-hidden">View rubric</span> '+renderLucideIcon_('arrow-right')+'</span>' : '') + '</span></button>';
+            const mobileRow = '<div class="rubric-mobile-row hidden @max-[480px]/rubrics:grid"><div><div><strong>' + escapeClientHtml(item.label) + '</strong><span aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span>' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
             return desktopCard + mobileRow;
           }).join('') + '</div>' + (data.assessments.length ? '' : '<p>No graded assessments configured.</p>');
           sharedRubrics = data;
@@ -341,11 +343,11 @@ const DashboardUI = (function() {
           section.setAttribute('aria-busy', 'false');
           resolve(data);
         } catch (err) { reject(err); }
-      }).withFailureHandler(reject).loadSharedRubrics();
+      }, reject);
     }).catch(function(err) {
       rubricsRequest = null;
       section.setAttribute('aria-busy', 'false');
-      target.innerHTML = '<p role="status">Unable to load rubrics.</p><button class="btn btn-outline" type="button">Retry</button>';
+      target.innerHTML = '<p role="status">Unable to load rubrics.</p><button class="border-0 inline-flex items-center rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" type="button">Retry</button>';
       target.querySelector('button').addEventListener('click', function() { loadSharedRubrics().catch(function() {}); });
       throw err;
     });
@@ -371,7 +373,6 @@ const DashboardUI = (function() {
     if (!drawer || !scrim) return;
     if (sharedDrawerState && sharedDrawerState.drawer !== drawer) closeSharedDrawer(sharedDrawerState.id, false);
     sharedDrawerState = {id:drawerId, drawer:drawer, scrim:scrim, trigger:trigger || document.activeElement};
-    scrim.onclick = function(event) { if (event.target === scrim) closeSharedDrawer(drawerId); };
     drawer.inert = false;
     drawer.hidden = false;
     scrim.hidden = false;
@@ -379,7 +380,7 @@ const DashboardUI = (function() {
     drawer.dataset.open = 'true';
     drawer.setAttribute('aria-hidden', 'false');
     scrim.classList.add('open');
-    document.body.classList.add('team-drawer-open');
+    document.body.classList.add('overflow-hidden');
     const focusTarget = (drawer.querySelector && drawer.querySelector('[data-drawer-close]')) || byId(drawerId === 'rubricDrawer' ? 'rubricDrawerClose' : 'teamDrawerClose');
     if (focusTarget) focusTarget.focus();
   }
@@ -398,7 +399,7 @@ const DashboardUI = (function() {
       sharedDrawerState = null;
       if (restoreFocus !== false && state.trigger && state.trigger.isConnected) state.trigger.focus();
     }
-    document.body.classList.remove('team-drawer-open');
+    document.body.classList.remove('overflow-hidden');
   }
   function openContentDrawer(title, content, trigger) {
     const drawer = byId('rubricDrawer');
@@ -502,96 +503,7 @@ const DashboardUI = (function() {
     }
     // Bridge promises settle after the runner hook, so resume queued preloads once handled.
     if (migrated) migrated.load().then(onRoleLoaded).catch(onRoleFailed).then(schedulePreload);
-    else dashboardRun().withSuccessHandler(onRoleLoaded).withFailureHandler(onRoleFailed).loadDashboardRoleContent(activeKey);
-  }
-
-  const announcementsState = { loading:false, loaded:false, query:'', audience:'all', type:'all', page:1, pageSize:5 };
-
-  function initializeAnnouncementSearch(target) {
-    const search=target.querySelector('#announcementSearch');
-    if(!search)return;
-    const items=Array.from(target.querySelectorAll('#announcementList [data-announcement-item]'));
-    const groups=Array.from(target.querySelectorAll('[data-announcement-group]'));
-    const audiences=Array.from(target.querySelectorAll('[data-announcement-audience]'));
-    const type=target.querySelector('[data-announcement-type-filter]');
-    const more=target.querySelector('[data-announcement-more]');
-    function render() {
-      const query=announcementsState.query.trim().toLocaleLowerCase();
-      const matches=items.filter(item=>(item.dataset.announcementSearch||'').toLocaleLowerCase().includes(query) && (announcementsState.audience==='all' || item.dataset.announcementAudiences.split(' ').includes(announcementsState.audience)) && (announcementsState.type==='all' || item.dataset.announcementType===announcementsState.type));
-      const visible=new Set(matches.slice(0,announcementsState.page*announcementsState.pageSize));
-      items.forEach(item=>{item.hidden=!visible.has(item);});
-      groups.forEach(group=>{group.hidden=!Array.from(group.querySelectorAll('[data-announcement-item]')).some(item=>!item.hidden);});
-      target.querySelector('[data-announcement-results]').textContent='Showing '+visible.size+' of '+matches.length+' announcements';
-      target.querySelector('[data-announcement-no-results]').hidden=matches.length>0;
-      const remaining=Math.max(0,matches.length-announcementsState.page*announcementsState.pageSize);
-      more.hidden=!remaining;
-      more.textContent='Show '+Math.min(remaining,announcementsState.pageSize)+' older announcements';
-      audiences.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.announcementAudience===announcementsState.audience)));
-    }
-    search.value=announcementsState.query;
-    type.value=announcementsState.type;
-    search.addEventListener('input',()=>{announcementsState.query=search.value;announcementsState.page=1;render();});
-    type.addEventListener('change',()=>{announcementsState.type=type.value;announcementsState.page=1;render();});
-    audiences.forEach(button=>button.addEventListener('click',()=>{announcementsState.audience=button.dataset.announcementAudience;announcementsState.page=1;render();}));
-    more.addEventListener('click',()=>{announcementsState.page++;render();});
-    render();
-  }
-
-  function renderAnnouncementsLoading() {
-    const target = byId('announcementsContent');
-    if (target) {
-      target.innerHTML = renderSkeleton('panel', 'Loading announcements');
-    }
-  }
-
-  function ensureAnnouncementsLoaded(forceRefresh) {
-    if (announcementsState.loading) return;
-    if (announcementsState.loaded && !forceRefresh) return;
-
-    const target = byId('announcementsContent');
-    if (!target) return;
-
-    announcementsState.loading = true;
-    const hadContent = announcementsState.loaded;
-    if (!hadContent) renderAnnouncementsLoading();
-    const finishLoading = beginContentLoading(target, 'Loading announcements');
-    const refreshButton = target.querySelector('[data-refresh-button]');
-    const status = target.querySelector('[data-refresh-status]');
-    if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderSkeleton('inline', 'Refreshing'); }
-    if (status) status.innerHTML = renderSkeleton('inline', 'Checking for updates');
-    target.setAttribute('aria-busy', 'true');
-
-    dashboardRun()
-      .withSuccessHandler(function(html) {
-        finishLoading();
-        announcementsState.loading = false;
-        announcementsState.loaded = true;
-        target.innerHTML = html;
-        initializeAnnouncementSearch(target);
-        target.setAttribute('aria-busy', 'false');
-        if (forceRefresh) {
-          const updatedButton = target.querySelector('[data-refresh-button]');
-          if (updatedButton && document.activeElement === document.body) updatedButton.focus();
-        }
-      })
-      .withFailureHandler(function(err) {
-        finishLoading();
-        announcementsState.loading = false;
-        announcementsState.loaded = hadContent;
-        target.setAttribute('aria-busy', 'false');
-        if (hadContent) {
-          if (refreshButton) { refreshButton.disabled = false; refreshButton.innerHTML = renderLucideIcon_('refresh-cw') + 'Refresh'; }
-          if (status) status.textContent = 'Could not refresh. Your previous announcements are still shown. Try again.';
-          return;
-        }
-        target.innerHTML = '<div>Unable to load announcements: ' +
-          escapeClientHtml(errorMessage(err)) + '<button type="button" class="btn btn-sm btn-outline" data-refresh-button onclick="refreshAnnouncements()">Try again</button></div>';
-      })
-      .loadAnnouncementsForCurrentUser();
-  }
-
-  function refreshAnnouncements() {
-    ensureAnnouncementsLoaded(true);
+    else Promise.resolve().then(function() { throw new Error('Unknown dashboard role.'); }).catch(onRoleFailed).then(schedulePreload);
   }
 
   function escapeClientHtml(value) {
@@ -673,6 +585,17 @@ const DashboardUI = (function() {
     const nav = byId('dashboardNavigation');
     if (!nav) return;
     document.addEventListener('click', function(event) {
+      const origin = event.target && event.target.closest ? event.target : null;
+      if (!origin) return;
+      if (sharedDrawerState && origin === sharedDrawerState.scrim) { closeSharedDrawer(sharedDrawerState.id); return; }
+      const tab = origin.closest('[data-role-tab]');
+      if (tab) { showRoleTab(tab.getAttribute('data-role-tab')); return; }
+      if (origin.closest('#roleMenuToggle')) { toggleRoleMenu(); return; }
+      if (origin.closest('#rubricDrawerClose')) { closeRubricDrawer(); return; }
+      const refresh = origin.closest('[data-shell-refresh]');
+      if (refresh) { const key = refresh.getAttribute('data-shell-refresh'); if (key === 'systemStatus') ensureSystemStatusLoaded(true); else refreshRoleDashboard(key); }
+    });
+    document.addEventListener('click', function(event) {
       if (!nav.contains(event.target)) setRoleMenuOpen(false, false);
     });
     document.addEventListener('keydown', function(event) {
@@ -739,9 +662,6 @@ const DashboardUI = (function() {
       loadSharedRubrics();
     } else if (activeKey === 'system-status') {
       ensureSystemStatusLoaded();
-    } else if (activeKey === 'announcements') {
-      // Click-to-load path. This may win the race against background preload.
-      ensureAnnouncementsLoaded(false);
     } else {
       loadRoleContent(activeKey);
       activateRole(activeKey);
@@ -798,6 +718,26 @@ const DashboardUI = (function() {
     if (!table) return;
     const state = options.state || table.tableSortState || {};
     table.tableSortState = state;
+    table.tableSortOptions = options;
+    if (!table.tableSortAttached) {
+      table.tableSortAttached = true;
+      table.addEventListener('click', function(event) {
+        const button = event.target.closest && event.target.closest('[data-table-sort]');
+        if (!button || !table.contains(button)) return;
+        const header = button.closest('th');
+        const column = Array.from(table.querySelectorAll('thead th')).indexOf(header);
+        const sortState = table.tableSortState, sortOptions = table.tableSortOptions;
+        sortState.direction = sortState.column === column && sortState.direction === 'ascending' ? 'descending' : 'ascending';
+        sortState.column = column;
+        sortState.type = header.getAttribute('data-sort-type');
+        initializeTableSorting(table, sortOptions);
+        if (sortOptions.onSort) sortOptions.onSort(sortState);
+        else {
+          const body = table.querySelector('tbody');
+          if (body) body.replaceChildren(...sortTableRows(Array.from(body.children), sortState));
+        }
+      });
+    }
     Array.from(table.querySelectorAll('thead th')).forEach((header, column) => {
       if (!header.hasAttribute('data-sort-type')) return;
       let button = header.querySelector('[data-table-sort]');
@@ -806,7 +746,7 @@ const DashboardUI = (function() {
         header.textContent = '';
         button = document.createElement('button');
         button.type = 'button';
-        button.className = 'btn btn-sm btn-outline';
+        button.className = 'border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
         button.setAttribute('data-table-sort', label);
         header.appendChild(button);
       }
@@ -816,17 +756,6 @@ const DashboardUI = (function() {
       button.textContent = label;
       button.setAttribute('data-sort-direction', selected ? state.direction : 'none');
       button.setAttribute('aria-label', 'Sort by ' + label + (selected && state.direction === 'ascending' ? ' descending' : ' ascending'));
-      button.onclick = function() {
-        state.direction = state.column === column && state.direction === 'ascending' ? 'descending' : 'ascending';
-        state.column = column;
-        state.type = header.getAttribute('data-sort-type');
-        initializeTableSorting(table, options);
-        if (options.onSort) options.onSort(state);
-        else {
-          const body = table.querySelector('tbody');
-          if (body) body.replaceChildren(...sortTableRows(Array.from(body.children),state));
-        }
-      };
     });
     return state;
   }
@@ -855,7 +784,7 @@ const DashboardUI = (function() {
     buttons.innerHTML = '';
 
     function addButton(label, page, disabled, active) {
-      const btn = document.createElement('button');btn.className='page-link';
+      const btn = document.createElement('button');btn.className='inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-md border border-line bg-paper px-3 text-sm text-ink no-underline hover:bg-tint aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:font-semibold aria-[current=page]:text-paper disabled:pointer-events-none disabled:opacity-50';
       btn.type = 'button';
       btn.textContent = label;
       if (label === 'Previous') btn.innerHTML = renderLucideIcon_('chevron-left') + 'Previous';
@@ -972,7 +901,7 @@ const DashboardUI = (function() {
       : '<div>Committee details not available.</div>';
 
     const repoHtml = data.repoUrl
-      ? '<a class="btn btn-outline" href="' +
+      ? '<a class="border-0 inline-flex items-center rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" href="' +
           escapeDrawerHtml(data.repoUrl) +
           '" target="_blank" rel="noopener">' +
           escapeDrawerHtml(data.repoUrl) +
@@ -997,14 +926,14 @@ const DashboardUI = (function() {
       '<div>' +
         '<div>Guide</div>' +
         '<div>' +
-          '<div class="card">' +
+          '<div class="rounded-card border border-edge bg-paper shadow-card">' +
             '<div>Guide</div>' +
             '<div>' +
               escapeDrawerHtml(data.guideName || '—') +
             '</div>' +
           '</div>' +
 
-          '<div class="card">' +
+          '<div class="rounded-card border border-edge bg-paper shadow-card">' +
             '<div>Email</div>' +
             '<div>' +
               escapeDrawerHtml(data.guideEmail || '—') +
@@ -1063,7 +992,7 @@ const DashboardUI = (function() {
 
         (data.reviews || []).map(function(review) {
           return '<div><span>' + escapeDrawerHtml(review.label) +
-            '</span><span class="badge badge--' + (review.completed ? 'success' : 'warning') + '">' + (review.available === false ? 'Unavailable' : review.completed ? 'Completed' : 'Pending') + '</span></div>';
+            '</span><span class="inline-flex items-center rounded-badge px-2 py-0.5 text-xs font-semibold ' + (review.completed ? 'bg-success-tint text-success' : 'bg-warning-tint text-warning') + '">' + (review.available === false ? 'Unavailable' : review.completed ? 'Completed' : 'Pending') + '</span></div>';
         }).join('') +
 
         '<div>' +
@@ -1078,14 +1007,14 @@ const DashboardUI = (function() {
         '<div>This Week</div>' +
 
         '<div>' +
-          '<div class="card">' +
+          '<div class="rounded-card border border-edge bg-paper shadow-card">' +
             '<div>Daily Logs</div>' +
             '<div>' +
               escapeDrawerHtml(data.weekLogs) +
             '</div>' +
           '</div>' +
 
-          '<div class="card">' +
+          '<div class="rounded-card border border-edge bg-paper shadow-card">' +
             '<div>GitHub Commits</div>' +
             '<div>' +
               escapeDrawerHtml(data.weekCommits) +
@@ -1137,21 +1066,21 @@ const DashboardUI = (function() {
       function current() { return request === coordinatorDrawerRequest && drawer.dataset.open === 'true' && target === byId('drawerSection-' + section); }
       function showRetry(message) {
         const note = document.createElement('div');note.className = '';note.textContent = message + ' ';
-        const button = document.createElement('button');button.className='btn btn-sm btn-outline';button.type = 'button';button.textContent = 'Retry';
+        const button = document.createElement('button');button.className='border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';button.type = 'button';button.textContent = 'Retry';
         button.addEventListener('click', function() { loadSection(section); });
         note.appendChild(button);target.appendChild(note);
       }
-      dashboardRun().withSuccessHandler(function(data) {
+      DataBridge.read('team-drawer:' + teamId + ':' + section,'API_coordinator_getTeamDrawer',[teamId, section],{timeoutMs:120000}).then(function(data) {
         if (!current()) return;
         pending.delete(section);
         target.innerHTML = buildCoordinatorTeamDrawerHtml(data, section);
         target.setAttribute('aria-busy', 'false');
         if (section === 'progress' && (data.reviews || []).some(review => review.available === false)) showRetry('Some review data is unavailable.');
-      }).withFailureHandler(function(err) {
+      }, function(err) {
         if (!current()) return;
         pending.delete(section);target.innerHTML = '';target.setAttribute('aria-busy', 'false');
         showRetry('Unable to load ' + section + ': ' + errorMessage(err));
-      }).loadCoordinatorDrawerSection(teamId, section);
+      });
     }
     ['basic','progress','activity'].forEach(loadSection);
   }
@@ -1400,7 +1329,7 @@ const DashboardUI = (function() {
       const rows = Array.from(results.values());
       host.querySelector('[data-resend-log]').hidden = !rows.length;
       const bounds = renderTeamPagination(rows.length, host.resendPagination, 'studentInvitations', render, 'students');
-      output.innerHTML = rows.length ? '<table class="table table--compact"><thead><tr><th>Team</th><th>Student</th><th>GitHub</th><th>Result</th><th>Details</th></tr></thead><tbody>' + rows.slice(bounds.start, bounds.end).map(row => '<tr>' + [row.teamId,row.student,row.username,row.status,row.reason].map(value => '<td>' + escapeClientHtml(value || '') + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '';
+      output.innerHTML = rows.length ? '<table class="w-full border-collapse text-sm [&_th]:border-b [&_td]:border-b [&_th]:border-edge [&_td]:border-edge [&_th]:px-2 [&_td]:px-2 [&_th]:py-1 [&_td]:py-1 [&_th]:text-left [&_td]:text-left [&_td]:align-top [&_thead_th]:bg-soft [&_thead_th]:text-xs [&_thead_th]:font-semibold [&_thead_th]:text-ink-2"><thead><tr><th>Team</th><th>Student</th><th>GitHub</th><th>Result</th><th>Details</th></tr></thead><tbody>' + rows.slice(bounds.start, bounds.end).map(row => '<tr>' + [row.teamId,row.student,row.username,row.status,row.reason].map(value => '<td>' + escapeClientHtml(value || '') + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '';
       return ['invited','already joined','pending','skipped','failed'].map(kind => rows.filter(row => row.status === kind).length + ' ' + kind).join(' · ');
     }
     host.renderResendLog = render;
@@ -1453,8 +1382,8 @@ const DashboardUI = (function() {
       button.disabled = false;
       refreshGithubStatus(null, message);
     }
-    dashboardRun().withSuccessHandler(function(result) { finish(result.message || ''); })
-      .withFailureHandler(function(err) { finish(errorMessage(err)); }).completeStudentGithubSetup();
+    DataBridge.write('API_student_completeGithubSetup',[]).then(function(result) { finish(result.message || ''); },
+      function(err) { finish(errorMessage(err)); });
   }
 
   function focusGithubAccountForm(button) {
@@ -1475,44 +1404,51 @@ const DashboardUI = (function() {
     panel.hidden = false;
     const finish = beginContentLoading(panel,'Resolving GitHub account');
     function settle() { finish(); form.githubBusy = false; input.disabled = false; setButtonsDisabled(form,false); }
-    dashboardRun().withSuccessHandler(function(result) {
+    DataBridge.write('API_student_previewGithub',[input.value]).then(function(result) {
       settle();
       if (!form.isConnected || form.githubRequest !== request) return;
       form.githubToken = result.token;
       const account = result.account, esc = escapeClientHtml;
-      panel.innerHTML = (account.avatarUrl ? '<img width="48" height="48" alt="" src="' + esc(account.avatarUrl) + '">' : '') +
-        '<p><strong>' + esc(account.displayName || '') + '</strong> <a target="_blank" rel="noopener" href="' + esc(account.profileUrl) + '">@' + esc(account.username) + '</a></p>' +
-        '<p>Is this your GitHub account?</p><button type="button" class="btn btn-primary" data-confirm-account>Yes, this is my account</button> <button type="button" class="secondary btn btn-outline" data-change-account>No, change profile link</button>';
+      panel.innerHTML = '<div class="flex items-center gap-3">' + (account.avatarUrl ? '<img width="48" height="48" alt="" class="size-12 shrink-0 rounded-full border border-edge" src="' + esc(account.avatarUrl) + '">' : '') +
+        '<div class="min-w-0"><p class="m-0 font-semibold text-ink">' + esc(account.displayName || account.username) + '</p><a class="text-sm text-primary" target="_blank" rel="noopener" href="' + esc(account.profileUrl) + '">@' + esc(account.username) + '</a></div></div>' +
+        '<p class="m-0 text-sm text-ink-2">Is this your GitHub account?</p><div class="flex flex-wrap gap-2"><button type="button" class="border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50" data-confirm-account>Yes, this is my account</button><button type="button" class="border-0 inline-flex items-center rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" data-change-account>No, change profile link</button></div>';
       input.disabled = true;
       form.querySelector('button[type="submit"]').hidden = true;
-      panel.querySelector('[data-confirm-account]').onclick = function() { confirmGithubAccount(form); };
-      panel.querySelector('[data-change-account]').onclick = function() {
-        form.githubRequest++; form.githubToken = null; panel.hidden = true; panel.innerHTML = '';
-        input.disabled = false; form.querySelector('button[type="submit"]').hidden = false; input.focus();
-      };
+      if (!panel.actionsAttached) {
+        panel.actionsAttached = true;
+        panel.addEventListener('click', function(event) {
+          const target = event.target.closest && event.target.closest('button');
+          if (!target || !panel.contains(target)) return;
+          if (target.hasAttribute('data-confirm-account')) confirmGithubAccount(form);
+          else if (target.hasAttribute('data-change-account')) {
+            form.githubRequest++; form.githubToken = null; panel.hidden = true; panel.innerHTML = '';
+            input.disabled = false; form.querySelector('button[type="submit"]').hidden = false; input.focus();
+          }
+        });
+      }
       panel.querySelector('[data-confirm-account]').focus();
-    }).withFailureHandler(function(error) {
+    }, function(error) {
       settle();
       if (!form.isConnected || form.githubRequest !== request) return;
       setText('githubSubmitStatus',errorMessage(error)); input.focus();
-    }).previewStudentGithubAccount(input.value);
+    });
   }
 
   function confirmGithubAccount(form) {
     if (form.githubBusy || !form.githubToken) return;
     form.githubBusy = true; setButtonsDisabled(form,true);
     setText('githubSubmitStatus','Connecting GitHub account...');
-    dashboardRun().withSuccessHandler(function(result) {
+    DataBridge.write('API_student_confirmGithub',[form.githubToken]).then(function(result) {
       form.githubBusy = false;
       if (!form.isConnected) return;
       form.hidden = true; form.githubToken = null;
       setText('githubSubmitStatus',result.message);
-      dashboardRun().withSuccessHandler(function(setup) { refreshGithubStatus(null,result.message + ' ' + (setup.message || '')); })
-        .withFailureHandler(function(error) { refreshGithubStatus(null,'GitHub account connected. Repository access is pending: ' + errorMessage(error)); }).completeStudentGithubSetup();
-    }).withFailureHandler(function(error) {
+      DataBridge.write('API_student_completeGithubSetup',[]).then(function(setup) { refreshGithubStatus(null,result.message + ' ' + (setup.message || '')); },
+        function(error) { refreshGithubStatus(null,'GitHub account connected. Repository access is pending: ' + errorMessage(error)); });
+    }, function(error) {
       form.githubBusy = false; setButtonsDisabled(form,false);
       if (form.isConnected) setText('githubSubmitStatus',errorMessage(error));
-    }).confirmStudentGithubAccount(form.githubToken);
+    });
   }
 
   return {
@@ -1525,7 +1461,6 @@ const DashboardUI = (function() {
     renderAssessmentHistory: renderAssessmentHistory,
     renderSkeleton: renderSkeleton,
     beginContentLoading: beginContentLoading,
-    guideRun: dashboardRun,
     refreshRoleDashboard,
     refreshSystemStatus: function() { ensureSystemStatusLoaded(true); },
     loadSharedTimeline,
@@ -1538,7 +1473,6 @@ const DashboardUI = (function() {
     toggleRoleMenu,
     initializeRoleMenu,
     initializeLoading,
-    refreshAnnouncements,
     toggleProblem,
     renderExpandableText,
     renderIcon: renderLucideIcon_,
@@ -1567,7 +1501,6 @@ const DashboardSchedule = Object.freeze({
 });
 
 function showRoleTab(key) { DashboardUI.showRoleTab(key); }
-function refreshAnnouncements() { DashboardUI.refreshAnnouncements(); }
 function toggleProblem(teamId) { DashboardUI.toggleProblem(teamId); }
 function toggleStudentMessage(idx) { DashboardUI.toggleStudentMessage(idx); }
 function focusCoordinatorTeam(teamId) { DashboardUI.focusCoordinatorTeam(teamId); }

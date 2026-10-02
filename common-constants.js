@@ -19,8 +19,7 @@ const SHEET_NAMES = {
   AIProgressAnalysis: 'AIProgressAnalysis',
   COMMITS: 'Commits',
   COMMIT_COLLECTION_STATUS: 'CommitCollectionStatus',
-  FLAGS: 'Flags',
-  ANNOUNCEMENTS: 'Announcements'
+  FLAGS: 'Flags'
 };
 
 // ===================================================================
@@ -80,16 +79,6 @@ const FIELD_DEFINITIONS = {
     REVIEWER2_NAME: 'Reviewer 2 Name', REVIEWER2_EMAIL: 'Reviewer 2 Email',
     REVIEWER3_NAME: 'Reviewer 3 Name', REVIEWER3_EMAIL: 'Reviewer 3 Email',
     REVIEWER4_NAME: 'Reviewer 4 Name', REVIEWER4_EMAIL: 'Reviewer 4 Email'
-  },
-
-  ANNOUNCEMENTS: {
-    TIMESTAMP: 'Timestamp',
-    EMAIL: 'Email address',
-    MESSAGE: 'Message',
-    FILE_LINK: 'Document Link (if any to be shared - Optional field)',
-    STUDENT_VISIBLE: 'Visibility to [Project Teams]',
-    GUIDE_VISIBLE: 'Visibility to [Guides]',
-    REVIEWER_VISIBLE: 'Visibility to [Reviewers]'
   },
 
   COMMITTEE_TAB: {

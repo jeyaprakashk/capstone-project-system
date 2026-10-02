@@ -181,3 +181,13 @@ test('both permanent schemas normalize only case and outer whitespace and never 
     sheet.rows[0].push(type==='accounts'?'GitHub ID':'GitHub Author ID');assert.throws(read,/Duplicate/);
   }
 });
+
+test('GitHub connection endpoints delegate to the existing functions and keep their messages',()=>{
+  const f=fixture();vm.runInContext(fs.readFileSync('api-envelope.js','utf8'),f.c);vm.runInContext(fs.readFileSync('student-api.js','utf8'),f.c);
+  const preview=JSON.parse(f.c.API_student_previewGithub('https://github.com/TypedName/'));
+  assert.equal(preview.ok,true);assert.equal(preview.data.account.username,'canonical');assert.ok(preview.data.token);const before=f.accounts.rows.length;assert.equal(f.accounts.rows.length,before);
+  const confirmed=JSON.parse(f.c.API_student_confirmGithub(preview.data.token));assert.equal(confirmed.ok,true);assert.equal(f.accounts.rows.length,before+1);
+  const again=JSON.parse(f.c.API_student_confirmGithub(preview.data.token));assert.equal(again.ok,false);assert.equal(again.error.code,'REJECTED');assert.match(again.error.message,/expired/);
+  const bad=JSON.parse(f.c.API_student_previewGithub('https://evil.example/u'));assert.equal(bad.ok,false);assert.equal(bad.error.code,'REJECTED');
+  assert.equal(typeof f.c.API_student_completeGithubSetup,'function');
+});

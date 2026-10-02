@@ -5,7 +5,7 @@ function renderLucideIcon_(name, label, className) {
   const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const extraClass = className ? ' ' + escape(className) : '';
   const accessible = label ? 'tabindex="0" role="img" aria-label="' + escape(label) + '"' : 'aria-hidden="true"';
-  return '<svg xmlns="http://www.w3.org/2000/svg" class="lucide-icon lucide-' + name + extraClass + '" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="' + (label ? 'true' : 'false') + '" ' + accessible + '>' + (label ? '<title>' + escape(label) + '</title>' : '') + nodes[name] + '</svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" class="lucide-icon lucide-' + name + (label ? ' pointer-events-auto' : ' pointer-events-none') + extraClass + '" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="' + (label ? 'true' : 'false') + '" ' + accessible + '>' + (label ? '<title>' + escape(label) + '</title>' : '') + nodes[name] + '</svg>';
 }
 
 /** Body-mounted positioning is retained for icons inside clipped tables, drawers and scroll regions. */
@@ -34,7 +34,7 @@ function initializeDashboardTooltips_() {
     hide();
     if (!tooltip) {
       tooltip = document.createElement('div');
-      tooltip.id = 'dashboardTooltip'; tooltip.className = 'dashboard-tooltip';
+      tooltip.id = 'dashboardTooltip'; tooltip.className = 'dashboard-tooltip pointer-events-none fixed z-[60] max-w-[min(280px,calc(100vw-16px))]';
       tooltip.setAttribute('role', 'tooltip');
     }
     // Modal dialogs occupy the top layer, above any body-level z-index.
