@@ -1,9 +1,12 @@
 # Project conventions
 
-For asynchronous UI reads and refreshes, follow [LOADING-UI.md](LOADING-UI.md).
-Reuse the shared skeleton renderer, refresh lifecycle helper, and loading styles.
-Preserve existing content on failed refreshes and settle loading on every path.
+For all dashboard UI work, follow [UI-STYLING.md](UI-STYLING.md). The single
+stylesheet is `app-styles.html`; components must use its tokens and classes.
+Keep that stylesheet exactly as supplied. During migration, if an existing
+component has no matching token or class, retain its existing styling and
+record the file, element, value, and purpose for review. Do not change UI
+behaviour while migrating styling.
 
-For action buttons and button-style links, follow [BUTTON-UI.md](BUTTON-UI.md).
-Use the shared `app-btn` size and semantic color classes; keep geometry and color
-definitions in `getStandardButtonStyles_()` rather than feature-specific CSS.
+For asynchronous reads and refreshes, follow the behavior described in
+[LOADING-UI.md](LOADING-UI.md). Preserve existing content on failed refreshes
+and settle loading on every path.

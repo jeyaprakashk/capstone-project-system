@@ -1,0 +1,60 @@
+
+## dashboard-client-scripts.js (35)
+80	closest	.overlay	=> .overlay
+269	querySelector	.timeline-toggle	=> .timeline-toggle
+274	querySelector	.timeline-track	=> .timeline-track
+275	querySelectorAll	.timeline-stop	=> .timeline-stop
+308	querySelector	.timeline-retry	=> .timeline-retry
+383	querySelector	.drawer-header button, .team-drawer-close	=> .drawer-header .team-drawer-close
+388	classList.contains	open
+433	querySelector	.drawer-header button, .team-drawer-close	=> .drawer-header .team-drawer-close
+507	querySelectorAll	.announcement-list .announcement-item	=> .announcement-list .announcement-item
+508	querySelectorAll	.announcement-date-group	=> .announcement-date-group
+517	querySelectorAll	.announcement-item	=> .announcement-item
+518	querySelector	.announcement-results	=> .announcement-results
+519	querySelector	.announcement-no-results	=> .announcement-no-results
+552	querySelector	.announcement-refresh-btn	=> .announcement-refresh-btn
+553	querySelector	.announcement-status	=> .announcement-status
+567	querySelector	.announcement-refresh-btn	=> .announcement-refresh-btn
+614	querySelectorAll	.system-status-primary > *, .coordinator-container > .assessment-section	=> .system-status-primary .coordinator-container .assessment-section
+692	querySelector	.role-tab-btn.active	=> .role-tab-btn .active
+853	querySelector	.skeleton, [aria-label^="Loading"], [aria-label^="Checking"]	=> .skeleton
+928	querySelector	.tracker-tabs .filter-tab.active	=> .tracker-tabs .filter-tab .active
+1045	querySelectorAll	.tracker-tabs .filter-tab	=> .tracker-tabs .filter-tab
+1058	querySelectorAll	.tracker-tabs .filter-tab	=> .tracker-tabs .filter-tab
+1284	classList.contains	open
+1313	querySelector	.team-tracker-section	=> .team-tracker-section
+1323	querySelectorAll	.col-review, .col-guide-evaluation, .col-health	=> .col-review .col-guide-evaluation .col-health
+1325	querySelectorAll	#coordinatorStats .stat-card-teal .stat-num, #coordinatorStats .stat-card-red .stat-num	=> .stat-card-teal .stat-num .stat-card-red .stat-num
+1326	querySelectorAll	.tracker-tabs button:disabled	=> .tracker-tabs
+1388	querySelector	.tracker-tabs .filter-tab.active	=> .tracker-tabs .filter-tab .active
+1398	querySelectorAll	.tracker-tabs .filter-tab	=> .tracker-tabs .filter-tab
+1438	querySelector	.col-activity	=> .col-activity
+1444	closest	.stat-card	=> .stat-card
+1473	querySelector	.col-activity	=> .col-activity
+1654	querySelector	.run-sync-btn	=> .run-sync-btn
+2025	closest	.step-card	=> .step-card
+2166	querySelector	[data-role-panel].active	=> .active
+
+## guide-weekly-client.js (6)
+211	querySelectorAll	.guide-weekly-card	=> .guide-weekly-card
+215	querySelector	.guide-weekly-summary	=> .guide-weekly-summary
+215	querySelector	.guide-weekly-actions	=> .guide-weekly-actions
+218	querySelector	.guide-weekly-student-header	=> .guide-weekly-student-header
+230	querySelector	.guide-weekly-actions	=> .guide-weekly-actions
+230	querySelector	.guide-weekly-summary	=> .guide-weekly-summary
+
+## icon-renderer.js (1)
+46	closest	.table-wrap,.tracker-table-scroll,.publishing-table-wrap,.team-drawer,.review-drawer	=> .table-wrap .tracker-table-scroll .publishing-table-wrap .team-drawer .review-drawer
+
+## internal-assessment-publishing-client.js (2)
+95	querySelectorAll	.publishing-table-wrap	=> .publishing-table-wrap
+96	querySelector	.publishing-table-wrap	=> .publishing-table-wrap
+
+## review-evaluation-client.js (4)
+98	querySelector	.review-header-students	=> .review-header-students
+266	querySelector	.team-drawer-content	=> .team-drawer-content
+391	querySelector	.team-drawer-content	=> .team-drawer-content
+460	querySelector	.review-actions	=> .review-actions
+
+TOTAL 48

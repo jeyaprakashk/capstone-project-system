@@ -23,13 +23,13 @@ function buildStudentPerfBox_() {
   if (!STUDENT_PERF_) return '';
   const rows = STUDENT_PERF_.measurements
     .filter(x => x.label !== 'buildStudentContent TOTAL')
-    .map(x => '<div style="display:flex;justify-content:space-between;gap:24px;padding:4px 0;border-bottom:1px solid #e5e7eb;"><span>' + escapeHtml(x.label) + '</span><strong style="font-family:JetBrains Mono,monospace;white-space:nowrap;">' + x.ms + ' ms</strong></div>')
+    .map(x => '<div style="display:flex;justify-content:space-between;gap:var(--space-6);padding:var(--space-1) 0;border-bottom:1px solid var(--border);"><span>' + escapeHtml(x.label) + '</span><strong style="font-family:var(--font);white-space:nowrap;">' + x.ms + ' ms</strong></div>')
     .join('');
   const total = Date.now() - STUDENT_PERF_.startedAt;
-  return '<div style="margin:24px 0;padding:16px 18px;border:2px dashed #d97706;border-radius:12px;background:#fffbeb;color:#1f2937;font:13px Inter,sans-serif;">' +
-    '<div style="font-weight:700;margin-bottom:10px;color:#92400e;">TEMPORARY PERFORMANCE DIAGNOSTICS</div>' +
+  return '<div style="margin:var(--space-6) 0;padding:var(--space-4) 18px;border:2px dashed var(--warning);border-radius:var(--radius-card);background:var(--canvas);color:var(--text);font:var(--fs-meta) var(--font);">' +
+    '<div style="font-weight:var(--fw-bold);margin-bottom:10px;color:var(--warning);">TEMPORARY PERFORMANCE DIAGNOSTICS</div>' +
     rows +
-    '<div style="display:flex;justify-content:space-between;gap:24px;padding-top:9px;font-size:14px;"><strong>TOTAL STUDENT SERVER TIME</strong><strong style="font-family:JetBrains Mono,monospace;white-space:nowrap;">' + total + ' ms</strong></div>' +
+    '<div style="display:flex;justify-content:space-between;gap:var(--space-6);padding-top:9px;font-size:var(--fs-body);"><strong>TOTAL STUDENT SERVER TIME</strong><strong style="font-family:var(--font);white-space:nowrap;">' + total + ' ms</strong></div>' +
     '</div>';
 }
 
@@ -90,11 +90,11 @@ function initialsOf(name) {
 }
 
 function buildTeamRoster(rosterSlots, myEmail) {
-  const chips = rosterSlots.map(s => {
+  const chips = rosterSlots.map((s, index) => {
     const isMe = emailsMatch(s.email, myEmail);
     return `
       <div class="member-chip">
-        <span class="avatar">${escapeHtml(initialsOf(s.name))}</span>
+        <span class="avatar avatar-${index % 3 + 1}">${escapeHtml(initialsOf(s.name))}</span>
         <div class="member-info">
           <div class="member-name">${escapeHtml(s.name)}${isMe ? ' <span class="you-tag">you</span>' : ''}</div>
           <div class="member-reg">${escapeHtml(s.regno)}</div>
@@ -107,7 +107,7 @@ function buildTeamRoster(rosterSlots, myEmail) {
 
 function buildStepNode(stepNum, state) {
   const icon = state === 'done' ? renderLucideIcon_('check', 'Complete') : state === 'locked' ? renderLucideIcon_('lock-keyhole', 'Locked') : stepNum;
-  return `<div class="step-node step-node-${state}">${icon}</div>`;
+  return `<div class="step-node circle step-node-${state}">${icon}</div>`;
 }
 
 function buildStepCard(stepNum, title, state, bodyHtml, ctaHtml, isLast) {
@@ -122,7 +122,7 @@ function buildStepCard(stepNum, title, state, bodyHtml, ctaHtml, isLast) {
       ${buildStepNode(stepNum, state)}
       ${isLast ? '' : '<div class="step-line"></div>'}
     </div>
-    <div class="step-card step-card-${state}">
+    <div class="step-card step-card-${state} card" data-step-card>
       <div class="step-header">
         <h4>${escapeHtml(title)}</h4>
         ${badge}
@@ -167,10 +167,10 @@ function buildStudentContent(email, teamId, teamStatusRow) {
         <label for="studentGithubProfile">Submit GitHub Account</label>
         <p>GitHub → <strong>Your profile</strong> → copy the profile URL and paste below.</p>
         <input id="studentGithubProfile" name="profileUrl" type="url" required maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://github.com/student123" aria-describedby="githubSubmitStatus"${d.githubCaptureReady ? '' : ' disabled'}>
-        <button class="workflow-btn app-btn btn-lg btn-primary" type="submit"${d.githubCaptureReady ? '' : ' disabled'}>Continue</button>
+        <button class="workflow-btn btn btn-lg btn-primary" type="submit"${d.githubCaptureReady ? '' : ' disabled'}>Continue</button>
         <div data-github-confirmation hidden></div>
         <p id="githubSubmitStatus" role="status" aria-live="polite"></p>
-        <button id="githubStatusRefresh" class="workflow-btn secondary app-btn btn-sm btn-secondary" type="button" hidden onclick="DashboardUI.refreshGithubStatus(this)">Refresh GitHub status</button>
+        <button id="githubStatusRefresh" class="workflow-btn secondary btn btn-sm btn-outline" type="button" hidden onclick="DashboardUI.refreshGithubStatus(this)">Refresh GitHub status</button>
       </form>`
     : '';
 
@@ -225,7 +225,7 @@ function buildStudentContent(email, teamId, teamStatusRow) {
 
     const titleCta =
       label.state === 'active'
-        ? `<a class="workflow-btn app-btn btn-md btn-primary"
+        ? `<a class="workflow-btn btn btn-primary"
               href="${escapeHtml(buildTeamIntakeLink(teamId))}"
               target="_blank"
               rel="noopener">
@@ -248,9 +248,9 @@ function buildStudentContent(email, teamId, teamStatusRow) {
   // WEEKLY PROGRESS LOG
   // ===============================================================
 
-  const logCard = titleApproved ? '<section class="student-weekly-card">' +
+  const logCard = titleApproved ? '<section class="student-weekly-card card">' +
     '<section id="studentWeeklyProgress" aria-label="Weekly progress">' +
-    '<div class="weekly-card-heading"><h3>Weekly progress</h3><button type="button" class="app-btn btn-sm btn-secondary" data-weekly-refresh aria-label="Refresh weekly progress" onclick="DashboardUI.loadWeeklyProgress()">Refresh</button></div>' +
+    '<div class="weekly-card-heading"><h3>Weekly progress</h3><button type="button" class="btn btn-sm btn-outline" data-weekly-refresh aria-label="Refresh weekly progress" onclick="DashboardUI.loadWeeklyProgress()">Refresh</button></div>' +
     '<div data-weekly-read>' + getSkeletonMarkup_('panel','Loading weekly progress') + '</div>' +
     '<p data-weekly-status role="status" aria-live="polite"></p>' +
     '<div data-weekly-form></div></section></section>' : '';
@@ -300,13 +300,13 @@ function buildStudentContent(email, teamId, teamStatusRow) {
     ${logCard}
 
     <div class="student-summary-grid">
-      <section class="student-summary-card" aria-label="Recent logs">
+      <section class="student-summary-card card" aria-label="Recent logs">
         <header class="heading-row"><h3>Recent logs</h3>${titleApproved ? '<a href="#studentWeeklyProgress" onclick="DashboardUI.openWeeklyActivity(this);return false;">View all logs</a>' : ''}</header>
         <div id="studentRecentActivity">${titleApproved ? getSkeletonMarkup_('panel','Loading recent logs') : '<p>Weekly logs will appear after project setup.</p>'}</div>
       </section>
-      <section class="student-summary-card student-assessments-card" aria-label="Assessments"><header><h3>Assessments</h3></header>
-    ${getAssessmentDefinitions_().filter(d=>d.type==='REVIEW').map(d=>'<section id="studentAssessment-'+escapeHtml(d.key)+'" data-review-result="'+escapeHtml(d.key)+'" data-assessment-label="'+escapeHtml(d.label)+'" class="assessment-section" aria-live="polite">'+getSkeletonMarkup_('panel', 'Loading '+d.label+' results')+'</section>').join('')}
-    <section id="studentGuideEvaluation" data-assessment-label="${escapeHtml((getAssessmentDefinitions_().find(d=>d.type==='GUIDE_EVALUATION') || {}).label || 'Guide Evaluation')}" class="assessment-section" aria-live="polite">${getSkeletonMarkup_('panel', 'Loading guide evaluation')}</section>
+      <section class="student-summary-card student-assessments-card card" aria-label="Assessments"><header><h3>Assessments</h3></header>
+    ${getAssessmentDefinitions_().filter(d=>d.type==='REVIEW').map(d=>'<section id="studentAssessment-'+escapeHtml(d.key)+'" data-review-result="'+escapeHtml(d.key)+'" data-assessment-label="'+escapeHtml(d.label)+'" class="assessment-section card" aria-live="polite">'+getSkeletonMarkup_('panel', 'Loading '+d.label+' results')+'</section>').join('')}
+    <section id="studentGuideEvaluation" data-assessment-label="${escapeHtml((getAssessmentDefinitions_().find(d=>d.type==='GUIDE_EVALUATION') || {}).label || 'Guide Evaluation')}" class="assessment-section card" aria-live="polite">${getSkeletonMarkup_('panel', 'Loading guide evaluation')}</section>
       </section>
     </div>
 
@@ -332,7 +332,7 @@ function buildGithubMemberRows_(roster, members, actionEmail, showNames, renderT
     const status = missing ? 'Submit GitHub Account' : joined ? 'Repository joined' : 'Accept Invitation Email';
     const icon = missing ? 'triangle-alert' : joined ? 'check' : 'clock';
     const statusText = missing && actionEmail && emailsMatch(student.email, actionEmail)
-      ? `<button type="button" class="github-form-jump app-btn btn-md btn-secondary" onclick="DashboardUI.focusGithubAccountForm(this)">${escapeHtml(status)}</button>` : `<span>${escapeHtml(status)}</span>`;
+      ? `<button type="button" class="github-form-jump btn btn-outline" onclick="DashboardUI.focusGithubAccountForm(this)">${escapeHtml(status)}</button>` : `<span>${escapeHtml(status)}</span>`;
     return `<li class="github-member-status${missing ? ' is-missing' : joined ? ' is-joined' : ''}"><span class="github-member-register">${showNames && student.name ? '<strong>'+escapeHtml(student.name)+'</strong><br>' : ''}${escapeHtml(student.regno || '')}</span><span class="github-member-separator" aria-hidden="true">—</span><span class="github-member-state">${renderLucideIcon_(icon)}${statusText}</span>${renderTiming ? '<span class="github-member-timing">'+renderTiming(member)+'</span>' : ''}</li>`;
   }).join('');
 }

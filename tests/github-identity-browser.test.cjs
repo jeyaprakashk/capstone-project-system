@@ -23,7 +23,7 @@ function fixture() {
 
 test('form jump scrolls and focuses inside the current card without navigation or RPC',()=>{
   const f=fixture(),calls=[];
-  f.document.body.className='step-card';f.input.id='studentGithubProfile';
+  f.document.body.setAttribute('data-step-card','');f.input.id='studentGithubProfile';
   f.input.scrollIntoView=options=>calls.push(['scroll',options.block,options.behavior]);
   f.input.focus=options=>calls.push(['focus',options.preventScroll]);
   f.context.focusGithubAccountForm(f.form.querySelector('button'));

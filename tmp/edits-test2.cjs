@@ -1,0 +1,1 @@
+module.exports=[{file:'tests/review-evaluation.test.cjs',find:"const chips=[0,1].map(i=>({dataset:{selectStudent:String(i)},attrs:{},",replace:"const chips=[0,1].map(i=>({dataset:{selectStudent:String(i)},attrs:{},classList:{toggle(){}},"}];

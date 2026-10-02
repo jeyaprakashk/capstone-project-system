@@ -19,6 +19,7 @@ function fixture(overrides = {}, runtime = {}) {
   const properties = runtime.properties || new Map([['SHEET_ID','test-id'],['GITHUB_TOKEN','test-token']]);
   const c = createSheetReadContext({Date, console,
     CacheService:runtime.cache ? {getScriptCache:()=>runtime.cache} : undefined,
+    HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(path.join(__dirname,'..',name+'.html'),'utf8')})},
     PropertiesService:{getScriptProperties:()=>({getProperty:key=>properties.get(key)||null,setProperty:(key,value)=>properties.set(key,value)})},
     SpreadsheetApp:{openById:()=>({getSheetByName:name=>name==='AssessmentDefinitions'?null:name==='Milestones'?milestones:sheet,getSheets:()=>[],getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),flush:()=>{}},
     Utilities:{getUuid:()=>require('node:crypto').randomUUID(),formatDate:(date,tz,pattern)=> {
@@ -451,7 +452,7 @@ test('unavailable reviews do not produce overdue review alerts or on-track healt
 
 test('drawer sections load independently, retry alone and ignore stale callbacks',()=>{
   const {c}=fixture();const requests=[];
-  const element=()=>{const classes=new Set();return {innerHTML:'',children:[],setAttribute(){},querySelector(){return null;},appendChild(child){this.children.push(child);},addEventListener(event,fn){this[event]=fn;},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}};};
+  const element=()=>{const classes=new Set();return {innerHTML:'',children:[],dataset:{},setAttribute(){},querySelector(){return null;},appendChild(child){this.children.push(child);},addEventListener(event,fn){this[event]=fn;},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}};};
   const elements=Object.fromEntries(['teamDrawer','teamDrawerBackdrop','teamDrawerContent','teamDrawerTitle','drawerSection-basic','drawerSection-progress','drawerSection-activity'].map(id=>[id,element()]));
   const document={readyState:'loading',addEventListener(){},getElementById:id=>elements[id],createElement:element,body:element()};
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},loadCoordinatorDrawerSection(teamId,section){requests.push({...handlers,teamId,section});}};return chain;}};
@@ -552,7 +553,7 @@ function timelineBrowser() {
   const document={body:target(),createElement:target,readyState:'loading',addEventListener:(event,callback)=>{initialize=callback;},
     getElementById:id=>id==='sharedProjectTimeline'?timeline:null,
     querySelectorAll:()=>[],querySelector:selector=>{
-      if(selector==='[data-role-panel].active')return {getAttribute:()=> 'guide'};
+      if(selector==='[data-role-panel]:not([hidden])')return {getAttribute:()=> 'guide'};
       if(selector.includes('data-role-content="guide"'))return guide;
       if(selector.includes('data-role-content="reviewer"'))return reviewer;
       return null;

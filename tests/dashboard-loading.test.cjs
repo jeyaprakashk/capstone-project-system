@@ -36,63 +36,70 @@ test('tracker sorts detached pages and retains sorting through searches',()=>{
  document.getElementById('trackerSearch').value='';c.applyCoordinatorFilters(true);assert.equal(ids()[0],'T1');
  document.querySelector('button').onclick();assert.equal(ids()[0],'T12');
 });
-function dialogFixture(deferDestroy=false) {
- const nodes=[],scripts=[],calls=[];let focused=0;
- const node=()=>({style:{},children:[],setAttribute(){},addEventListener(){},appendChild(child){this.children.push(child);},showModal(){this.open=true;},close(){this.open=false;},remove(){this.removed=true;},focus(){focused++;}});
- const previous={isConnected:true,focus(){focused++;}};
- const document={activeElement:previous,createElement(){const el=node();nodes.push(el);return el;},body:node(),head:{appendChild(script){scripts.push(script);}}};
- const window={matchMedia:()=>({matches:true})};
- const c=vm.createContext({document,window,setTimeout,clearTimeout});
+function dialogFixture() {
+ const {document,window}=require('linkedom').parseHTML('<html><body><button id="previous">Previous</button></body></html>');
+ document.activeElement=document.getElementById('previous');
+ window.HTMLElement.prototype.focus=function(){document.activeElement=this;};
+ const c=vm.createContext({document});
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
- for(const file of ['lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- const api=c.dashboardDialogsBrowser_(()=>'<div>Skeleton</div>',c.renderLucideIcon_);
- const resolveLibrary=()=>{window.Swal={fire(options){calls.push(options);return new Promise(resolve=>{options.resolve=result=>{resolve(result);if(!deferDestroy)options.didDestroy();};});}};scripts.at(-1).onload();};
- return {api,nodes,scripts,calls,resolveLibrary,focused:()=>focused};
+ return {document,api:c.dashboardDialogsBrowser_(),overlay:()=>document.querySelector('.overlay')};
 }
-test('dialogs load once, block duplicate approvals, preserve literal text and restore focus',async()=>{
- const f=dialogFixture();const result=f.api.ask('<b>Discard?</b>');
- assert.equal(f.scripts.length,1);assert(f.nodes[0].open);
- assert.equal(await f.api.ask('Duplicate'),false);
- f.resolveLibrary();await Promise.resolve();await Promise.resolve();
- assert.equal(f.calls[0].text,'<b>Discard?</b>');assert.equal(f.calls[0].html,undefined);
- assert.equal(f.calls[0].target,f.nodes[0]);assert.equal(f.calls[0].focusCancel,true);
- assert.equal(f.calls[0].animation,false);
- f.calls[0].resolve({isConfirmed:false});assert.equal(await result,false);
- assert(f.nodes[0].removed);assert.equal(f.focused(),1);
- const next=f.api.ask('Submit?');await Promise.resolve();
- assert.equal(f.scripts.length,1);f.calls[1].resolve({isConfirmed:true});assert.equal(await next,true);
+test('framework modal queues confirmations, preserves literal text and returns focus',async()=>{
+ const f=dialogFixture(),previous=f.document.activeElement;
+ const result=f.api.ask('<b>Discard?</b>');
+ assert.equal(f.overlay().querySelector('.modal').getAttribute('role'),'dialog');
+ assert.equal(f.overlay().querySelector('.modal').getAttribute('aria-modal'),'true');
+ assert.equal(f.overlay().querySelector('.modal-body').textContent,'<b>Discard?</b>');
+ const queued=f.api.ask('Duplicate');
+ assert.doesNotMatch(f.overlay().textContent,/Duplicate/);
+ f.overlay().querySelector('.modal-footer button').click();
+ assert.equal(await result,false);await Promise.resolve();
+ assert.match(f.overlay().textContent,/Duplicate/);
+ f.overlay().querySelector('.modal-footer button').click();assert.equal(await queued,false);
+ assert.equal(f.overlay(),null);assert.equal(f.document.activeElement,previous);
+ const next=f.api.ask('Submit?');f.overlay().querySelector('.modal-footer button:last-child').click();assert.equal(await next,true);
 });
-test('dialog host stays mounted until animated cleanup finishes',async()=>{
- const f=dialogFixture(true);let settled=false;
- const result=f.api.ask('Close drawer?').then(value=>{settled=true;return value;});
- f.resolveLibrary();await Promise.resolve();await Promise.resolve();
- f.calls[0].resolve({isConfirmed:true});
- await Promise.resolve();await Promise.resolve();
- assert.equal(settled,false);assert(f.nodes[0].open);assert(!f.nodes[0].removed);
- assert.equal(f.focused(),0);assert.equal(await f.api.ask('Duplicate'),false);
- f.calls[0].didDestroy();
- assert.equal(await result,true);assert(f.nodes[0].removed);assert.equal(f.focused(),1);
+test('framework modal traps focus and Escape cancels',async()=>{
+ const f=dialogFixture(),result=f.api.ask('Close drawer?'),overlay=f.overlay();
+ const buttons=overlay.querySelectorAll('button');buttons[1].focus();
+ const tab=new f.document.defaultView.Event('keydown',{bubbles:true,cancelable:true});
+ Object.defineProperty(tab,'key',{value:'Tab'});Object.defineProperty(tab,'shiftKey',{value:false});
+ overlay.dispatchEvent(tab);assert.equal(f.document.activeElement,buttons[0]);
+ const esc=new f.document.defaultView.Event('keydown',{bubbles:true,cancelable:true});Object.defineProperty(esc,'key',{value:'Escape'});
+ overlay.dispatchEvent(esc);assert.equal(await result,false);
 });
-
-test('prompt validates blank remarks and returns trimmed input only on approval',async()=>{
- const f=dialogFixture();const result=f.api.requestText('Reason');f.resolveLibrary();await Promise.resolve();await Promise.resolve();
- assert(f.calls[0].inputValidator('   '));assert.equal(f.calls[0].inputValidator('Evidence'),undefined);
- f.calls[0].resolve({isConfirmed:true,value:' Evidence '});assert.equal(await result,'Evidence');
- const cancelled=f.api.requestText('Reason');await Promise.resolve();f.calls[1].resolve({isConfirmed:false});assert.equal(await cancelled,null);
+test('framework prompt validates blank remarks and returns trimmed input',async()=>{
+ const f=dialogFixture(),result=f.api.requestText('Reason');
+ const input=f.overlay().querySelector('textarea');input.value='   ';
+ f.overlay().querySelector('.modal-footer button:last-child').click();
+ assert.equal(f.overlay().querySelector('[role="alert"]').textContent,'Please enter a remark.');
+ input.value=' Evidence ';f.overlay().querySelector('.modal-footer button:last-child').click();
+ assert.equal(await result,'Evidence');
+ const cancelled=f.api.requestText('Reason');f.overlay().querySelector('.modal-footer button').click();assert.equal(await cancelled,null);
 });
-test('failed library load fails closed and the next action retries the download',async()=>{
- const f=dialogFixture();const result=f.api.ask('Publish?');f.scripts[0].onerror();
- await Promise.resolve();await Promise.resolve();await Promise.resolve();
- const panel=f.nodes[0].children.at(-1);assert.match(panel.children[0].textContent,/not performed/);
- panel.children[1].onclick();assert.equal(await result,false);
- const retry=f.api.ask('Publish?');assert.equal(f.scripts.length,2);f.resolveLibrary();await Promise.resolve();await Promise.resolve();
- f.calls[0].resolve({isConfirmed:true});assert.equal(await retry,true);
+test('framework confirmation works without a remote dialog library',async()=>{
+ const f=dialogFixture(),result=f.api.ask('Publish?');
+ assert.equal(f.document.querySelector('script[src*="sweetalert"]'),null);
+ f.overlay().querySelector('.modal-footer button:last-child').click();assert.equal(await result,true);
 });
-test('notifications wait for an existing confirmation instead of replacing it',async()=>{
- const f=dialogFixture();const decision=f.api.ask('Discard?');const notice=f.api.notify('Sync completed','success');
- f.resolveLibrary();await Promise.resolve();await Promise.resolve();assert.equal(f.calls.length,1);
- f.calls[0].resolve({isConfirmed:false});await decision;await Promise.resolve();await Promise.resolve();
- assert.equal(f.calls[1].text,'Sync completed');f.calls[1].resolve({isConfirmed:true});await notice;
+test('danger confirmation uses framework notice, inerts the page and cancels on scrim click',async()=>{
+ const f=dialogFixture(),previous=f.document.getElementById('previous');
+ const result=f.api.confirmDialog({title:'Delete item',body:'This action removes the item.',confirmText:'Delete',cancelText:'Keep',tone:'danger'});
+ const overlay=f.overlay();
+ assert.equal(overlay.querySelector('.modal-header h2').textContent,'Delete item');
+ assert.match(overlay.querySelector('.notice--danger').textContent,/removes the item/);
+ assert.equal(overlay.querySelector('.btn-outline').textContent,'Keep');
+ assert.equal(overlay.querySelector('.btn-primary').textContent,'Delete');
+ assert.equal(previous.inert,true);
+ overlay.click();assert.equal(await result,false);
+ assert.notEqual(previous.inert,true);assert.equal(f.document.activeElement,previous);
+});
+test('notifications wait for an existing confirmation',async()=>{
+ const f=dialogFixture(),decision=f.api.ask('Discard?'),notice=f.api.notify('Sync completed','success');
+ assert.match(f.overlay().textContent,/Discard/);
+ f.overlay().querySelector('.modal-footer button').click();await decision;await Promise.resolve();
+ assert.match(f.overlay().textContent,/Sync completed/);
+ f.overlay().querySelector('.modal-footer button').click();await notice;
 });
 test('Coordinator storage setup displays journals, blocks duplicates and retries failures',()=>{
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body>'+['reviewConfigurationCard','createAssessmentDefinitionsButton','reviewDefinitionsLink','reviewAssessmentReadiness','reviewConfigurationRecheck','initializeAssessmentStorageButton','reviewConfigurationSummary','reviewConfigurationIssues','reviewConfigurationCheckedAt','reviewConfigLink','reviewRubricsLink','assessmentStorageStatus','assessmentStorageResults'].map(id=>'<div id="'+id+'"></div>').join('')+'</body></html>');
@@ -207,7 +214,7 @@ test('student rubric tab reuses shared content and switching back restores My Te
 });
 
 test('shell selects the common theme before scripts or fonts load',()=>{
- const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})}});
+ const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
  for(const file of ['common-styles.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
  for(const name of ['getInternalAssessmentPublishingClientScript_','getDashboardClientScript','getGuideEvaluationClientScript','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_']) c[name]=()=>'';
  for(const key of ['student','guide','reviewer','coord']) {
@@ -219,7 +226,9 @@ test('shell selects the common theme before scripts or fonts load',()=>{
   assert.equal(document.querySelector('#sharedRubricsHeading').tagName,'H2');
   assert.equal(document.querySelector('.timeline-heading h2').textContent,'Project timeline');
   assert(html.indexOf(c.getEditorialStyles_())<html.indexOf('</style>'));
-  assert.match(html,/Source\+Serif\+4/);assert.match(html,/Source\+Sans\+3/);
+  assert(html.indexOf('</style>')<html.indexOf('/* ====================================================================='));
+  assert.match(html,/Source\+Sans\+3/);
+  assert.doesNotMatch(html,/Source\+Serif\+4|Space\+Grotesk|JetBrains\+Mono|family=Inter/);
  }
  const html=c.buildDashboardShell('preview@example.test',[{key:'student',label:'My Team',contentId:'studentContent'},{key:'guide',label:'Guide',contentId:'guideContent'}]);
  assert.match(html,/<body data-dashboard-theme="editorial">/);
@@ -231,10 +240,14 @@ test('shell selects the common theme before scripts or fonts load',()=>{
 
 test('shared heading scale keeps content larger than cards and subsections',()=>{
  const c=vm.createContext({});vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
- const css=c.getEditorialStyles_();
- const size=level=>Number(css.match(new RegExp('--heading-'+level+':(\\d+)px'))[1]);
- assert(size('content')>size('card'));
- assert(size('card')>size('subsection'));
+ const css=c.getEditorialStyles_(),sheet=fs.readFileSync('app-styles.html','utf8');
+ const size=level=>{
+  const token=sheet.match(new RegExp('--fs-'+level+':(\\d+)px'));
+  assert(token,level);
+  return Number(token[1]);
+ };
+ assert(size('h1')>size('h2'));
+ assert(size('h2')>size('h3'));
  for(const selector of ['.student-dashboard .dash-hero h2','.dashboard-body-surface .dashboard-container-header h2','.utility-body .utility-header :is(h1,h2)']) assert(css.includes(selector));
 });
 
@@ -249,12 +262,17 @@ test('editorial rules stay opt-in and text palette pairs meet normal-text contra
   }
  }
  assert(!css.includes('!important'));
- const token=name=>{const match=(css+c.getBaseStyles()).match(new RegExp('--color-'+name+':(#[0-9a-f]{6})','i'));assert(match,name);return match[1];};
+ const palette=fs.readFileSync('app-styles.html','utf8');
+ const token=name=>{
+  const match=palette.match(new RegExp('--'+name+':(#[0-9a-f]{6}|var\\(--([a-z-]+)\\))','i'));
+  assert(match,name);
+  return match[1].startsWith('#')?match[1]:token(match[2]);
+ };
  const luminance=hex=>{
   const rgb=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
   return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;
  };
- for(const [foreground,background] of [['ink','canvas'],['ink','paper'],['ink-muted','canvas'],['ink-muted','paper'],['accent-primary','accent-tint'],['accent-primary','paper'],['on-accent','accent-fill'],['on-accent','accent-fill-hover'],['success','success-tint'],['warning','warning-tint'],['danger','danger-tint'],['info','info-tint']]) {
+ for(const [foreground,background] of [['text','canvas'],['text','paper'],['muted','canvas'],['muted','paper'],['primary','tint'],['primary','paper'],['paper','primary'],['paper','primary-hover'],['success','success-tint'],['warning','warning-tint'],['danger','danger-tint'],['info','info-tint']]) {
   const values=[luminance(token(foreground)),luminance(token(background))].sort((a,b)=>a-b);
   assert((values[1]+.05)/(values[0]+.05)>=4.5,foreground+' on '+background);
  }
@@ -262,8 +280,8 @@ test('editorial rules stay opt-in and text palette pairs meet normal-text contra
 
 function rubricClientFixture() {
  const f=fixture(), nodes={}, document=f.c.document;
- for(const id of ['sharedRubrics','sharedRubricsContent','sharedRubricsToggle','rubricDrawer','rubricDrawerBackdrop','rubricDrawerTitle','rubricDrawerContent','rubricDrawerClose','teamDrawer','teamDrawerBackdrop']) {
-  const classes=new Set();nodes[id]={innerHTML:'',attrs:{},isConnected:true,setAttribute(k,v){this.attrs[k]=v;},
+ for(const id of ['sharedRubrics','sharedRubricsContent','sharedRubricsToggle','rubricDrawer','rubricDrawerBackdrop','rubricDrawerTitle','rubricDrawerContent','rubricDrawerClose','teamDrawer','teamDrawerBackdrop','teamDrawerContent','teamDrawerTitle','teamDrawerClose']) {
+  const classes=new Set();nodes[id]={innerHTML:'',attrs:{},dataset:{},isConnected:true,setAttribute(k,v){this.attrs[k]=v;},
    classList:{add:k=>classes.add(k),remove:k=>classes.delete(k),contains:k=>classes.has(k)},
    querySelectorAll:()=>[],focus(){document.activeElement=this;}};
  }
@@ -271,6 +289,8 @@ function rubricClientFixture() {
  nodes.sharedRubricsContent.querySelector=()=>retry;
  nodes.rubricDrawer.querySelectorAll=()=>[nodes.rubricDrawerClose];
  nodes.rubricDrawer.contains=el=>el===nodes.rubricDrawerClose;
+ nodes.teamDrawer.querySelectorAll=()=>[nodes.teamDrawerClose];
+ nodes.teamDrawer.contains=el=>el===nodes.teamDrawerClose;
  document.body.classList={add(){},remove(){}};
  const lookup=document.getElementById;document.getElementById=id=>nodes[id]||lookup(id);
  const ui=vm.runInContext('DashboardUI',f.c);
@@ -281,7 +301,7 @@ function rubricClientFixture() {
 
 test('rubrics start alongside pending role and timeline, deduplicate and survive role switches',async()=>{
  const f=rubricClientFixture();const query=f.c.document.querySelector;
- f.c.document.querySelector=selector=>selector==='[data-role-panel].active'?{getAttribute:()=> 'guide'}:query(selector);
+ f.c.document.querySelector=selector=>selector==='[data-role-panel]:not([hidden])'?{getAttribute:()=> 'guide'}:query(selector);
  f.c.initializeFirstRoleTab();
  for(const key of ['loadDashboardRoleContent','loadSharedProjectTimeline','loadSharedRubrics']) assert(f.requests.some(r=>r.key===key),key);
  const promise=f.ui.loadSharedRubrics();assert.equal(f.ui.loadSharedRubrics(),promise);
@@ -330,8 +350,8 @@ test('shared rubric shell follows timeline and reuses responsive drawer styles',
  const router=fs.readFileSync('dashboard-router.js','utf8'), coordinator=fs.readFileSync('coordinator-dashboard.js','utf8');
  assert(router.indexOf('id="sharedRubrics"')>router.indexOf('id="sharedProjectTimeline"'));
  assert(router.indexOf('id="sharedRubrics"')<router.indexOf('${rolePanels}'));
- assert.match(router,/id="rubricDrawer" class="team-drawer" role="dialog"/);
- assert.match(router,/id="rubricDrawerBackdrop"[^>]+DashboardUI.closeRubricDrawer/);
+ assert.match(router,/id="rubricDrawer" class="team-drawer drawer" data-tooltip-boundary role="dialog"/);
+ assert.match(router,/id="rubricDrawerBackdrop" class="team-drawer-backdrop drawer-scrim" hidden/);
  assert.match(coordinator,/width: min\(520px, 92vw\)/);
  assert.match(coordinator,/@media \(max-width: 600px\)\s*\{\s*\.team-drawer\s*\{\s*width: 100%/);
  assert(!coordinator.includes('${buildRubricsStatusCard_()}'));
@@ -348,7 +368,7 @@ test('rubric request failures release loading state and retry successfully',asyn
 test('rubric drawer escapes text, traps focus, closes on Escape and excludes team drawer',async()=>{
  const f=rubricClientFixture();const promise=f.ui.loadSharedRubrics();f.done('loadSharedRubrics',f.data);await promise;
  const trigger={isConnected:true,focus(){f.c.document.activeElement=this;}};
- f.nodes.teamDrawer.classList.add('open');f.ui.openRubricDrawer('review1',trigger);
+ f.nodes.teamDrawer.classList.add('open');f.nodes.teamDrawer.dataset.open='true';f.ui.openRubricDrawer('review1',trigger);
  assert(!f.nodes.teamDrawer.classList.contains('open'));assert(f.nodes.rubricDrawer.classList.contains('open'));
  assert.match(f.nodes.rubricDrawerContent.innerHTML,/&lt;unsafe&gt;/);assert.match(f.nodes.rubricDrawerContent.innerHTML,/Level 5/);
  assert.equal(f.c.document.activeElement,f.nodes.rubricDrawerClose);
@@ -358,6 +378,19 @@ test('rubric drawer escapes text, traps focus, closes on Escape and excludes tea
  f.ui.openRubricDrawer('see',trigger);assert(!f.nodes.rubricDrawer.classList.contains('open'));
  f.ui.openRubricDrawer('review1',trigger);f.ui.focusCoordinatorTeam('1');assert(!f.nodes.rubricDrawer.classList.contains('open'));
  assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
+});
+test('coordinator drawer shares focus trap, Escape and trigger focus return',()=>{
+ const f=rubricClientFixture(),trigger={isConnected:true,focus(){f.c.document.activeElement=this;}};
+ f.c.document.activeElement=trigger;
+ f.ui.focusCoordinatorTeam('1');
+ assert(f.nodes.teamDrawer.classList.contains('open'));
+ assert.equal(f.nodes.teamDrawer.attrs['aria-hidden'],'false');
+ assert.equal(f.c.document.activeElement,f.nodes.teamDrawerClose);
+ f.fire('keydown',{key:'Escape',preventDefault(){}});
+ assert.equal(f.nodes.teamDrawer.inert,true);
+ assert.equal(f.c.document.activeElement,trigger);
+ const source=fs.readFileSync('coordinator-dashboard.js','utf8');
+ assert.match(source,/id="teamDrawer"[\s\S]*?role="dialog" aria-modal="true" aria-labelledby="teamDrawerTitle"/);
 });
 test('all roles preload in order while announcements remain pending, and are reused',()=>{
  const f=fixture();f.click('guide');vm.runInContext('DashboardUI.initializeLoading()',f.c);
@@ -471,6 +504,10 @@ test('hidden preloaded panels use full skeletons while visible short controls st
   const finish=ui.beginContentLoading(host,'Loading tab',{compact});
   const overlay=host.querySelector('.app-loading-overlay');
   assert(overlay.querySelector('.app-skeleton--'+variant));
+  assert.equal(overlay.querySelectorAll('.sr-only').length,1);
+  assert.equal(overlay.querySelector('.sr-only').textContent,'Loading');
+  assert.equal(overlay.querySelector('.app-skeleton').getAttribute('aria-busy'),'true');
+  assert(overlay.querySelector(variant==='inline'?'.spinner--sm':'.skeleton[aria-hidden="true"]'));
   assert.equal(button.inert,true);
   if(initialHeight===0){height=180;assert.equal(overlay.querySelectorAll('.app-skeleton-lines > span').length,3);}
   finish();finish();assert.equal(host.children.length,1);assert.equal(host.firstElementChild,button);
@@ -622,7 +659,7 @@ test('reviewer assigned table includes all assigned stages and excludes other co
  assert(html.includes('R1'));assert(html.includes('&lt;script&gt;title&lt;/script&gt;'));assert(!html.includes('<script>'));
  assert(html.includes('Pending review'));assert(html.includes('Approved'));assert(html.includes('Revision requested'));
  const unsubmitted=c.buildReviewerAssignedTeams_({assigned:[['T4','C1','','','Guide','   ']]});
- assert(unsubmitted.includes('status-badge gray">Not submitted</span>'));assert(!unsubmitted.includes('Awaiting guide'));
+ assert(unsubmitted.includes('class="chip">Not submitted</span>'));assert(!unsubmitted.includes('Awaiting guide'));
  const submitted=c.buildReviewerAssignedTeams_({assigned:[['T5','C1','','','Guide','Submitted title']]});
  assert(submitted.includes('Awaiting guide'));
  assert(c.buildReviewerAssignedTeams_({assigned:[]}).includes('No teams are assigned to you.'));

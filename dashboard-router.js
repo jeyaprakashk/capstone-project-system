@@ -132,27 +132,25 @@ function buildDashboardShell(email, views) {
   // Role tabs are followed by one common utility tab. Announcements is not a role.
   const roleIcons = { student:'graduation-cap', guide:'book-open', reviewer:'clipboard-check', coord:'network' };
   const roleButtons = views.map((view, index) =>
-    `<button type="button" class="role-tab-btn${index === 0 ? ' active' : ''}" data-role-tab="${escapeHtml(view.key)}" onclick="showRoleTab('${escapeHtml(view.key)}')">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml(view.label)}</button>`
+    `<button type="button" class="role-tab-btn tab${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml(view.key)}" aria-controls="rolePanel-${escapeHtml(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml(view.key)}" onclick="showRoleTab('${escapeHtml(view.key)}')">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml(view.label)}</button>`
   ).join('');
-  const rubricsButton = `<button type="button" class="role-tab-btn" data-role-tab="rubrics" onclick="showRoleTab('rubrics')">${renderLucideIcon_('book-open')}Timeline &amp; Rubrics</button>`;
+  const rubricsButton = `<button type="button" class="role-tab-btn tab" role="tab" id="roleTab-rubrics" aria-controls="rolePanel-rubrics" aria-selected="false" tabindex="-1" data-role-tab="rubrics" onclick="showRoleTab('rubrics')">${renderLucideIcon_('book-open')}Timeline &amp; Rubrics</button>`;
   const hasCoordinator = views.some(view => view.key === 'coord');
-  const systemButton = hasCoordinator ? `<button type="button" class="role-tab-btn" data-role-tab="system-status" onclick="showRoleTab(&quot;system-status&quot;)">${renderLucideIcon_('activity')}System Status</button>` : '';
-  const systemPanel = hasCoordinator ? `<section class="role-panel dashboard-body-surface utility-body" data-role-panel="system-status">${buildDashboardContainerHeader_('System Status', 'systemStatus')}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
-  const announcementsButton = `<button type="button" class="role-tab-btn" data-role-tab="announcements" onclick="showRoleTab('announcements')">${renderLucideIcon_('megaphone')}Announcements</button>`;
+  const systemButton = hasCoordinator ? `<button type="button" class="role-tab-btn tab" role="tab" id="roleTab-system-status" aria-controls="rolePanel-system-status" aria-selected="false" tabindex="-1" data-role-tab="system-status" onclick="showRoleTab(&quot;system-status&quot;)">${renderLucideIcon_('activity')}System Status</button>` : '';
+  const systemPanel = hasCoordinator ? `<section class="role-panel tabpanel dashboard-body-surface utility-body" id="rolePanel-system-status" role="tabpanel" aria-labelledby="roleTab-system-status" data-role-panel="system-status" hidden>${buildDashboardContainerHeader_('System Status', 'systemStatus')}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
+  const announcementsButton = `<button type="button" class="role-tab-btn tab" role="tab" id="roleTab-announcements" aria-controls="rolePanel-announcements" aria-selected="false" tabindex="-1" data-role-tab="announcements" onclick="showRoleTab('announcements')">${renderLucideIcon_('megaphone')}Announcements</button>`;
 
   const rolePanels = views.map((view, index) =>
-    `<section class="role-panel${index === 0 ? ' active' : ''}" data-role-panel="${escapeHtml(view.key)}"><div class="${view.key === 'student' ? '' : 'dashboard-body-surface'}" id="${escapeHtml(view.contentId)}" data-role-content="${escapeHtml(view.key)}">${getSkeletonMarkup_('panel', 'Loading ' + view.label)}</div></section>`
+    `<section class="role-panel tabpanel${index === 0 ? ' active' : ''}" id="rolePanel-${escapeHtml(view.key)}" role="tabpanel" aria-labelledby="roleTab-${escapeHtml(view.key)}" data-role-panel="${escapeHtml(view.key)}"${index === 0 ? '' : ' hidden'}><div class="${view.key === 'student' ? '' : 'dashboard-body-surface'}" id="${escapeHtml(view.contentId)}" data-role-content="${escapeHtml(view.key)}">${getSkeletonMarkup_('panel', 'Loading ' + view.label)}</div></section>`
   ).join('');
 
-  const announcementsPanel = `<section class="role-panel" data-role-panel="announcements"><div id="announcementsContent">${getSkeletonMarkup_('panel', 'Loading announcements')}</div></section>`;
+  const announcementsPanel = `<section class="role-panel tabpanel" id="rolePanel-announcements" role="tabpanel" aria-labelledby="roleTab-announcements" data-role-panel="announcements" hidden><div id="announcementsContent">${getSkeletonMarkup_('panel', 'Loading announcements')}</div></section>`;
 
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <base target="_top">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 ${getGuideStyles()}
 ${getCoordinatorStyles()}
@@ -163,96 +161,91 @@ ${getSharedTimelineStyles_()}
 ${getLoadingStyles_()}
 ${getDashboardSurfaceStyles_()}
 ${getLucideStyles_()}
-.dashboard-navigation { margin-bottom:20px; }
-.role-tabs { display:flex; gap:8px; flex-wrap:wrap; }
+.dashboard-navigation { margin-bottom:var(--space-5); }
+.role-tabs { display:flex; gap:var(--space-2); flex-wrap:wrap; }
 .role-menu-toggle { display:none; }
-.dashboard-navigation button:focus-visible { outline:3px solid #9e77ed; outline-offset:3px; }
+.dashboard-navigation button:focus-visible { outline:3px solid var(--primary); outline-offset:3px; }
 @media(max-width:1200px) {
-  .dashboard-navigation { padding:8px; border:1px solid #e4e7ec; border-radius:14px; background:#fff; }
-  .role-menu-toggle { display:flex; align-items:center; gap:10px; width:100%; min-height:44px; padding:10px 12px; border:0; border-radius:9px; background:#f8fafc; color:#182230; font:600 14px 'Inter','Segoe UI',sans-serif; cursor:pointer; text-align:left; }
+  .dashboard-navigation { padding:var(--space-2); border:1px solid var(--border); border-radius:var(--radius-card); background:var(--paper); }
+  .role-menu-toggle { display:flex; align-items:center; gap:10px; width:100%; min-height:44px; cursor:pointer; text-align:left; }
   .role-menu-toggle .role-menu-label { flex:1; }
-  .role-menu-toggle .role-menu-caption { color:#667085; font-size:12px; font-weight:400; }
-  .dashboard-navigation .role-tabs { display:none; margin-top:8px; gap:4px; }
+  .role-menu-toggle .role-menu-caption { color:var(--primary); font-size:var(--fs-meta); font-weight:var(--fw-regular); }
+  .dashboard-navigation .role-tabs { display:none; margin-top:var(--space-2); gap:var(--space-1); }
   .dashboard-navigation.menu-open .role-tabs { display:flex; flex-direction:column; }
-  .dashboard-navigation .role-tab-btn { width:100%; min-height:44px; justify-content:flex-start; border-radius:9px; }
+  .dashboard-navigation .role-tab-btn { width:100%; min-height:44px; justify-content:flex-start; }
 }
-.role-tab-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding: 10px 20px; border-radius: 999px; font-size: 14px; font-weight: 600; border: 1px solid #dcdfe4; background: #fff; color: #6b7280; cursor: pointer; }
-.role-tab-btn.active { background: #1f2430; color: #fff; border-color: #1f2430; }
+.role-tab-btn { display:inline-flex; align-items:center; justify-content:center; gap:var(--space-2); cursor: pointer; }
 @media(min-width:1201px) {
-  .dashboard-navigation { background:#fff; border:1px solid #e4e7ec; border-radius:12px; padding:0; }
-  .dashboard-navigation .role-tabs { gap:0; flex-wrap:wrap; border-radius:11px; }
-  .dashboard-navigation .role-tab-btn { flex:1 0 auto; min-height:48px; padding:12px 14px; border:0; border-radius:0; background:transparent; color:#667085; white-space:nowrap; }
-  .dashboard-navigation .role-tab-btn:hover { background:#f8fafc; color:#344054; }
-  .dashboard-navigation .role-tab-btn.active { background:#f5f3ff; color:#6941c6; box-shadow:inset 0 -3px #6941c6; }
+  .dashboard-navigation { background:var(--paper); border:1px solid var(--border); border-radius:var(--radius-card); padding:0; }
+  .dashboard-navigation .role-tabs { gap:0; flex-wrap:wrap; border-radius:var(--radius-card); }
+  .dashboard-navigation .role-tab-btn { flex:1 0 auto; min-height:48px; white-space:nowrap; }
   .dashboard-navigation .role-tab-btn:focus-visible { outline-offset:-3px; }
 }
 .role-panel { display: none; }
 .role-panel.active { display: block; }
-.role-load-error { margin:20px 0; padding:14px 16px; border:1px solid #fecaca; background:#fef2f2; color:#991b1b; border-radius:10px; }
-.shared-rubrics { container:rubrics / inline-size; margin:0 0 20px; padding:20px 24px; border:1px solid #30324d; border-radius:16px; background:radial-gradient(ellipse at top right,rgba(139,92,246,.16),transparent 60%),#101523; color:#c5cee0; color-scheme:dark; box-shadow:0 8px 24px rgba(11,15,23,.14),inset 0 1px 0 rgba(255,255,255,.04); }
-.shared-rubrics h2 { margin:0 0 12px; font-family:'Space Grotesk','Inter',sans-serif; font-size:16px; color:#f5f7fa; }
-.rubric-assessments { display:grid; grid-template-columns:1fr; grid-auto-rows:1fr; gap:12px; }
-.rubric-assessment { display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; min-width:0; gap:18px; padding:18px; border:1px solid #45526b; border-radius:10px; background:#1b2335; color:#c5cee0; font:inherit; text-align:left; cursor:pointer; overflow-wrap:anywhere; transition:background .18s ease,border-color .18s ease; }
-.rubric-assessment strong { flex:1 1 100px; min-width:0; font-size:16px; line-height:1.4; color:#f5f7fa; }
-.rubric-assessment:hover:enabled { border-color:#9e77ed; background:#302747; }
-.rubric-assessment span { font-size:var(--font-size-body); line-height:1.5; }
-.rubric-assessment .rubric-weight { flex:0 0 auto; max-width:100%; box-sizing:border-box; padding:3px 9px; border:1px solid #705494; border-radius:var(--pill-radius); background:#332647; color:#e2d9ff; font-size:14px; font-weight:700; }
-.rubric-assessment .rubric-header, .rubric-assessment .rubric-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; width:100%; min-width:0; text-align:left; }
+.role-load-error { margin:var(--space-5) 0; padding:14px var(--space-4); border:1px solid var(--danger-tint); background:var(--canvas); color:var(--danger); border-radius:var(--radius-btn); }
+.shared-rubrics { container:rubrics / inline-size; margin:0 0 var(--space-5); padding:var(--space-5) var(--space-6); border:1px solid var(--border); border-radius:var(--radius-card); background:var(--paper); color:var(--text); box-shadow:var(--shadow-card); }
+.shared-rubrics h2 { margin:0 0 var(--space-3); font-family:var(--font); font-size:var(--fs-h2); color:var(--text); }
+.rubric-assessments { display:grid; grid-template-columns:1fr; grid-auto-rows:1fr; gap:var(--space-3); }
+.rubric-assessment { display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; min-width:0; gap:var(--space-4); text-align:left; cursor:pointer; overflow-wrap:anywhere; }
+.rubric-assessment strong { flex:1 1 100px; min-width:0; font-size:var(--fs-h3); line-height:var(--lh-heading); color:var(--text); }
+.rubric-assessment span { font-size:var(--fs-body); line-height:var(--lh-body); }
+.rubric-assessment .rubric-weight { flex:0 0 auto; max-width:100%; box-sizing:border-box; padding:3px 9px; border:1px solid var(--border); border-radius:var(--radius-badge); background:var(--tint); color:var(--primary); font-size:var(--fs-body); font-weight:var(--fw-bold); }
+.rubric-assessment .rubric-header, .rubric-assessment .rubric-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px var(--space-4); width:100%; min-width:0; text-align:left; }
 .rubric-assessment .rubric-footer { margin-top:auto; }
-.rubric-assessment .rubric-metadata { color:#c5cee0; font-weight:400; }
-.rubric-assessment .rubric-action { display:inline-flex; align-items:center; gap:6px; color:#e2d9ff; font-weight:600; }
+.rubric-assessment .rubric-metadata { color:var(--muted); font-weight:var(--fw-regular); }
+.rubric-assessment .rubric-action { display:inline-flex; align-items:center; gap:6px; color:var(--primary); font-weight:var(--fw-semibold); }
 .rubric-mobile-row { display:none; }
 @container rubrics (width < 480px) {
   .rubric-assessments { gap:0; grid-auto-rows:auto; }
   .shared-rubrics .rubric-assessment { display:none; }
-  .rubric-mobile-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; min-height:64px; box-sizing:border-box; padding:8px 0; gap:2px 10px; }
-  .rubric-mobile-row ~ .rubric-mobile-row { border-top:1px solid #354057; }
+  .rubric-mobile-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; min-height:64px; box-sizing:border-box; padding:var(--space-2) 0; gap:2px 10px; }
+  .rubric-mobile-row ~ .rubric-mobile-row { border-top:1px solid var(--primary-hover); }
   .rubric-mobile-details { display:contents; }
   .rubric-mobile-title { display:contents; }
-  .rubric-mobile-title strong { grid-column:1; grid-row:1; min-width:0; overflow-wrap:anywhere; font-size:14px; line-height:1.4; color:#f5f7fa; }
-  .rubric-mobile-weight { grid-column:2; grid-row:1; justify-self:end; padding:2px 7px; border:1px solid #705494; border-radius:var(--pill-radius); background:#332647; color:#e2d9ff; font-size:12px; font-weight:700; line-height:1.4; white-space:nowrap; }
-  .rubric-mobile-meta { grid-column:1; grid-row:2; color:#c5cee0; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
-  .shared-rubrics .rubric-view-button { grid-column:2; grid-row:2; justify-self:end; position:relative; isolation:isolate; min-width:44px; min-height:44px; padding:6px 8px; border:0; border-radius:6px; background:transparent; color:#cbd5e1; font-family:inherit; font-size:12px; font-weight:600; line-height:1.4; white-space:nowrap; cursor:pointer; }
-  .shared-rubrics .rubric-view-button::before { content:''; position:absolute; inset:6px 0; z-index:-1; border:1px solid #3b4556; border-radius:6px; background:#0b101a; }
-  .shared-rubrics .rubric-view-button:hover:enabled { color:#f8fafc; }
-  .shared-rubrics .rubric-view-button:hover:enabled::before { background:#1b2433; border-color:#64748b; }
-  .shared-rubrics .rubric-view-button:focus-visible { outline:3px solid #cbd5e1; outline-offset:3px; }
+  .rubric-mobile-title strong { grid-column:1; grid-row:1; min-width:0; overflow-wrap:anywhere; font-size:var(--fs-body); line-height:var(--lh-heading); color:var(--text); }
+  .rubric-mobile-weight { grid-column:2; grid-row:1; justify-self:end; padding:2px 7px; border:1px solid var(--border); border-radius:var(--radius-badge); background:var(--tint); color:var(--primary); font-size:var(--fs-meta); font-weight:var(--fw-bold); line-height:var(--lh-heading); white-space:nowrap; }
+  .rubric-mobile-meta { grid-column:1; grid-row:2; color:var(--muted); font-size:var(--fs-meta); line-height:var(--lh-body); overflow-wrap:anywhere; }
+  .shared-rubrics .rubric-view-button { grid-column:2; grid-row:2; justify-self:end; position:relative; isolation:isolate; min-width:44px; min-height:44px; line-height:var(--lh-heading); white-space:nowrap; cursor:pointer; }
+  .shared-rubrics .rubric-view-button:focus-visible { outline:3px solid var(--border); outline-offset:3px; }
 }
 @container rubrics (min-width:480px) { .rubric-assessments { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @container rubrics (min-width:960px) { .rubric-assessments { grid-template-columns:repeat(4,minmax(0,1fr)); } }
-.shared-rubrics-heading > button, #sharedRubricsContent > button { padding:8px 14px; border:1px solid #655192; border-radius:8px; background:#34274f; color:#e2d9ff; font:inherit; cursor:pointer; }
-.shared-rubrics-heading > button:hover, #sharedRubricsContent > button:hover { background:#473568; }
-.shared-rubrics-heading > button:focus-visible, #sharedRubricsContent > button:focus-visible { outline:3px solid #c4b5fd; outline-offset:3px; }
+.shared-rubrics-heading > button, #sharedRubricsContent > button { cursor:pointer; }
+.shared-rubrics-heading > button:focus-visible, #sharedRubricsContent > button:focus-visible { outline:3px solid var(--tint); outline-offset:3px; }
 #sharedRubrics[hidden] { display:none; }
-.shared-rubrics .app-skeleton { --skeleton-base:#242e42; --skeleton-highlight:#39425c; --skeleton-edge:#303b51; }
-.rubric-assessment:focus-visible, #rubricDrawer button:focus-visible { outline:3px solid #9e77ed; outline-offset:3px; }
-.rubric-levels { margin:12px 0 0; }
-.rubric-levels dt { margin-top:10px; font-size:12px; font-weight:600; color:#344054; }
-.rubric-levels dd { margin:4px 0 0; color:#667085; font-size:var(--font-size-body); line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
+.rubric-assessment:focus-visible, #rubricDrawer button:focus-visible { outline:3px solid var(--primary); outline-offset:3px; }
+.rubric-levels { margin:var(--space-3) 0 0; }
+.rubric-levels dt { margin-top:10px; font-size:var(--fs-meta); font-weight:var(--fw-semibold); color:var(--primary-hover); }
+.rubric-levels dd { margin:var(--space-1) 0 0; color:var(--primary); font-size:var(--fs-body); line-height:var(--lh-body); white-space:pre-wrap; overflow-wrap:anywhere; }
 #rubricDrawer .drawer-project-title { white-space:pre-wrap; overflow-wrap:anywhere; }
-@media(max-width:600px) { .shared-rubrics { padding:16px; } }
+@media(max-width:600px) { .shared-rubrics { padding:var(--space-4); } }
 ${getEditorialStyles_()}
 </style>
+${HtmlService.createHtmlOutputFromFile('app-styles').getContent()}
 </head>
 <body data-dashboard-theme="editorial">
 <header class="dashboard-app-header">
 <h1>Dashboard</h1>
 <p class="signed-in-as">Signed in as ${escapeHtml(email)}</p>
 <nav class="dashboard-navigation" id="dashboardNavigation" aria-label="Dashboard sections">
-<button type="button" class="role-menu-toggle" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems" onclick="DashboardUI.toggleRoleMenu()"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span class="role-menu-label" id="roleMenuLabel">${escapeHtml(views[0].label)}</span><span class="role-menu-caption">Menu</span></button>
-<div class="role-tabs" id="roleMenuItems">${roleButtons}${rubricsButton}${announcementsButton}${systemButton}</div>
+<button type="button" class="role-menu-toggle btn btn-outline" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems" onclick="DashboardUI.toggleRoleMenu()"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span class="role-menu-label" id="roleMenuLabel">${escapeHtml(views[0].label)}</span><span class="role-menu-caption">Menu</span></button>
+<div class="role-tabs tabs" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}${rubricsButton}${announcementsButton}${systemButton}</div>
 </nav>
 </header>
+<section class="role-panel tabpanel" id="rolePanel-rubrics" role="tabpanel" aria-labelledby="roleTab-rubrics" data-role-panel="rubrics" hidden>
 <section id="sharedProjectTimeline" hidden class="shared-timeline" aria-label="Project timeline" aria-busy="true"><div class="timeline-heading"><h2>Project timeline</h2></div>${getSkeletonMarkup_('timeline', 'Loading project timeline')}</section>
-<section id="sharedRubrics" hidden class="shared-rubrics utility-body" aria-labelledby="sharedRubricsHeading" aria-busy="true"><div class="shared-rubrics-heading utility-header"><h2 id="sharedRubricsHeading">Rubrics &amp; Guidelines</h2></div><div id="sharedRubricsContent">${getSkeletonMarkup_('panel', 'Loading assessment rubrics')}</div></section>
+<section id="sharedRubrics" hidden class="shared-rubrics utility-body card" aria-labelledby="sharedRubricsHeading" aria-busy="true"><div class="shared-rubrics-heading utility-header"><h2 id="sharedRubricsHeading">Rubrics &amp; Guidelines</h2></div><div id="sharedRubricsContent">${getSkeletonMarkup_('panel', 'Loading assessment rubrics')}</div></section>
+</section>
 ${rolePanels}
 ${announcementsPanel}
 ${systemPanel}
-<div id="rubricDrawerBackdrop" class="team-drawer-backdrop" onclick="DashboardUI.closeRubricDrawer()" aria-hidden="true"></div>
-<aside id="rubricDrawer" class="team-drawer" role="dialog" aria-modal="true" aria-labelledby="rubricDrawerTitle" aria-hidden="true" inert>
-  <div class="team-drawer-header"><div><div class="team-drawer-eyebrow">ASSESSMENT RUBRIC</div><h2 id="rubricDrawerTitle" class="team-drawer-title"></h2></div>
-  <button type="button" id="rubricDrawerClose" class="team-drawer-close app-btn btn-sm btn-secondary btn-icon" aria-label="Close rubric details" onclick="DashboardUI.closeRubricDrawer()">${renderLucideIcon_('x')}</button></div>
-  <div id="rubricDrawerContent" class="team-drawer-content"></div>
+<div id="rubricDrawerBackdrop" class="team-drawer-backdrop drawer-scrim" hidden aria-hidden="true"></div>
+<aside id="rubricDrawer" class="team-drawer drawer" data-tooltip-boundary role="dialog" aria-modal="true" aria-labelledby="rubricDrawerTitle" aria-hidden="true" inert hidden>
+  <div class="team-drawer-header drawer-header"><div><div class="team-drawer-eyebrow">ASSESSMENT RUBRIC</div><h2 id="rubricDrawerTitle" class="team-drawer-title"></h2></div>
+  <button type="button" id="rubricDrawerClose" data-drawer-close class="team-drawer-close btn btn-sm btn-outline" aria-label="Close rubric details" onclick="DashboardUI.closeRubricDrawer()">${renderLucideIcon_('x')}</button></div>
+  <div id="rubricDrawerContent" class="team-drawer-content drawer-body" data-drawer-content></div>
+  <div class="drawer-footer" hidden></div>
 </aside>
 <script>
 ${getDashboardClientScript()}

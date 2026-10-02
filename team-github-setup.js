@@ -129,6 +129,10 @@ function getTeamGithubSetup_(teamId, options) {
         } else { member.access = 'unavailable'; }
       });
       result.ready = members.every(member => member.access === 'active' || member.access === 'invited');
+      if (PropertiesService.getScriptProperties().getProperty('GITHUB_TEMPLATE_PENDING_' + slug.toLowerCase())) {
+        result.ready = false;
+        result.accessError = 'Repository template setup is incomplete. Retry GitHub setup.';
+      }
     } catch (err) { result.accessError = err.message; }
   }
   result.accountsComplete = result.usernamesComplete;
@@ -195,12 +199,13 @@ function repairTeamGithubSetup_(teamId) {
   const created = repo.status === 404;
   if (created) {
     if (!textEquals_(slug, expectedSlug)) throw new Error('Saved repository was not found. Contact your coordinator before creating a replacement.');
+    PropertiesService.getScriptProperties().setProperty(githubTemplatePendingKey_(slug), JSON.stringify({version:4}));
     repo = createTeamRepo(name, teamId);
   }
   if (repo.status !== (created ? 201 : 200) || !repo.body || !repo.body.html_url) throw new Error('Repository lookup or creation failed: ' + repo.status);
   // Record the URL before access repair; readiness is always checked separately.
   updateTeamStatusRepoUrl_(teamId, repo.body.html_url);
-  if (created) setReadmeHeading(slug, name, teamId, row[columns.TITLE] || 'Team ' + teamId + ' Capstone');
+  resumeGithubTemplateInitialization_(slug, teamId);
   const invitations = getGithubInvitations_(slug);
   setup.members.forEach(member => ensureGithubPermission_(slug, member.username, 'push', invitations, member.githubId));
   return getTeamGithubSetup_(teamId, { repoUrl: repo.body.html_url });

@@ -1,0 +1,1 @@
+module.exports=[{file:'dashboard-client-scripts.js',find:'<button type="button" class="rubric-assessment" data-rubric-key=',replace:'<button type="button" class="rubric-assessment tile" data-rubric-key='}];

@@ -24,19 +24,19 @@ function makeGithubRequest(method, path, payload) {
     },
     muteHttpExceptions: true
   };
-  if (payload) options.payload = JSON.stringify(payload);
+  if (payload) { options.payload = JSON.stringify(payload); options.contentType = 'application/json'; }
   
   Logger.log(`GitHub API Request:`);
   Logger.log(`  Method: ${method}`);
   Logger.log(`  URL: ${url}`);
-  if (payload) Logger.log(`  Payload: ${JSON.stringify(payload)}`);
+  if (payload) Logger.log('  Payload fields: ' + Object.keys(payload).join(', '));
   
   const response = UrlFetchApp.fetch(url, options);
   const statusCode = response.getResponseCode();
   const responseBody = response.getContentText();
   
   Logger.log(`  Status: ${statusCode}`);
-  Logger.log(`  Response: ${responseBody.substring(0, 200)}`);
+  // Responses may contain base64 blobs; log status only, never file contents.
   
   if (statusCode === 403) {
     Logger.log(`403 FORBIDDEN - Possible causes:`);
@@ -79,40 +79,6 @@ function createTeamRepo(repoName, teamId) {
     auto_init: false
   };
   return makeGithubRequest('POST', `/orgs/${ORG_NAME}/repos`, payload);
-}
-
-function setReadmeHeading(repoSlug, repoName, teamId, title) {
-  const readme = `# Team ${teamId}: ${title}\n\nCapstone Project\n`;
-  const content = Utilities.base64Encode(readme);
-
-  const payload = {
-    message: `Initial commit: Capstone project for Team ${teamId}`,
-    content: content,
-    committer: {
-      name: 'System',
-      email: 'system@capstone.local'
-    }
-  };
-
-  try {
-    const result = makeGithubRequest(
-      'PUT',
-      `/repos/${repoSlug}/contents/README.md`,
-      payload
-    );
-
-    Logger.log(
-      `README.md created for ${repoName}: ${result.status}`
-    );
-
-    return result;
-
-  } catch (err) {
-    Logger.log(
-      `ERROR creating README for ${repoName}: ${err.message}`
-    );
-    throw err;
-  }
 }
 
 /**
@@ -369,112 +335,6 @@ function addMissingGuideCollaborators() {
   return results;
 }
 
-
-// ===================================================================
-// BACKFILL README TO EXISTING EMPTY REPOS
-// ===================================================================
-function backfillReadmeToAllRepos() {
-  const orgName = String(getConfig('GITHUB_ORG_NAME')).trim();
-  const TS = getColumnMap(
-    SHEET_NAMES.TEAM_STATUS,
-    FIELD_DEFINITIONS.TEAM_STATUS
-  );
-  const statusRows = getSheetRows(SHEET_NAMES.TEAM_STATUS);
-
-  const results = {
-    success: [],
-    failed: [],
-    skipped: []
-  };
-
-  try {
-    const repos = getAllGithubOrgRepos_();
-    const currentTeams = statusRows.filter(row => row[TS.TEAM_ID]);
-    const teamRepos = repos.filter(repo => currentTeams.some(row =>
-      textEquals_(repo.name, getTeamRepoName_(row[TS.TEAM_ID], row[TS.SEMESTER]))
-    ));
-
-    Logger.log(`Found ${teamRepos.length} capstone team repos`);
-
-    teamRepos.forEach(repo => {
-      try {
-        const teamStatus = currentTeams.find(row =>
-          textEquals_(repo.name, getTeamRepoName_(row[TS.TEAM_ID], row[TS.SEMESTER]))
-        );
-        const teamId = teamStatus[TS.TEAM_ID];
-
-        const title = teamStatus
-          ? teamStatus[TS.TITLE]
-          : teamId;
-
-        const repoSlug = `${orgName}/${repo.name}`;
-
-        const check = makeGithubRequest(
-          'GET',
-          `/repos/${repoSlug}/contents/README.md`
-        );
-
-        if (check.status === 200) {
-          results.skipped.push({
-            teamId,
-            repo: repo.name,
-            reason: 'README already exists'
-          });
-          return;
-        }
-
-        if (check.status !== 404) {
-          results.failed.push({
-            teamId,
-            repo: repo.name,
-            reason: `README check returned ${check.status}`
-          });
-          return;
-        }
-
-        const create = setReadmeHeading(
-          repoSlug,
-          repo.name,
-          teamId,
-          title
-        );
-
-        if (create.status === 201) {
-          results.success.push({
-            teamId,
-            repo: repo.name
-          });
-        } else {
-          results.failed.push({
-            teamId,
-            repo: repo.name,
-            reason: `README creation returned ${create.status}`
-          });
-        }
-
-      } catch (err) {
-        results.failed.push({
-          repo: repo.name,
-          reason: err.message
-        });
-      }
-    });
-
-  } catch (err) {
-    results.failed.push({
-      reason: err.message
-    });
-  }
-
-  Logger.log(
-    `README backfill complete — ` +
-    `${results.success.length} created, ` +
-    `${results.skipped.length} skipped, ` +
-    `${results.failed.length} failed.`
-  );
-
-  return results;
-}
 
 // ===================================================================
 // BACKFILL EXISTING GITHUB REPOS INTO TeamStatus

@@ -398,25 +398,25 @@ function buildCoordinatorHeaderStats(stats) {
     const remaining = color === 'red' ? value : stats.total - value;
     return remaining <= 0 ? 'complete' : remaining / stats.total >= .6 ? 'danger' : remaining / stats.total >= .3 ? 'warning' : 'neutral';
   };
-  const card = (label, value, color, note, icon, detail, ids) => `<div class="stat-card stat-card-${color}" data-completion-tone="${completionTone(value, color, note)}">
+  const card = (label, value, color, note, icon, detail, ids, progressStat) => `<div class="stat-card stat-card-${color}" data-stat-card${progressStat ? ' data-progress-stat' : ''} data-completion-tone="${completionTone(value, color, note)}">
     <div class="stat-label">${label}</div>${renderLucideIcon_(icon, '', 'stat-icon')}
-    <div class="stat-header"><div class="stat-num"${ids ? ' id="coordinatorActiveTeams"' : ''}>${value}</div><div class="stat-pct"${ids ? ' id="coordinatorActiveTeamsPct"' : ''}>${note}</div></div>
+    <div class="stat-header"><div class="stat-num" data-stat-value${ids ? ' id="coordinatorActiveTeams"' : ''}>${value}</div><div class="stat-pct"${ids ? ' id="coordinatorActiveTeamsPct"' : ''}>${note}</div></div>
     <div class="stat-detail">${detail}</div></div>`;
-  const progress = (value, color, left, right) => `<div class="stat-track" aria-hidden="true"><span style="width:${pct(value)}%;background:var(--color-success,${color})"></span></div><div class="stat-detail-row"><span>${left}</span><span${value < stats.total ? ' class="stat-outstanding"' : ''}>${right}</span></div>`;
+  const progress = (value, left, right) => `<div class="stat-track" aria-hidden="true"><span style="width:${pct(value)}%;background:var(--success)"></span></div><div class="stat-detail-row"><span>${left}</span><span${value < stats.total ? ' class="stat-outstanding"' : ''}>${right}</span></div>`;
   const repos = stats.reposReady || 0, approved = stats.titleApproved || 0;
   return `<div class="coord-stats coordinator-stats-grid">
     ${card('Total Teams', stats.total, 'blue', 'Teams Roster', 'users', '<span class="stat-registered">●</span> Teams registered')}
-    ${card('Repositories Available', repos, 'purple', pct(repos) + '% linked', 'git-branch', progress(repos, '#4338ca', repos + ' / ' + stats.total + ' recorded', Math.max(0, stats.total - repos) + ' missing'))}
-    ${card('Title Approved', approved, 'green', pct(approved) + '% validated', 'tag', progress(approved, '#059669', approved + ' approved', Math.max(0, stats.total - approved) + ' pending approval'))}
+    ${card('Repositories Available', repos, 'purple', pct(repos) + '% linked', 'git-branch', progress(repos, repos + ' / ' + stats.total + ' recorded', Math.max(0, stats.total - repos) + ' missing'))}
+    ${card('Title Approved', approved, 'green', pct(approved) + '% validated', 'tag', progress(approved, approved + ' approved', Math.max(0, stats.total - approved) + ' pending approval'))}
     ${card('Active This Week', skeleton('Loading activity'), 'orange', skeleton('Loading activity'), 'trending-up', 'Weekly repository activity', true)}
     ${reviews.map((review, index) => {
       const result = stats.reviews && stats.reviews[review.key];
       const value = stats.loading ? skeleton('Loading ' + review.label) : result ? result.completed : '—';
       const note = stats.loading ? '' : !result ? 'Unavailable' : result.unavailable ? result.unavailable + ' unavailable' : pct(result.completed) + '% (' + result.completed + '/' + stats.total + ')';
-      return card(escapeHtml(review.label) + ' Completed', value, 'teal', note, ['clipboard-check', 'file-text', 'book-open'][index % 3], 'Team review completion');
+      return card(escapeHtml(review.label) + ' Completed', value, 'teal', note, ['clipboard-check', 'file-text', 'book-open'][index % 3], 'Team review completion', false, true);
     }).join('')}
-    ${card('Guide Evaluation Completed', stats.loading ? skeleton('Loading guide evaluation') : stats.guideEvaluation && stats.guideEvaluation.available ? stats.guideEvaluation.completed : '—', 'teal', stats.loading ? '' : stats.guideEvaluation && stats.guideEvaluation.available ? pct(stats.guideEvaluation.completed) + '% evaluated' : 'Unavailable', 'graduation-cap', 'Guide assessment completion')}
-    ${card('Need Attention', stats.loading ? skeleton('Loading attention count') : stats.needsAttention, 'red', stats.loading ? '' : pct(stats.needsAttention) + '% of cohort', 'triangle-alert', 'Teams with overdue requirements')}
+    ${card('Guide Evaluation Completed', stats.loading ? skeleton('Loading guide evaluation') : stats.guideEvaluation && stats.guideEvaluation.available ? stats.guideEvaluation.completed : '—', 'teal', stats.loading ? '' : stats.guideEvaluation && stats.guideEvaluation.available ? pct(stats.guideEvaluation.completed) + '% evaluated' : 'Unavailable', 'graduation-cap', 'Guide assessment completion', false, true)}
+    ${card('Need Attention', stats.loading ? skeleton('Loading attention count') : stats.needsAttention, 'red', stats.loading ? '' : pct(stats.needsAttention) + '% of cohort', 'triangle-alert', 'Teams with overdue requirements', false, true)}
   </div>`;
 }
 
@@ -433,7 +433,7 @@ function buildTeamCompletionProgress(stages) {
     {label:'Title Approval', stage:stages.titleApproval},
     ...reviews.map(review => ({label:review.label, stage:stages[review.key]})),
     {label:'Guide Evaluation', untracked:true}, ...getSeeProgressRows_()];
-  return `<section class="assessment-section team-progress" aria-labelledby="teamProgressHeading">
+  return `<section class="assessment-section team-progress card" aria-labelledby="teamProgressHeading">
     <h3 id="teamProgressHeading" class="assessment-title">Team Progress</h3>
     ${configurationUnavailable ? '<p role="status">Review configuration unavailable. Check System Status.</p>' : ''}
     ${rows.map(({label, stage, untracked, external}) => {
@@ -457,10 +457,10 @@ function buildNeedsAttentionTable(teams) {
   const rows = teams.slice(0, 11).map((t, idx) => {
     const sev = t.severity === 'high' ? 'high' : t.severity === 'medium' ? 'medium' : 'low';
     const ts = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    return `<tr><td class="col-index">${idx + 1}</td><td class="col-severity"><span class="severity-badge ${sev}">${sev.toUpperCase()}</span></td><td class="col-team">${escapeHtml(t.row[ts.TEAM_ID])}</td><td class="col-issue">${escapeHtml(t.issue)}</td><td class="col-since">${t.daysOverdue} days</td><td class="col-guide">${escapeHtml(t.row[ts.GUIDE_NAME])}</td><td class="col-action"><button type="button" class="link-button action-link app-btn btn-sm btn-secondary" onclick="focusCoordinatorTeam('${escapeHtml(String(t.row[ts.TEAM_ID]))}')">View</button></td></tr>`;
+    return `<tr><td class="col-index">${idx + 1}</td><td class="col-severity"><span class="severity-badge ${sev}">${sev.toUpperCase()}</span></td><td class="col-team">${escapeHtml(t.row[ts.TEAM_ID])}</td><td class="col-issue">${escapeHtml(t.issue)}</td><td class="col-since">${t.daysOverdue} days</td><td class="col-guide">${escapeHtml(t.row[ts.GUIDE_NAME])}</td><td class="col-action"><button type="button" class="link-button action-link btn btn-sm btn-outline" onclick="focusCoordinatorTeam('${escapeHtml(String(t.row[ts.TEAM_ID]))}')">View</button></td></tr>`;
   }).join('');
 
-  return `<div class="needs-attention"><div class="table-title">Needs Attention (${teams.length} teams) <button type="button" class="link-button view-all app-btn btn-sm btn-secondary" onclick="showAllCoordinatorTeams()">View all ${renderLucideIcon_('arrow-right')}</button></div><div class="tracker-table-scroll" role="region" aria-label="Teams needing attention, scroll horizontally for more columns" tabindex="0"><table class="attention-table"><thead><tr><th>#</th><th>Severity</th><th>Team</th><th>Issue</th><th>Overdue</th><th>Guide</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  return `<div class="needs-attention"><div class="table-title">Needs Attention (${teams.length} teams) <button type="button" class="link-button view-all btn btn-sm btn-outline" onclick="showAllCoordinatorTeams()">View all ${renderLucideIcon_('arrow-right')}</button></div><div class="tracker-table-scroll table-wrap" data-tooltip-boundary role="region" aria-label="Teams needing attention, scroll horizontally for more columns" tabindex="0"><table class="attention-table table table--compact"><thead><tr><th>#</th><th>Severity</th><th>Team</th><th>Issue</th><th>Overdue</th><th>Guide</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 
 function buildAssessmentProgress(assessmentProgress) {
@@ -468,7 +468,7 @@ function buildAssessmentProgress(assessmentProgress) {
   try { configuredReviews = getInternalReviews_(); } catch (err) { /* See configuration card. */ }
   const bar = (c, p) => { const pct = c + p > 0 ? Math.round((c / (c + p)) * 100) : 0; return `<div class="assessment-bar"><div class="assessment-bar-inner"><div class="assessment-fill" style="width:${pct}%"></div></div><span class="assessment-pct">${pct}%</span></div>`; };
 
-  return `<div class="assessment-section"><h3 class="assessment-title">Assessment Progress</h3>
+  return `<div class="assessment-section card"><h3 class="assessment-title">Assessment Progress</h3>
     ${configuredReviews.map(review => {
       const progress = assessmentProgress[review.key];
       return `<div class="assessment-row"><div class="assessment-label">${escapeHtml(review.label)}</div>${progress.unavailable ? "<span>Partial data: " + progress.unavailable + " unavailable</span>" : bar(progress.completed, progress.pending)}<div class="assessment-stat">${progress.completed} / ${progress.completed + progress.pending + (progress.unavailable || 0)}</div></div>`;
@@ -480,7 +480,7 @@ function buildAssessmentProgress(assessmentProgress) {
 
 function buildGithubAccessSection(githubAccess) {
   return `
-    <div class="github-section system-status-card">
+    <div class="github-section system-status-card card">
 
       <div class="github-header system-card-header"><div class="system-card-heading">
         <h3 class="github-title system-card-title">
@@ -490,7 +490,8 @@ function buildGithubAccessSection(githubAccess) {
           Configured
         </span></div>
       <button
-        class="run-sync-btn app-btn btn-md btn-primary"
+        id="githubSyncButton"
+        class="run-sync-btn btn btn-primary"
         onclick="runGithubSync()">
         Run Sync
       </button>
@@ -530,16 +531,16 @@ function buildCoordinatorTeamActions_(team) {
   const label = escapeHtml(String(team.teamId));
   const recipients = team.emailRecipients || [];
   const email = recipients.length
-    ? `<a class="team-action-icon app-btn btn-sm btn-secondary btn-icon" href="${escapeHtml('mailto:' + recipients.map(encodeURIComponent).join(',') + '?subject=' + encodeURIComponent('Capstone — Team ' + team.teamId))}" aria-label="Email guide and members of team ${label}" title="Email guide and team members">${mail}</a>`
-    : `<button type="button" class="team-action-icon app-btn btn-sm btn-secondary btn-icon" disabled aria-label="No email addresses available for team ${label}" title="No email addresses available">${mail}</button>`;
-  return `<div class="team-action-controls"><button type="button" class="team-action-icon app-btn btn-sm btn-secondary btn-icon" onclick="focusCoordinatorTeam(this.closest('tr').getAttribute('data-team-id'))" aria-label="View team ${label}" title="View team details">${eye}</button>${email}</div>`;
+    ? `<a class="team-action-icon btn btn-sm btn-outline" href="${escapeHtml('mailto:' + recipients.map(encodeURIComponent).join(',') + '?subject=' + encodeURIComponent('Capstone — Team ' + team.teamId))}" aria-label="Email guide and members of team ${label}" title="Email guide and team members">${mail}</a>`
+    : `<button type="button" class="team-action-icon btn btn-sm btn-outline" disabled aria-label="No email addresses available for team ${label}" title="No email addresses available">${mail}</button>`;
+  return `<div class="team-action-controls"><button type="button" class="team-action-icon btn btn-sm btn-outline" onclick="focusCoordinatorTeam(this.closest('tr').getAttribute('data-team-id'))" aria-label="View team ${label}" title="View team details">${eye}</button>${email}</div>`;
 }
 
 function buildCompletionIndicator_(status) {
-  if (status === 'Completed') return renderLucideIcon_('check', 'Completed');
-  if (status === 'Pending') return renderLucideIcon_('clock', 'Pending');
+  if (status === 'Completed') return '<span class="badge badge--success">Completed</span>';
+  if (status === 'Pending') return '<span class="badge badge--warning">Pending</span>';
   if (/^loading/i.test(status || '')) return getSkeletonMarkup_('inline', 'Loading assessment');
-  return renderLucideIcon_('triangle-alert', status || 'Unavailable');
+  return '<span class="badge badge--danger">' + escapeHtml(status || 'Unavailable') + '</span>';
 }
 
 function buildTeamTrackerTable(teamData, deadlinePills) {
@@ -549,35 +550,35 @@ function buildTeamTrackerTable(teamData, deadlinePills) {
   const attentionCount = teamData.filter(t => t.health === 'attention').length;
   const onTrackCount = teamData.filter(t => t.health === 'ontrack').length;
   const rows = teamData.map(t => {
-    const titleBadge = t.titleStatus === 'APPROVED' ? `<span class="tracker-health green">${renderLucideIcon_('check', 'Title approved')}</span>` : t.titleStatus === 'NEEDS_REVIEW' ? `<span class="tracker-health orange">${renderLucideIcon_('clock', 'Title needs review')}</span>` : t.titleStatus === 'REJECTED_BY_GUIDE' ? `<span class="tracker-health red">${renderLucideIcon_('x', 'Title rejected by guide')}</span>` : `<span class="tracker-health gray">${renderLucideIcon_('clock', 'Title pending')}</span>`;
+    const titleBadge = t.titleStatus === 'APPROVED' ? '<span class="badge badge--success">Approved</span>' : t.titleStatus === 'NEEDS_REVIEW' ? '<span class="badge badge--warning">Review</span>' : t.titleStatus === 'REJECTED_BY_GUIDE' ? '<span class="badge badge--danger">Rejected</span>' : '<span class="badge badge--info">Pending</span>';
     const repoLabel = escapeHtml([t.repoStatus === 'ready' ? 'Repository URL recorded' : 'Pending', t.githubMessage, t.githubTiming, t.repoUrl ? 'Repository available' : ''].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join(' ? '));
-    const repoBadge = t.repoStatus === 'loading' ? getSkeletonMarkup_('inline', 'Checking GitHub setup') : `<span class="tracker-health ${t.repoStatus === 'ready' ? 'green' : 'red'}" tabindex="0" role="img" aria-label="${repoLabel}" title="${repoLabel}">${renderLucideIcon_(t.repoStatus === 'ready' ? 'check' : 'x')}</span>`;
+    const repoBadge = t.repoStatus === 'loading' ? getSkeletonMarkup_('inline', 'Checking GitHub setup') : `<span class="badge badge--${t.repoStatus === 'ready' ? 'success' : 'danger'}" tabindex="0" aria-label="${repoLabel}" title="${repoLabel}">${t.repoStatus === 'ready' ? 'Ready' : 'Pending'}</span>`;
     const health = t.health === 'ontrack' ? {color:'green', label:'On track', icon:'check'} : t.health === 'monitor' ? {color:'orange', label:'Monitor', icon:'clock'} : {color:'red', label:'Needs attention', icon:'triangle-alert'};
-    const healthBadge = t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading health') : `<span class="tracker-health ${health.color}" tabindex="0" role="img" aria-label="${health.label}" title="${health.label}">${renderLucideIcon_(health.icon)}</span>`;
+    const healthBadge = t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading health') : `<span class="badge badge--${health.color === 'green' ? 'success' : health.color === 'orange' ? 'warning' : 'danger'}" tabindex="0" aria-label="${health.label}" title="${health.label}">${health.label}</span>`;
     const registers = t.registerNumbers || [];
 
-    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td class="col-team" data-sort-value="${escapeHtml(String(t.teamId))}"><strong>${escapeHtml(t.teamId)}</strong><div class="tracker-registers">${registers.length ? registers.map(value => escapeHtml(value)).join(', ') : '—'}</div></td><td class="col-guide">${escapeHtml(t.guide)}</td><td class="col-repo" data-sort-value="${escapeHtml(String(t.repoStatus || 'Unavailable'))}">${repoBadge}</td><td class="col-status" data-sort-value="${escapeHtml(String(t.titleStatus || 'Unavailable'))}">${titleBadge}</td><td class="col-activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review" data-sort-value="${escapeHtml(String(t.health === 'loading' ? 'loading' : t.reviews[review.key] || 'Unavailable'))}">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation" data-sort-value="${escapeHtml(String(t.guideEvaluation || 'Unavailable'))}">${buildCompletionIndicator_(t.guideEvaluation)}</td><td class="col-health" data-sort-value="${escapeHtml(String(t.health || 'Unavailable'))}">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
+    return `<tr data-team-id="${escapeHtml(String(t.teamId))}" data-search="${escapeHtml([t.teamId, t.guide, ...registers].join(' ').toLowerCase())}" data-deadlines="${escapeHtml((t.pendingDeadlines || []).join(' '))}" data-health="${escapeHtml(t.health)}" data-title-status="${escapeHtml(t.titleStatus)}" data-repo-status="${escapeHtml(t.repoStatus)}"><td class="col-team" data-sort-value="${escapeHtml(String(t.teamId))}"><strong>${escapeHtml(t.teamId)}</strong><div class="tracker-registers">${registers.length ? registers.map(value => escapeHtml(value)).join(', ') : '—'}</div></td><td class="col-guide">${escapeHtml(t.guide)}</td><td class="col-repo" data-sort-value="${escapeHtml(String(t.repoStatus || 'Unavailable'))}">${repoBadge}</td><td class="col-status" data-sort-value="${escapeHtml(String(t.titleStatus || 'Unavailable'))}">${titleBadge}</td><td class="col-activity" data-col="activity">${getSkeletonMarkup_('inline', 'Loading weekly activity')}</td>${configuredReviews.map(review => `<td class="col-review" data-col="review" data-sort-value="${escapeHtml(String(t.health === 'loading' ? 'loading' : t.reviews[review.key] || 'Unavailable'))}">${t.health === 'loading' ? getSkeletonMarkup_('inline', 'Loading ' + review.label) : buildCompletionIndicator_(t.reviews[review.key])}</td>`).join('')}<td class="col-guide-evaluation" data-col="guide-evaluation" data-sort-value="${escapeHtml(String(t.guideEvaluation || 'Unavailable'))}">${buildCompletionIndicator_(t.guideEvaluation)}</td><td class="col-health" data-col="health" data-sort-value="${escapeHtml(String(t.health || 'Unavailable'))}">${healthBadge}</td><td class="col-action">${buildCoordinatorTeamActions_(t)}</td></tr>`;
   }).join('');
 
-  return `<div class="team-tracker-section"><div class="tracker-header"><h3 class="assessment-title tracker-title">Team Tracker (${teamData.length} teams)</h3></div>
-    <div class="tracker-tabs">
-      <button class="tab active" data-filter="all" onclick="filterTeamTracker(this, 'all')">All (${teamData.length})</button>
-      <button class="tab" data-filter="attention" ${teamData.some(t => t.health === "loading") ? "disabled" : ""} onclick="filterTeamTracker(this, 'attention')">Attention (${teamData.some(t => t.health === 'loading') ? getSkeletonMarkup_('inline', 'Loading attention count') : attentionCount})</button>
-      <button class="tab" data-filter="ontrack" ${teamData.some(t => t.health === "loading") ? "disabled" : ""} onclick="filterTeamTracker(this, 'ontrack')">On Track (${teamData.some(t => t.health === 'loading') ? getSkeletonMarkup_('inline', 'Loading on-track count') : onTrackCount})</button>
-      ${deadlinePills.map(pill => `<button class="tab deadline-pill${pill.overdue ? ' deadline-overdue' : ''}" data-filter="deadline:${escapeHtml(pill.key)}" title="Due ${escapeHtml(formatProjectDay_(pill.due))}" onclick="filterTeamTracker(this, this.getAttribute('data-filter'))">${escapeHtml(pill.label)} (${pill.count})</button>`).join('')}
+  return `<div class="team-tracker-section card" data-team-tracker="coordinator"><div class="tracker-header"><h3 class="assessment-title tracker-title">Team Tracker (${teamData.length} teams)</h3></div>
+    <div class="tracker-tabs segmented" data-tracker-filters>
+      <button class="filter-tab active" data-filter="all" aria-pressed="true" onclick="filterTeamTracker(this, 'all')">All (${teamData.length})</button>
+      <button class="filter-tab" data-filter="attention" aria-pressed="false" ${teamData.some(t => t.health === "loading") ? "disabled" : ""} onclick="filterTeamTracker(this, 'attention')">Attention (${teamData.some(t => t.health === 'loading') ? getSkeletonMarkup_('inline', 'Loading attention count') : attentionCount})</button>
+      <button class="filter-tab" data-filter="ontrack" aria-pressed="false" ${teamData.some(t => t.health === "loading") ? "disabled" : ""} onclick="filterTeamTracker(this, 'ontrack')">On Track (${teamData.some(t => t.health === 'loading') ? getSkeletonMarkup_('inline', 'Loading on-track count') : onTrackCount})</button>
+      ${deadlinePills.map(pill => `<button class="filter-tab deadline-pill${pill.overdue ? ' deadline-overdue' : ''}" data-filter="deadline:${escapeHtml(pill.key)}" aria-pressed="false" title="Due ${escapeHtml(formatProjectDay_(pill.due))}" onclick="filterTeamTracker(this, this.getAttribute('data-filter'))">${escapeHtml(pill.label)} (${pill.count})${pill.overdue ? ' <span class="badge badge--danger">Overdue</span>' : ''}</button>`).join('')}
     </div>
-    <button class="app-btn btn-md btn-secondary" type="button" id="weeklyActivityRetry" onclick="loadCoordinatorWeeklyActivity()" hidden>Retry activity</button>
-    <div class="tracker-search"><input type="text" id="trackerSearch" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" oninput="filterTrackerSearch()"><button class="reset-btn app-btn btn-md btn-secondary" onclick="resetTrackerFilters()">Reset</button></div>
-    <div class="tracker-table-scroll" role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="team-tracker-table"><thead><tr><th data-sort-type="text">Team</th><th data-sort-type="text">Guide</th><th data-sort-type="text">Repo</th><th data-sort-type="text">Title</th><th data-sort-type="pair" title="Sort by logs, then commit records">Weekly Activity</th>${configuredReviews.map(review => `<th data-sort-type="text" class="col-review" title="${escapeHtml(review.label)}">${escapeHtml(review.label.replace(/^Review\s+(\d+)$/i, 'R$1'))}</th>`).join('')}<th data-sort-type="text">Guide Eval</th><th data-sort-type="text">Health</th><th>Actions</th></tr></thead><tbody id="trackerBody">${rows}</tbody></table></div>
+    <button class="btn btn-outline" type="button" id="weeklyActivityRetry" onclick="loadCoordinatorWeeklyActivity()" hidden>Retry activity</button>
+    <div class="tracker-search"><input type="text" id="trackerSearch" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" oninput="filterTrackerSearch()"><button class="reset-btn btn btn-outline" onclick="resetTrackerFilters()">Reset</button></div>
+    <div class="tracker-table-scroll table-wrap" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="team-tracker-table table table--compact"><thead><tr><th data-sort-type="text">Team</th><th data-sort-type="text">Guide</th><th data-sort-type="text">Repo</th><th data-sort-type="text">Title</th><th data-sort-type="pair" title="Sort by logs, then commit records">Weekly Activity</th>${configuredReviews.map(review => `<th data-sort-type="text" class="col-review" title="${escapeHtml(review.label)}">${escapeHtml(review.label.replace(/^Review\s+(\d+)$/i, 'R$1'))}</th>`).join('')}<th data-sort-type="text">Guide Eval</th><th data-sort-type="text">Health</th><th>Actions</th></tr></thead><tbody id="trackerBody">${rows}</tbody></table></div>
     ${buildTeamPagination_('tracker', 'coord', teamData.length)}
   </div>`;
 }
 
 function buildCommitteeDirectory_(committees) {
   const items = (committees || []).map(committee => {
-    return `<details class="committee-item" data-committee-key="${escapeHtml(normalizeText_(committee.number))}">
+    return `<details class="committee-item tile" data-committee-key="${escapeHtml(normalizeText_(committee.number))}">
       <summary><span class="committee-summary-name">Committee ${escapeHtml(committee.number)}<small>${committee.members.length} reviewers · ${committee.teams.length} teams</small></span><span aria-hidden="true" class="committee-chevron">${renderLucideIcon_('chevron-down')}</span></summary>
-      <div class="committee-body"><ul class="committee-members">${committee.members.length ? committee.members.map(member => `<li><span class="committee-avatar" aria-hidden="true">${escapeHtml((member.name || member.email).slice(0,1).toUpperCase())}</span><div><strong>${escapeHtml(member.name || 'Name not provided')}</strong><span class="committee-email">${escapeHtml(member.email || 'Email not provided')}</span></div></li>`).join('') : '<li>No reviewers assigned.</li>'}</ul>
+      <div class="committee-body"><ul class="committee-members">${committee.members.length ? committee.members.map((member, index) => `<li><span class="avatar avatar-${index % 3 + 1} committee-avatar" aria-hidden="true">${escapeHtml((member.name || member.email).slice(0,1).toUpperCase())}</span><div><strong>${escapeHtml(member.name || 'Name not provided')}</strong><span class="committee-email">${escapeHtml(member.email || 'Email not provided')}</span></div></li>`).join('') : '<li>No reviewers assigned.</li>'}</ul>
       <div class="committee-teams"><span>Assigned teams</span><div>${committee.teams.length ? committee.teams.map(team => `<span class="committee-team-chip">${escapeHtml(team)}</span>`).join('') : 'No teams assigned'}</div></div></div>
     </details>`;
   }).join('');
@@ -585,8 +586,8 @@ function buildCommitteeDirectory_(committees) {
 }
 
 function buildCommitteeReadinessCard_() {
-  return `<section id="committeeConfigurationCard" class="assessment-section system-status-card review-config-card configuration-card" aria-labelledby="committeeConfigurationHeading" aria-busy="true">
-    <div class="review-config-heading system-card-header"><div class="system-card-heading"><h3 class="system-card-title" id="committeeConfigurationHeading">Review Committees</h3><span id="committeeConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline','Checking review committees')}</span></div><button class="app-btn btn-sm btn-secondary" id="committeeConfigurationRecheck" type="button" onclick="DashboardUI.recheckCommitteeConfiguration()">Recheck</button></div>
+  return `<section id="committeeConfigurationCard" class="assessment-section system-status-card review-config-card configuration-card card" aria-labelledby="committeeConfigurationHeading" aria-busy="true">
+    <div class="review-config-heading system-card-header"><div class="system-card-heading"><h3 class="system-card-title" id="committeeConfigurationHeading">Review Committees</h3><span id="committeeConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline','Checking review committees')}</span></div><button class="btn btn-sm btn-outline" id="committeeConfigurationRecheck" type="button" onclick="DashboardUI.recheckCommitteeConfiguration()">Recheck</button></div>
     <ul id="committeeConfigurationIssues" hidden></ul>
     <p>Select a committee to see reviewers and assigned teams.</p>
     <div id="committeeDirectoryContent"></div>
@@ -617,17 +618,17 @@ function getCoordinatorCommitteeConfiguration() {
 }
 
 function buildReviewConfigurationCard_() {
-  return `<section id="reviewConfigurationCard" class="assessment-section system-status-card review-config-card configuration-card assessment-setup" aria-labelledby="reviewConfigurationHeading" aria-busy="true">
-    <div class="review-config-heading system-card-header"><div class="system-card-heading"><h3 class="system-card-title" id="reviewConfigurationHeading">Assessment readiness</h3><span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span></div><button class="app-btn btn-sm btn-secondary" id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
+  return `<section id="reviewConfigurationCard" class="assessment-section system-status-card review-config-card configuration-card assessment-setup card" aria-labelledby="reviewConfigurationHeading" aria-busy="true">
+    <div class="review-config-heading system-card-header"><div class="system-card-heading"><h3 class="system-card-title" id="reviewConfigurationHeading">Assessment readiness</h3><span id="reviewConfigurationSummary" class="review-config-pill" role="status" aria-live="polite">${getSkeletonMarkup_('inline', 'Checking assessment readiness')}</span></div><button class="btn btn-sm btn-outline" id="reviewConfigurationRecheck" type="button" onclick="recheckReviewConfiguration()">Recheck</button></div>
     <ul id="reviewConfigurationIssues" hidden></ul>
-    <button class="app-btn btn-md btn-secondary" type="button" id="createAssessmentDefinitionsButton" hidden disabled onclick="DashboardUI.bootstrapAssessmentDefinitions()">Create assessment definitions tab</button>
+    <button class="btn btn-outline" type="button" id="createAssessmentDefinitionsButton" hidden disabled onclick="DashboardUI.bootstrapAssessmentDefinitions()">Create assessment definitions tab</button>
     <p>First create the definitions schema, then use Assessment definitions to enter the academic configuration. Setup never supplies assessment instances or policy choices.</p>
     <ul id="reviewAssessmentReadiness" class="review-assessment-readiness" aria-label="Readiness by assessment"></ul>
     <p class="review-readiness-note">Storage readiness is separate from team entry availability, which also checks reviewer assignment, opening dates and prerequisites.</p>
     <div id="assessmentStorageSetup">
     <div class="assessment-storage-controls">
       <p>Prepare configured assessment journals. Existing assessment data stays unchanged.</p>
-      <button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="run-sync-btn app-btn btn-md btn-primary" onclick="initializeAssessmentStorage()">Create missing assessment storage</button>
+      <button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="run-sync-btn btn btn-primary" onclick="initializeAssessmentStorage()">Create missing assessment storage</button>
     </div>
     <p id="assessmentStorageStatus" role="status" aria-live="polite"></p><ul id="assessmentStorageResults"></ul>
     </div>
@@ -659,16 +660,16 @@ function buildCoordinatorDrawer_() {
     <!-- Team details drawer -->
     <div
       id="teamDrawerBackdrop"
-      class="team-drawer-backdrop"
-      onclick="closeCoordinatorTeamDrawer()">
+      class="team-drawer-backdrop drawer-scrim" hidden>
     </div>
 
     <aside
       id="teamDrawer"
-      class="team-drawer"
-      aria-hidden="true">
+      class="team-drawer drawer" data-tooltip-boundary
+      role="dialog" aria-modal="true" aria-labelledby="teamDrawerTitle"
+      aria-hidden="true" inert hidden>
 
-      <div class="team-drawer-header">
+      <div class="team-drawer-header drawer-header">
         <div>
           <div class="team-drawer-eyebrow">TEAM DETAILS</div>
           <div
@@ -680,7 +681,7 @@ function buildCoordinatorDrawer_() {
 
         <button
           type="button"
-          class="team-drawer-close app-btn btn-sm btn-secondary btn-icon"
+          class="team-drawer-close btn btn-sm btn-outline" data-drawer-close
           onclick="closeCoordinatorTeamDrawer()"
           aria-label="Close">
           ${renderLucideIcon_('x')}
@@ -689,8 +690,10 @@ function buildCoordinatorDrawer_() {
 
       <div
         id="teamDrawerContent"
-        class="team-drawer-content">
+        class="team-drawer-content drawer-body" data-drawer-content>
       </div>
+
+      <div class="drawer-footer" hidden></div>
 
     </aside>
   `;
@@ -704,7 +707,7 @@ function buildCoordinatorAsyncShell_() {
       try { reviews = getInternalReviews_(); } catch (err) { /* See System Status. */ }
       return `<div id="${id}Placeholder" class="coord-stats coordinator-stats-grid" aria-label="Loading summary cards">${Array.from({length:6 + reviews.length}, () => `<div class="stat-card coordinator-stat-placeholder">${getSkeletonMarkup_('panel', label)}</div>`).join('')}</div>`;
     }
-    return `<div id="${id}Placeholder" class="coordinator-card-placeholder">${getSkeletonMarkup_('panel', label)}</div>`;
+    return `<div id="${id}Placeholder" class="coordinator-card-placeholder card">${getSkeletonMarkup_('panel', label)}</div>`;
   };
   const panel = (id, label) => id === 'coordinatorTracker'
     ? `<div id="${id}" aria-busy="true">${getSkeletonMarkup_('panel', label)}</div>`
@@ -736,25 +739,25 @@ function loadCoordinatorSection(section) {
 
 function getCoordinatorStyles() {
   return `
-.team-progress-row { display:grid; grid-template-columns:150px minmax(0,1fr) 70px; align-items:center; gap:16px; padding:12px 0; border-bottom:1px solid #eef0f3; font-size:var(--font-size-body); }
+.team-progress-row { display:grid; grid-template-columns:150px minmax(0,1fr) 70px; align-items:center; gap:var(--space-4); padding:var(--space-3) 0; border-bottom:1px solid var(--canvas); font-size:var(--fs-body); }
 .team-progress-row:last-child { border-bottom:0; }
-.team-progress-track { height:8px; border-radius:8px; background:#e9edf3; overflow:hidden; }
-.team-progress-track > div { height:100%; background:#2684eb; border-radius:8px; }
-.team-progress-note { color:#64748b; font-size:12px; display:block; margin-top:4px; }
-.team-progress-count { text-align:right; color:#475569; }
-.team-progress .assessment-title { margin:0 0 8px; }
-@media (max-width:600px) { .team-progress-row { grid-template-columns:minmax(0,1fr) auto; gap:8px; } .team-progress-detail { grid-column:1 / -1; grid-row:2; } }
+.team-progress-track { height:8px; border-radius:var(--radius-badge); background:var(--border); overflow:hidden; }
+.team-progress-track > div { height:100%; background:var(--primary); border-radius:var(--radius-badge); }
+.team-progress-note { color:var(--primary); font-size:var(--fs-meta); display:block; margin-top:var(--space-1); }
+.team-progress-count { text-align:right; color:var(--primary-hover); }
+.team-progress .assessment-title { margin:0 0 var(--space-2); }
+@media (max-width:600px) { .team-progress-row { grid-template-columns:minmax(0,1fr) auto; gap:var(--space-2); } .team-progress-detail { grid-column:1 / -1; grid-row:2; } }
 #coordinatorAsyncRoot [hidden], #systemStatusContent [hidden] { display:none !important; }
-.guide-eval-criterion { border:1px solid #dcdfe4; border-radius:8px; padding:16px; margin:16px 0; }
+.guide-eval-criterion { border:1px solid var(--border); border-radius:var(--radius-tile); padding:var(--space-4); margin:var(--space-4) 0; }
 .guide-eval-criterion textarea { display:block; width:100%; min-height:65px; box-sizing:border-box; }
-.guide-eval-criterion input, .guide-eval-criterion select { padding:8px; max-width:100%; }
-.guide-admin-row { display:flex; flex-wrap:wrap; gap:10px; padding:10px 0; border-bottom:1px solid #eee; }
-.system-status-cards .system-status-card { padding:16px 18px; }
-.system-status-cards .system-status-card .system-card-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:nowrap; gap:12px; margin:0 0 12px; }
+.guide-eval-criterion input, .guide-eval-criterion select { padding:var(--space-2); max-width:100%; }
+.guide-admin-row { display:flex; flex-wrap:wrap; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+.system-status-cards .system-status-card { padding:var(--space-4) 18px; }
+.system-status-cards .system-status-card .system-card-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:nowrap; gap:var(--space-3); margin:0 0 var(--space-3); }
 .system-status-cards .system-card-heading { display:flex; align-items:center; flex-wrap:wrap; min-width:0; gap:6px 10px; }
-.system-status-cards .system-status-card .system-card-title { margin:0; font-family:inherit; font-size:14px; font-weight:700; line-height:1.5; letter-spacing:normal; }
-.system-status-cards .system-card-header > button { flex:none; width:auto; margin:0 0 0 auto; min-height:36px; padding:7px 12px; line-height:1.5; }
-.system-status-cards .system-card-header > .publishing-toggle { width:36px; min-height:36px; padding:0; }
+.system-status-cards .system-status-card .system-card-title { margin:0; font-family:inherit; font-size:var(--fs-body); font-weight:var(--fw-bold); line-height:var(--lh-body); letter-spacing:normal; }
+.system-status-cards .system-card-header > button { flex:none; width:auto; margin:0 0 0 auto; min-height:36px; line-height:var(--lh-body); }
+.system-status-cards .system-card-header > .publishing-toggle { width:36px; min-height:36px; }
 .system-status-cards .system-card-heading > [role="status"] { max-width:100%; }
 .system-status-cards .system-status-card .github-info { margin-bottom:0; }
 .system-status-cards .internal-publishing:has(> [data-publishing-body][hidden]) > .system-card-header { margin-bottom:0; }
@@ -763,150 +766,150 @@ function getCoordinatorStyles() {
   .system-status-cards .system-card-header > button { min-height:44px; }
   .system-status-cards .system-card-header > .publishing-toggle { width:44px; }
 }
-.system-status-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
-.system-status-heading button { padding:9px 18px; border:1px solid #dcdfe4; border-radius:8px; background:#fff; cursor:pointer; }
-#systemStatusMessage { color:#6b7280; font-size:var(--font-size-body); }
-.coordinator-card-placeholder { background:#fff; border:1px solid #e5e7eb; border-radius:16px; margin-bottom:24px; overflow:hidden; min-height:200px; box-shadow:0 2px 8px rgba(15,23,42,.04); }
-.coordinator-stat-placeholder .app-skeleton { min-height:110px; padding:8px 0; }
+.system-status-heading { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); flex-wrap:wrap; }
+.system-status-heading button { cursor:pointer; }
+#systemStatusMessage { color:var(--primary); font-size:var(--fs-body); }
+.coordinator-card-placeholder { background:var(--paper); border:1px solid var(--border); border-radius:var(--radius-card); margin-bottom:var(--space-6); overflow:hidden; min-height:200px; box-shadow:var(--shadow-card); }
+.coordinator-stat-placeholder .app-skeleton { min-height:110px; padding:var(--space-2) 0; }
 .coordinator-stat-placeholder .app-skeleton-title { width:45%; margin-bottom:18px; }
 .coordinator-stat-placeholder .app-skeleton-lines { gap:10px; }
 .coordinator-stat-placeholder .app-skeleton-lines > :last-child { display:none; }
 #coordinatorCommitteeCardPlaceholder { min-height:280px; }
 #coordinatorCompletionPlaceholder { min-height:220px; }
-${getBaseStyles()}${getStatusBadgeStyles()}${getTableStyles()}${getFilterTabStyles()}${getCollapsibleStyles()}
-body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
+${getBaseStyles()}${getTableStyles()}${getFilterTabStyles()}${getCollapsibleStyles()}
+body { max-width: 1400px; margin: 0 auto; padding: var(--space-5) var(--space-4); }
 .coordinator-container { display: flex; flex-direction: column; gap: 15px; }
 .assessment-setup { min-width:0; }
 .committee-directory { margin:0; padding:0; }
-.committee-directory-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
-.committee-directory-heading h4 { margin:0; font-size:13px; }
-.committee-directory-heading > span,.committee-directory-heading h4 span { font-size:12px; color:#64748b; font-weight:400; }
-.committee-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; align-items:start; margin:10px 0; }
-.committee-item { min-width:0; border:1px solid #e2e8f0; border-radius:10px; background:#fff; overflow:hidden; }
-.committee-item summary { display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; list-style:none; }
+.committee-directory-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--space-2); margin-bottom:var(--space-3); }
+.committee-directory-heading h4 { margin:0; font-size:var(--fs-meta); }
+.committee-directory-heading > span,.committee-directory-heading h4 span { font-size:var(--fs-meta); color:var(--primary); font-weight:var(--fw-regular); }
+.committee-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--space-2); align-items:start; margin:10px 0; }
+.committee-item { min-width:0; border:1px solid var(--border); border-radius:var(--radius-tile); background:var(--paper); overflow:hidden; }
+.committee-item summary { display:flex; align-items:center; gap:10px; padding:var(--space-3) 14px; cursor:pointer; list-style:none; }
 .committee-item summary::-webkit-details-marker { display:none; }
-.committee-item summary:focus-visible { outline:2px solid #6366f1; outline-offset:-3px; }
-.committee-summary-name { flex:1; min-width:0; overflow-wrap:anywhere; font-size:var(--font-size-body); font-weight:600; }
-.committee-summary-name small { display:block; margin-top:4px; color:#64748b; font-weight:400; font-size:11px; }
+.committee-item summary:focus-visible { outline:2px solid var(--primary); outline-offset:-3px; }
+.committee-summary-name { flex:1; min-width:0; overflow-wrap:anywhere; font-size:var(--fs-body); font-weight:var(--fw-semibold); }
+.committee-summary-name small { display:block; margin-top:var(--space-1); color:var(--primary); font-weight:var(--fw-regular); font-size:var(--fs-meta); }
 .committee-item[open] .committee-chevron { transform:rotate(180deg); }
-.committee-body { padding:0 14px 14px; border-top:1px solid #f1f5f9; }
-.committee-members { list-style:none; padding:0; margin:12px 0; display:grid; gap:10px; }
+.committee-body { padding:0 14px 14px; border-top:1px solid var(--canvas); }
+.committee-members { list-style:none; padding:0; margin:var(--space-3) 0; display:grid; gap:10px; }
 .committee-members li { display:flex; align-items:center; gap:9px; min-width:0; }
 .committee-members li > div { min-width:0; }
-.committee-members strong { font-size:var(--font-size-body); font-weight:600; overflow-wrap:anywhere; }
-.committee-avatar { flex:none; width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:#eef2ff; color:#4338ca; font-size:12px; }
-.committee-email { display:block; color:#64748b; font-size:12px; overflow-wrap:anywhere; }
-.committee-teams { font-size:12px; color:#64748b; }
+.committee-members strong { font-size:var(--fs-body); font-weight:var(--fw-semibold); overflow-wrap:anywhere; }
+.committee-avatar { flex:none; }
+.committee-email { display:block; color:var(--primary); font-size:var(--fs-meta); overflow-wrap:anywhere; }
+.committee-teams { font-size:var(--fs-meta); color:var(--primary); }
 .committee-teams > div { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
-.committee-team-chip { background:#f1f5f9; color:#334155; border-radius:var(--pill-radius); padding:3px 7px; overflow-wrap:anywhere; }
-.assessment-setup > .assessment-title { margin-top:0; margin-bottom:8px; }
-.assessment-setup-intro { margin:0 0 16px; color:#64748b; font-size:var(--font-size-body); line-height:1.5; }
-.system-status-primary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:stretch; margin-bottom:16px; }
+.committee-team-chip { background:var(--canvas); color:var(--primary-hover); border-radius:var(--radius-badge); padding:3px 7px; overflow-wrap:anywhere; }
+.assessment-setup > .assessment-title { margin-top:0; margin-bottom:var(--space-2); }
+.assessment-setup-intro { margin:0 0 var(--space-4); color:var(--primary); font-size:var(--fs-body); line-height:var(--lh-body); }
+.system-status-primary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-4); align-items:stretch; margin-bottom:var(--space-4); }
 .system-status-primary > * { min-width:0; margin:0; }
-#studentInvitationResend .pagination, #studentInvitationResend .pagination-buttons { flex-wrap:wrap; gap:8px; }
-#studentInvitationResend summary { cursor:pointer; margin:8px 0; }
-#studentInvitationResend .pagination, #studentInvitationResend .pagination-buttons { flex-wrap:wrap; gap:8px; }
-#studentInvitationResend summary { cursor:pointer; margin:8px 0; }
+#studentInvitationResend .pagination, #studentInvitationResend .pagination-buttons { flex-wrap:wrap; gap:var(--space-2); }
+#studentInvitationResend summary { cursor:pointer; margin:var(--space-2) 0; }
+#studentInvitationResend .pagination, #studentInvitationResend .pagination-buttons { flex-wrap:wrap; gap:var(--space-2); }
+#studentInvitationResend summary { cursor:pointer; margin:var(--space-2) 0; }
 
-.rubrics-status-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
-.rubrics-status-title { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px; }
-.rubrics-status-count { color:#64748b; font-size:11px; font-weight:400; }
-.rubrics-status-heading .assessment-title { margin:0; font-size:14px; }
-.rubrics-status-pill { padding:4px 10px; border-radius:var(--pill-radius); font-size:11px; font-weight:600; line-height:1.5; }
-.rubrics-status-pill[data-configured="true"] { color:var(--color-success); background:var(--color-success-tint); }
-.rubrics-status-pill[data-configured="false"] { color:var(--color-warning); background:var(--color-warning-tint); }
-.rubrics-status-detail { margin:12px 0 0; color:#64748b; font-size:var(--font-size-body); line-height:1.6; overflow-wrap:anywhere; }
-.rubrics-assessment-list { margin:10px 0 0; font-size:var(--font-size-body); }
-.rubrics-assessment-list > div { display:flex; justify-content:space-between; flex-wrap:wrap; gap:3px 12px; padding:6px 0; border-top:1px solid #eef0f5; }
+.rubrics-status-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-2); }
+.rubrics-status-title { display:flex; align-items:baseline; flex-wrap:wrap; gap:var(--space-2); }
+.rubrics-status-count { color:var(--primary); font-size:var(--fs-meta); font-weight:var(--fw-regular); }
+.rubrics-status-heading .assessment-title { margin:0; font-size:var(--fs-body); }
+.rubrics-status-pill { padding:var(--space-1) 10px; border-radius:var(--radius-badge); font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-body); }
+.rubrics-status-pill[data-configured="true"] { color:var(--success); background:var(--success-tint); }
+.rubrics-status-pill[data-configured="false"] { color:var(--warning); background:var(--warning-tint); }
+.rubrics-status-detail { margin:var(--space-3) 0 0; color:var(--primary); font-size:var(--fs-body); line-height:var(--lh-body); overflow-wrap:anywhere; }
+.rubrics-assessment-list { margin:10px 0 0; font-size:var(--fs-body); }
+.rubrics-assessment-list > div { display:flex; justify-content:space-between; flex-wrap:wrap; gap:3px var(--space-3); padding:6px 0; border-top:1px solid var(--canvas); }
 .rubrics-assessment-list > div:last-child { padding-bottom:0; }
-.rubrics-assessment-list dt { color:#1f2937; font-weight:600; overflow-wrap:anywhere; }
-.rubrics-assessment-list dd { margin:0; color:#64748b; font-variant-numeric:tabular-nums; }
+.rubrics-assessment-list dt { color:var(--text); font-weight:var(--fw-semibold); overflow-wrap:anywhere; }
+.rubrics-assessment-list dd { margin:0; color:var(--primary); font-variant-numeric:tabular-nums; }
 @media(max-width:900px) { .system-status-primary { grid-template-columns:minmax(0,1fr); } }
-.review-config-card { padding:10px 12px; margin-bottom:14px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#0f172a; }
-.configuration-card { min-width:0; width:100%; box-sizing:border-box; margin:0 0 16px; padding:12px; }
+.review-config-card { padding:10px var(--space-3); margin-bottom:14px; border:1px solid var(--border); border-radius:var(--radius-card); background:var(--paper); color:var(--text); }
+.configuration-card { min-width:0; width:100%; box-sizing:border-box; margin:0 0 var(--space-4); padding:var(--space-3); }
 .configuration-card [hidden] { display:none !important; }
 .configuration-card .committee-item { min-width:0; margin:0; }
-.assessment-storage-controls { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-top:10px; }
+.assessment-storage-controls { display:flex; align-items:center; flex-wrap:wrap; gap:6px var(--space-3); margin-top:10px; }
 .assessment-storage-controls p { flex:1 1 260px; }
-.assessment-setup #initializeAssessmentStorageButton { width:auto; max-width:100%; margin:0 0 0 auto; padding:4px 10px; border:1px solid #1f2430; border-radius:6px; font-size:12px; white-space:normal; }
+.assessment-setup #initializeAssessmentStorageButton { width:auto; max-width:100%; margin:0 0 0 auto; padding:var(--space-1) 10px; border:1px solid var(--text); border-radius:var(--radius-btn); font-size:var(--fs-meta); white-space:normal; }
 .assessment-setup [hidden] { display:none !important; }
 #assessmentStorageStatus:empty,#assessmentStorageResults:empty { display:none; }
-.review-config-pill { display:inline-flex; padding:4px 9px; border-radius:var(--pill-radius); background:#f1f5f9; color:#475569; font-size:11px; font-weight:600; line-height:1.4; }
-.review-config-card[data-state="ready"] .review-config-pill { color:var(--color-success); background:var(--color-success-tint); }
-.review-config-card[data-state="invalid"] .review-config-pill { color:var(--color-warning); background:var(--color-warning-tint); }
-.review-config-heading { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 8px; }
-.review-config-heading button { margin-left:auto; border:1px solid #94a3b8; border-radius:6px; padding:4px 10px; background:white; color:#0f172a; cursor:pointer; }
-.review-config-heading h4 { margin:0; font-size:13px; font-weight:600; }
-.review-config-card .review-assessment-readiness { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; margin:10px 0; padding:0; list-style:none; }
-.review-config-card .review-assessment-readiness > li { box-sizing:border-box; min-width:0; margin:0; padding:8px 10px; border:1px solid var(--color-border,#e4e7ec); border-radius:6px; overflow-wrap:anywhere; }
-.review-assessment-readiness strong { font-size:13px; line-height:1.35; }
-.review-assessment-readiness small { display:block; margin-top:3px; font-size:12px; line-height:1.4; }
-.review-config-card .review-readiness-note { font-size:var(--font-size-body); color:var(--color-ink-muted,#64748b); }
-.review-config-footer { display:flex; align-items:center; flex-wrap:wrap; margin-top:8px; gap:6px 12px; font-size:11px; color:#64748b; }
-#reviewConfigurationIssues { margin:8px 0 0; padding-left:18px; font-size:var(--font-size-body); }
-.review-config-card li { margin:4px 0; }
-.review-config-card p { margin:6px 0; font-size:var(--font-size-body); line-height:1.4; }
-.coord-stats.coordinator-stats-grid { display:grid; width:100%; grid-template-columns:repeat(4,minmax(0,1fr)); grid-auto-rows:1fr; gap:12px; margin-bottom:24px; }
-.coordinator-stats-grid .stat-card { position:relative; display:flex; flex-direction:column; gap:8px; min-width:0; min-height:114px; box-sizing:border-box; padding:13px; background:#fff; border:1px solid #f0edf8; border-radius:7px; box-shadow:0 1px 1px rgba(15,23,42,.02); }
-.coordinator-stats-grid .stat-label { min-height:22px; padding-right:29px; font-size:9px; color:#64748b; font-weight:500; letter-spacing:.45px; text-transform:uppercase; line-height:1.4; }
-.coordinator-stats-grid .lucide-icon.stat-icon { position:absolute; top:12px; right:12px; width:18px; height:18px; padding:6px; box-sizing:content-box; border-radius:4px; background:#e0e7ff; }
+.review-config-pill { display:inline-flex; padding:var(--space-1) 9px; border-radius:var(--radius-badge); background:var(--canvas); color:var(--primary-hover); font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-heading); }
+.review-config-card[data-state="ready"] .review-config-pill { color:var(--success); background:var(--success-tint); }
+.review-config-card[data-state="invalid"] .review-config-pill { color:var(--warning); background:var(--warning-tint); }
+.review-config-heading { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 var(--space-2); }
+.review-config-heading button { margin-left:auto; cursor:pointer; }
+.review-config-heading h4 { margin:0; font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
+.review-config-card .review-assessment-readiness { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--space-2); margin:10px 0; padding:0; list-style:none; }
+.review-config-card .review-assessment-readiness > li { box-sizing:border-box; min-width:0; margin:0; padding:var(--space-2) 10px; border:1px solid var(--border); border-radius:var(--radius-tile); overflow-wrap:anywhere; }
+.review-assessment-readiness strong { font-size:var(--fs-meta); line-height:var(--lh-heading); }
+.review-assessment-readiness small { display:block; margin-top:3px; font-size:var(--fs-meta); line-height:var(--lh-heading); }
+.review-config-card .review-readiness-note { font-size:var(--fs-body); color:var(--muted); }
+.review-config-footer { display:flex; align-items:center; flex-wrap:wrap; margin-top:var(--space-2); gap:6px var(--space-3); font-size:var(--fs-meta); color:var(--primary); }
+#reviewConfigurationIssues { margin:var(--space-2) 0 0; padding-left:18px; font-size:var(--fs-body); }
+.review-config-card li { margin:var(--space-1) 0; }
+.review-config-card p { margin:6px 0; font-size:var(--fs-body); line-height:var(--lh-heading); }
+.coord-stats.coordinator-stats-grid { display:grid; width:100%; grid-template-columns:repeat(4,minmax(0,1fr)); grid-auto-rows:1fr; gap:var(--space-3); margin-bottom:var(--space-6); }
+.coordinator-stats-grid .stat-card { position:relative; display:flex; flex-direction:column; gap:var(--space-2); min-width:0; min-height:114px; box-sizing:border-box; padding:13px; background:var(--paper); border:1px solid var(--canvas); border-radius:var(--radius-card); box-shadow:var(--shadow-card); }
+.coordinator-stats-grid .stat-label { min-height:22px; padding-right:29px; font-size:var(--fs-meta); color:var(--primary); font-weight:var(--fw-semibold); text-transform:uppercase; line-height:var(--lh-heading); }
+.coordinator-stats-grid .lucide-icon.stat-icon { position:absolute; top:12px; right:12px; width:18px; height:18px; padding:6px; box-sizing:content-box; border-radius:var(--radius-badge); background:var(--canvas); }
 .coordinator-stats-grid .stat-header { display:flex; align-items:baseline; flex-wrap:wrap; gap:6px; min-height:26px; }
-.coordinator-stats-grid .stat-card .stat-num { font-size:25px; font-weight:750; color:#0f172a; line-height:1; font-variant-numeric:tabular-nums; }
-.coordinator-stats-grid .stat-pct { padding:2px 4px; background:#eef2ff; font-size:9px; color:#64748b; font-weight:400; line-height:1.3; }
+.coordinator-stats-grid .stat-card .stat-num { font-size:var(--fs-kpi); font-weight:var(--fw-bold); color:var(--text); line-height:var(--lh-tight); font-variant-numeric:tabular-nums; }
+.coordinator-stats-grid .stat-pct { padding:2px var(--space-1); background:var(--canvas); font-size:var(--fs-meta); color:var(--primary); font-weight:var(--fw-regular); line-height:var(--lh-heading); }
 .coordinator-stats-grid .stat-pct:empty { display:none; }
-.coordinator-stats-grid .stat-detail { margin-top:auto; color:#475569; font-size:10px; line-height:1.4; }
-.coordinator-stats-grid .stat-detail-row { display:flex; justify-content:space-between; gap:8px; font-size:9px; }
+.coordinator-stats-grid .stat-detail { margin-top:auto; color:var(--primary-hover); font-size:var(--fs-meta); line-height:var(--lh-heading); }
+.coordinator-stats-grid .stat-detail-row { display:flex; justify-content:space-between; gap:var(--space-2); font-size:var(--fs-meta); }
 .coordinator-stats-grid .stat-detail-row > span { flex:1; }
-.coordinator-stats-grid .stat-detail-row .stat-outstanding { color:#dc2626; font-weight:700; font-size:10px; }
-.coordinator-stats-grid .stat-track { height:4px; border-radius:4px; background:#e9eaff; overflow:hidden; margin-bottom:4px; }
+.coordinator-stats-grid .stat-detail-row .stat-outstanding { color:var(--danger); font-weight:var(--fw-bold); font-size:var(--fs-meta); }
+.coordinator-stats-grid .stat-track { height:4px; border-radius:var(--radius-badge); background:var(--canvas); overflow:hidden; margin-bottom:var(--space-1); }
 .coordinator-stats-grid .stat-track > span { display:block; height:100%; border-radius:inherit; }
-.coordinator-stats-grid .stat-registered { color:#059669; }
+.coordinator-stats-grid .stat-registered { color:var(--success); }
 .coordinator-stats-grid .stat-card-blue .stat-pct { background:transparent; padding:0; }
-.coordinator-stats-grid .stat-card-purple .stat-pct,.coordinator-stats-grid .stat-card-green .stat-pct { background:#d1fae5; color:#047857; }
-.coordinator-stats-grid .stat-card-green .stat-icon { background:#a7f3d0; }
-.coordinator-stats-grid .stat-card-orange .stat-icon { background:#ffedd5; }
-.coordinator-stats-grid .stat-card-red { background:#fff5f7; }
-.coordinator-stats-grid .stat-card-red .stat-label,.coordinator-stats-grid .stat-card-red .stat-num { color:#dc2626; }
-.coordinator-stats-grid .stat-card-red .stat-pct { background:#ffe4e6; color:#be123c; }
-.coordinator-stats-grid .stat-card-red .stat-icon { background:#dc2626; color:#fff; }
+.coordinator-stats-grid .stat-card-purple .stat-pct,.coordinator-stats-grid .stat-card-green .stat-pct { background:var(--success-tint); color:var(--text); }
+.coordinator-stats-grid .stat-card-green .stat-icon { background:var(--success-tint); }
+.coordinator-stats-grid .stat-card-orange .stat-icon { background:var(--warning-tint); }
+.coordinator-stats-grid .stat-card-red { background:var(--canvas); }
+.coordinator-stats-grid .stat-card-red .stat-label,.coordinator-stats-grid .stat-card-red .stat-num { color:var(--danger); }
+.coordinator-stats-grid .stat-card-red .stat-pct { background:var(--canvas); color:var(--danger); }
+.coordinator-stats-grid .stat-card-red .stat-icon { background:var(--danger); color:var(--paper); }
 /* Completion tones override the decorative card palette, including unknown data. */
-.coordinator-stats-grid .stat-card[data-completion-tone] { --stat-tone:#4f46e5; --stat-tint:#eef2ff; background:#fff; }
-.coordinator-stats-grid .stat-card[data-completion-tone="complete"] { --stat-tone:#047857; --stat-tint:#d1fae5; }
-.coordinator-stats-grid .stat-card[data-completion-tone="warning"] { --stat-tone:#b45309; --stat-tint:#fef3c7; }
-.coordinator-stats-grid .stat-card[data-completion-tone="danger"] { --stat-tone:#dc2626; --stat-tint:#fee2e2; }
+.coordinator-stats-grid .stat-card[data-completion-tone] { --stat-tone:var(--primary); --stat-tint:var(--canvas); background:var(--paper); }
+.coordinator-stats-grid .stat-card[data-completion-tone="complete"] { --stat-tone:var(--text); --stat-tint:var(--success-tint); }
+.coordinator-stats-grid .stat-card[data-completion-tone="warning"] { --stat-tone:var(--warning); --stat-tint:var(--warning-tint); }
+.coordinator-stats-grid .stat-card[data-completion-tone="danger"] { --stat-tone:var(--danger); --stat-tint:var(--canvas); }
 .coordinator-stats-grid .stat-card[data-completion-tone] .stat-icon,
 .coordinator-stats-grid .stat-card[data-completion-tone] .stat-pct { color:var(--stat-tone); background:var(--stat-tint); }
 .coordinator-stats-grid .stat-card[data-completion-tone] .stat-num { color:var(--stat-tone); }
-.coordinator-stats-grid .stat-card[data-completion-tone] .stat-label { color:#64748b; }
+.coordinator-stats-grid .stat-card[data-completion-tone] .stat-label { color:var(--primary); }
 .coordinator-stats-grid .stat-card[data-completion-tone] .stat-track > span { background:var(--stat-tone) !important; }
 .coordinator-stats-grid .coordinator-stat-placeholder { display:block; }
 .coordinator-stats-grid .coordinator-stat-placeholder .app-skeleton { min-height:86px; box-sizing:border-box; }
 @media (max-width:760px) { .coord-stats.coordinator-stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } }
 @media (max-width:340px) { .coord-stats.coordinator-stats-grid { grid-template-columns:minmax(0,1fr); } }
-.stat-card-blue .stat-icon { color: #3b82f6; }
-.stat-card-blue .stat-num { color: #3b82f6; }
-.stat-card-green .stat-icon { color: #16a34a; }
-.stat-card-green .stat-num { color: #16a34a; }
-.stat-card-purple .stat-icon { color: #8b5cf6; }
-.stat-card-purple .stat-num { color: #8b5cf6; }
-.stat-card-orange .stat-icon { color: #f97316; }
-.stat-card-orange .stat-num { color: #f97316; }
-.stat-card-teal .stat-icon { color: #06b6d4; }
-.stat-card-teal .stat-num { color: #06b6d4; }
-.stat-card-gray .stat-icon { color: #9ca3af; }
-.stat-card-gray .stat-num { color: #9ca3af; }
-.stat-card-red .stat-icon { color: #dc2626; }
-.stat-card-red .stat-num { color: #dc2626; }
+.stat-card-blue .stat-icon { color: var(--primary); }
+.stat-card-blue .stat-num { color: var(--primary); }
+.stat-card-green .stat-icon { color: var(--success); }
+.stat-card-green .stat-num { color: var(--success); }
+.stat-card-purple .stat-icon { color: var(--primary); }
+.stat-card-purple .stat-num { color: var(--primary); }
+.stat-card-orange .stat-icon { color: var(--warning); }
+.stat-card-orange .stat-num { color: var(--warning); }
+.stat-card-teal .stat-icon { color: var(--info); }
+.stat-card-teal .stat-num { color: var(--info); }
+.stat-card-gray .stat-icon { color: var(--muted); }
+.stat-card-gray .stat-num { color: var(--muted); }
+.stat-card-red .stat-icon { color: var(--danger); }
+.stat-card-red .stat-num { color: var(--danger); }
 /* =========================================================
    SEMESTER PROGRESS
    ========================================================= */
 
 .pipeline-section {
-  background: #ffffff;
-  border: 1px solid #e7edf4;
-  border-radius: 12px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius:var(--radius-card);
   padding: 18px;
-  box-shadow: 0 1px 3px rgba(15,23,42,0.05);
+  box-shadow:var(--shadow-card);
 }
 
 
@@ -916,33 +919,33 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
 }
 
 .pipeline-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #172554;
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-bold);
+  color: var(--primary-hover);
 }
 
 .semester-dates {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 11.5px;
-  color: #64748b;
+  gap: var(--space-3);
+  font-size: var(--fs-meta);
+  color: var(--primary);
   white-space: nowrap;
 }
 
 .semester-dates strong {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 
 .date-divider {
   width: 1px;
   height: 16px;
-  background: #cbd5e1;
+  background: var(--border);
 }
 
 
@@ -955,7 +958,7 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 
   overflow-x: auto;
 
-  padding: 1px 0 8px;
+  padding: 1px 0 var(--space-2);
 
   scrollbar-width: thin;
 }
@@ -971,10 +974,10 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 
   padding: 14px 13px 11px;
 
-  border: 1px solid #dfe7f0;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius:var(--radius-tile);
 
-  background: #ffffff;
+  background: var(--paper);
 
   box-sizing: border-box;
 
@@ -988,7 +991,7 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
   display: flex;
   align-items: flex-start;
 
-  gap: 8px;
+  gap: var(--space-2);
 
   min-height: 42px;
 }
@@ -998,74 +1001,21 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 }
 
 .stage-label {
-  font-size: 12px;
-  line-height: 1.18;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-tight);
 
-  font-weight: 700;
+  font-weight: var(--fw-bold);
 
-  color: #334155;
+  color: var(--primary-hover);
 }
 
 .stage-subtitle {
   margin-top: 3px;
 
-  font-size: 9.5px;
-  line-height: 1.18;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-tight);
 
-  color: #94a3b8;
-}
-
-
-/* ---------- Stage icons ---------- */
-
-.stage-icon {
-  width: 20px;
-  height: 20px;
-
-  flex: 0 0 20px;
-
-  margin-top: 1px;
-
-  border-radius: 50%;
-
-  display: inline-flex;
-
-  align-items: center;
-  justify-content: center;
-
-  box-sizing: border-box;
-
-  font-size: 12px;
-  font-weight: 800;
-}
-
-
-/* Completed */
-
-.stage-icon.completed {
-  background: #1683e8;
-  color: #ffffff;
-}
-
-
-/* Pending */
-
-.stage-icon.pending {
-  border: 2px solid #94a3b8;
-  background: #ffffff;
-}
-
-
-/* Development */
-
-.stage-icon.development {
-  border-radius: 0;
-
-  color: #64748b;
-
-  background: transparent;
-
-  font-size: 18px;
+  color: var(--primary);
 }
 
 
@@ -1076,11 +1026,11 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 
   min-height: 17px;
 
-  font-size: 11.5px;
+  font-size: var(--fs-meta);
 
-  color: #64748b;
+  color: var(--primary);
 
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 
 
@@ -1091,9 +1041,9 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 
   margin-top: 7px;
 
-  background: #d8e0e9;
+  background: var(--border);
 
-  border-radius: 999px;
+  border-radius:var(--radius-badge);
 
   overflow: hidden;
 }
@@ -1101,19 +1051,19 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .progress-fill {
   height: 100%;
 
-  border-radius: 999px;
+  border-radius:var(--radius-badge);
 }
 
 .progress-fill.blue {
-  background: #1683e8;
+  background: var(--primary);
 }
 
 .progress-fill.green {
-  background: #16b364;
+  background: var(--success);
 }
 
 .progress-fill.gray {
-  background: #94a3b8;
+  background: var(--primary);
 }
 
 
@@ -1124,11 +1074,11 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 
   margin-top: 7px;
 
-  font-size: 11.5px;
+  font-size: var(--fs-meta);
 
-  color: #64748b;
+  color: var(--primary);
 
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 
 
@@ -1144,9 +1094,9 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
   align-items: center;
   justify-content: center;
 
-  color: #526b88;
+  color: var(--primary);
 
-  font-size: 23px;
+  font-size: var(--fs-h1);
 }
 
 
@@ -1158,23 +1108,23 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 
   align-items: center;
 
-  gap: 8px;
+  gap: var(--space-2);
 
   margin-top: 7px;
 
   padding: 0 2px;
 
-  font-size: 10.5px;
+  font-size: var(--fs-meta);
 
-  color: #64748b;
+  color: var(--primary);
 }
 
 .development-legend strong {
-  color: #475569;
+  color: var(--primary-hover);
 }
 
 .legend-separator {
-  color: #cbd5e1;
+  color: var(--muted);
 }
 
 
@@ -1199,213 +1149,163 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
     min-width: 130px;
   }
 }
-.needs-attention { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-.table-title { font-size: 14px; font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 14px; }
-.view-all { color: #3b5bdb; font-size: 13px; }
+.needs-attention { background: var(--paper); border-radius:var(--radius-card); padding: var(--space-5); box-shadow:var(--shadow-card); }
+.table-title { font-size: var(--fs-body); font-weight: var(--fw-bold); display: flex; justify-content: space-between; margin-bottom: 14px; }
 .attention-table { width: 100%; border-collapse: collapse; }
-.attention-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; color: #8b8f99; padding: 10px 12px; border-bottom: 1px solid #eef0f3; }
-.attention-table td { padding: 12px; border-bottom: 1px solid #f2f3f5; font-size:var(--font-size-body); }
+.attention-table th { text-align: left; font-size: var(--fs-meta); text-transform: uppercase; color: var(--muted); padding: 10px var(--space-3); border-bottom: 1px solid var(--canvas); }
+.attention-table td { padding: var(--space-3); border-bottom: 1px solid var(--canvas); font-size:var(--fs-body); }
 .col-index { width: 30px; text-align: center; }
 .col-severity { width: 80px; }
-.col-team { font-weight: 600; }
-.severity-badge { display: inline-block; padding: 4px 10px; border-radius:var(--pill-radius); font-size: 11px; font-weight: 600; }
-.severity-badge.high { background:var(--color-danger-tint); color:var(--color-danger); }
-.severity-badge.medium { background:var(--color-warning-tint); color:var(--color-warning); }
-.severity-badge.low { background:var(--color-info-tint); color:var(--color-info); }
-.action-link { color: #3b5bdb; font-size: 13px; }
-.two-column-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.col-team { font-weight: var(--fw-semibold); }
+.severity-badge { display: inline-block; padding: var(--space-1) 10px; border-radius:var(--radius-badge); font-size: var(--fs-meta); font-weight: var(--fw-semibold); }
+.severity-badge.high { background:var(--danger-tint); color:var(--danger); }
+.severity-badge.medium { background:var(--warning-tint); color:var(--warning); }
+.severity-badge.low { background:var(--info-tint); color:var(--info); }
+.two-column-layout { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
 @media (max-width: 1024px) { .two-column-layout { grid-template-columns: 1fr; } }
-.assessment-section { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-.assessment-title { font-size: 14px; font-weight: 700; margin-bottom: 16px; }
-.assessment-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.assessment-label { width: 120px; font-size: 13px; font-weight: 600; }
-.assessment-bar { flex: 1; display: flex; align-items: center; gap: 8px; }
-.assessment-bar-inner { flex: 1; height: 8px; background: #eef0f3; border-radius: 4px; overflow: hidden; }
-.assessment-fill { height: 100%; background: linear-gradient(90deg, #10b981, #34d399); }
-.assessment-pct { font-size: 12px; font-weight: 600; min-width: 35px; }
-.assessment-stat { font-size: 12px; color: #6b7280; min-width: 60px; text-align: right; }
-.github-section { background: #fff; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-.github-header { display: flex; justify-content: space-between; align-items: center; flex-wrap:wrap; gap:8px; margin-bottom: 8px; }
-.github-title { font-size: 14px; font-weight: 700; }
-.github-status { display: inline-block; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius:var(--pill-radius); line-height:1.5; }
-.github-status.configured { background:var(--color-success-tint); color:var(--color-success); }
-.github-row { display: flex; justify-content: space-between; flex-wrap:wrap; gap:3px 12px; padding: 6px 0; border-bottom: 1px solid #f2f3f5; font-size:var(--font-size-body); }
+.assessment-section { background: var(--paper); border-radius:var(--radius-card); padding: var(--space-5); box-shadow:var(--shadow-card); }
+.assessment-title { font-size: var(--fs-body); font-weight: var(--fw-bold); margin-bottom: var(--space-4); }
+.assessment-row { display: flex; align-items: center; gap: var(--space-3); margin-bottom: 14px; }
+.assessment-label { width: 120px; font-size: var(--fs-meta); font-weight: var(--fw-semibold); }
+.assessment-bar { flex: 1; display: flex; align-items: center; gap: var(--space-2); }
+.assessment-bar-inner { flex: 1; height: 8px; background: var(--canvas); border-radius:var(--radius-badge); overflow: hidden; }
+.assessment-fill { height: 100%; background: linear-gradient(90deg, var(--success), var(--success)); }
+.assessment-pct { font-size: var(--fs-meta); font-weight: var(--fw-semibold); min-width: 35px; }
+.assessment-stat { font-size: var(--fs-meta); color: var(--primary); min-width: 60px; text-align: right; }
+.github-section { background: var(--paper); border-radius:var(--radius-card); padding: var(--space-4) 18px; box-shadow:var(--shadow-card); }
+.github-header { display: flex; justify-content: space-between; align-items: center; flex-wrap:wrap; gap:var(--space-2); margin-bottom: var(--space-2); }
+.github-title { font-size: var(--fs-body); font-weight: var(--fw-bold); }
+.github-status { display: inline-block; font-size: var(--fs-meta); font-weight: var(--fw-semibold); padding: var(--space-1) 10px; border-radius:var(--radius-badge); line-height:var(--lh-body); }
+.github-status.configured { background:var(--success-tint); color:var(--success); }
+.github-row { display: flex; justify-content: space-between; flex-wrap:wrap; gap:3px var(--space-3); padding: 6px 0; border-bottom: 1px solid var(--canvas); font-size:var(--fs-body); }
 .github-row > span { overflow-wrap:anywhere; min-width:0; }
-.github-value { font-weight: 600; font-family: 'Courier New', monospace; }
-.run-sync-btn { padding: 10px 16px; border-radius: 8px; background: #1f2430; color: #fff; border: none; font-weight: 600; font-size: 13px; cursor: pointer; width: 100%; margin-top: 12px; }
-.run-sync-btn:hover { background: #333a4a; }
+.github-value { font-weight: var(--fw-semibold); font-family: var(--font); }
+.run-sync-btn { cursor: pointer; width: 100%; margin-top: var(--space-3); }
 /* Shared presentation for the two primary System Status cards. */
-.system-status-primary > .system-status-card { display:flex; flex-direction:column; align-self:stretch; box-sizing:border-box; margin:0; padding:16px 18px; border:0; border-radius:12px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.05); font-family:inherit; font-size:var(--font-size-body); line-height:1.5; }
-.system-status-card .github-header, .system-status-card .rubrics-status-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin:0 0 10px; }
-.system-status-card .github-title, .system-status-card .assessment-title { margin:0; font-family:inherit; font-size:14px; font-weight:700; line-height:1.5; }
-.system-status-card .github-status, .system-status-card .rubrics-status-pill { display:inline-block; padding:4px 10px; border-radius:var(--pill-radius); font-family:inherit; font-size:11px; font-weight:600; line-height:1.5; }
-.system-status-card .github-status.configured, .system-status-card .rubrics-status-pill[data-configured="true"] { color:var(--color-success); background:var(--color-success-tint); }
+.system-status-primary > .system-status-card { display:flex; flex-direction:column; align-self:stretch; box-sizing:border-box; margin:0; padding:var(--space-4) 18px; border:0; border-radius:var(--radius-card); background:var(--paper); box-shadow:var(--shadow-card); font-family:inherit; font-size:var(--fs-body); line-height:var(--lh-body); }
+.system-status-card .github-header, .system-status-card .rubrics-status-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-2); margin:0 0 10px; }
+.system-status-card .github-title, .system-status-card .assessment-title { margin:0; font-family:inherit; font-size:var(--fs-body); font-weight:var(--fw-bold); line-height:var(--lh-body); }
+.system-status-card .github-status, .system-status-card .rubrics-status-pill { display:inline-block; padding:var(--space-1) 10px; border-radius:var(--radius-badge); font-family:inherit; font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-body); }
+.system-status-card .github-status.configured, .system-status-card .rubrics-status-pill[data-configured="true"] { color:var(--success); background:var(--success-tint); }
 .system-status-card .github-info, .system-status-card .rubrics-assessment-list { margin:0; }
-.system-status-card .github-row, .system-status-card .rubrics-assessment-list > div { display:flex; justify-content:space-between; flex-wrap:wrap; gap:3px 12px; padding:6px 0; border:0; border-top:1px solid #eef0f5; font-size:var(--font-size-body); line-height:1.5; }
-.system-status-card .github-label, .system-status-card .rubrics-assessment-list dt { color:#1f2937; font-weight:600; }
-.system-status-card .github-value, .system-status-card .rubrics-assessment-list dd { margin:0; color:#64748b; font-family:inherit; font-size:var(--font-size-body); font-weight:400; font-variant-numeric:tabular-nums; }
+.system-status-card .github-row, .system-status-card .rubrics-assessment-list > div { display:flex; justify-content:space-between; flex-wrap:wrap; gap:3px var(--space-3); padding:6px 0; border:0; border-top:1px solid var(--canvas); font-size:var(--fs-body); line-height:var(--lh-body); }
+.system-status-card .github-label, .system-status-card .rubrics-assessment-list dt { color:var(--text); font-weight:var(--fw-semibold); }
+.system-status-card .github-value, .system-status-card .rubrics-assessment-list dd { margin:0; color:var(--primary); font-family:inherit; font-size:var(--fs-body); font-weight:var(--fw-regular); font-variant-numeric:tabular-nums; }
 .system-status-card .rubrics-status-detail { margin:0 0 10px; }
-.system-status-card .run-sync-btn { margin-top:auto; padding:7px 12px; min-height:32px; border-radius:6px; font-family:inherit; font-size:12px; line-height:1.5; }
+.system-status-card .run-sync-btn { margin-top:auto; min-height:32px; line-height:var(--lh-body); }
 .system-status-card .github-info { margin-bottom:10px; }
 @media(min-width:901px) {
   .system-status-primary { grid-auto-rows:1fr; }
   .system-status-primary > .system-status-card { height:100%; }
 }
-.team-tracker-section { min-width:0; max-width:100%; box-sizing:border-box; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.team-tracker-section { min-width:0; max-width:100%; box-sizing:border-box; background: var(--paper); border-radius:var(--radius-card); padding: var(--space-5); box-shadow:var(--shadow-card); }
 .tracker-title { margin-top:0; }
 #weeklyActivityRetry[hidden] { display:none !important; }
 .tracker-table-scroll { width:100%; max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; }
-.tracker-table-scroll:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
+.tracker-table-scroll:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
 .team-tracker-table .col-team { width:100px; min-width:100px; max-width:160px; white-space:normal; }
-.team-tracker-table .tracker-registers { margin-top:5px; max-width:220px; white-space:normal; overflow-wrap:anywhere; font-size:11px; font-weight:400; line-height:1.5; color:#64748b; font-variant-numeric:tabular-nums; }
+.team-tracker-table .tracker-registers { margin-top:5px; max-width:220px; white-space:normal; overflow-wrap:anywhere; font-size:var(--fs-meta); font-weight:var(--fw-regular); line-height:var(--lh-body); color:var(--primary); font-variant-numeric:tabular-nums; }
 .team-tracker-table .col-guide { min-width:170px; max-width:220px; overflow-wrap:anywhere; }
-.team-tracker-table .col-health { width:36px; text-align:center; }
-.tracker-health { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; }
-.tracker-health.green { background:var(--color-success-tint); color:var(--color-success); }
-.tracker-health.orange { background:var(--color-warning-tint); color:var(--color-warning); }
-.tracker-health.red { background:var(--color-danger-tint); color:var(--color-danger); }
-.tracker-health.gray { background:var(--color-soft); color:var(--color-ink-muted); }
-.team-tracker-section .pagination { flex-wrap:wrap; gap:12px; }
+.team-tracker-table .col-health { text-align:center; }
+.team-tracker-section .pagination { flex-wrap:wrap; gap:var(--space-3); }
 .team-tracker-section .pagination-buttons { flex-wrap:wrap; }
 .tracker-search input { min-width:0; width:100%; box-sizing:border-box; }
 @media (max-width:600px) {
   .team-tracker-section { padding:14px; }
-  .team-tracker-table th,.team-tracker-table td { padding:9px 8px; }
-  .tracker-tabs .tab { padding:6px 10px; }
+  .team-tracker-table th,.team-tracker-table td { padding:9px var(--space-2); }
 }
-.tracker-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.tab { padding: 7px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid #dcdfe4; background: #fff; color: #6b7280; cursor: pointer; }
-.tab.active { background: #1f2430; color: #fff; border-color: #1f2430; }
-.tracker-search { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
-.tracker-search #trackerSearch,.tracker-search .reset-btn { height:40px; box-sizing:border-box; margin:0; padding:0 14px; line-height:normal; }
+.tracker-tabs { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.tracker-search { display:flex; align-items:center; gap:var(--space-2); margin-bottom:14px; }
+.tracker-search #trackerSearch { height:40px; box-sizing:border-box; margin:0; padding:0 14px; line-height:normal; }
+.tracker-search .reset-btn { height:40px; box-sizing:border-box; margin:0; line-height:normal; }
 .tracker-search #trackerSearch { flex:1; min-width:0; }
 .tracker-search .reset-btn { flex:none; display:inline-flex; align-items:center; justify-content:center; }
-.tracker-tabs .tab[data-filter="attention"] { color:var(--color-danger); border-color:var(--color-danger); background:var(--color-danger-tint); }
-.tracker-tabs .tab[data-filter="ontrack"] { color:var(--color-success); border-color:var(--color-success); background:var(--color-success-tint); }
-.tracker-tabs .deadline-pill { color:var(--color-warning); border-color:var(--color-warning); background:var(--color-warning-tint); }
-.tracker-tabs .deadline-pill.deadline-overdue { color:var(--color-danger); border-color:var(--color-danger); background:var(--color-danger-tint); }
-.tracker-tabs .tab.active { background:#1f2430; color:#fff; border-color:#1f2430; }
-.tracker-tabs .tab:focus-visible,.tracker-search .reset-btn:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
-.tracker-tabs .tab:hover:not(.active) { border-color:currentColor; }
-#trackerSearch { flex: 1; padding: 10px 14px; border: 1px solid #dcdfe4; border-radius: 8px; font-size:var(--font-size-body); }
-.reset-btn { padding: 10px 16px; border-radius: 8px; background: #f3f4f6; border: 1px solid #dcdfe4; font-weight: 600; font-size: 13px; cursor: pointer; }
-.team-tracker-table { width: 100%; border-collapse: collapse; font-size:var(--font-size-body); }
-.team-tracker-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; color: #8b8f99; padding: 10px 12px; border-bottom: 1px solid #eef0f3; }
-.team-tracker-table td { padding: 7px 12px; border-bottom: 1px solid #f2f3f5; }
+.tracker-tabs .filter-tab:focus-visible,.tracker-search .reset-btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+#trackerSearch { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius:var(--radius-btn); font-size:var(--fs-body); }
+.reset-btn { cursor: pointer; }
+.team-tracker-table { width: 100%; border-collapse: collapse; font-size:var(--fs-body); }
+.team-tracker-table th { text-align: left; font-size: var(--fs-meta); text-transform: uppercase; color: var(--muted); padding: 10px var(--space-3); border-bottom: 1px solid var(--canvas); }
+.team-tracker-table td { padding: 7px var(--space-3); border-bottom: 1px solid var(--canvas); }
 .team-tracker-table th:first-child,.team-tracker-table td.col-team { padding-right:6px; }
 .team-tracker-table th:nth-child(2),.team-tracker-table td.col-guide { padding-left:6px; }
 .team-tracker-table th:nth-child(5),.team-tracker-table td.col-activity { width:76px; padding-right:6px; }
 .team-tracker-table th:nth-child(6),.team-tracker-table td.col-activity + td { padding-left:6px; }
 .col-title { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.health-badge { display: inline-block; padding: 4px 10px; border-radius:var(--pill-radius); font-size: 11px; font-weight: 600; }
-.health-badge.green { background:var(--color-success-tint); color:var(--color-success); }
-.health-badge.orange { background:var(--color-warning-tint); color:var(--color-warning); }
-.health-badge.red { background:var(--color-danger-tint); color:var(--color-danger); }
-.view-link { color: #3b5bdb; }
-.team-action-controls { display:flex; align-items:center; gap:8px; }
-.team-action-icon { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border:1px solid #dce3ee; border-radius:9px; background:#fff; color:#3b5bdb; cursor:pointer; text-decoration:none; padding:0; }
-.team-action-icon:hover { background:#eef2ff; border-color:#a5b4fc; }
-.team-action-icon:focus-visible { outline:2px solid #3b5bdb; outline-offset:3px; }
-.link-button { border: 0; background: transparent; padding: 0; cursor: pointer; font: inherit; }
-.pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 13px; }
-.pagination-buttons { display: flex; gap: 4px; }
-.pagination-buttons button { padding: 6px 10px; border: 1px solid #dcdfe4; border-radius: 6px; background: #fff; font-size: 12px; cursor: pointer; }
-.pagination-buttons button.active { background: #1f2430; color: #fff; border-color: #1f2430; }
-.pagination-ellipsis { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; color: #6b7280; }
-.team-drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.28);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.22s ease, visibility 0.22s ease;
-  z-index: 9998;
-}
-
-.team-drawer-backdrop.open {
-  opacity: 1;
-  visibility: visible;
-}
-
-.team-drawer {
+.health-badge { display: inline-block; padding: var(--space-1) 10px; border-radius:var(--radius-badge); font-size: var(--fs-meta); font-weight: var(--fw-semibold); }
+.health-badge.green { background:var(--success-tint); color:var(--success); }
+.health-badge.orange { background:var(--warning-tint); color:var(--warning); }
+.health-badge.red { background:var(--danger-tint); color:var(--danger); }
+.view-link { color: var(--primary); }
+.team-action-controls { display:flex; align-items:center; gap:var(--space-2); }
+.team-action-icon { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; cursor:pointer; }
+.team-action-icon:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
+.link-button { cursor: pointer; }
+.pagination { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-4); font-size: var(--fs-meta); }
+.pagination-buttons { display: flex; gap: var(--space-1); }
+.pagination-ellipsis { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; color: var(--primary); }
+.review-drawer {
   position: fixed;
   top: 0;
   right: 0;
   width: min(520px, 92vw);
   height: 100vh;
-  background: #ffffff;
-  box-shadow: -8px 0 30px rgba(15, 23, 42, 0.14);
-  transform: translateX(100%);
-  transition: transform 0.25s ease;
-  z-index: 9999;
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  z-index:var(--z-drawer);
   display: flex;
   flex-direction: column;
 }
-
-.team-drawer.open {
-  transform: translateX(0);
-}
-
-.team-drawer-header {
+.review-drawer .team-drawer-header {
   min-height: 74px;
-  padding: 18px 20px;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 18px var(--space-5);
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .team-drawer-eyebrow {
-  font-size: 10px;
-  font-weight: 700;
-  color: #8b8f99;
-  letter-spacing: 0.9px;
-}
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
+  color: var(--muted);
+  }
 
 .team-drawer-title {
   margin-top: 3px;
   font-family: inherit;
-  font-size: 16px;
-  line-height: 1.4;
-  font-weight: 700;
-  letter-spacing: 0;
+  font-size: var(--fs-h3);
+  line-height: var(--lh-heading);
+  font-weight: var(--fw-bold);
   text-transform: uppercase;
-  color: #1f2430;
+  color: var(--text);
 }
 
 .team-drawer-close {
   width: 36px;
   height: 36px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  color: #4b5563;
   display:inline-flex;
   align-items:center;
   justify-content:center;
   cursor: pointer;
 }
 
-.team-drawer-close:hover {
-  background: #f3f4f6;
-}
 
-.team-drawer-content {
+.review-drawer .team-drawer-content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: var(--space-5);
 }
 
 .drawer-error {
-  padding: 40px 10px;
+  padding: var(--space-10) 10px;
   text-align: center;
-  color: #6b7280;
-  font-size:var(--font-size-body);
+  color: var(--primary);
+  font-size:var(--fs-body);
 }
 
 .drawer-error {
-  color: #b91c1c;
+  color: var(--danger);
 }
 
 .drawer-section {
@@ -1415,26 +1315,25 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 .drawer-section-title {
   margin-bottom: 10px;
   padding-bottom: 7px;
-  border-bottom: 1px solid #eef0f3;
-  color: #8b8f99;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.7px;
+  border-bottom: 1px solid var(--canvas);
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
   text-transform: uppercase;
 }
 
 .drawer-project-title {
-  font-size: 16px;
-  line-height: 1.5;
-  font-weight: 650;
-  color: #1f2937;
+  font-size: var(--fs-h3);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-bold);
+  color: var(--text);
 }
 
 .drawer-problem {
   margin-top: 10px;
-  color: #6b7280;
-  font-size:var(--font-size-body);
-  line-height: 1.55;
+  color: var(--primary);
+  font-size:var(--fs-body);
+  line-height: var(--lh-body);
 }
 
 .drawer-info-grid {
@@ -1444,31 +1343,30 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 }
 
 .drawer-info-card {
-  padding: 12px;
-  border: 1px solid #eef0f3;
-  border-radius: 8px;
-  background: #fafbfc;
+  padding: var(--space-3);
+  border: 1px solid var(--canvas);
+  border-radius:var(--radius-card);
+  background: var(--canvas);
 }
 
 .drawer-info-label {
-  margin-bottom: 4px;
-  color: #8b8f99;
-  font-size: 10px;
-  font-weight: 650;
+  margin-bottom: var(--space-1);
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
   text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
+  }
 
 .drawer-info-value {
-  color: #1f2937;
-  font-size:var(--font-size-body);
-  font-weight: 600;
+  color: var(--text);
+  font-size:var(--fs-body);
+  font-weight: var(--fw-semibold);
   overflow-wrap: anywhere;
 }
 
 .drawer-person {
   padding: 10px 0;
-  border-bottom: 1px solid #f2f3f5;
+  border-bottom: 1px solid var(--canvas);
 }
 
 .drawer-person:last-child {
@@ -1476,15 +1374,15 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 }
 
 .drawer-person-name {
-  color: #1f2937;
-  font-size:var(--font-size-body);
-  font-weight: 650;
+  color: var(--text);
+  font-size:var(--fs-body);
+  font-weight: var(--fw-bold);
 }
 
 .drawer-person-meta {
   margin-top: 3px;
-  color: #8b8f99;
-  font-size: 11px;
+  color: var(--muted);
+  font-size: var(--fs-meta);
   overflow-wrap: anywhere;
 }
 
@@ -1492,10 +1390,10 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 10px 0;
-  border-bottom: 1px solid #f2f3f5;
-  font-size:var(--font-size-body);
+  border-bottom: 1px solid var(--canvas);
+  font-size:var(--fs-body);
 }
 
 .drawer-status-row:last-child {
@@ -1503,35 +1401,29 @@ body { max-width: 1400px; margin: 0 auto; padding: 20px 16px; }
 }
 
 .drawer-status-label {
-  color: #6b7280;
+  color: var(--primary);
 }
 
 .drawer-status-value {
-  color: #1f2937;
-  font-weight: 650;
+  color: var(--text);
+  font-weight: var(--fw-bold);
   text-align: right;
 }
 
 .drawer-status-good {
-  color: #15803d;
+  color: var(--text);
 }
 
 .drawer-status-warn {
-  color: #b45309;
+  color: var(--warning);
 }
 
 .drawer-status-bad {
-  color: #b91c1c;
+  color: var(--danger);
 }
 
 .drawer-repo-link {
-  color: #3b5bdb;
-  text-decoration: none;
   overflow-wrap: anywhere;
-}
-
-.drawer-repo-link:hover {
-  text-decoration: underline;
 }
 
 body.team-drawer-open {
@@ -1573,7 +1465,7 @@ function buildCommitteeData_(committeeRows, statusRows, RC, TS) {
 function buildRubricsStatusCard_() {
   const status = getRubricsStatus_();
   const count = (status.assessments || []).length;
-  return `<section class="assessment-section rubrics-status-card system-status-card" aria-labelledby="rubricsStatusHeading">
+  return `<section class="assessment-section rubrics-status-card system-status-card card" aria-labelledby="rubricsStatusHeading">
     <div class="rubrics-status-heading system-card-header"><div class="system-card-heading"><h3 class="assessment-title system-card-title" id="rubricsStatusHeading">Rubrics</h3>
       <span class="rubrics-status-pill" data-configured="${status.configured}" role="status">${status.configured?'Configured':'Not configured'}</span></div></div>
     ${count ? '<p class="rubrics-status-count">'+count+' '+(count===1?'assessment':'assessments')+'</p>' : ''}
@@ -1593,16 +1485,16 @@ function loadCoordinatorSystemStatus() {
     let publishing;
     try {publishing=publicationDefinitions_().map(d=>buildInternalAssessmentPublishing_(d.key)).join('');}
     catch(err){publishing='<p role="status">Assessment configuration needs attention. Use Assessment readiness below.</p>';}
-    return `<div class="coordinator-container system-status-cards">
-      <div class="system-status-primary">${buildGithubAccessSection(access)}
-      <section class="system-status-card" id="studentInvitationResend">
+    return `<div class="coordinator-container system-status-cards" data-status-cards>
+      <div class="system-status-primary" data-status-primary>${buildGithubAccessSection(access)}
+      <section class="system-status-card card" id="studentInvitationResend">
         <h3 class="system-card-title">Student GitHub invitations</h3>
         <p>Renew expired or missing invitations for students in existing team repositories. Joined students and pending invitations are skipped.</p>
-        <button type="button" class="app-btn btn-md btn-primary" onclick="DashboardUI.runStudentInvitationResend()">Resend expired student invitations</button>
+        <button type="button" class="btn btn-primary" onclick="DashboardUI.runStudentInvitationResend()">Resend expired student invitations</button>
         <p data-resend-status role="status" aria-live="polite"></p>
         <details data-resend-log hidden>
           <summary>View student invitation log</summary>
-          <div data-resend-results class="tracker-table-scroll" role="region" aria-label="Student invitation results" tabindex="0"></div>
+          <div data-resend-results data-tooltip-boundary class="tracker-table-scroll table-wrap" role="region" aria-label="Student invitation results" tabindex="0"></div>
           ${buildTeamPagination_('studentInvitations', 'invitations', 0, 'students')}
         </details>
       </section>

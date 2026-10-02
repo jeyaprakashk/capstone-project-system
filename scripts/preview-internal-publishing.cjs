@@ -4,6 +4,7 @@
  * Add &narrow=1 for a 390px frame, or &details=1 for student details.
  */
 const http=require('node:http'),fs=require('node:fs'),vm=require('node:vm');
+const attachedStylesheet=fs.readFileSync('app-styles.html','utf8');
 const {publishingFixture}=require('../tests/internal-publishing-fixture.cjs');
 const styles=vm.createContext({escapeHtml:value=>String(value)});vm.runInContext(fs.readFileSync('common-styles.js','utf8'),styles);
 vm.runInContext(fs.readFileSync('icon-renderer.js','utf8'),styles);
@@ -34,14 +35,14 @@ function reportFor(key){
 }
 function page(url){
   const key=['review1','review2','guide_eval'].includes(url.searchParams.get('assessment'))?url.searchParams.get('assessment'):'review1';
-  if(url.searchParams.has('narrow'))return '<!doctype html><title>Publishing · narrow preview</title><style>body{margin:0;background:#e8edee}iframe{display:block;width:390px;height:1050px;border:0;margin:auto}</style><iframe title="390 pixel publishing preview" src="/?assessment='+key+'&details=1"></iframe>';
+  if(url.searchParams.has('narrow'))return '<!doctype html><title>Publishing · narrow preview</title><style>'+styles.getBaseStyles()+'body{margin:0;background:var(--canvas)}iframe{display:block;width:390px;height:1050px;border:0;margin:auto}</style><iframe title="390 pixel publishing preview" src="/?assessment='+key+'&details=1"></iframe>';
   const f=publishingFixture(key),report=reportFor(key);
   f.c.getSkeletonMarkup_=styles.getSkeletonMarkup_;
   f.c.escapeHtml=value=>String(value);
   const css=styles.getBaseStyles()+styles.getCardStyles()+styles.getTableStyles()+styles.getLoadingStyles_()+styles.getDashboardSurfaceStyles_()+styles.getEditorialStyles_()+styles.getLucideStyles_();
   const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
   const begin=source.slice(source.indexOf('  function beginContentLoading('),source.indexOf('  function setText('));
-  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+report.config.title+' · Publishing preview</title><style>'+css+'body{padding:28px;background:#f3f6f6}main{max-width:1200px;margin:auto}.assessment-section{padding:24px;background:white;border:1px solid #dde5e5;border-radius:12px}.preview-nav{display:flex;gap:18px;margin:0 auto 18px;max-width:1200px;font-size:12px}.preview-nav a{color:#0f766e}@media(max-width:640px){body{padding:12px}.assessment-section{padding:14px}}</style></head><body><nav class="preview-nav"><a href="/?assessment=review1">Review 1</a><a href="/?assessment=review2">Review 2</a><a href="/?assessment=guide_eval">Guide Evaluation</a><a href="/?assessment='+key+'&narrow=1">Narrow</a><span>Synthetic data only</span></nav><main>'+f.c.buildInternalAssessmentPublishing_(key)+'</main><script>const previewReport='+JSON.stringify(report).replace(/</g,'\\u003c')+';const renderSkeleton='+styles.getSkeletonMarkup_.toString()+';function escapeHtml(s){return String(s).replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\\"":"&quot;"}[c]));}'+begin+`
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+report.config.title+' · Publishing preview</title><style>'+css+'body{padding:28px;background:var(--canvas)}main{max-width:1200px;margin:auto}.assessment-section{padding:24px;background:var(--paper);border:1px solid var(--border);border-radius:12px}.preview-nav{display:flex;gap:18px;margin:0 auto 18px;max-width:1200px;font-size:var(--fs-badge)}.preview-nav a{color:var(--primary)}@media(max-width:640px){body{padding:12px}.assessment-section{padding:14px}}</style></head><body><nav class="preview-nav"><a href="/?assessment=review1">Review 1</a><a href="/?assessment=review2">Review 2</a><a href="/?assessment=guide_eval">Guide Evaluation</a><a href="/?assessment='+key+'&narrow=1">Narrow</a><span>Synthetic data only</span></nav><main>'+f.c.buildInternalAssessmentPublishing_(key)+'</main><script>const previewReport='+JSON.stringify(report).replace(/</g,'\\u003c')+';const renderSkeleton='+styles.getSkeletonMarkup_.toString()+';function escapeHtml(s){return String(s).replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\\"":"&quot;"}[c]));}'+begin+`
   ${fs.readFileSync('lucide-icons.js','utf8')}
   ${fs.readFileSync('icon-renderer.js','utf8')}
   initializeDashboardTooltips_();
@@ -52,4 +53,4 @@ function page(url){
   },120))});}
   `+f.c.getInternalAssessmentPublishingClientScript_()+`;InternalAssessmentPublishing.refresh('${key}').then(()=>{`+(url.searchParams.has('details')?`document.querySelector('[data-details="3"]').click();document.querySelector('[data-details="5"]').click();document.querySelectorAll('.review1-history').forEach(node=>node.open=true);`:'')+`});</script></body></html>`;
 }
-http.createServer((request,response)=>{try{response.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});response.end(page(new URL(request.url,'http://127.0.0.1')).replace('<body><nav','<body data-dashboard-theme="editorial"><nav'));}catch(error){response.writeHead(500);response.end(error.stack);}}).listen(8765,'127.0.0.1',()=>console.log('Synthetic publishing preview: http://127.0.0.1:8765'));
+http.createServer((request,response)=>{try{response.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});response.end(page(new URL(request.url,'http://127.0.0.1')).replace('<body><nav','<body data-dashboard-theme="editorial"><nav').replace('</style>','</style>'+attachedStylesheet));}catch(error){response.writeHead(500);response.end(error.stack);}}).listen(8765,'127.0.0.1',()=>console.log('Synthetic publishing preview: http://127.0.0.1:8765'));

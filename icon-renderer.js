@@ -12,7 +12,7 @@ function getLucideStyles_() {
   return `
   .lucide-icon { display:inline-block; width:16px; height:16px; flex-shrink:0; vertical-align:-3px; pointer-events:none; }
   .lucide-icon[aria-label] { pointer-events:auto; }
-  .dashboard-tooltip { position:fixed; z-index:2147483647; max-width:min(280px,calc(100vw - 16px)); padding:7px 10px; border-radius:7px; background:#182230; color:#fff; font:12px/1.4 'Inter','Segoe UI',sans-serif; box-shadow:0 3px 12px rgba(0,0,0,.2); overflow-wrap:anywhere; pointer-events:none; }
+  .dashboard-tooltip { position:fixed; z-index:var(--z-tooltip); max-width:min(280px,calc(100vw - 16px)); padding:7px 10px; border-radius:var(--radius-badge); background:var(--text); color:var(--paper); font:var(--fs-meta)/var(--lh-heading) var(--font); box-shadow:var(--shadow-overlay); overflow-wrap:anywhere; pointer-events:none; }
   .dashboard-tooltip[hidden] { display:none; }
   .lucide-icon.icon-leading { margin-right:5px; }
   .lucide-icon.icon-trailing { margin-left:5px; }
@@ -20,12 +20,10 @@ function getLucideStyles_() {
   .team-action-icon .lucide-icon, .team-drawer-close .lucide-icon { width:18px; height:18px; }
   .announcement-empty-icon .lucide-icon { width:24px; height:24px; }
   .step-node .lucide-icon { width:16px; height:16px; }
-  .icon-spin { animation:lucide-spin 1s linear infinite; }
-  @keyframes lucide-spin { to { transform:rotate(360deg); } }
-  @media(prefers-reduced-motion:reduce) { .icon-spin { animation:none; } }
   `;
 }
 
+/** Body-mounted positioning is retained for icons inside clipped tables, drawers and scroll regions. */
 /** Delegated tooltip events also cover content replaced by asynchronous refreshes. */
 function initializeDashboardTooltips_() {
   let tooltip = null, active = null, oldDescription = null, nativeTitle = null;
@@ -44,6 +42,8 @@ function initializeDashboardTooltips_() {
     if (nativeOwner && nativeOwner.getAttribute('data-native-tooltip') !== null) { hide(); return; }
     const owner = target.closest('[data-tooltip], [title], svg[aria-label]');
     if (!owner || owner === active) return;
+    // Fixed positioning is required only when an ancestor clips CSS tooltips.
+    if (!owner.closest('[data-tooltip-boundary]')) { hide(); return; }
     const text = owner.getAttribute('data-tooltip') || owner.getAttribute('title') || owner.getAttribute('aria-label');
     if (!text) return;
     hide();

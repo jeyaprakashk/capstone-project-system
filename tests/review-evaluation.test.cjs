@@ -282,7 +282,7 @@ function browserFixture(extended=false,key='review1') {
         if(selector.startsWith('[data-decision-reason'))return {value:'Reviewed evidence'};
         if(selector.startsWith('[data-components'))return {value:'individual'};
         if(selector.startsWith('[data-decision='))return {value:'OTHER'};
-        if(selector==='.review-actions')return {set innerHTML(value){for(const m of value.matchAll(/(data-(?:target-draft|target-submit|reload|close))/g))buttons.push(button(m[1]));}};
+        if(selector==='[data-review-actions]')return {set innerHTML(value){for(const m of value.matchAll(/(data-(?:target-draft|target-submit|reload|close))/g))buttons.push(button(m[1]));}};
       }
       if(selector==='[data-message]')return status;if(selector==='form')return form;if(selector.startsWith('[data-total='))return totals[Number(selector.match(/\d+/)[0])];return buttons.find(b=>b.hasAttribute(selector.slice(1,-1)));},
     querySelectorAll(selector){if(selector==='[data-index]')return fields;if(selector.startsWith('[data-absence]'))return [...absenceNodes.values()].flatMap(h=>Object.values(h.controls));const inputs=fields.flatMap(f=>Object.values(f.controls));return selector.includes('button')?[...buttons,...inputs,...fields.flatMap(f=>[...f.buttons,...f.querySelector('[data-feedback-options]').querySelectorAll('button')])]:inputs;}
@@ -461,7 +461,7 @@ for(const key of ['review1','review2']) {
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
     assert.match(f.drawer.innerHTML,/data-team-pills/);assert.match(f.drawer.innerHTML,/data-select-pi="0"/);
     const field=f.fields()[0],group={querySelectorAll:()=>[field]},content={scrollTop:120},query=f.drawer.querySelector.bind(f.drawer);
-    f.drawer.querySelector=s=>s==='[data-criteria-group="team"]'?group:s==='.team-drawer-content'?content:query(s);
+    f.drawer.querySelector=s=>s==='[data-criteria-group="team"]'?group:s==='[data-drawer-content]'?content:query(s);
     let scrolled=false;field.scrollIntoView=()=>{scrolled=true;};
     const marks=field.controls['[data-marks]'];marks.checkValidity=()=>!marks.validity;Object.defineProperty(marks,'validationMessage',{get:()=>marks.validity});
     const pill={dataset:{selectPi:'0'},hasAttribute:a=>a==='data-select-pi',closest:s=>s==='button'?pill:null};
@@ -494,7 +494,7 @@ for(const key of ['review1','review2']) {
     const panels=Object.fromEntries(['team','individual'].map(name=>[name,{hidden:name!=='team',open:name==='team',querySelectorAll:()=>[]}]));
     const tabs=Object.fromEntries(['team','individual'].map(name=>[name,{dataset:{criteriaTab:name},attrs:{},hasAttribute:attr=>attr==='data-criteria-tab',setAttribute(k,v){this.attrs[k]=v;},focus(){this.focused=true;},closest(selector){return selector==='button'?this:null;}}]));
     const chips={},query=f.drawer.querySelector.bind(f.drawer);
-    f.drawer.querySelector=selector=>selector==='.review-header-students'?chips:selector.startsWith('[data-criteria-group="')?panels[selector.match(/"([^"]+)"/)[1]]:selector.startsWith('[data-criteria-tab="')?tabs[selector.match(/"([^"]+)"/)[1]]:query(selector);
+    f.drawer.querySelector=selector=>selector==='[data-review-students]'?chips:selector.startsWith('[data-criteria-group="')?panels[selector.match(/"([^"]+)"/)[1]]:selector.startsWith('[data-criteria-tab="')?tabs[selector.match(/"([^"]+)"/)[1]]:query(selector);
     f.fields()[0].controls['[data-marks]'].value='48';f.fields()[0].controls['[data-level]'].value='3';f.events.input();
     f.events.click({target:tabs.individual});assert.equal(panels.team.hidden,true);assert.equal(panels.individual.hidden,false);assert.equal(tabs.individual.attrs['aria-selected'],'true');assert.equal(chips.hidden,false);
     f.events.keydown({target:tabs.individual,key:'ArrowLeft',preventDefault(){}});assert.equal(panels.team.hidden,false);assert.equal(panels.individual.hidden,true);assert.equal(tabs.team.focused,true);assert.equal(chips.hidden,true);
@@ -520,7 +520,7 @@ for(const key of ['review1','review2']) {
     assert.match(f.drawer.innerHTML,/data-select-student="0" aria-pressed="true"/);
     assert.match(f.drawer.innerHTML,/data-select-student="1" aria-pressed="false"/);
     const panels=[0,1].map(i=>({dataset:{studentGroup:String(i)},open:i===0,hidden:i!==0}));
-    const chips=[0,1].map(i=>({dataset:{selectStudent:String(i)},attrs:{},hasAttribute:name=>name==='data-select-student',setAttribute(k,v){this.attrs[k]=v;},closest:selector=>selector==='button'?chips[i]:null}));
+    const chips=[0,1].map(i=>({dataset:{selectStudent:String(i)},attrs:{},classList:{toggle(){}},hasAttribute:name=>name==='data-select-student',setAttribute(k,v){this.attrs[k]=v;},closest:selector=>selector==='button'?chips[i]:null}));
     const parent={open:false,closest:selector=>selector==='[data-criteria-group]'?parent:null};
     const query=f.drawer.querySelector.bind(f.drawer),all=f.drawer.querySelectorAll.bind(f.drawer);
     f.drawer.querySelector=selector=>selector==='[data-criteria-group="individual"]'?parent:selector.startsWith('[data-select-student="')?chips[Number(selector.match(/\d+/)[0])]:selector.startsWith('[data-student-group="')?panels[Number(selector.match(/\d+/)[0])]:query(selector);

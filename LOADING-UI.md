@@ -1,9 +1,8 @@
 # Loading and refresh behavior
 
-Use the shared skeleton treatment for asynchronous reads throughout the project.
+Use the shared loading lifecycle for asynchronous reads throughout the project.
 This applies to dashboards, cards, tables, drawers, evaluation results, and status
-checks. Do not introduce visible “Loading…” / “Refreshing…” text or a separate
-spinner design. Keep descriptive loading text in the skeleton's accessible label.
+checks. Keep descriptive loading text in the loading state’s accessible label.
 
 ## Initial reads
 
@@ -19,12 +18,9 @@ avoid retaining empty space from setup actions.
 
 For tabs with a refresh action, render the header with
 `buildTabHeader_(title, key, action, updated)`; role dashboards use
-`buildDashboardContainerHeader_(title, key)`. The shared `tab-header` and
-`tab-refresh-btn` styles provide the heading, timestamp beneath it, text Refresh
-button on the same row, and bottom divider. Keep button text, size, colors, and
-spacing in these common styles rather than adding tab-specific overrides. Pass
-the tab's own refresh action and update its timestamp only after a successful read.
-Refresh buttons use `app-btn btn-sm btn-secondary` from [BUTTON-UI.md](BUTTON-UI.md).
+`buildDashboardContainerHeader_(title, key)`. Pass the tab's own refresh action
+and update its timestamp only after a successful read. Follow
+[UI-STYLING.md](UI-STYLING.md) for presentation.
 
 Use `DashboardUI.beginContentLoading(element, label)`. It covers the existing DOM
 with the shared skeleton, retains the content's height and event handlers, sets
@@ -60,13 +56,10 @@ the refresh trigger while pending and restore its label and enabled state when
 settled. Keep successful content on refresh failure; show a readable error and
 retry path. Do not overwrite unsaved form input as part of a background refresh.
 
-Loading styles belong in `getLoadingStyles_()` in `common-styles.js`. Reuse the
-same animation and reduced-motion handling; use `--loading-surface` and existing
-`--skeleton-*` variables for themed surfaces. Do not add feature-specific overlays.
+The loading state’s presentation belongs in the single stylesheet.
 
 Mutation actions such as Save, Submit, Publish, and Sync retain their explicit
 action and result messages. Their subsequent data reads follow this convention.
 
 Verify success, failure, retry, and duplicate-request behavior when changing a
-loader. Run `npm test`; visually check preserved dimensions, keyboard interaction,
-and reduced motion when a browser preview is available.
+loader. Run `npm test` and check keyboard interaction when a browser preview is available.

@@ -2,6 +2,7 @@
 function guideWeeklyBrowser_() {
   const host = ()=>document.getElementById('guideWeeklyProgress');
   const esc = value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const badgeClass = tone=>({green:'badge badge--success',orange:'badge badge--warning',blue:'badge badge--info',red:'badge badge--danger',gray:'chip'}[tone] || 'chip');
   const message = error=>typeof error === 'string' ? error : error?.message || 'Request failed.';
   function rpc(method,args,success,failure) {
     try { DashboardUI.guideRun().withSuccessHandler(success).withFailureHandler(failure)[method](...args); }
@@ -38,14 +39,14 @@ function guideWeeklyBrowser_() {
         pill.innerHTML=DashboardUI.renderSkeleton('inline','Checking team actions');return;
       }
       pill.removeAttribute('aria-busy');
-      pill.hidden=!first;pill.className='tag orange';
+      pill.hidden=!first;pill.className='badge badge--warning';
       pill.textContent=first?first.label+' · '+first.count:'';
       button.setAttribute('aria-description',actions.map(action=>action.label+' · '+action.count).join(', ')+(unknown?' · Some action statuses could not be checked.':''));
     });
     const actions=teamActions(selectedTeam);
     root.querySelectorAll('[data-guide-tab]').forEach(button=>{
       let badge=button.querySelector('[data-guide-tab-attention]');
-      if(!badge){badge=document.createElement('span');badge.dataset.guideTabAttention='';badge.className='tag orange';(button.querySelector('strong') || button).appendChild(badge);}
+      if(!badge){badge=document.createElement('span');badge.dataset.guideTabAttention='';badge.className='badge badge--warning';(button.querySelector('strong') || button).appendChild(badge);}
       const action=actions.find(action=>action.key===button.dataset.guideTab);
       badge.hidden=!action;badge.textContent=action?String(action.count):'';
       badge.title=action?(action.key==='documents'?'Documents supporting pending title review':action.label+' requiring action')+': '+action.count:'';
@@ -98,7 +99,7 @@ function guideWeeklyBrowser_() {
     const previousTeam=selectedTeam;
     selectedTeam=teams.some(team=>team.dataset.guideTeam===String(index))?String(index):(teams[0]?.dataset.guideTeam || '');
     if(!preserveView)root.attentionLandingTeam=selectedTeam;
-    root.querySelectorAll('[data-guide-select]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.guideSelect===selectedTeam)));
+    root.querySelectorAll('[data-guide-select]').forEach(button=>{const active=button.dataset.guideSelect===selectedTeam;button.setAttribute('aria-pressed',String(active));button.classList.toggle('tile--selected',active);button.classList.toggle('marker-accent',active);});
     root.querySelectorAll('[data-guide-heading]').forEach(heading=>{heading.hidden=heading.dataset.guideHeading!==selectedTeam;});
     teams.forEach(team=>{team.hidden=team.dataset.guideTeam!==selectedTeam || (selectedView==='weekly' || selectedView==='evaluation');});
     // Tab changes only toggle visibility; keep loaded details and disclosure state.
@@ -117,7 +118,7 @@ function guideWeeklyBrowser_() {
     }
     if(editor)editor.hidden=view!=='evaluation';
     selectedView=view;
-    root.querySelectorAll('[data-guide-tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.guideTab===view)));
+    root.querySelectorAll('[data-guide-tab]').forEach(button=>{const active=button.dataset.guideTab===view;button.setAttribute('aria-pressed',String(active));button.classList.toggle('tile--selected',active);});
     root.querySelectorAll('[data-guide-view]').forEach(panel=>{panel.hidden=panel.dataset.guideView!==view;});
     host().hidden=view!=='weekly';
     selectTeam(selectedTeam,true);
@@ -146,7 +147,7 @@ function guideWeeklyBrowser_() {
     });
   }
   function submissionBadge(timeliness,firstSubmittedAt,deadlineAt,timeZone) {
-    const state={ON_TIME:['green','On-time submission'],LATE:['orange','Late submission']}[timeliness] || ['gray','Timing unavailable'];
+    const state={ON_TIME:['green','On-time submission'],LATE:['red','Late submission']}[timeliness] || ['gray','Timing unavailable'];
     if(timeliness==='LATE' && firstSubmittedAt && Number.isFinite(deadlineAt)) {
       const submitted=new Date(firstSubmittedAt);
       if(Number.isFinite(submitted.getTime()) && submitted.getTime()>deadlineAt) {
@@ -158,7 +159,7 @@ function guideWeeklyBrowser_() {
         state[1]=days>0?days+' day'+(days===1?'':'s')+' late':'Less than 1 day late';
       }
     }
-    return '<span class="tag '+state[0]+'" data-submission-timing>'+state[1]+'</span>';
+    return '<span class="'+badgeClass(state[0])+'" data-submission-timing>'+state[1]+'</span>';
   }
   function submissionDeadline(node,entry) {
     const week=JSON.parse(node.dataset.guideWeeks || '[]').find(week=>week.weekId===entry.weekId);
@@ -207,14 +208,14 @@ function guideWeeklyBrowser_() {
     if(actionBarObserver)actionBarObserver.disconnect();
     if(resizeActionBars && typeof window!=='undefined'){window.removeEventListener('resize',resizeActionBars);document.removeEventListener('scroll',resizeActionBars,true);}
     if(typeof ResizeObserver==='undefined' || typeof window==='undefined')return;
-    const cards=Array.from(node.querySelectorAll('.guide-weekly-card'));
+    const cards=Array.from(node.querySelectorAll('[data-weekly-card]'));
     const update=()=>{
       if(!current(node)){actionBarObserver.disconnect();window.removeEventListener('resize',update);document.removeEventListener('scroll',update,true);return;}
       cards.forEach(card=>{
-        const content=card.querySelector('.guide-weekly-summary'),bar=card.querySelector('.guide-weekly-actions');
+        const content=card.querySelector('[data-weekly-summary]'),bar=card.querySelector('[data-weekly-actions]');
         const height=bar.getBoundingClientRect().height;
         if(!height)return; // Hidden tabs are measured when revealed.
-        const header=card.querySelector('.guide-weekly-student-header');
+        const header=card.querySelector('[data-weekly-student-header]');
         const previous=Number(card.dataset.actionReserve || 0);
         const bounds=content.getBoundingClientRect(),bodyTop=header.getBoundingClientRect().bottom,bodyBottom=bounds.bottom-previous;
         const bodyHeight=Math.max(0,bodyBottom-bodyTop);
@@ -226,7 +227,7 @@ function guideWeeklyBrowser_() {
       });
     };
     actionBarObserver=new ResizeObserver(update);
-    cards.forEach(card=>{actionBarObserver.observe(card.querySelector('.guide-weekly-actions'));actionBarObserver.observe(card.querySelector('.guide-weekly-summary'));});
+    cards.forEach(card=>{actionBarObserver.observe(card.querySelector('[data-weekly-actions]'));actionBarObserver.observe(card.querySelector('[data-weekly-summary]'));});
     resizeActionBars=update;window.addEventListener('resize',update);document.addEventListener('scroll',update,true);update();
   }
   function render(node) {
@@ -247,11 +248,11 @@ function guideWeeklyBrowser_() {
     const weekSummary=(total === null ? submitted+' submitted' : completed+'/'+total+' required submitted')+' · '+pending+' awaiting decision';
     const weekIndex=node.data.weeks.indexOf(node.week);
     target.innerHTML='<nav class="guide-week-navigation" aria-label="Select weekly progress week">'+
-      '<button type="button" class="app-btn btn-md btn-secondary" data-week-step="1" data-week-boundary="'+(weekIndex===node.data.weeks.length-1)+'" '+(weekIndex===node.data.weeks.length-1?'disabled':'')+' title="'+(weekIndex===node.data.weeks.length-1?'First project week. No more previous weeks':'Previous week')+'" aria-label="Previous week">&#8249; Previous</button>'+
+      '<button type="button" class="btn btn-outline" data-week-step="1" data-week-boundary="'+(weekIndex===node.data.weeks.length-1)+'" '+(weekIndex===node.data.weeks.length-1?'disabled':'')+' title="'+(weekIndex===node.data.weeks.length-1?'First project week. No more previous weeks':'Previous week')+'" aria-label="Previous week">&#8249; Previous</button>'+
       '<span class="guide-week-label" aria-live="polite">'+esc(weekDateRange(node))+'</span>'+
-      '<button type="button" class="app-btn btn-md btn-secondary" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' title="'+(weekIndex===0?'Latest available project week. No more next weeks':'Next week')+'" aria-label="Next week">Next &#8250;</button>'+
-      '<span class="tag '+weekStatus.tone+' guide-week-status" data-week-status role="status" title="'+esc(weekSummary)+'">'+weekStatus.label+'</span></nav>'+
-      (entries.length ? entries.map(entry=>'<article class="guide-weekly-card"><div data-entry="'+esc(entry.entryId)+'" class="guide-weekly-summary"><header class="guide-weekly-student-header"><div><strong>'+esc(entry.student)+'</strong><small>'+esc(entry.regNo)+'</small></div><span class="guide-weekly-score">AI Quality '+qualityScore(entry.score)+'</span>'+submissionDeadline(node,entry)+'</header>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div><div class="guide-weekly-actions" data-sign-entry="'+esc(entry.entryId)+'"><span>Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="app-btn btn-sm '+(status==='DISCUSSED'?'btn-primary':'btn-secondary')+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></article>').join(''):'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
+      '<button type="button" class="btn btn-outline" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' title="'+(weekIndex===0?'Latest available project week. No more next weeks':'Next week')+'" aria-label="Next week">Next &#8250;</button>'+
+      '<span class="'+badgeClass(weekStatus.tone)+' guide-week-status" data-week-status role="status" title="'+esc(weekSummary)+'">'+weekStatus.label+'</span></nav>'+
+      (entries.length ? entries.map(entry=>'<article class="guide-weekly-card" data-weekly-card><div data-entry="'+esc(entry.entryId)+'" class="guide-weekly-summary" data-weekly-summary><header class="guide-weekly-student-header" data-weekly-student-header><div><strong>'+esc(entry.student)+'</strong><small>'+esc(entry.regNo)+'</small></div><span class="guide-weekly-score">AI Quality '+qualityScore(entry.score)+'</span>'+submissionDeadline(node,entry)+'</header>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div><div class="guide-weekly-actions" data-weekly-actions data-sign-entry="'+esc(entry.entryId)+'"><span>Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="btn btn-sm '+(status==='DISCUSSED'?'btn-primary':'btn-outline')+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></article>').join(''):'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
     target.querySelectorAll('[data-week-step]').forEach(button=>button.onclick=()=>{if(node.busy || button.disabled)return;const next=node.data.weeks[weekIndex+Number(button.dataset.weekStep)];if(next){node.week=next;render(node);}});
     target.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>sign(node,button));
     reserveActionBarSpace(node);
@@ -264,7 +265,7 @@ function guideWeeklyBrowser_() {
     const output=node.querySelector('[data-guide-weekly-status]');
     output.textContent=(status==='DISCUSSED'?'Discussed':'Not Discussed')+' will save in 5 seconds and freeze student revisions. ';
     const undo=document.createElement('button');
-    undo.type='button';undo.className='app-btn btn-sm btn-secondary';undo.textContent='Undo';undo.dataset.signUndo='';
+    undo.type='button';undo.className='btn btn-sm btn-outline';undo.textContent='Undo';undo.dataset.signUndo='';
     output.appendChild(undo);
     const timer=setTimeout(()=>{
       if(!current(node)){node.busy=false;return;}
@@ -323,7 +324,7 @@ function weeklyPhase2SetupBrowser_() {
       const actions=document.createElement('div');actions.className='assessment-storage-controls';target.appendChild(actions);
       [['storage',report.storageReady,report.canSetupStorage,'Create weekly progress storage'],['triggers',report.triggerReady!==false,report.canSetupTriggers,'Create weekly AI schedule']].forEach(([kind,ready,allowed,label])=>{
         if(ready)return;
-        const button=document.createElement('button');button.type='button';button.className='app-btn btn-md btn-primary';button.textContent=label;button.dataset.allowed=String(allowed);button.disabled=!allowed;button.onclick=()=>setup(node,kind);actions.appendChild(button);
+        const button=document.createElement('button');button.type='button';button.className='btn btn-primary';button.textContent=label;button.dataset.allowed=String(allowed);button.disabled=!allowed;button.onclick=()=>setup(node,kind);actions.appendChild(button);
       });
       report.issues.forEach(issue=>{const line=document.createElement('p');line.textContent=issue;target.appendChild(line);});
       if(node.readError){node.querySelector('[data-weekly-setup-status]').textContent='';node.readError=false;}

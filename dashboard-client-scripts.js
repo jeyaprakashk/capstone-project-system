@@ -15,83 +15,81 @@ function renderExpandableText_(value, maxLen = 130) {
     ' <em class="expand-hint">less</em></span></summary></details>';
 }
 
-/** Lazy-load one pinned bundle; a separate top-layer host also covers marking dialogs. */
-function dashboardDialogsBrowser_(renderSkeleton, renderIcon) {
-  let library, active=false, settled=Promise.resolve();
-  function load() {
-    if (window.Swal) return Promise.resolve(window.Swal);
-    if (!library) library=new Promise((resolve,reject)=>{
-      const script=document.createElement('script');
-      const timer=setTimeout(()=>finish(new Error('Dialog download timed out.')),15000);
-      function finish(error) {
-        clearTimeout(timer);script.onload=null;script.onerror=null;
-        if(error){script.remove();reject(error);}else resolve(window.Swal);
-      }
-      script.src='https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/dist/sweetalert2.all.min.js';
-      script.onload=()=>finish(window.Swal?null:new Error('Dialog library unavailable.'));
-      script.onerror=()=>finish(new Error('Dialog download failed.'));
-      document.head.appendChild(script);
-    }).catch(error=>{library=null;throw error;});
-    return library;
-  }
-  async function show(kind,text,icon) {
-    // A second action must never inherit approval from an already open confirmation.
-    if(active)return {isConfirmed:false};
-    active=true;
-    let settle;
-    settled=new Promise(resolve=>{settle=resolve;});
-    const previous=document.activeElement;
-    const host=document.createElement('dialog');
-    host.setAttribute('aria-label','Dashboard message');
-    host.style.cssText='position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;color:inherit;';
-    host.addEventListener('cancel',event=>event.preventDefault());
-    host.addEventListener('keydown',event=>event.stopPropagation());
-    host.addEventListener('focusin',event=>event.stopPropagation());
-    document.body.appendChild(host);
-    try {
-      host.showModal();
-      host.innerHTML=renderSkeleton('panel','Preparing message');
-      const swal=await load();
-      host.innerHTML='';
-      // The result resolves before the close animation finishes. Keep the host
-      // mounted until SweetAlert has removed its body classes and scroll lock.
-      let finishDialog;
-      const dialogDestroyed=new Promise(resolve=>{finishDialog=resolve;});
-      const result=await swal.fire({
-        target:host,titleText:kind==='confirm'?'Please confirm':kind==='prompt'?'Add a remark':icon==='error'?'Unable to complete action':'Message',
-        text:String(text),icon:'info',iconHtml:renderIcon(({success:'check',error:'x',warning:'triangle-alert',question:'circle-help',info:'info'})[icon] || (kind==='confirm'?'circle-help':'info')),buttonsStyling:false,customClass:{icon:'dashboard-dialog-icon',confirmButton:'app-btn btn-md btn-primary',cancelButton:'app-btn btn-md btn-secondary'},
-        showCancelButton:kind!=='alert',confirmButtonText:kind==='alert'?'OK':'Continue',
-        cancelButtonText:'Cancel',focusCancel:kind==='confirm',allowOutsideClick:false,
-        heightAuto:false,returnFocus:false,keydownListenerCapture:true,
-        animation:!window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-        ...(kind==='prompt'?{input:'textarea',inputLabel:String(text),inputAttributes:{maxlength:'5000'},
-          inputValidator:value=>!value.trim()?'Please enter a remark.':undefined}:{}),
-        didOpen:()=>{const content=swal.getHtmlContainer();if(content)content.style.whiteSpace='pre-line';},
-        didDestroy:()=>finishDialog()
-      });
-      await dialogDestroyed;
-      return result;
-    } catch(error) {
-      // Fail closed when the CDN is unavailable; retain form data and permit retry.
-      host.innerHTML='';
-      const panel=document.createElement('div');
-      panel.style.cssText='margin:15vh auto;padding:24px;max-width:480px;background:var(--color-paper,white);color:var(--color-ink,#172033);border-radius:var(--editorial-radius,12px);';
-      const message=document.createElement('p');
-      message.style.whiteSpace='pre-line';
-      message.textContent=kind==='alert'?String(text):'Unable to open the confirmation. Your action was not performed. Please close this message and try again.';
-      const button=document.createElement('button');button.className='app-btn btn-sm btn-secondary';button.textContent='Close';
-      panel.appendChild(message);panel.appendChild(button);host.appendChild(panel);
-      await new Promise(resolve=>{button.onclick=resolve;button.focus();});
-      return {isConfirmed:false};
-    } finally {
-      host.close();host.remove();active=false;settle();
-      if(previous && previous.isConnected)previous.focus();
+/** Shared confirmation, notice and short-text dialog using the framework modal. */
+function dashboardDialogsBrowser_() {
+  let queue=Promise.resolve(), pending=0, activeTrigger=null;
+  function show(kind,options,trigger) {
+    const previous=trigger;
+    activeTrigger=trigger;
+    const host=document.querySelector('dialog[open]') || document.body;
+    const overlay=document.createElement('div');overlay.className='overlay';overlay.setAttribute('data-dialog-overlay','');
+    const modal=document.createElement('section');modal.className='modal';
+    modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
+    const heading=document.createElement('h2');heading.id='dashboardDialogHeading';
+    heading.textContent=options.title || (kind==='confirm'?'Please confirm':kind==='prompt'?'Add a remark':'Message');
+    modal.setAttribute('aria-labelledby',heading.id);
+    const header=document.createElement('div');header.className='modal-header';header.appendChild(heading);
+    const body=document.createElement('div');body.className='modal-body';
+    const message=document.createElement('p');message.className=options.tone==='danger'?'notice notice--danger student-text':'student-text';message.textContent=String(options.body || '');body.appendChild(message);
+    const footer=document.createElement('div');footer.className='modal-footer';
+    let input=null,error=null;
+    if(kind==='prompt') {
+      input=document.createElement('textarea');input.maxLength=5000;
+      input.setAttribute('aria-label',String(options.body || ''));body.appendChild(input);
+      error=document.createElement('p');error.setAttribute('role','alert');error.hidden=true;body.appendChild(error);
     }
+    const cancel=document.createElement('button');cancel.type='button';cancel.className='btn btn-outline';cancel.textContent=options.cancelText || 'Cancel';
+    const confirm=document.createElement('button');confirm.type='button';confirm.className='btn btn-primary';confirm.textContent=options.confirmText || (kind==='alert'?'OK':'Continue');
+    if(kind!=='alert')footer.appendChild(cancel);
+    footer.appendChild(confirm);modal.appendChild(header);modal.appendChild(body);modal.appendChild(footer);overlay.appendChild(modal);
+    const siblings=Array.from(host.children).filter(node=>node!==overlay).map(node=>({node:node,inert:node.inert}));
+    host.appendChild(overlay);siblings.forEach(item=>{item.node.inert=true;});
+    return new Promise(resolve=>{
+      let closed=false;
+      function finish(approved) {
+        if(closed)return;
+        closed=true;
+        overlay.removeEventListener('keydown',onKeydown);
+        document.removeEventListener('focusin',onFocus,true);
+        overlay.remove();siblings.forEach(item=>{item.node.inert=item.inert;});
+        if(previous && previous.isConnected)previous.focus();
+        resolve({isConfirmed:approved,value:approved && input?input.value:''});
+      }
+      function onKeydown(event) {
+        if(event.key==='Escape'){event.preventDefault();finish(false);return;}
+        if(event.key!=='Tab')return;
+        const controls=Array.from(modal.querySelectorAll('button:not([disabled]),textarea:not([disabled])'));
+        const first=controls[0],last=controls[controls.length-1];
+        if(event.shiftKey && document.activeElement===first){event.preventDefault();last.focus();}
+        else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first.focus();}
+      }
+      function onFocus(event){if(!overlay.contains(event.target)) (kind==='confirm'?cancel:input||confirm).focus();}
+      overlay.addEventListener('keydown',onKeydown);
+      overlay.addEventListener('click',event=>{if(event.target===overlay)finish(false);});
+      document.addEventListener('focusin',onFocus,true);
+      cancel.addEventListener('click',()=>finish(false));
+      confirm.addEventListener('click',()=>{
+        if(input && !input.value.trim()){error.textContent='Please enter a remark.';error.hidden=false;input.focus();return;}
+        finish(true);
+      });
+      (kind==='confirm'?cancel:input||confirm).focus();
+    });
   }
+  function enqueue(kind,options) {
+    const focused=document.activeElement;
+    const trigger=focused && focused.closest && focused.closest('[data-dialog-overlay]') ? activeTrigger : focused;
+    const invoke=()=>show(kind,options,trigger);
+    const result=pending ? queue.then(invoke) : invoke();
+    pending++;
+    queue=result.then(()=>{pending--;},()=>{pending--;});
+    return result;
+  }
+  function confirmDialog(options) {return enqueue('confirm',options).then(result=>result.isConfirmed);}
   return {
-    notify:async (text,icon)=>{while(active)await settled;return show('alert',text,icon);},
-    ask:async text=>(await show('confirm',text)).isConfirmed,
-    requestText:async text=>{const result=await show('prompt',text);return result.isConfirmed?result.value.trim():null;}
+    confirmDialog,
+    notify:(text,icon)=>enqueue('alert',{title:icon==='error'?'Unable to complete action':'Message',body:text,confirmText:'OK',tone:icon==='error'?'danger':icon}),
+    ask:text=>confirmDialog({title:'Please confirm',body:text,confirmText:'Continue',cancelText:'Cancel',tone:/discard|delete|remove|reopen/i.test(text)?'danger':undefined}),
+    requestText:async text=>{const result=await enqueue('prompt',{title:'Add a remark',body:text,confirmText:'Continue',cancelText:'Cancel'});return result.isConfirmed?result.value.trim():null;}
   };
 }
 
@@ -100,7 +98,7 @@ function getDashboardClientScript() {
 const DashboardUI = (function() {
   'use strict';
   const renderSkeleton = ${getSkeletonMarkup_.toString()};
-  const dialogs = (${dashboardDialogsBrowser_.toString()})(renderSkeleton, renderLucideIcon_);
+  const dialogs = (${dashboardDialogsBrowser_.toString()})();
   const renderExpandableText = ${renderExpandableText_.toString()};
   const renderAssessmentHistory = ${renderAssessmentHistory_.toString()};
   ${getLucideIconNodes_.toString()}
@@ -253,28 +251,28 @@ const DashboardUI = (function() {
     const start = Math.max(0, (next < 0 ? milestones.length : next) - 2);
     const finish = next < 0 ? milestones.length : Math.min(milestones.length, next + 3);
     target.innerHTML = '<div class="timeline-heading"><h2>Project timeline</h2>' +
-      (milestones.length ? '<button type="button" class="timeline-toggle app-btn btn-sm btn-secondary" aria-expanded="false" aria-controls="projectTimelineMilestones">View full timeline</button>' : '') + '</div>' +
+      (milestones.length ? '<button type="button" class="timeline-toggle btn btn-sm btn-outline" data-timeline-toggle aria-expanded="false" aria-controls="projectTimelineMilestones">View full timeline</button>' : '') + '</div>' +
       (!milestones.length ? '<p class="timeline-empty">No project milestones scheduled</p>' : '') +
-      '<ol id="projectTimelineMilestones" class="timeline-track" style="--timeline-stops:' + (finish-start) + '">' + milestones.map(function(m,index) {
+      '<ol id="projectTimelineMilestones" class="timeline-track" data-timeline-track style="--timeline-stops:' + (finish-start) + '">' + milestones.map(function(m,index) {
         const past = m.day < data.today, current = index === next;
         const mobileContext = next < 0 ? index >= Math.max(0, milestones.length - 2) : Math.abs(index - next) <= 1;
         const description = m.openingDate ? 'Opens ' + m.openingDate + '; due ' + m.date : m.date;
         const days = m.day - data.today;
         const timing = current ? 'CURRENT · ' + (days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : 'Due in ' + days + ' days')
           : !past ? (days === 0 ? 'Due today' : 'In ' + days + (days === 1 ? ' day' : ' days')) : '';
-        return '<li class="timeline-stop timeline-' + (past ? 'past' : current ? 'current' : 'future') + '" data-timeline-mobile="' + mobileContext + '" data-timeline-context="' + (index >= start && index < finish) + '"' + (index < start || index >= finish ? ' hidden' : '') + (current ? ' aria-current="step"' : '') + '>' +
-          '<span class="timeline-dot" aria-hidden="true">' + (past ? renderLucideIcon_('check') : current ? '<span class="timeline-node-core"></span>' : '') + '</span>' +
+        return '<li data-timeline-stop class="timeline-stop timeline-' + (past ? 'past' : current ? 'current' : 'future') + '" data-timeline-mobile="' + mobileContext + '" data-timeline-context="' + (index >= start && index < finish) + '"' + (index < start || index >= finish ? ' hidden' : '') + (current ? ' aria-current="step"' : '') + '>' +
+          '<span class="stage-dot circle" aria-hidden="true">' + (past ? renderLucideIcon_('check') : current ? '<span class="timeline-node-core circle"></span>' : '') + '</span>' +
           '<strong>' + escapeClientHtml(m.label) + '</strong>' +
           '<span class="timeline-date" title="' + escapeClientHtml(description) + '" aria-label="' + escapeClientHtml(description) + '">' + escapeClientHtml(m.date) + '</span>' +
           (timing ? '<span class="timeline-timing">' + timing + '</span>' : '') + '</li>';
       }).join('') + '</ol>';
-    const toggle = target.querySelector('.timeline-toggle');
+    const toggle = target.querySelector('[data-timeline-toggle]');
     if (toggle) toggle.addEventListener('click', function() {
       const expanded = toggle.getAttribute('aria-expanded') !== 'true';
       toggle.setAttribute('aria-expanded', String(expanded));
       toggle.textContent = expanded ? 'Show less' : 'View full timeline';
-      target.querySelector('.timeline-track').classList.toggle('timeline-full', expanded);
-      target.querySelectorAll('.timeline-stop').forEach(item => { item.hidden = !expanded && item.dataset.timelineContext !== 'true'; });
+      target.querySelector('[data-timeline-track]').classList.toggle('timeline-full', expanded);
+      target.querySelectorAll('[data-timeline-stop]').forEach(item => { item.hidden = !expanded && item.dataset.timelineContext !== 'true'; });
     });
   }
 
@@ -306,8 +304,8 @@ const DashboardUI = (function() {
         timelineRequest = null;
         if (target) {
           target.setAttribute('aria-busy', 'false');
-          target.innerHTML = '<div class="timeline-heading"><h2>Project timeline</h2><span role="status">Schedule unavailable</span><button type="button" class="timeline-retry app-btn btn-sm btn-secondary">Retry</button></div>';
-          target.querySelector('.timeline-retry').addEventListener('click', function() { loadSharedTimeline().catch(function() {}); });
+          target.innerHTML = '<div class="timeline-heading"><h2>Project timeline</h2><span role="status">Schedule unavailable</span><button type="button" class="timeline-retry btn btn-sm btn-outline" data-timeline-retry>Retry</button></div>';
+          target.querySelector('[data-timeline-retry]').addEventListener('click', function() { loadSharedTimeline().catch(function() {}); });
         }
         reject(err);
       }
@@ -318,7 +316,7 @@ const DashboardUI = (function() {
   const loadedRoleTabs = Object.create(null);
   let sharedRubrics = null;
   let rubricsRequest = null;
-  let rubricTrigger = null;
+  let sharedDrawerState = null;
   function syncRubricsDisclosure() {
     const section = byId('sharedRubrics');
     if (section) section.hidden = activeRole !== 'rubrics';
@@ -333,8 +331,8 @@ const DashboardUI = (function() {
       dashboardRun().withSuccessHandler(function(data) {
         try {
           target.innerHTML = '<div class="rubric-assessments">' + data.assessments.map(function(item) {
-            const desktopCard = '<button type="button" class="rubric-assessment" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span class="rubric-header"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-weight">' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span class="rubric-footer"><span class="rubric-metadata">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span class="rubric-action"><span class="rubric-mobile-hidden">View rubric</span> '+renderLucideIcon_('arrow-right')+'</span>' : '') + '</span></button>';
-            const mobileRow = '<div class="rubric-mobile-row"><div class="rubric-mobile-details"><div class="rubric-mobile-title"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-mobile-weight" aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span class="rubric-mobile-meta">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="rubric-view-button app-btn btn-sm btn-secondary" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
+            const desktopCard = '<button type="button" class="rubric-assessment tile' + (item.available ? '' : ' tile--locked') + '" data-rubric-key="' + escapeClientHtml(item.key) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '><span class="rubric-header"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-weight">' + escapeClientHtml(item.weight) + '%<span class="rubric-mobile-hidden"> weight</span></span></span><span class="rubric-footer"><span class="rubric-metadata">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span>' + (item.available ? '<span class="rubric-action"><span class="rubric-mobile-hidden">View rubric</span> '+renderLucideIcon_('arrow-right')+'</span>' : '') + '</span></button>';
+            const mobileRow = '<div class="rubric-mobile-row"><div class="rubric-mobile-details"><div class="rubric-mobile-title"><strong>' + escapeClientHtml(item.label) + '</strong><span class="rubric-mobile-weight" aria-label="' + escapeClientHtml(item.weight) + '% weight">' + escapeClientHtml(item.weight) + '% weight</span></div><span class="rubric-mobile-meta">' + (item.available ? escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks' : escapeClientHtml(item.status)) + '</span></div><button type="button" class="rubric-view-button btn btn-sm btn-outline" data-rubric-key="' + escapeClientHtml(item.key) + '" aria-label="View rubric for ' + escapeClientHtml(item.label) + '"' + (item.available ? ' aria-haspopup="dialog"' : ' disabled') + '>View rubric</button></div>';
             return desktopCard + mobileRow;
           }).join('') + '</div>' + (data.assessments.length ? '' : '<p>No graded assessments configured.</p>');
           sharedRubrics = data;
@@ -348,7 +346,7 @@ const DashboardUI = (function() {
     }).catch(function(err) {
       rubricsRequest = null;
       section.setAttribute('aria-busy', 'false');
-      target.innerHTML = '<p role="status">Unable to load rubrics.</p><button class="app-btn btn-md btn-secondary" type="button">Retry</button>';
+      target.innerHTML = '<p role="status">Unable to load rubrics.</p><button class="btn btn-outline" type="button">Retry</button>';
       target.querySelector('button').addEventListener('click', function() { loadSharedRubrics().catch(function() {}); });
       throw err;
     });
@@ -360,7 +358,6 @@ const DashboardUI = (function() {
     const drawer = byId('rubricDrawer');
     if (!item || !item.available || !drawer) return;
     closeCoordinatorTeamDrawer();
-    rubricTrigger = trigger || document.activeElement;
     byId('rubricDrawerTitle').textContent = item.label;
     byId('rubricDrawerContent').innerHTML = '<div class="drawer-section"><div class="drawer-section-title">Assessment contribution</div><div class="drawer-project-title">' + escapeClientHtml(item.weight) + '% of overall assessment</div><p class="drawer-person-meta">' + escapeClientHtml(item.criterionCount) + ' criteria · ' + escapeClientHtml(item.totalMarks) + ' marks</p>' + (item.evaluationNotice ? '<p class="drawer-person-meta">'+escapeClientHtml(item.evaluator)+' · '+escapeClientHtml(item.evaluationNotice)+'</p>' : '') + '</div>' + item.criteria.map(function(c) {
       return '<section class="drawer-section"><div class="drawer-section-title">' + escapeClientHtml(c.pi) + ' · ' + escapeClientHtml(c.co) + ' · ' + escapeClientHtml(c.type) + ' · ' + escapeClientHtml(c.maxMarks) + ' marks</div><h3 class="drawer-project-title">' + escapeClientHtml(c.name) + '</h3><dl class="rubric-levels">' + c.descriptors.map(function(text, level) {
@@ -370,47 +367,74 @@ const DashboardUI = (function() {
     openContentDrawer(item.label, byId('rubricDrawerContent').innerHTML, trigger);
   }
 
+  function openSharedDrawer(drawerId, scrimId, trigger) {
+    const drawer = byId(drawerId), scrim = byId(scrimId);
+    if (!drawer || !scrim) return;
+    if (sharedDrawerState && sharedDrawerState.drawer !== drawer) closeSharedDrawer(sharedDrawerState.id, false);
+    sharedDrawerState = {id:drawerId, drawer:drawer, scrim:scrim, trigger:trigger || document.activeElement};
+    scrim.onclick = function(event) { if (event.target === scrim) closeSharedDrawer(drawerId); };
+    drawer.inert = false;
+    drawer.hidden = false;
+    scrim.hidden = false;
+    drawer.classList.add('open');
+    drawer.dataset.open = 'true';
+    drawer.setAttribute('aria-hidden', 'false');
+    scrim.classList.add('open');
+    document.body.classList.add('team-drawer-open');
+    const focusTarget = (drawer.querySelector && drawer.querySelector('[data-drawer-close]')) || byId(drawerId === 'rubricDrawer' ? 'rubricDrawerClose' : 'teamDrawerClose');
+    if (focusTarget) focusTarget.focus();
+  }
+  function closeSharedDrawer(drawerId, restoreFocus) {
+    const drawer = byId(drawerId);
+    if (!drawer || drawer.dataset.open !== 'true') return;
+    const state = sharedDrawerState && sharedDrawerState.drawer === drawer ? sharedDrawerState : null;
+    drawer.classList.remove('open');
+    delete drawer.dataset.open;
+    drawer.setAttribute('aria-hidden', 'true');
+    drawer.inert = true;
+    drawer.hidden = true;
+    if (state) {
+      state.scrim.hidden = true;
+      state.scrim.classList.remove('open');
+      sharedDrawerState = null;
+      if (restoreFocus !== false && state.trigger && state.trigger.isConnected) state.trigger.focus();
+    }
+    document.body.classList.remove('team-drawer-open');
+  }
   function openContentDrawer(title, content, trigger) {
     const drawer = byId('rubricDrawer');
     if (!drawer) return;
-    closeCoordinatorTeamDrawer();
-    rubricTrigger = trigger || document.activeElement;
+    closeCoordinatorTeamDrawer(false);
     byId('rubricDrawerTitle').textContent = title;
     byId('rubricDrawerContent').innerHTML = content;
-    drawer.inert = false;
-    drawer.classList.add('open');
-    drawer.setAttribute('aria-hidden', 'false');
-    byId('rubricDrawerBackdrop').classList.add('open');
-    document.body.classList.add('team-drawer-open');
+    openSharedDrawer('rubricDrawer', 'rubricDrawerBackdrop', trigger);
     byId('rubricDrawerContent').scrollTop = 0;
-    byId('rubricDrawerClose').focus();
   }
-
   function closeRubricDrawer(restoreFocus) {
-    const drawer = byId('rubricDrawer');
-    if (!drawer || !drawer.classList.contains('open')) return;
-    drawer.classList.remove('open');
-    drawer.setAttribute('aria-hidden', 'true');
-    drawer.inert = true;
-    byId('rubricDrawerBackdrop').classList.remove('open');
-    document.body.classList.remove('team-drawer-open');
-    if (restoreFocus !== false && rubricTrigger && rubricTrigger.isConnected) rubricTrigger.focus();
-    rubricTrigger = null;
+    closeSharedDrawer('rubricDrawer', restoreFocus);
   }
   document.addEventListener('keydown', function(event) {
-    const drawer = byId('rubricDrawer');
-    if (!drawer || !drawer.classList.contains('open')) return;
-    if (event.key === 'Escape') { event.preventDefault(); closeRubricDrawer(); }
+    const state = sharedDrawerState;
+    if (!state) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (state.id === 'rubricDrawer') closeRubricDrawer();
+      else closeCoordinatorTeamDrawer();
+    }
     if (event.key === 'Tab') {
-      const controls = Array.from(drawer.querySelectorAll('button:not([disabled]), a[href], summary, [tabindex="0"]'));
+      const controls = Array.from(state.drawer.querySelectorAll ? state.drawer.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex="0"]') : []).filter(function(el) { return !el.hidden && (!el.getClientRects || el.getClientRects().length); });
       const first = controls[0], last = controls[controls.length - 1];
+      if (!first) { event.preventDefault(); return; }
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
   });
   document.addEventListener('focusin', function(event) {
-    const drawer = byId('rubricDrawer');
-    if (drawer && drawer.classList.contains('open') && !drawer.contains(event.target)) byId('rubricDrawerClose').focus();
+    const state = sharedDrawerState;
+    if (state && !state.drawer.contains(event.target)) {
+      const close = (state.drawer.querySelector && state.drawer.querySelector('[data-drawer-close]')) || byId(state.id === 'rubricDrawer' ? 'rubricDrawerClose' : 'teamDrawerClose');
+      if (close) close.focus();
+    }
   });
   const loadingRoleTabs = Object.create(null);
 
@@ -482,8 +506,8 @@ const DashboardUI = (function() {
   function initializeAnnouncementSearch(target) {
     const search=target.querySelector('#announcementSearch');
     if(!search)return;
-    const items=Array.from(target.querySelectorAll('.announcement-list .announcement-item'));
-    const groups=Array.from(target.querySelectorAll('.announcement-date-group'));
+    const items=Array.from(target.querySelectorAll('#announcementList [data-announcement-item]'));
+    const groups=Array.from(target.querySelectorAll('[data-announcement-group]'));
     const audiences=Array.from(target.querySelectorAll('[data-announcement-audience]'));
     const type=target.querySelector('[data-announcement-type-filter]');
     const more=target.querySelector('[data-announcement-more]');
@@ -492,9 +516,9 @@ const DashboardUI = (function() {
       const matches=items.filter(item=>(item.dataset.announcementSearch||'').toLocaleLowerCase().includes(query) && (announcementsState.audience==='all' || item.dataset.announcementAudiences.split(' ').includes(announcementsState.audience)) && (announcementsState.type==='all' || item.dataset.announcementType===announcementsState.type));
       const visible=new Set(matches.slice(0,announcementsState.page*announcementsState.pageSize));
       items.forEach(item=>{item.hidden=!visible.has(item);});
-      groups.forEach(group=>{group.hidden=!Array.from(group.querySelectorAll('.announcement-item')).some(item=>!item.hidden);});
-      target.querySelector('.announcement-results').textContent='Showing '+visible.size+' of '+matches.length+' announcements';
-      target.querySelector('.announcement-no-results').hidden=matches.length>0;
+      groups.forEach(group=>{group.hidden=!Array.from(group.querySelectorAll('[data-announcement-item]')).some(item=>!item.hidden);});
+      target.querySelector('[data-announcement-results]').textContent='Showing '+visible.size+' of '+matches.length+' announcements';
+      target.querySelector('[data-announcement-no-results]').hidden=matches.length>0;
       const remaining=Math.max(0,matches.length-announcementsState.page*announcementsState.pageSize);
       more.hidden=!remaining;
       more.textContent='Show '+Math.min(remaining,announcementsState.pageSize)+' older announcements';
@@ -527,8 +551,8 @@ const DashboardUI = (function() {
     const hadContent = announcementsState.loaded;
     if (!hadContent) renderAnnouncementsLoading();
     const finishLoading = beginContentLoading(target, 'Loading announcements');
-    const refreshButton = target.querySelector('.announcement-refresh-btn');
-    const status = target.querySelector('.announcement-status');
+    const refreshButton = target.querySelector('[data-refresh-button]');
+    const status = target.querySelector('[data-refresh-status]');
     if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderSkeleton('inline', 'Refreshing'); }
     if (status) status.innerHTML = renderSkeleton('inline', 'Checking for updates');
     target.setAttribute('aria-busy', 'true');
@@ -542,7 +566,7 @@ const DashboardUI = (function() {
         initializeAnnouncementSearch(target);
         target.setAttribute('aria-busy', 'false');
         if (forceRefresh) {
-          const updatedButton = target.querySelector('.announcement-refresh-btn');
+          const updatedButton = target.querySelector('[data-refresh-button]');
           if (updatedButton && document.activeElement === document.body) updatedButton.focus();
         }
       })
@@ -557,7 +581,7 @@ const DashboardUI = (function() {
           return;
         }
         target.innerHTML = '<div class="role-load-error">Unable to load announcements: ' +
-          escapeClientHtml(errorMessage(err)) + '<button type="button" class="announcement-refresh-btn app-btn btn-sm btn-secondary" onclick="refreshAnnouncements()">Try again</button></div>';
+          escapeClientHtml(errorMessage(err)) + '<button type="button" class="announcement-refresh-btn btn btn-sm btn-outline" data-refresh-button onclick="refreshAnnouncements()">Try again</button></div>';
       })
       .loadAnnouncementsForCurrentUser();
   }
@@ -589,7 +613,7 @@ const DashboardUI = (function() {
     if (!systemStatusState.loaded) target.innerHTML = renderSkeleton('panel', 'Loading system status');
     const buttons = Array.from(target.querySelectorAll('button')).map(function(el) { return {el:el, disabled:el.disabled}; });
     buttons.forEach(function(item) { item.el.disabled = true; });
-    const cards = Array.from(target.querySelectorAll('.system-status-primary > *, .coordinator-container > .assessment-section'));
+    const cards = Array.from(target.querySelectorAll('[data-status-primary] > *, [data-status-cards] > section'));
     const finishCards = (cards.length ? cards : [target]).map(function(card) { return beginContentLoading(card, 'Loading system status'); });
     target.setAttribute('aria-busy', 'true');
     setText('systemStatusMessage', '');
@@ -650,13 +674,24 @@ const DashboardUI = (function() {
     nav.addEventListener('focusout', function(event) {
       if (event.relatedTarget && !nav.contains(event.relatedTarget)) setRoleMenuOpen(false, false);
     });
+    const tablist = byId('roleMenuItems');
+    if (tablist) tablist.addEventListener('keydown', function(event) {
+      if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+      const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+      const index = tabs.indexOf(document.activeElement);
+      if (index < 0) return;
+      event.preventDefault();
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].focus();
+      showRoleTab(tabs[next].getAttribute('data-role-tab'));
+    });
     const media = window.matchMedia('(max-width: 1200px)');
     if (media.addEventListener) media.addEventListener('change', function(event) {
       const toggle = byId('roleMenuToggle');
       const focusInNav = nav.contains(document.activeElement);
       setRoleMenuOpen(false, event.matches && focusInNav);
       if (!event.matches && document.activeElement === toggle) {
-        const selected = nav.querySelector('.role-tab-btn.active');
+        const selected = nav.querySelector('[data-role-tab][aria-selected="true"]');
         if (selected) selected.focus();
       }
     });
@@ -674,11 +709,15 @@ const DashboardUI = (function() {
     clearTimeout(preloadTimer);
     if (loadedRoleTabs[activeKey]) recordPerformance({event:'tab_core_ready', role:activeKey, durationMs:0});
     document.querySelectorAll('[data-role-panel]').forEach(function(panel) {
-      panel.classList.toggle('active', panel.getAttribute('data-role-panel') === activeKey);
+      const selected = panel.getAttribute('data-role-panel') === activeKey;
+      panel.classList.toggle('active', selected);
+      panel.hidden = !selected;
     });
     document.querySelectorAll('[data-role-tab]').forEach(function(btn) {
       const selected = btn.getAttribute('data-role-tab') === activeKey;
       btn.classList.toggle('active', selected);
+      btn.setAttribute('aria-selected', String(selected));
+      btn.tabIndex = selected ? 0 : -1;
       if (selected) {
         btn.setAttribute('aria-current', 'page');
         setText('roleMenuLabel', btn.textContent.trim());
@@ -813,7 +852,7 @@ const DashboardUI = (function() {
     if (!state || state.column == null) return rows.slice();
     const value = row => {
       const cell = row.children[state.column];
-      if (!cell || cell.querySelector('.skeleton, [aria-label^="Loading"], [aria-label^="Checking"]')) return null;
+      if (!cell || cell.querySelector('[data-skeleton], [aria-label^="Loading"], [aria-label^="Checking"]')) return null;
       const explicit = cell.getAttribute('data-sort-value');
       const text = (explicit !== null ? explicit : cell.textContent).trim();
       if ((state.type === 'number' || state.type === 'pair') && !text.split('/').every(part=>part.trim() !== '' && Number.isFinite(Number(part)))) return null;
@@ -846,7 +885,7 @@ const DashboardUI = (function() {
         header.textContent = '';
         button = document.createElement('button');
         button.type = 'button';
-        button.className = 'app-btn btn-sm btn-secondary btn-table-sort';
+        button.className = 'btn btn-sm btn-outline';
         button.setAttribute('data-table-sort', label);
         header.appendChild(button);
       }
@@ -888,7 +927,7 @@ const DashboardUI = (function() {
   function getCoordinatorFilteredRows() {
     const box = byId('trackerSearch');
     const q = box ? box.value.trim().toLowerCase() : '';
-    const activeTab = document.querySelector('.tracker-tabs .tab.active');
+    const activeTab = document.querySelector('[data-tracker-filters] [data-filter][aria-pressed="true"]');
     const filter = activeTab ? activeTab.getAttribute('data-filter') || 'all' : 'all';
 
     return getCoordinatorRows().filter(function(row) {
@@ -926,13 +965,13 @@ const DashboardUI = (function() {
     buttons.innerHTML = '';
 
     function addButton(label, page, disabled, active) {
-      const btn = document.createElement('button');btn.className='app-btn btn-sm btn-secondary';
+      const btn = document.createElement('button');btn.className='page-link';
       btn.type = 'button';
       btn.textContent = label;
       if (label === 'Previous') btn.innerHTML = renderLucideIcon_('chevron-left', '', 'icon-leading') + 'Previous';
       if (label === 'Next') btn.innerHTML = 'Next' + renderLucideIcon_('chevron-right', '', 'icon-trailing');
       btn.disabled = !!disabled;
-      if (active) { btn.className='app-btn btn-sm btn-primary'; btn.classList.add('active'); btn.setAttribute('aria-current', 'page'); }
+      if (active) { btn.classList.add('active'); btn.setAttribute('aria-current', 'page'); }
       btn.addEventListener('click', function() {
         if (disabled) return;
         state.page = page;
@@ -1005,9 +1044,10 @@ const DashboardUI = (function() {
   }
 
   function filterTeamTracker(btn, type) {
-    document.querySelectorAll('.tracker-tabs .tab').forEach(function(tab) { tab.classList.remove('active'); });
+    document.querySelectorAll('[data-tracker-filters] [data-filter]').forEach(function(tab) { tab.classList.remove('active'); tab.setAttribute('aria-pressed', 'false'); });
     if (btn) {
       btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
       btn.setAttribute('data-filter', type || 'all');
     }
     applyCoordinatorFilters(true);
@@ -1018,10 +1058,11 @@ const DashboardUI = (function() {
   function resetTrackerFilters() {
     const box = byId('trackerSearch');
     if (box) box.value = '';
-    const tabs = document.querySelectorAll('.tracker-tabs .tab');
-    tabs.forEach(function(tab) { tab.classList.remove('active'); });
+    const tabs = document.querySelectorAll('[data-tracker-filters] [data-filter]');
+    tabs.forEach(function(tab) { tab.classList.remove('active'); tab.setAttribute('aria-pressed', 'false'); });
     if (tabs.length) {
       tabs[0].classList.add('active');
+      tabs[0].setAttribute('aria-pressed', 'true');
       tabs[0].setAttribute('data-filter', 'all');
     }
     applyCoordinatorFilters(true);
@@ -1082,7 +1123,7 @@ const DashboardUI = (function() {
       : '<div class="drawer-person-meta">Committee details not available.</div>';
 
     const repoHtml = data.repoUrl
-      ? '<a class="drawer-repo-link app-btn btn-md btn-secondary" href="' +
+      ? '<a class="drawer-repo-link btn btn-outline" href="' +
           escapeDrawerHtml(data.repoUrl) +
           '" target="_blank" rel="noopener">' +
           escapeDrawerHtml(data.repoUrl) +
@@ -1107,14 +1148,14 @@ const DashboardUI = (function() {
       '<div class="drawer-section">' +
         '<div class="drawer-section-title">Guide</div>' +
         '<div class="drawer-info-grid">' +
-          '<div class="drawer-info-card">' +
+          '<div class="drawer-info-card card">' +
             '<div class="drawer-info-label">Guide</div>' +
             '<div class="drawer-info-value">' +
               escapeDrawerHtml(data.guideName || '—') +
             '</div>' +
           '</div>' +
 
-          '<div class="drawer-info-card">' +
+          '<div class="drawer-info-card card">' +
             '<div class="drawer-info-label">Email</div>' +
             '<div class="drawer-info-value">' +
               escapeDrawerHtml(data.guideEmail || '—') +
@@ -1173,15 +1214,12 @@ const DashboardUI = (function() {
 
         (data.reviews || []).map(function(review) {
           return '<div class="drawer-status-row"><span class="drawer-status-label">' + escapeDrawerHtml(review.label) +
-            '</span><span class="drawer-status-value ' + (review.completed ? 'drawer-status-good' : 'drawer-status-warn') +
-            '">' + (review.available === false ? 'Unavailable' : review.completed ? 'Completed' : 'Pending') + '</span></div>';
+            '</span><span class="drawer-status-value ' + (review.completed ? 'drawer-status-good' : 'drawer-status-warn') + '">' + (review.available === false ? 'Unavailable' : review.completed ? 'Completed' : 'Pending') + '</span></div>';
         }).join('') +
 
         '<div class="drawer-status-row">' +
           '<span class="drawer-status-label">Overall Health</span>' +
-          '<span class="drawer-status-value ' +
-            getHealthClass(data.health) +
-          '">' +
+          '<span class="drawer-status-value ' + getHealthClass(data.health) + '">' +
             escapeDrawerHtml(getHealthLabel(data.health)) +
           '</span>' +
         '</div>' +
@@ -1191,14 +1229,14 @@ const DashboardUI = (function() {
         '<div class="drawer-section-title">This Week</div>' +
 
         '<div class="drawer-info-grid">' +
-          '<div class="drawer-info-card">' +
+          '<div class="drawer-info-card card">' +
             '<div class="drawer-info-label">Daily Logs</div>' +
             '<div class="drawer-info-value">' +
               escapeDrawerHtml(data.weekLogs) +
             '</div>' +
           '</div>' +
 
-          '<div class="drawer-info-card">' +
+          '<div class="drawer-info-card card">' +
             '<div class="drawer-info-label">GitHub Commits</div>' +
             '<div class="drawer-info-value">' +
               escapeDrawerHtml(data.weekCommits) +
@@ -1236,10 +1274,7 @@ const DashboardUI = (function() {
       return '<div id="drawerSection-' + section + '" aria-busy="true">' + labels.map(function(label) { return '<div class="drawer-section"><div class="drawer-section-title">' + label + '</div>' + renderSkeleton('panel', 'Loading ' + label) + '</div>'; }).join('') + '</div>';
     }).join('');
 
-    drawer.classList.add('open');
-    backdrop.classList.add('open');
-    drawer.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('team-drawer-open');
+    openSharedDrawer('teamDrawer', 'teamDrawerBackdrop', document.activeElement);
 
     const pending = new Set();
     function loadSection(section) {
@@ -1250,10 +1285,10 @@ const DashboardUI = (function() {
       target.setAttribute('aria-busy', 'true');
       const retryButton = target.querySelector('button');
       if (retryButton) retryButton.disabled = true;
-      function current() { return request === coordinatorDrawerRequest && drawer.classList.contains('open') && target === byId('drawerSection-' + section); }
+      function current() { return request === coordinatorDrawerRequest && drawer.dataset.open === 'true' && target === byId('drawerSection-' + section); }
       function showRetry(message) {
         const note = document.createElement('div');note.className = 'drawer-error';note.textContent = message + ' ';
-        const button = document.createElement('button');button.className='app-btn btn-sm btn-secondary';button.type = 'button';button.textContent = 'Retry';
+        const button = document.createElement('button');button.className='btn btn-sm btn-outline';button.type = 'button';button.textContent = 'Retry';
         button.addEventListener('click', function() { loadSection(section); });
         note.appendChild(button);target.appendChild(note);
       }
@@ -1272,31 +1307,14 @@ const DashboardUI = (function() {
     ['basic','progress','activity'].forEach(loadSection);
   }
 
-  function closeCoordinatorTeamDrawer() {
+  function closeCoordinatorTeamDrawer(restoreFocus) {
     coordinatorDrawerRequest++;
-    const drawer = byId('teamDrawer');
-    const backdrop = byId('teamDrawerBackdrop');
-
-    if (drawer) {
-      drawer.classList.remove('open');
-      drawer.setAttribute('aria-hidden', 'true');
-    }
-
-    if (backdrop) {
-      backdrop.classList.remove('open');
-    }
-
-    document.body.classList.remove('team-drawer-open');
+    closeSharedDrawer('teamDrawer', restoreFocus);
   }
-  document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-      closeCoordinatorTeamDrawer();
-    }
-  });
 
   function showAllCoordinatorTeams() {
     resetTrackerFilters();
-    const tracker = document.querySelector('.team-tracker-section');
+    const tracker = document.querySelector('[data-team-tracker="coordinator"]');
     if (tracker) tracker.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -1306,10 +1324,10 @@ const DashboardUI = (function() {
 
   function markCoordinatorProgressUnavailable() {
     getCoordinatorRows().forEach(function(row) {
-      row.querySelectorAll('.col-review, .col-guide-evaluation, .col-health').forEach(function(cell) { cell.setAttribute('data-sort-value', 'Unavailable'); cell.innerHTML = renderLucideIcon_('triangle-alert', 'Unavailable'); });
+      row.querySelectorAll('[data-col="review"], [data-col="guide-evaluation"], [data-col="health"]').forEach(function(cell) { cell.setAttribute('data-sort-value', 'Unavailable'); cell.innerHTML = renderLucideIcon_('triangle-alert', 'Unavailable'); });
     });
-    document.querySelectorAll('#coordinatorStats .stat-card-teal .stat-num, #coordinatorStats .stat-card-red .stat-num').forEach(function(el) { el.textContent = 'Unavailable'; });
-    document.querySelectorAll('.tracker-tabs button:disabled').forEach(function(el) { el.textContent = el.getAttribute('data-filter') === 'attention' ? 'Attention (Unavailable)' : 'On Track (Unavailable)'; });
+    document.querySelectorAll('#coordinatorStats [data-progress-stat] [data-stat-value]').forEach(function(el) { el.textContent = 'Unavailable'; });
+    document.querySelectorAll('[data-tracker-filters] [data-filter]:disabled').forEach(function(el) { el.textContent = el.getAttribute('data-filter') === 'attention' ? 'Attention (Unavailable)' : 'On Track (Unavailable)'; });
   }
 
   // Application CSS is inline in the document head. Wait for web fonts as well
@@ -1355,7 +1373,7 @@ const DashboardUI = (function() {
     function retry(message) {
       if (!status) return;
       status.textContent = message + ' ';
-      const button = document.createElement('button');button.className='app-btn btn-sm btn-secondary';
+      const button = document.createElement('button');button.className='btn btn-sm btn-outline';
       button.type = 'button';button.textContent = 'Retry';
       button.addEventListener('click', function() { loadCoordinatorSectionAsync(section); });
       status.appendChild(button);
@@ -1371,7 +1389,7 @@ const DashboardUI = (function() {
       if (state.overviewSucceeded && state.progressSucceeded) setText('coordUpdated', updatedLabel());
       const search = byId('trackerSearch');
       const searchText = search ? search.value : '';
-      const selected = document.querySelector('.tracker-tabs .tab.active');
+      const selected = document.querySelector('[data-tracker-filters] [data-filter][aria-pressed="true"]');
       const filter = selected ? selected.getAttribute('data-filter') : 'all';
       if (section === 'progress') { state.progressReady = true;state.progressFailed = false; }
       Object.keys(result.panels).forEach(function(id) {
@@ -1381,9 +1399,9 @@ const DashboardUI = (function() {
         if (target) { target.innerHTML = result.panels[id];target.setAttribute('aria-busy', 'false'); }
       });
       if (byId('trackerSearch')) byId('trackerSearch').value = searchText;
-      const tabs = Array.from(document.querySelectorAll('.tracker-tabs .tab'));
+      const tabs = Array.from(document.querySelectorAll('[data-tracker-filters] [data-filter]'));
       const restoredFilter = tabs.some(tab => tab.getAttribute('data-filter') === filter && !tab.disabled) ? filter : 'all';
-      tabs.forEach(function(tab) { tab.classList.toggle('active', tab.getAttribute('data-filter') === restoredFilter); });
+      tabs.forEach(function(tab) { const pressed = tab.getAttribute('data-filter') === restoredFilter; tab.classList.toggle('active', pressed); tab.setAttribute('aria-pressed', String(pressed)); });
       applyCoordinatorFilters(false);
       renderCoordinatorActivity();
       if (state.progressFailed) markCoordinatorProgressUnavailable();
@@ -1421,13 +1439,13 @@ const DashboardUI = (function() {
       const label = result.state === 'active' ? 'Logs / commit records this week' : result.state === 'not-started' ? 'Weekly logging has not started' : result.state === 'ended' ? 'Weekly logging has ended' : 'Activity unavailable: check project dates';
       if (body) getCoordinatorRows().forEach(function(row) {
         const item = result.teams[row.getAttribute('data-team-id').trim().toLowerCase()];
-        const cell = row.querySelector('.col-activity');
+        const cell = row.querySelector('[data-col="activity"]');
         if (cell) { cell.textContent = item && result.state === 'active' ? item.logs + '/' + item.commits : '—'; cell.title = label; }
       });
       applyCoordinatorFilters(false);
       setText('coordinatorActiveTeams', result.activeTeams === null ? '—' : result.activeTeams);
       const activeValue = byId('coordinatorActiveTeams');
-      const activeCard = activeValue && activeValue.closest ? activeValue.closest('.stat-card') : null;
+      const activeCard = activeValue && activeValue.closest ? activeValue.closest('[data-stat-card]') : null;
       if (activeCard) {
         const remaining = result.totalTeams - result.activeTeams;
         const tone = result.activeTeams === null || !result.totalTeams || result.state !== 'active' ? 'neutral' : remaining <= 0 ? 'complete' : remaining / result.totalTeams >= .6 ? 'danger' : remaining / result.totalTeams >= .3 ? 'warning' : 'neutral';
@@ -1456,7 +1474,7 @@ const DashboardUI = (function() {
       activityRequestPending = false;
       if (root !== byId('coordinatorAsyncRoot')) return;
       const body = byId('trackerBody');
-      if (body) getCoordinatorRows().forEach(function(row) { const cell = row.querySelector('.col-activity'); if (cell) { cell.textContent = '—'; cell.title = 'Activity unavailable'; } });
+      if (body) getCoordinatorRows().forEach(function(row) { const cell = row.querySelector('[data-col="activity"]'); if (cell) { cell.textContent = '—'; cell.title = 'Activity unavailable'; } });
       setText('coordinatorActiveTeams', '—');setText('coordinatorActiveTeamsPct', 'Unavailable');
       setText('weeklyActivityStatus', 'Unable to load weekly activity: ' + errorMessage(err));
       if (byId('weeklyActivityRetry')) byId('weeklyActivityRetry').hidden = false;
@@ -1637,7 +1655,7 @@ const DashboardUI = (function() {
   }
 
   function runGithubSync() {
-    const btn = document.querySelector('.run-sync-btn');
+    const btn = document.getElementById('githubSyncButton');
 
     if (btn) {
       btn.disabled = true;
@@ -1706,7 +1724,7 @@ const DashboardUI = (function() {
       const rows = Array.from(results.values());
       host.querySelector('[data-resend-log]').hidden = !rows.length;
       const bounds = renderTeamPagination(rows.length, host.resendPagination, 'studentInvitations', render, 'students');
-      output.innerHTML = rows.length ? '<table><thead><tr><th>Team</th><th>Student</th><th>GitHub</th><th>Result</th><th>Details</th></tr></thead><tbody>' + rows.slice(bounds.start, bounds.end).map(row => '<tr>' + [row.teamId,row.student,row.username,row.status,row.reason].map(value => '<td>' + escapeClientHtml(value || '') + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '';
+      output.innerHTML = rows.length ? '<table class="table table--compact"><thead><tr><th>Team</th><th>Student</th><th>GitHub</th><th>Result</th><th>Details</th></tr></thead><tbody>' + rows.slice(bounds.start, bounds.end).map(row => '<tr>' + [row.teamId,row.student,row.username,row.status,row.reason].map(value => '<td>' + escapeClientHtml(value || '') + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '';
       return ['invited','already joined','pending','skipped','failed'].map(kind => rows.filter(row => row.status === kind).length + ' ' + kind).join(' · ');
     }
     host.renderResendLog = render;
@@ -1833,7 +1851,7 @@ const DashboardUI = (function() {
         : '<p>No GitHub activity found for you this week. Commit your project work/evidence to the team repository, then refresh.</p>';
     }
     panel.innerHTML = '<div class="heading-row"><h5>Your GitHub activity' + weeklySeparator + esc(weeklyWeekLabel(weekId)) + '</h5>' +
-      '<button type="button" class="app-btn btn-sm btn-secondary btn-icon" data-weekly-github-refresh title="Refresh GitHub Activity" aria-label="Refresh GitHub Activity" onclick="DashboardUI.loadWeeklyProgress()">' + renderLucideIcon_('refresh-cw') + '</button></div>' + body;
+      '<button type="button" class="btn btn-sm btn-outline" data-weekly-github-refresh title="Refresh GitHub Activity" aria-label="Refresh GitHub Activity" onclick="DashboardUI.loadWeeklyProgress()">' + renderLucideIcon_('refresh-cw') + '</button></div>' + body;
   }
   function loadWeeklyProgress() {
     const host = byId('studentWeeklyProgress');
@@ -1862,7 +1880,7 @@ const DashboardUI = (function() {
         data.weeks.filter(week=>week.weekId !== host.querySelector('form')?.dataset.week && !data.actions.some(action=>action.weekId === week.weekId)).map(function(week) {
           return '<p class="weekly-closed-state">' + esc(weeklyWeekLabel(week.weekId) + weeklySeparator + weeklyStateLabel(week,data.timezone)) + '</p>';
         }).join('') + (data.actions.length > 1 ? '<nav class="weekly-week-switcher" aria-label="Choose progress week">' +
-        data.actions.map(function(action) { return '<button type="button" class="app-btn btn-sm btn-secondary" data-week="' + esc(action.weekId) + '" onclick="DashboardUI.chooseWeeklyAction(this)">' +
+        data.actions.map(function(action) { return '<button type="button" class="btn btn-sm btn-outline" data-week="' + esc(action.weekId) + '" onclick="DashboardUI.chooseWeeklyAction(this)">' +
           esc(weeklyWeekLabel(action.weekId)) + '</button>'; }).join(' ') + '</nav>' : '');
       const formContainer = host.querySelector('[data-weekly-form]');
       const form = host.querySelector('form');
@@ -1904,7 +1922,7 @@ const DashboardUI = (function() {
       const esc=escapeClientHtml;
       const editable=host.weeklyData.ready && hasWeeklyGithubEvidence(host,action.weekId) && host.weeklyData.actions.some(a=>a.weekId===action.weekId);
       container.hidden=false;
-      container.innerHTML='<div class="weekly-submission-summary">'+weeklyFields.map(field=>'<section><h5>'+esc(field[1])+'</h5><p>'+esc(saved[field[0]] || '')+'</p></section>').join('')+'</div>'+(editable?'<button type="button" class="app-btn btn-sm btn-secondary" data-weekly-edit onclick="DashboardUI.editWeeklySubmission(this)">Edit submission</button>':'');
+      container.innerHTML='<div class="weekly-submission-summary">'+weeklyFields.map(field=>'<section><h5>'+esc(field[1])+'</h5><p>'+esc(saved[field[0]] || '')+'</p></section>').join('')+'</div>'+(editable?'<button type="button" class="btn btn-sm btn-outline" data-weekly-edit onclick="DashboardUI.editWeeklySubmission(this)">Edit submission</button>':'');
       renderWeeklyGithub(host,action.weekId);
       return;
     }
@@ -1919,7 +1937,7 @@ const DashboardUI = (function() {
     const latest = data.history.filter(r=>r.weekId === action.weekId && r.entryStatus !== 'MISSED').slice(-1)[0] || {};
     host.querySelector('[data-weekly-form]').innerHTML = '<form class="weekly-progress-form" data-week="' + esc(action.weekId) + '" onsubmit="DashboardUI.submitWeeklyProgress(event,this)">' +
       weeklyFields.map(function(field) { return '<div class="weekly-field"><label for="weekly-' + field[0] + '">' + esc(field[1]) + ' <span class="weekly-required" aria-hidden="true">*</span></label><textarea id="weekly-' + field[0] + '" name="' + field[0] + '" rows="3" required maxlength="10000" placeholder="' + esc(field[2]) + '">' + esc(latest[field[0]] || '') + '</textarea></div>'; }).join('') +
-      '<div class="weekly-form-actions"><button type="submit" class="workflow-btn app-btn btn-lg btn-primary"></button>' + (saved ? '<button type="button" class="app-btn btn-sm btn-secondary" data-weekly-cancel onclick="DashboardUI.cancelWeeklyEdit(this)">Cancel</button>' : '') + '</div></form>';
+      '<div class="weekly-form-actions"><button type="submit" class="workflow-btn btn btn-lg btn-primary"></button>' + (saved ? '<button type="button" class="btn btn-sm btn-outline" data-weekly-cancel onclick="DashboardUI.cancelWeeklyEdit(this)">Cancel</button>' : '') + '</div></form>';
     renderWeeklyGithub(host,action.weekId);
     host.querySelector('form').addEventListener('input',function() { this.weeklyDirty = true; });
   }
@@ -2008,7 +2026,7 @@ const DashboardUI = (function() {
   }
 
   function focusGithubAccountForm(button) {
-    const card = button.closest('.step-card');
+    const card = button.closest('[data-step-card]');
     const input = card && card.querySelector('#studentGithubProfile');
     if (!input || input.disabled) return;
     input.scrollIntoView({block:'center', behavior:'auto'});
@@ -2032,7 +2050,7 @@ const DashboardUI = (function() {
       const account = result.account, esc = escapeClientHtml;
       panel.innerHTML = (account.avatarUrl ? '<img width="48" height="48" alt="" src="' + esc(account.avatarUrl) + '">' : '') +
         '<p><strong>' + esc(account.displayName || '') + '</strong> <a target="_blank" rel="noopener" href="' + esc(account.profileUrl) + '">@' + esc(account.username) + '</a></p>' +
-        '<p>Is this your GitHub account?</p><button type="button" class="workflow-btn app-btn btn-md btn-primary" data-confirm-account>Yes, this is my account</button> <button type="button" class="workflow-btn secondary app-btn btn-md btn-secondary" data-change-account>No, change profile link</button>';
+        '<p>Is this your GitHub account?</p><button type="button" class="workflow-btn btn btn-primary" data-confirm-account>Yes, this is my account</button> <button type="button" class="workflow-btn secondary btn btn-outline" data-change-account>No, change profile link</button>';
       input.disabled = true;
       form.querySelector('button[type="submit"]').hidden = true;
       panel.querySelector('[data-confirm-account]').onclick = function() { confirmGithubAccount(form); };
@@ -2066,7 +2084,7 @@ const DashboardUI = (function() {
   }
 
   return {
-    notify: dialogs.notify, ask: dialogs.ask, requestText: dialogs.requestText,
+    notify: dialogs.notify, ask: dialogs.ask, confirmDialog: dialogs.confirmDialog, requestText: dialogs.requestText,
     loadWeeklyProgress, chooseWeeklyAction, submitWeeklyProgress,
     refreshGithubStatus,
     retryGithubSetup,
@@ -2149,7 +2167,7 @@ function closeCoordinatorTeamDrawer() {
 
 function initializeFirstRoleTab() {
   DashboardUI.initializeRoleMenu();
-  const activePanel = document.querySelector('[data-role-panel].active');
+  const activePanel = document.querySelector('[data-role-panel]:not([hidden])');
   if (activePanel) {
     DashboardUI.showRoleTab(activePanel.getAttribute('data-role-panel'));
   }

@@ -50,9 +50,9 @@ function reviewEvaluationBrowser_(reviewKey) {
   function hiddenStudent(index) {return targeted?targeted.index!==index:focusedAssessment() && !pendingStudents().includes(index) && !absenceCorrectable(index);}
   function absenceCorrectable(index) {const a=savedStudent(index).assessment;return !!a && (['REVIEW_DAY_ABSENCE','PROLONGED'].includes(a.facts.type) || a.nextActions?.makeup);}
   function criteriaTabs() {
-    return '<div class="review-criteria-tabs" role="tablist" aria-label="Assessment components">'+['team','individual'].map(component=>{
+    return '<div class="review-criteria-tabs tabs" role="tablist" aria-label="Assessment components">'+['team','individual'].map(component=>{
       const label=component==='team'?'Team Criteria':'Individual',max=model.config.criteria.filter(c=>c.type.toLowerCase()===component).reduce((sum,c)=>sum+c.maxMarks,0);
-      return '<button type="button" role="tab" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-selected="'+(activeCriteria===component)+'" tabindex="'+(activeCriteria===component?'0':'-1')+'"><span class="review-tab-label">'+DashboardUI.renderIcon(component==='team'?'users':'user')+label+'</span><span class="review-tab-caption">'+max+' pts '+(component==='team'?'pool':'weight')+'</span></button>';
+      return '<button type="button" class="tab" role="tab" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-selected="'+(activeCriteria===component)+'" tabindex="'+(activeCriteria===component?'0':'-1')+'"><span class="review-tab-label">'+DashboardUI.renderIcon(component==='team'?'users':'user')+label+'</span><span class="review-tab-caption">'+max+' pts '+(component==='team'?'pool':'weight')+'</span></button>';
     }).join('')+'</div>';
   }
   let gradingProgress={team:{graded:0,total:0},individual:{graded:0,total:0}},activeTeamPI=null,activeStudentPIs={};
@@ -60,7 +60,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     return '<span data-pi-icon>'+DashboardUI.renderIcon('clock')+'</span><span class="review-pi-label"><strong>'+escape(c.pi+'–'+c.co)+'</strong><small>0–'+escape(c.maxMarks)+'</small></span>';
   }
   function individualPills(owner) {
-    return '<div class="review-pi-pills" data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators">'+model.config.criteria.map((c,index)=>{
+    return '<div class="review-pi-pills segmented" data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators">'+model.config.criteria.map((c,index)=>{
       if(c.type!=='Individual' && !(targeted && targeted.index===owner && targeted.components.includes('team')))return '';
       return '<button type="button" data-select-individual-pi="'+index+'" data-student="'+owner+'" aria-pressed="false" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>';
     }).join('')+'</div>';
@@ -82,7 +82,7 @@ function reviewEvaluationBrowser_(reviewKey) {
   function teamPills() {
     const criteria=model.config.criteria.map((c,index)=>({c,index})).filter(({c})=>c.type==='Team');
     if(!criteria.some(({index})=>index===activeTeamPI))activeTeamPI=criteria.length?criteria[0].index:null;
-    return '<div class="review-pi-pills" data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
+    return '<div class="review-pi-pills segmented" data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
   }
   function updateTabProgress() {
     const row=drawer.querySelector('[data-tab-progress]');if(!row)return;
@@ -95,7 +95,7 @@ function reviewEvaluationBrowser_(reviewKey) {
       if(tab){tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;tab.disabled=busy || reading || focusedAssessment() && component==='team';}
       if(panel){panel.hidden=!selected;panel.open=selected;}
     }
-    const students=drawer.querySelector('.review-header-students');if(students)students.hidden=activeCriteria!=='individual';
+    const students=drawer.querySelector('[data-review-students]');if(students)students.hidden=activeCriteria!=='individual';
     const assessmentSummary=drawer.querySelector('[data-assessment-summary]');if(assessmentSummary)assessmentSummary.hidden=activeCriteria!=='individual';
     updateTabProgress();
     const pills=drawer.querySelector('[data-team-pills]');if(pills)pills.hidden=activeCriteria!=='team';
@@ -117,7 +117,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     model.roster.students.forEach((student,index)=>{
       const selected=index===activeStudent,group=drawer.querySelector('[data-student-group="'+index+'"]'),chip=drawer.querySelector('[data-select-student="'+index+'"]');
       if(group){group.hidden=hiddenStudent(index) || !selected;group.open=selected;}
-      if(chip){chip.setAttribute('aria-pressed',String(selected));chip.disabled=busy || reading;}
+      if(chip){chip.setAttribute('aria-pressed',String(selected));chip.classList.toggle('tile--selected',selected);chip.disabled=busy || reading;}
       const summary=drawer.querySelector('[data-summary-student="'+index+'"]');
       if(summary)summary.hidden=hiddenStudent(index) || !selected;
     });
@@ -133,14 +133,14 @@ function reviewEvaluationBrowser_(reviewKey) {
     if(group)revealCriterion(group);
   }
   function studentChips(students) {
-    return '<ul class="review-header-students" aria-label="Select student">'+students.map((s,index)=>{
+    return '<ul class="review-header-students" data-review-students aria-label="Select student">'+students.map((s,index)=>{
       const words=String(s.name||s.register).trim().split(/\s+/),short=words[0]+(words.length>1?' '+words[words.length-1].charAt(0)+'.':'');
       const initials=words.map(w=>w.charAt(0)).slice(0,2).join('');
-      return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" title="'+escape(s.name+' ('+s.register+')')+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'"><span class="review-avatar" aria-hidden="true">'+escape(initials)+'</span><span class="review-student-details">'+escape(short)+'</span><small class="review-student-register">'+escape(s.register)+'</small><span class="review-student-score" data-student-score="'+index+'">— / '+model.config.maximum+'</span></button></li>';
+      return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" class="tile'+(index===activeStudent?' tile--selected':'')+'" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" title="'+escape(s.name+' ('+s.register+')')+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'"><span class="avatar avatar-'+(index%3+1)+' review-avatar" aria-hidden="true">'+escape(initials)+'</span><span class="review-student-details">'+escape(short)+'</span><small class="review-student-register">'+escape(s.register)+'</small><span class="review-student-score" data-student-score="'+index+'">— / '+model.config.maximum+'</span></button></li>';
     }).join('')+'</ul>';
   }
   function assessmentSummaryCard(students) {
-    return '<section class="review-assessment-summary" data-assessment-summary aria-live="polite" aria-label="Assessment Summary"><h3>Assessment Summary <small data-summary-unsaved hidden>Unsaved preview</small></h3>'+students.map((student,index)=>assessmentSummary(index)).join('')+'</section>';
+    return '<section class="review-assessment-summary card" data-assessment-summary aria-live="polite" aria-label="Assessment Summary"><h3>Assessment Summary <small data-summary-unsaved hidden>Unsaved preview</small></h3>'+students.map((student,index)=>assessmentSummary(index)).join('')+'</section>';
   }
   function assessmentSummary(index) {
     const student=savedStudent(index).assessment?savedStudent(index):(model.assessmentResults||[]).find(s=>s.register===model.roster.students[index].register)||{};
@@ -197,7 +197,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     return false;
   }
   function makeupControls(index,student) {
-    return student.assessment?.nextActions?.makeup?'<button class="app-btn btn-md btn-primary" type="button" data-target="'+index+'">Conduct Makeup Assessment</button>':'';
+    return student.assessment?.nextActions?.makeup?'<button class="btn btn-primary" type="button" data-target="'+index+'">Conduct Makeup Assessment</button>':'';
   }
 
   function absenceEvidenceFields(index,f) {
@@ -208,7 +208,7 @@ function reviewEvaluationBrowser_(reviewKey) {
   function absenceControl(index,student) {
     const f=student.assessment?.facts||{type:'UNSELECTED'};
     const choice=(name,value)=>'<select data-fact="'+name+'"><option value="">Select</option><option value="yes"'+(value===true?' selected':'')+'>Yes</option><option value="no"'+(value===false?' selected':'')+'>No</option></select>';
-    return '<div class="review-criterion" data-absence="'+index+'"'+(targeted?' hidden':'')+'>'+attendancePicker(index,f.type)+'<div data-exception-fields><label data-approval-field>Absence Approved?'+choice('approved',f.approved)+'</label>'+absenceEvidenceFields(index,f)+'<div data-prolonged-fields><label>Contribution Established?'+choice('contribution',f.verifiedContribution)+'</label><p>The committee considers contribution evidence submitted by the team and endorsed by the Guide.</p><label>Attended the Review?'+choice('attended',f.attended)+'</label></div></div><div data-effective="'+index+'"></div>'+(!model.availability.editable && !targeted && absenceCorrectable(index)?(correctionIndex===index?'<button class="app-btn btn-md btn-secondary" type="button" data-record-absence="'+index+'">Save absence details</button><button class="app-btn btn-md btn-secondary" type="button" data-cancel-absence="'+index+'">Cancel editing</button>':correctionIndex===null?'<button class="app-btn btn-md btn-secondary" type="button" data-edit-absence="'+index+'">Edit absence details</button>':''):'')+'</div>';
+    return '<div class="review-criterion" data-absence="'+index+'"'+(targeted?' hidden':'')+'>'+attendancePicker(index,f.type)+'<div data-exception-fields><label data-approval-field>Absence Approved?'+choice('approved',f.approved)+'</label>'+absenceEvidenceFields(index,f)+'<div data-prolonged-fields><label>Contribution Established?'+choice('contribution',f.verifiedContribution)+'</label><p>The committee considers contribution evidence submitted by the team and endorsed by the Guide.</p><label>Attended the Review?'+choice('attended',f.attended)+'</label></div></div><div data-effective="'+index+'"></div>'+(!model.availability.editable && !targeted && absenceCorrectable(index)?(correctionIndex===index?'<button class="btn btn-outline" type="button" data-record-absence="'+index+'">Save absence details</button><button class="btn btn-outline" type="button" data-cancel-absence="'+index+'">Cancel editing</button>':correctionIndex===null?'<button class="btn btn-outline" type="button" data-edit-absence="'+index+'">Edit absence details</button>':''):'')+'</div>';
   }
   async function close() {
     if (busy || (dirty && !await DashboardUI.ask('Discard unsaved '+reviewLabel+' marks?'))) return;
@@ -219,7 +219,7 @@ function reviewEvaluationBrowser_(reviewKey) {
   }
   function ensure() {
     if (drawer) return;
-    drawer=document.createElement('dialog');drawer.className='team-drawer open review-drawer';
+    drawer=document.createElement('dialog');drawer.className='team-drawer open review-drawer';drawer.setAttribute('data-tooltip-boundary','');
     drawer.setAttribute('aria-labelledby',reviewKey+'Heading');
     drawer.addEventListener('toggle',event=>{
       const group=event.target;
@@ -263,7 +263,7 @@ function reviewEvaluationBrowser_(reviewKey) {
         const current=drawer.querySelector('[data-index="'+activeTeamPI+'"][data-owner="team"]');
         if(current && !validateClosingGroup({querySelectorAll:()=>[current]}))return;
         const field=drawer.querySelector('[data-index="'+Number(button.dataset.selectPi)+'"][data-owner="team"]');
-        if(field){activeTeamPI=Number(button.dataset.selectPi);syncCriteriaTabs();const content=drawer.querySelector('.team-drawer-content');if(content)content.scrollTop=0;const level=field.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});}
+        if(field){activeTeamPI=Number(button.dataset.selectPi);syncCriteriaTabs();const content=drawer.querySelector('[data-drawer-content]');if(content)content.scrollTop=0;const level=field.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});}
         return;
       }
       if(button.hasAttribute('data-select-individual-pi')) {
@@ -379,7 +379,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     const navigation=assessment?'<div class="review-assessment-navigation">'+criteriaTabs()+'<div class="review-tab-progress" data-tab-progress aria-live="polite"></div>'+teamPills()+(students.length?studentChips(students):'')+'</div>':'';
     if(assessment && students.length)body=assessmentSummaryCard(students)+body;
     const statusMessage='<p class="review-message" data-message role="status" aria-live="polite"></p>';
-    return '<div class="team-drawer-header"><div class="review-heading-details"><div class="review-header-line"><h2 class="team-drawer-title" id="'+reviewKey+'Heading">'+escape(title)+'</h2><span class="review-header-review">'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review-progress" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="team-drawer-close app-btn btn-sm btn-secondary btn-icon" data-close aria-label="Close '+escape(reviewLabel)+' drawer">'+DashboardUI.renderIcon('x')+'</button></div>'+navigation+'<div class="team-drawer-content">'+body+(footer?'':statusMessage)+'</div>'+(footer?'<div class="review-footer">'+statusMessage+footer+'</div>':'');
+    return '<div class="team-drawer-header"><div class="review-heading-details"><div class="review-header-line"><h2 class="team-drawer-title" id="'+reviewKey+'Heading">'+escape(title)+'</h2><span class="review-header-review">'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review-progress" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="team-drawer-close btn btn-sm btn-outline" data-close data-drawer-close aria-label="Close '+escape(reviewLabel)+' drawer">'+DashboardUI.renderIcon('x')+'</button></div>'+navigation+'<div class="team-drawer-content" data-drawer-content>'+body+(footer?'':statusMessage)+'</div>'+(footer?'<div class="review-footer">'+statusMessage+footer+'</div>':'');
   }
 
   function open(team,button) {
@@ -388,7 +388,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     ensure();
     const previous=drawer.open && String(drawer.dataset.team).trim().toLowerCase()===String(team).trim().toLowerCase()?model:null,previousDirty=dirty,previousTarget=targeted;
     trigger=button;reading=true;
-    if(previous && DashboardUI.beginContentLoading){finishRead=DashboardUI.beginContentLoading(drawer.querySelector('.team-drawer-content'),'Refreshing '+reviewLabel+' evaluation');const reload=drawer.querySelector('[data-reload]');if(reload)reload.disabled=true;}
+    if(previous && DashboardUI.beginContentLoading){finishRead=DashboardUI.beginContentLoading(drawer.querySelector('[data-drawer-content]'),'Refreshing '+reviewLabel+' evaluation');const reload=drawer.querySelector('[data-reload]');if(reload)reload.disabled=true;}
     else {activeCriteria='team';activeStudent=0;activeStudentPIs={};model=null;dirty=false;pending=null;targeted=null;correctionIndex=null;drawer.dataset.team=team;drawer.innerHTML=shell(team,DashboardUI.renderSkeleton('drawer','Loading '+reviewLabel+' evaluation'));}
     const token=++sequence;
     if(!drawer.open)drawer.showModal();
@@ -401,12 +401,12 @@ function reviewEvaluationBrowser_(reviewKey) {
       if(token!==sequence || !drawer.open)return;
       if(finishRead)finishRead();finishRead=null;reading=false;
       if(previous){model=previous;dirty=previousDirty;targeted=previousTarget;const reload=drawer.querySelector('[data-reload]');if(reload)reload.disabled=false;message(error.message+' Existing entries are retained. Use Reload to retry.');}
-      else {drawer.innerHTML=shell(team,'<button class="app-btn btn-sm btn-secondary" type="button" data-reload>Retry</button>');message(error.message);}
+      else {drawer.innerHTML=shell(team,'<button class="btn btn-sm btn-outline" type="button" data-reload>Retry</button>');message(error.message);}
     });
   }
   function control(c,index,owner,score) {
     score=score||{};
-    return '<fieldset class="guide-eval-criterion review-criterion '+(c.type==='Team'?'review-team-rubric':'review-individual-rubric')+'" data-index="'+index+'" data-owner="'+owner+'"'+(focusedAssessment() && (!targeted || String(owner)!==String(targeted.index) || !targeted.components.includes(c.type==='Team'?'team':'individual'))?' hidden':'')+'><legend class="review-criterion-accessible-title">'+escape(c.name)+'</legend><div class="review-criterion-meta"><span>'+escape(c.pi+' · '+c.co)+'</span><span>Max '+c.maxMarks+' marks</span></div><h3 class="review-card-title">'+escape(c.name)+'</h3><p class="review-control-title">Proficiency level</p><select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select><div class="review-levels" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+'" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div><div class="review-descriptor" data-descriptor aria-live="polite"></div><details><summary>View full rubric descriptors</summary>'+c.descriptors.map((text,i)=>'<p><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><div class="review-award"><div class="review-award-heading"><label for="reviewMarks-'+owner+'-'+index+'">Fine-tune mark</label><span data-range></span></div><div class="review-stepper"><button class="app-btn btn-sm btn-secondary btn-icon" type="button" data-step="-0.5" aria-label="Decrease marks">'+DashboardUI.renderIcon('minus')+'</button><input data-marks id="reviewMarks-'+owner+'-'+index+'" aria-describedby="reviewMarksError-'+owner+'-'+index+'" type="number" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button class="app-btn btn-sm btn-secondary btn-icon" type="button" data-step="0.5" aria-label="Increase marks">'+DashboardUI.renderIcon('plus')+'</button></div><input data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total" data-awarded-total></span><div class="review-slider-values" data-slider-values aria-label="Selectable marks"></div></div><p class="review-marks-error" data-marks-error id="reviewMarksError-'+owner+'-'+index+'" aria-live="polite" hidden></p><div class="review-feedback-heading"><div class="review-feedback-title"><strong>Criterion Feedback</strong><span data-feedback-required></span></div><span data-feedback-status></span></div><div class="review-feedback-options" data-feedback-options aria-label="Feedback suggestions"></div><button type="button" class="review-other-feedback" data-other-feedback aria-pressed="false">Other remarks</button><label class="review-feedback-label" data-custom-feedback-label hidden>Other remarks<textarea data-custom-feedback maxlength="2000" rows="2" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden maxlength="2000">'+escape(score.remark||'')+'</textarea></fieldset>';
+    return '<fieldset class="guide-eval-criterion review-criterion '+(c.type==='Team'?'review-team-rubric':'review-individual-rubric')+' card" data-index="'+index+'" data-owner="'+owner+'"'+(focusedAssessment() && (!targeted || String(owner)!==String(targeted.index) || !targeted.components.includes(c.type==='Team'?'team':'individual'))?' hidden':'')+'><legend class="review-criterion-accessible-title">'+escape(c.name)+'</legend><div class="review-criterion-meta"><span>'+escape(c.pi+' · '+c.co)+'</span><span>Max '+c.maxMarks+' marks</span></div><h3 class="review-card-title">'+escape(c.name)+'</h3><p class="review-control-title">Proficiency level</p><select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select><div class="review-levels segmented" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+'" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div><div class="review-descriptor" data-descriptor aria-live="polite"></div><details><summary>View full rubric descriptors</summary>'+c.descriptors.map((text,i)=>'<p><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><div class="review-award"><div class="review-award-heading"><label for="reviewMarks-'+owner+'-'+index+'">Fine-tune mark</label><span data-range></span></div><div class="review-stepper"><button class="btn btn-sm btn-outline" type="button" data-step="-0.5" aria-label="Decrease marks">'+DashboardUI.renderIcon('minus')+'</button><input data-marks id="reviewMarks-'+owner+'-'+index+'" aria-describedby="reviewMarksError-'+owner+'-'+index+'" type="number" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button class="btn btn-sm btn-outline" type="button" data-step="0.5" aria-label="Increase marks">'+DashboardUI.renderIcon('plus')+'</button></div><input data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total" data-awarded-total></span><div class="review-slider-values" data-slider-values aria-label="Selectable marks"></div></div><p class="review-marks-error" data-marks-error id="reviewMarksError-'+owner+'-'+index+'" aria-live="polite" hidden></p><div class="review-feedback-heading"><div class="review-feedback-title"><strong>Criterion Feedback</strong><span data-feedback-required></span></div><span data-feedback-status></span></div><div class="review-feedback-options segmented" data-feedback-options aria-label="Feedback suggestions"></div><button type="button" class="review-other-feedback btn btn-sm btn-outline" data-other-feedback aria-pressed="false">Other remarks</button><label class="review-feedback-label" data-custom-feedback-label hidden>Other remarks<textarea data-custom-feedback maxlength="2000" rows="2" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden maxlength="2000">'+escape(score.remark||'')+'</textarea></fieldset>';
   }
   function accordion(title,description,content) {
     return '<details class="review-accordion" data-criteria-group="'+(title==='Team Criteria'?'team':'individual')+'" name="review-criteria" id="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-panel" role="tabpanel" aria-labelledby="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-tab"'+(focusedAssessment()?(title==='Team Criteria'?' hidden':' open'):'')+'><summary><strong>'+title+'</strong>'+(title==='Team Criteria'?'<span class="review-header-mark" data-team-mark aria-label="Common team score"></span>':'')+(description?'<span>'+description+'</span>':'')+'</summary><div class="review-accordion-content">'+content+'</div></details>';
@@ -456,8 +456,8 @@ function reviewEvaluationBrowser_(reviewKey) {
       const student=savedStudents.find(v=>v.register===s.register)||{},a=student.assessment||{},draft=a.makeupDraft||{},scores=targeted && targeted.index===index?(draft.scores||{}):!d.availability.editable && a.individualSource==='makeup'?(a.makeup?.scores||{}):(student.scores||{});
       return '<details class="review-student-accordion" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary><span class="review-student-heading"><strong>'+escape(s.name)+'</strong><span class="review-header-mark" data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span class="review-student-subheading"><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div class="review-accordion-content">'+absenceControl(index,student)+individualPills(index)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
     }).join('');
-    drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div class="review-actions">'+(d.availability.editable?'<button class="app-btn btn-md btn-secondary" type="button" data-draft>Save Draft</button><button class="app-btn btn-lg btn-primary" type="button" data-submit>Submit Evaluation</button>':'')+'<button class="app-btn btn-sm btn-secondary" type="button" data-reload>Reload</button><button class="app-btn btn-sm btn-secondary" type="button" data-close>Close</button></div>');
-    if(targeted)drawer.querySelector('.review-actions').innerHTML='<button class="app-btn btn-md btn-secondary" type="button" data-target-draft>Save Makeup Draft</button><button class="app-btn btn-lg btn-primary" type="button" data-target-submit>Submit Makeup</button><button class="app-btn btn-sm btn-secondary" type="button" data-reload>Cancel / Reload</button><button class="app-btn btn-sm btn-secondary" type="button" data-close>Close</button>';
+    drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div class="review-actions" data-review-actions>'+(d.availability.editable?'<button class="btn btn-outline" type="button" data-draft>Save Draft</button><button class="btn btn-lg btn-primary" type="button" data-submit>Submit Evaluation</button>':'')+'<button class="btn btn-sm btn-outline" type="button" data-reload>Reload</button><button class="btn btn-sm btn-outline" type="button" data-close>Close</button></div>');
+    if(targeted)drawer.querySelector('[data-review-actions]').innerHTML='<button class="btn btn-outline" type="button" data-target-draft>Save Makeup Draft</button><button class="btn btn-lg btn-primary" type="button" data-target-submit>Submit Makeup</button><button class="btn btn-sm btn-outline" type="button" data-reload>Cancel / Reload</button><button class="btn btn-sm btn-outline" type="button" data-close>Close</button>';
     drawer.querySelector('form').addEventListener('submit',event=>event.preventDefault());
     drawer.querySelectorAll('[data-absence] input,[data-absence] select,[data-absence] textarea').forEach(el=>el.disabled=!!targeted);
     syncStudentSelection();syncCriteriaTabs();updateRanges();drawer.querySelector('[data-close]').focus();
@@ -761,7 +761,7 @@ function reviewEvaluationBrowser_(reviewKey) {
       finish();studentBusy=false;
       if(document.getElementById('studentAssessment-'+reviewKey)!==host)return;
       const notice=document.createElement('p');notice.textContent=reviewLabel+' results unavailable. '+error.message+' ';
-      const button=document.createElement('button');button.className='app-btn btn-sm btn-secondary';button.textContent='Retry';button.onclick=()=>{notice.remove();student();};notice.appendChild(button);host.appendChild(notice);
+      const button=document.createElement('button');button.className='btn btn-sm btn-outline';button.textContent='Retry';button.onclick=()=>{notice.remove();student();};notice.appendChild(button);host.appendChild(notice);
     });
   }
   window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
@@ -771,248 +771,217 @@ function getReviewEvaluationClientScript_() {
   return [reviewPolicyFacts_,reviewPolicyScoresComplete_,reviewPolicyCalculate_].map(f=>f.toString()).join('\n')+'\nconst ReviewAssessmentBrowser = '+reviewEvaluationBrowser_.toString()+'; const ReviewEvaluations = (()=>{const instances=new Map();const get=key=>{if(!instances.has(key))instances.set(key,ReviewAssessmentBrowser(key));return instances.get(key);};return {open:(team,key,button)=>get(key).open(team,button),student:key=>get(key).student(),admin:key=>get(key).admin()};})();';
 }
 function getReviewEvaluationStyles_() {
-  return `.review-drawer { inset:0 0 0 auto; margin:0; padding:0; border:0; max-width:100vw; max-height:100dvh; height:100dvh; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; font-size:var(--font-size-body); line-height:1.5; }
-  .review-drawer .team-drawer-title { margin:0; font-family:inherit; font-size:16px; font-weight:700; line-height:1.4; letter-spacing:0; text-transform:uppercase; }
-  .review-drawer .drawer-project-title { font-size:13px; }
-  .review-drawer .review-project-meta { font-size:10px; }
-  .review-project-meta-row { display:flex; align-items:baseline; justify-content:space-between; gap:4px 16px; flex-wrap:wrap; margin:8px 0 0; color:var(--color-ink-muted,#667085); }
+  return `.review-drawer { inset:0 0 0 auto; margin:0; padding:0; border:0; max-width:100vw; max-height:100dvh; height:100dvh; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; font-size:var(--fs-body); line-height:var(--lh-body); }
+  .review-drawer .team-drawer-title { margin:0; font-family:inherit; font-size:var(--fs-h3); font-weight:var(--fw-bold); line-height:var(--lh-heading); text-transform:uppercase; }
+  .review-drawer .drawer-project-title { font-size:var(--fs-meta); }
+  .review-drawer .review-project-meta { font-size:var(--fs-meta); }
+  .review-project-meta-row { display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-1) var(--space-4); flex-wrap:wrap; margin:var(--space-2) 0 0; color:var(--muted); }
   .review-project-meta-row .review-project-meta { margin:0; min-width:0; overflow-wrap:anywhere; }
   .review-project-meta-row .review-project-meta:last-child { flex-shrink:0; text-align:right; }
 
-  .review-exception-summary { display:grid; gap:16px; margin:16px 0; }
-  .review-exception-summary dt, .review-assessment-summary dt { font-size:12px; color:var(--muted-text, var(--color-ink-muted,#64748b)); margin-bottom:4px; }
+  .review-exception-summary { display:grid; gap:var(--space-4); margin:var(--space-4) 0; }
+  .review-exception-summary dt, .review-assessment-summary dt { font-size:var(--fs-meta); color:var(--muted); margin-bottom:var(--space-1); }
   .review-exception-summary dd, .review-assessment-summary dd { margin:0; overflow-wrap:anywhere; }
-  .review-criterion .review-absence-choice { display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:400; }
+  .review-criterion .review-absence-choice { display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:var(--fw-regular); }
   .review-criterion .review-absence-choice input { width:auto; margin:0; }
-  .review-criterion :is([data-review-day-fields],[data-contribution-fields],[data-absence-evidence]) fieldset { border:0; padding:0; margin:12px 0; }
-  .review-assessment-summary dd { font-size:var(--font-size-body); font-weight:600; }
+  .review-criterion :is([data-review-day-fields],[data-contribution-fields],[data-absence-evidence]) fieldset { border:0; padding:0; margin:var(--space-3) 0; }
+  .review-assessment-summary dd { font-size:var(--fs-body); font-weight:var(--fw-semibold); }
   .review-recorded-reason { white-space:pre-wrap; }
-  .review-criterion label.review-absence-evidence-choice { display:flex; align-items:center; gap:8px; margin:6px 0; }
+  .review-criterion label.review-absence-evidence-choice { display:flex; align-items:center; gap:var(--space-2); margin:6px 0; }
   .review-absence-evidence-choice input[type="checkbox"] { width:auto; flex:none; }
   .review-drawer:not([open]) { display:none; }
   .review-drawer.open { transform:none; transition:none; }
   .review-drawer [hidden] { display:none !important; }
-  .review-drawer::backdrop { background:rgba(15,23,42,.28); }
+  .review-drawer::backdrop { background:var(--scrim); }
   .review-drawer .team-drawer-header { position:relative; display:block; flex-shrink:0; }
   .review-heading-details { min-width:0; flex:1; }
-  .review-team-line { display:flex; align-items:center; justify-content:space-between; gap:8px 12px; flex-wrap:wrap; }
+  .review-team-line { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2) var(--space-3); flex-wrap:wrap; }
   .review-team-line .team-drawer-title { margin:0; }
-  .review-header-line { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-height:36px; padding-right:44px; margin-bottom:0; color:var(--color-ink,#344054); font-size:12px; font-weight:500; line-height:1.5; }
+  .review-header-line { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-height:36px; padding-right:44px; margin-bottom:0; color:var(--text); font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-body); }
   .review-header-line > span { white-space:nowrap; }
-  .review-header-review { padding:2px 8px; border-radius:var(--pill-radius); background:var(--color-accent-tint,#f4ebff); color:var(--color-accent-primary,#6941c6); font-size:11px; font-weight:500; }
-  .review-header-line .review-header-due { padding:2px 6px; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--pill-radius); background:var(--color-canvas,#f9fafb); color:var(--color-ink,#182230); font-size:10px; font-weight:500; }
-  .review-header-line .review-header-due[data-timing="info"] { background:var(--color-info-tint,#eff8ff); border-color:var(--color-info,#b2ddff); color:var(--color-info,#175cd3); }
-  .review-header-line .review-header-due[data-timing="success"] { background:var(--color-success-tint,#ecfdf3); border-color:var(--color-success,#abefc6); color:var(--color-success,#067647); }
-  .review-header-line .review-header-due[data-timing="warning"] { background:var(--color-warning-tint,#fffaeb); border-color:var(--color-warning,#fedf89); color:var(--color-warning,#93370d); }
-  .review-header-line .review-header-due[data-timing="danger"] { background:var(--color-danger-tint,#fef3f2); border-color:var(--color-danger,#fecdca); color:var(--color-danger,#b42318); }
+  .review-header-review { padding:2px var(--space-2); border-radius:var(--radius-badge); background:var(--tint); color:var(--primary); font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
+  .review-header-line .review-header-due { padding:2px 6px; border:1px solid var(--control-border); border-radius:var(--radius-badge); background:var(--canvas); color:var(--text); font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
+  .review-header-line .review-header-due[data-timing="info"] { background:var(--info-tint); border-color:var(--info); color:var(--info); }
+  .review-header-line .review-header-due[data-timing="success"] { background:var(--success-tint); border-color:var(--success); color:var(--success); }
+  .review-header-line .review-header-due[data-timing="warning"] { background:var(--warning-tint); border-color:var(--warning); color:var(--warning); }
+  .review-header-line .review-header-due[data-timing="danger"] { background:var(--danger-tint); border-color:var(--danger); color:var(--danger); }
   .review-header-line .review-header-due { white-space:normal; }
-  .review-heading-details > .review-progress { margin-top:8px; width:100%; box-sizing:border-box; }
-  .review-project-title-row { margin-top:8px; border-top:1px solid var(--color-border,#e4e7ec); border-bottom:1px solid var(--color-border,#e4e7ec); }
-  .review-project-title-row > summary { display:flex; align-items:center; gap:6px; padding:7px 0; list-style:none; cursor:pointer; color:var(--color-ink,#344054); font-size:11px; font-weight:600; }
+  .review-heading-details > .review-progress { margin-top:var(--space-2); width:100%; box-sizing:border-box; }
+  .review-project-title-row { margin-top:var(--space-2); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+  .review-project-title-row > summary { display:flex; align-items:center; gap:6px; padding:7px 0; list-style:none; cursor:pointer; color:var(--text); font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
   .review-project-title-row > summary::-webkit-details-marker { display:none; }
   .review-project-title-row > summary > span { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .review-project-title-row .lucide-icon { width:13px; height:13px; flex-shrink:0; color:var(--color-accent-primary,#9333ea); }
-  .review-project-title-row .review-title-chevron { color:var(--color-ink-muted,#98a2b3); }
+  .review-project-title-row .lucide-icon { width:13px; height:13px; flex-shrink:0; color:var(--primary); }
+  .review-project-title-row .review-title-chevron { color:var(--muted); }
   .review-project-title-row[open] .review-title-chevron { transform:rotate(180deg); }
-  .review-project-title-row > summary:focus-visible { outline:2px solid var(--color-accent-primary,#6941c6); outline-offset:2px; border-radius:4px; }
-  .review-project-title-row > p { margin:0 0 8px; max-height:15dvh; overflow:auto; overflow-wrap:anywhere; font-size:var(--font-size-body); color:var(--color-ink,#344054); }
-  .review-assessment-navigation { flex:0 0 auto; padding:6px 20px 4px; background:var(--color-canvas,#f8fafc); border-bottom:1px solid var(--color-border,#e4e7ec); }
-  .review-criteria-tabs { display:flex; gap:4px; padding:3px; margin:0; border:1px solid var(--color-border,#e4e7ec); border-radius:var(--editorial-radius,11px); background:var(--color-paper,#fff); }
-  .review-drawer .review-criteria-tabs [role="tab"] { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; min-width:0; min-height:44px; box-sizing:border-box; padding:4px 5px; border:1px solid transparent; border-radius:var(--editorial-radius,8px); background:transparent; color:var(--color-ink,#344054); font-size:12px; font-weight:600; line-height:1.4; }
+  .review-project-title-row > summary:focus-visible { outline:2px solid var(--primary); outline-offset:2px; border-radius:var(--radius-btn); }
+  .review-project-title-row > p { margin:0 0 var(--space-2); max-height:15dvh; overflow:auto; overflow-wrap:anywhere; font-size:var(--fs-body); color:var(--text); }
+  .review-assessment-navigation { flex:0 0 auto; padding:6px var(--space-5) var(--space-1); background:var(--canvas); border-bottom:1px solid var(--border); }
   .review-tab-label { display:flex; align-items:center; justify-content:center; gap:5px; }
-  .review-tab-label .lucide-icon { width:14px; height:14px; color:var(--color-ink-muted,#98a2b3); }
-  .review-tab-caption { color:var(--color-ink-muted,#8492a6); font-size:11px; font-weight:400; }
-  .review-pi-pills { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:6px; padding:0; margin-top:6px; }
+  .review-tab-label .lucide-icon { width:14px; height:14px; color:var(--muted); }
+  .review-tab-caption { color:var(--muted); font-size:var(--fs-meta); font-weight:var(--fw-regular); }
+  .review-drawer .review-pi-pills { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:6px; margin-top:6px; }
   .review-pi-pills[data-individual-pills] { margin:0 0 6px; }
-  .review-drawer .review-pi-pills button { display:flex; flex:0 0 auto; align-items:center; justify-content:flex-start; gap:5px; width:auto; min-width:0; max-width:100%; min-height:34px; box-sizing:border-box; padding:4px 8px; margin:0; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--pill-radius); background:var(--color-paper,#fff); color:var(--color-ink-muted,#475467); font-size:11px; text-align:left; }
-  .review-pi-label { display:flex; flex-direction:column; align-items:flex-start; line-height:1.3; overflow-wrap:anywhere; }
-  .review-pi-label strong { font-size:11px; font-weight:600; }
-  .review-pi-label small { font-size:9px; font-weight:400; }
+  .review-drawer .review-pi-pills button { display:flex; flex:0 0 auto; align-items:center; justify-content:flex-start; gap:5px; width:auto; min-width:0; max-width:100%; min-height:34px; box-sizing:border-box; margin:0; text-align:left; }
+  .review-pi-label { display:flex; flex-direction:column; align-items:flex-start; line-height:var(--lh-heading); overflow-wrap:anywhere; }
+  .review-pi-label strong { font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
+  .review-pi-label small { font-size:var(--fs-meta); font-weight:var(--fw-regular); }
   .review-pi-pills [data-pi-icon] { display:flex; }
   .review-pi-pills .lucide-icon { width:12px; height:12px; }
-  .review-drawer .review-pi-pills button[aria-pressed="false"]:not(:disabled):hover { border-color:var(--color-accent-primary,#9e77ed); background:var(--color-accent-tint,#f4f3ff); color:var(--color-ink-muted,#475467); }
-  .review-drawer .review-pi-pills [data-complete="true"] { color:var(--color-success,#067647); background:var(--color-success-tint,#ecfdf3); border-color:var(--color-success,#abefc6); }
-  .review-drawer .review-pi-pills button[aria-pressed="true"],.review-drawer .review-pi-pills button[aria-pressed="true"]:hover { border-color:var(--color-accent-primary,#6941c6); background:var(--color-accent-primary,#6941c6); color:var(--color-paper,#fff); box-shadow:0 1px 3px rgba(16,24,40,.12); }
-  .review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="false"]:not(:disabled):hover { border-color:var(--color-accent-secondary,#99f6e4); background:var(--color-accent-tint,#f0fdfa); color:var(--color-accent-primary,#115e59); }
-  .review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="true"], .review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="true"]:hover { border-color:var(--color-accent-secondary,#99f6e4); background:var(--color-accent-tint,#f0fdfa); color:var(--color-accent-primary,#115e59); box-shadow:inset 0 0 0 1px var(--color-accent-primary,#14b8a6); }
   .review-card-title { display:none; }
-  .review-criterion[data-index] { position:relative; margin:0 0 16px; padding:16px; border:1px solid var(--color-border,#e4e7ec); border-top:5px solid var(--color-accent-primary,#7f56d9); border-radius:var(--editorial-radius,16px); background:linear-gradient(110deg,var(--color-paper,#fff) 65%,var(--color-accent-tint,#faf5ff)); }
-  .review-individual-rubric[data-index] { border-top-color:var(--color-accent-primary,#0f766e); background:linear-gradient(110deg,var(--color-paper,#fff) 65%,var(--color-accent-tint,#f0fdfa)); }
-  .review-individual-rubric[data-index] .review-criterion-meta span:first-child { background:var(--color-accent-tint,#f0fdfa); color:var(--color-accent-primary,#115e59); }
+  .review-criterion[data-index] { position:relative; margin:0 0 var(--space-4); padding:var(--space-4); border:1px solid var(--border); border-top:5px solid var(--primary); border-radius:var(--radius-card); background:linear-gradient(110deg,var(--paper) 65%,var(--tint)); }
+  .review-individual-rubric[data-index] { border-top-color:var(--primary); background:linear-gradient(110deg,var(--paper) 65%,var(--tint)); }
+  .review-individual-rubric[data-index] .review-criterion-meta span:first-child { background:var(--tint); color:var(--primary); }
   .review-criterion[data-index] > legend { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-  .review-criterion[data-index] .review-card-title { display:block; margin:8px 0 14px; color:var(--color-ink,#182230); font-size:14px; line-height:1.4; font-weight:700; }
+  .review-criterion[data-index] .review-card-title { display:block; margin:var(--space-2) 0 14px; color:var(--text); font-size:var(--fs-body); line-height:var(--lh-heading); font-weight:var(--fw-bold); }
   .review-criterion[data-index] .review-criterion-meta { margin-bottom:0; gap:6px; }
-  .review-criterion[data-index] .review-criterion-meta span { padding:3px 6px; font-size:10px; }
-  .review-criterion[data-index] .review-control-title { margin-top:10px; color:var(--color-ink-muted,#8492a6); font-size:10px; text-transform:uppercase; letter-spacing:.04em; }
-  .review-criterion[data-index] .review-levels button[aria-pressed="true"] { background:var(--color-accent-primary,#6941c6); color:var(--color-paper,#fff); border-color:var(--color-accent-secondary,#b692f6); }
-  .review-criterion[data-index] .review-feedback-heading { margin-top:14px; padding-top:12px; border-top:1px solid var(--color-border,#eaecf0); }
-  .review-criterion[data-index] .review-feedback-options button { border-radius:var(--pill-radius); padding:5px 8px; min-height:28px; }
-  .review-tab-progress { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; color:var(--color-ink-muted,#667085); font-size:11px; }
-  .review-graded-pill { padding:2px 7px; border:1px solid var(--color-border,#e4e7ec); border-radius:var(--pill-radius); background:var(--color-soft,#f2f4f7); color:var(--color-ink-muted,#667085); white-space:nowrap; }
-  .review-graded-pill[data-completion="partial"] { color:var(--color-accent-primary,#6941c6); border-color:var(--color-accent-secondary,#e9d5ff); background:var(--color-accent-tint,#faf5ff); }
-  .review-graded-pill[data-completion="complete"] { color:var(--color-success,#067647); border-color:var(--color-success,#abefc6); background:var(--color-success-tint,#ecfdf3); }
-  .review-drawer .review-criteria-tabs [aria-selected="false"]:not(:disabled):hover { background:var(--color-canvas,#f8fafc); }
-  .review-drawer .review-criteria-tabs [aria-selected="true"] { background:var(--color-accent-tint,#faf5ff); color:var(--color-accent-primary,#6927da); border-color:var(--color-accent-secondary,#e9d5ff); }
-  .review-drawer .review-criteria-tabs [data-criteria-tab="individual"][aria-selected="true"] { background:var(--color-accent-tint,#f0fdfa); color:var(--color-accent-primary,#115e59); border-color:var(--color-accent-secondary,#99f6e4); }
-  .review-criteria-tabs [aria-selected="true"] .review-tab-label::after { content:""; width:5px; height:5px; border-radius:50%; background:currentColor; }
-  .review-criteria-tabs [aria-selected="true"] .lucide-icon,.review-criteria-tabs [aria-selected="true"] .review-tab-caption { color:inherit; }
-  .review-criteria-tabs [role="tab"]:focus-visible { outline:2px solid currentColor; outline-offset:1px; }
-  .review-header-students { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:6px; max-width:100%; list-style:none; padding:2px 0; margin:6px 0 0; color:var(--color-ink-muted,#667085); font-size:11px; font-weight:400; line-height:1.4; }
+  .review-criterion[data-index] .review-criterion-meta span { padding:3px 6px; font-size:var(--fs-meta); }
+  .review-criterion[data-index] .review-control-title { margin-top:10px; color:var(--muted); font-size:var(--fs-meta); text-transform:uppercase; }
+  .review-criterion[data-index] .review-feedback-heading { margin-top:14px; padding-top:var(--space-3); border-top:1px solid var(--border); }
+  .review-tab-progress { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); margin-top:var(--space-2); color:var(--muted); font-size:var(--fs-meta); }
+  .review-graded-pill { padding:2px 7px; border:1px solid var(--border); border-radius:var(--radius-badge); background:var(--soft); color:var(--muted); white-space:nowrap; }
+  .review-graded-pill[data-completion="partial"] { color:var(--primary); border-color:var(--border); background:var(--tint); }
+  .review-graded-pill[data-completion="complete"] { color:var(--success); border-color:var(--success); background:var(--success-tint); }
+  .review-header-students { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:6px; max-width:100%; list-style:none; padding:2px 0; margin:6px 0 0; color:var(--muted); font-size:var(--fs-meta); font-weight:var(--fw-regular); line-height:var(--lh-heading); }
   .review-header-students li { min-width:0; }
-  .review-drawer .review-header-students button { display:grid; grid-template-columns:20px minmax(0,1fr); align-content:start; align-items:center; gap:4px; width:100%; height:100%; min-height:44px; box-sizing:border-box; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--editorial-radius,9px); padding:8px 6px; background:var(--color-paper,#fff); color:var(--color-ink,#344054); font-size:11px; text-align:left; cursor:pointer; }
-  .review-drawer .review-header-students button { border-color:var(--color-accent-secondary,#99f6e4); background:var(--color-accent-tint,#f0fdfa); color:var(--color-accent-primary,#115e59); }
-  .review-drawer .review-header-students button[aria-pressed="false"]:not(:disabled):hover { border-color:var(--color-accent-secondary,#5eead4); background:var(--color-accent-tint,#ccfbf1); }
-  .review-drawer .review-header-students button[aria-pressed="true"] { background:var(--color-accent-tint,#f0fdfa); border-color:var(--color-accent-primary,#14b8a6); color:var(--color-accent-primary,#115e59); box-shadow:inset 0 0 0 1px var(--color-accent-primary,#14b8a6); }
-  .review-drawer .review-header-students button:focus-visible, .review-drawer .review-pi-pills[data-individual-pills] button:focus-visible { outline:2px solid var(--color-accent-primary,#0f766e); outline-offset:2px; }
-  .review-avatar { display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:var(--color-soft,#f2f4f7); color:var(--color-ink-muted,#475467); font-size:9px; font-weight:600; }
-  .review-header-students .review-avatar { background:var(--color-accent-tint,#ccfbf1); color:var(--color-accent-primary,#115e59); }
-  .review-header-students [aria-pressed="true"] .review-avatar { background:var(--color-accent-primary,#0f766e); color:var(--color-paper,#fff); }
-  .review-header-students .review-student-details { font-weight:600; }
-  .review-student-register { grid-column:1 / -1; color:var(--color-ink-muted,#667085); font-size:10px; overflow-wrap:anywhere; }
-  .review-header-students .review-student-score { grid-column:1 / -1; padding-top:3px; border-top:1px solid var(--color-border,#eaecf0); font-size:11px; text-align:left; white-space:normal; overflow-wrap:anywhere; }
+  .review-drawer .review-header-students button { display:grid; grid-template-columns:20px minmax(0,1fr); align-content:start; align-items:center; gap:var(--space-1); width:100%; height:100%; min-height:44px; box-sizing:border-box; text-align:left; cursor:pointer; }
+  .review-drawer .review-header-students button:focus-visible, .review-drawer .review-pi-pills[data-individual-pills] button:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  .review-header-students .review-student-details { font-weight:var(--fw-semibold); }
+  .review-student-register { grid-column:1 / -1; color:var(--muted); font-size:var(--fs-meta); overflow-wrap:anywhere; }
+  .review-header-students .review-student-score { grid-column:1 / -1; padding-top:3px; border-top:1px solid var(--border); font-size:var(--fs-meta); text-align:left; white-space:normal; overflow-wrap:anywhere; }
 
   .review-student-details { min-width:0; overflow-wrap:anywhere; }
-  .review-student-score { flex-shrink:0; color:var(--color-accent-primary,#6941c6); font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
-  .review-header-students .review-student-score { color:var(--color-accent-primary,#115e59); border-top-color:var(--color-accent-secondary,#99f6e4); }
+  .review-student-score { flex-shrink:0; color:var(--primary); font-weight:var(--fw-semibold); font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
+  .review-header-students .review-student-score { color:var(--primary); border-top-color:var(--border); }
   .review-drawer .team-drawer-close { position:absolute; top:18px; right:20px; }
-  .review-drawer form .drawer-section > h3 { margin:20px 0 12px; padding:10px 12px; border-left:4px solid var(--color-accent-primary,#6941c6); border-radius:var(--editorial-radius,6px); background:var(--color-accent-tint,#f4f3ff); color:var(--color-accent-hover,#42307d); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
-  .review-drawer .team-drawer-content { background:var(--color-canvas,#f8fafc); flex:1 1 auto; min-height:0; overflow-y:auto; padding-top:6px; }
-  .review-criterion { min-width:0; margin:14px 0; border:1px solid var(--color-border,#e4e7ec); border-radius:var(--editorial-radius,8px); padding:14px; background:var(--color-paper,#fff); }
+  .review-drawer form .drawer-section > h3 { margin:var(--space-5) 0 var(--space-3); padding:10px var(--space-3); border-left:4px solid var(--primary); border-radius:var(--radius-btn); background:var(--tint); color:var(--primary-hover); font-size:var(--fs-meta); line-height:var(--lh-body); overflow-wrap:anywhere; }
+  .review-drawer .team-drawer-content { background:var(--canvas); flex:1 1 auto; min-height:0; overflow-y:auto; padding-top:6px; }
+  .review-criterion { min-width:0; margin:14px 0; border:1px solid var(--border); border-radius:var(--radius-btn); padding:14px; background:var(--paper); }
   .review-drawer .review-criterion[data-absence] { margin:0 0 14px; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
   .review-criterion [data-absence-editor] > label:first-child { margin-top:0; }
-  .review-attendance > span { display:block; margin-bottom:4px; color:var(--color-ink,#344054); font-weight:600; }
-  .review-criterion .review-attendance-picker { font-size:12px; color:var(--color-ink,#344054); }
-  .review-attendance-picker > summary { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; box-sizing:border-box; padding:6px 8px; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--editorial-radius,6px); background:var(--color-paper,#fff); list-style:none; cursor:pointer; }
+  .review-attendance > span { display:block; margin-bottom:var(--space-1); color:var(--text); font-weight:var(--fw-semibold); }
+  .review-criterion .review-attendance-picker { font-size:var(--fs-meta); color:var(--text); }
+  .review-attendance-picker > summary { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); min-height:34px; box-sizing:border-box; padding:6px var(--space-2); border:1px solid var(--control-border); border-radius:var(--radius-btn); background:var(--paper); list-style:none; cursor:pointer; }
   .review-attendance-picker > summary::-webkit-details-marker { display:none; }
   .review-attendance-picker > summary[aria-disabled="true"] { opacity:.6; cursor:default; }
-  .review-attendance-picker[open] > summary { border-color:var(--color-accent-primary,#14b8a6); }
+  .review-attendance-picker[open] > summary { border-color:var(--primary); }
   .review-attendance-picker[open] > summary .lucide-icon { transform:rotate(180deg); }
-  .review-attendance-options { margin-top:4px; padding:4px; border:1px solid var(--color-accent-secondary,#99f6e4); border-radius:var(--editorial-radius,6px); background:var(--color-paper,#fff); }
-  .review-criterion .review-attendance-options label { display:flex; align-items:center; gap:8px; margin:0; padding:7px 8px; border-radius:4px; color:var(--color-ink,#344054); font-weight:400; cursor:pointer; }
-  .review-criterion .review-attendance-options input { width:14px; height:14px; flex:0 0 14px; margin:0; padding:0; accent-color:var(--color-accent-primary,#0f766e); }
-  .review-attendance-options label:hover, .review-attendance-options label:focus-within { background:var(--color-accent-tint,#f0fdfa); }
-  .review-attendance-options input:checked + span { color:var(--color-accent-primary,#115e59); font-weight:600; }
-  .review-drawer .review-attendance-picker > summary:focus-visible { outline:2px solid var(--color-accent-primary,#0f766e); outline-offset:2px; }
-  .review-criterion > legend { max-width:100%; box-sizing:border-box; padding:4px 8px; color:var(--color-ink,#182230); font-size:13px; font-weight:700; line-height:1.5; overflow-wrap:anywhere; }
-  .review-criterion label { display:block; margin-top:12px; color:var(--color-ink,#344054); font-weight:600; }
-  .review-criterion :is(input,select,textarea) { display:block; width:100%; box-sizing:border-box; font:inherit; margin-top:4px; padding:5px 6px; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--editorial-radius,6px); }
-  .review-criterion :is(input,select,textarea) { font-weight:400; color:var(--color-ink,#182230); background:var(--color-paper,#fff); }
-  .review-drawer button { font:inherit; cursor:pointer; }
+  .review-attendance-options { margin-top:var(--space-1); padding:var(--space-1); border:1px solid var(--border); border-radius:var(--radius-btn); background:var(--paper); }
+  .review-criterion .review-attendance-options label { display:flex; align-items:center; gap:var(--space-2); margin:0; padding:7px var(--space-2); border-radius:var(--radius-btn); color:var(--text); font-weight:var(--fw-regular); cursor:pointer; }
+  .review-criterion .review-attendance-options input { width:14px; height:14px; flex:0 0 14px; margin:0; padding:0; accent-color:var(--primary); }
+  .review-attendance-options label:hover, .review-attendance-options label:focus-within { background:var(--tint); }
+  .review-attendance-options input:checked + span { color:var(--primary); font-weight:var(--fw-semibold); }
+  .review-drawer .review-attendance-picker > summary:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  .review-criterion > legend { max-width:100%; box-sizing:border-box; padding:var(--space-1) var(--space-2); color:var(--text); font-size:var(--fs-meta); font-weight:var(--fw-bold); line-height:var(--lh-body); overflow-wrap:anywhere; }
+  .review-criterion label { display:block; margin-top:var(--space-3); color:var(--text); font-weight:var(--fw-semibold); }
+  .review-criterion :is(input,select,textarea) { display:block; width:100%; box-sizing:border-box; font:inherit; margin-top:var(--space-1); padding:5px 6px; border:1px solid var(--control-border); border-radius:var(--radius-btn); }
+  .review-criterion :is(input,select,textarea) { font-weight:var(--fw-regular); color:var(--text); background:var(--paper); }
+  .review-drawer button { cursor:pointer; }
   .review-criterion [data-level][hidden] { display:none; }
-  .review-criterion-meta { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
-  .review-criterion-meta span { padding:5px 9px; border-radius:var(--pill-radius); background:var(--color-accent-tint,#f4f3ff); color:var(--color-accent-primary,#6941c6); font-size:11px; font-weight:700; }
-  .review-criterion-meta span:last-child { background:var(--color-soft,#f2f4f7); color:var(--color-ink-muted,#475467); }
-  .review-control-title { color:var(--color-ink-muted,#667085); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
-  .review-marks-error { margin:8px 0 12px; padding:9px 11px; border:1px solid var(--color-danger,#fda29b); border-left:3px solid var(--color-danger,#d92d20); border-radius:var(--editorial-radius,6px); background:var(--color-danger-tint,#fef3f2); color:var(--color-danger,#b42318); font-size:var(--font-size-body); font-weight:600; line-height:1.5; }
-  .review-criterion input[aria-invalid="true"] { border-color:var(--color-danger,#d92d20); background:var(--color-danger-tint,#fff6f5); }
-  .review-levels { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; padding:4px; border-radius:var(--editorial-radius,12px); background:var(--color-soft,#f2f4f7); }
-  .review-drawer .review-levels button { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:0; min-height:44px; padding:6px 1px; border:1px solid transparent; border-radius:var(--editorial-radius,8px); background:transparent; color:var(--color-ink-muted,#475467); }
-  .review-levels button strong { display:block; font-size:12px; font-weight:500; }
-  .review-levels button small { display:block; margin:0; font-size:9px; font-weight:400; line-height:1.4; white-space:nowrap; }
-  .review-slider-values { grid-column:1 / -1; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px 8px; padding:0 6px; color:var(--color-ink-muted,#8492a6); font-size:10px; font-variant-numeric:tabular-nums; }
-  .review-slider-values .is-selected { color:var(--color-accent-primary,#6941c6); font-weight:700; }
-  .review-levels button[aria-pressed="true"] strong { font-weight:800; }
-  .review-drawer .review-levels button[aria-pressed="true"] { background:var(--color-accent-primary,#6941c6); border-color:var(--color-accent-primary,#9e77ed); color:var(--color-paper,#fff); box-shadow:0 1px 3px rgba(16,24,40,.12); }
-  .review-descriptor { margin:14px 0 10px; padding:12px; border:1px solid var(--color-accent-secondary,#e9d7fe); border-radius:var(--editorial-radius,10px); background:var(--color-accent-tint,#faf5ff); color:var(--color-accent-hover,#53389e); font-size:var(--font-size-body); line-height:1.5; white-space:pre-wrap; }
-  .review-criterion details { font-size:var(--font-size-body); color:var(--color-accent-primary,#6941c6); }
+  .review-criterion-meta { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-2); margin-bottom:var(--space-5); }
+  .review-criterion-meta span { padding:5px 9px; border-radius:var(--radius-badge); background:var(--tint); color:var(--primary); font-size:var(--fs-meta); font-weight:var(--fw-bold); }
+  .review-criterion-meta span:last-child { background:var(--soft); color:var(--muted); }
+  .review-control-title { color:var(--muted); font-size:var(--fs-meta); font-weight:var(--fw-bold); text-transform:uppercase; }
+  .review-marks-error { margin:var(--space-2) 0 var(--space-3); padding:9px 11px; border:1px solid var(--danger); border-left:3px solid var(--danger); border-radius:var(--radius-btn); background:var(--danger-tint); color:var(--danger); font-size:var(--fs-body); font-weight:var(--fw-semibold); line-height:var(--lh-body); }
+  .review-criterion input[aria-invalid="true"] { border-color:var(--danger); background:var(--danger-tint); }
+  .review-drawer .review-levels { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:var(--space-1); }
+  .review-drawer .review-levels button { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:0; min-height:44px; }
+  .review-levels button strong { display:block; font-size:var(--fs-meta); font-weight:var(--fw-semibold); }
+  .review-levels button small { display:block; margin:0; font-size:var(--fs-meta); font-weight:var(--fw-regular); line-height:var(--lh-heading); white-space:nowrap; }
+  .review-slider-values { grid-column:1 / -1; display:flex; justify-content:space-between; flex-wrap:wrap; gap:var(--space-1) var(--space-2); padding:0 6px; color:var(--muted); font-size:var(--fs-meta); font-variant-numeric:tabular-nums; }
+  .review-slider-values .is-selected { color:var(--primary); font-weight:var(--fw-bold); }
+  .review-levels button[aria-pressed="true"] strong { font-weight:var(--fw-bold); }
+  .review-descriptor { margin:14px 0 10px; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--radius-btn); background:var(--tint); color:var(--primary-hover); font-size:var(--fs-body); line-height:var(--lh-body); white-space:pre-wrap; }
+  .review-criterion details { font-size:var(--fs-body); color:var(--primary); }
   .review-criterion summary { cursor:pointer; }
   .review-accordion { margin:0; border:0; padding:0; background:transparent; }
-  .review-accordion > summary { cursor:pointer; padding:12px; border-left:4px solid var(--color-accent-primary,#6941c6); border-radius:var(--editorial-radius,7px); background:var(--color-accent-tint,#f4f3ff); color:var(--color-accent-hover,#42307d); font-size:13px; }
-  .review-accordion > summary strong { font-weight:700; }
-  .review-accordion > summary span { display:block; margin:4px 0 0 16px; color:var(--color-ink-muted,#475467); font-size:12px; line-height:1.5; }
-  .review-accordion > summary:focus-visible { outline:3px solid var(--color-accent-primary,#9e77ed); outline-offset:2px; }
+  .review-accordion > summary { cursor:pointer; padding:var(--space-3); border-left:4px solid var(--primary); border-radius:var(--radius-btn); background:var(--tint); color:var(--primary-hover); font-size:var(--fs-meta); }
+  .review-accordion > summary strong { font-weight:var(--fw-bold); }
+  .review-accordion > summary span { display:block; margin:var(--space-1) 0 0 var(--space-4); color:var(--muted); font-size:var(--fs-meta); line-height:var(--lh-body); }
+  .review-accordion > summary:focus-visible { outline:3px solid var(--primary); outline-offset:2px; }
   .review-accordion[data-criteria-group] > summary { display:none; }
-  .review-accordion[data-criteria-group="individual"] > summary { border-left-color:var(--color-accent-primary,#0f766e); background:var(--color-accent-tint,#f0fdfa); color:var(--color-accent-primary,#115e59); }
-  .review-accordion[data-criteria-group="individual"] > summary:focus-visible { outline-color:var(--color-accent-primary,#14b8a6); }
-  .review-accordion[data-criteria-group="individual"] .drawer-section > h3 { border-left-color:var(--color-accent-primary,#0f766e); background:var(--color-accent-tint,#f0fdfa); color:var(--color-accent-primary,#115e59); }
+  .review-accordion[data-criteria-group="individual"] > summary { border-left-color:var(--primary); background:var(--tint); color:var(--primary); }
+  .review-accordion[data-criteria-group="individual"] > summary:focus-visible { outline-color:var(--primary); }
+  .review-accordion[data-criteria-group="individual"] .drawer-section > h3 { border-left-color:var(--primary); background:var(--tint); color:var(--primary); }
   .review-accordion-content { padding:0; }
   .review-student-accordion { margin:0; border:0; padding:0; background:transparent; }
   .review-student-accordion > summary { display:none; }
-  .review-assessment-summary { display:block; margin:0 0 12px; padding:8px 10px; border:1px solid var(--color-border,#dbe3e9); border-radius:var(--editorial-radius,8px); background:var(--color-paper,#fff); color:var(--color-ink-muted,#475569); font-size:var(--font-size-body); }
-  .review-assessment-summary h3 { margin:0 0 6px; font-size:12px; color:var(--color-ink,#0f172a); }
-  .review-assessment-summary dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px 12px; margin:0; }
+  .review-assessment-summary { display:block; margin:0 0 var(--space-3); padding:var(--space-2) 10px; border:1px solid var(--border); border-radius:var(--radius-btn); background:var(--paper); color:var(--muted); font-size:var(--fs-body); }
+  .review-assessment-summary h3 { margin:0 0 6px; font-size:var(--fs-meta); color:var(--text); }
+  .review-assessment-summary dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px var(--space-3); margin:0; }
   .review-assessment-summary dl > div { display:flex; align-items:baseline; flex-wrap:wrap; gap:3px 6px; }
-  .review-assessment-summary dt { margin:0; font-size:11px; color:var(--color-ink-muted,#64748b); }
+  .review-assessment-summary dt { margin:0; font-size:var(--fs-meta); color:var(--muted); }
   .review-assessment-summary .review-summary-status { grid-column:1 / -1; }
-  .review-assessment-summary dd { color:var(--color-ink,#1e293b); font-variant-numeric:tabular-nums; }
-  .review-assessment-summary .review-summary-total { border-left:2px solid var(--color-accent-secondary,#99f6e4); padding-left:8px; }
-  .review-assessment-summary .review-summary-total[data-resolved="true"] dd { color:var(--color-accent-primary,#0f766e); font-weight:700; }
-  .review-assessment-summary .review-summary-status dd { padding:2px 7px; border-radius:var(--pill-radius); background:var(--color-soft,#f1f5f9); color:var(--color-ink-muted,#475569); font-size:var(--font-size-body); }
-  .review-assessment-summary .review-summary-status[data-tone="complete"] dd { background:var(--color-success-tint,#ecfdf5); color:var(--color-success,#047857); }
-  .review-assessment-summary .review-summary-status[data-tone="pending"] dd { background:var(--color-warning-tint,#fffbeb); color:var(--color-warning,#92400e); }
-  .review-assessment-summary .review-summary-status[data-tone="exception"] dd { background:var(--color-danger-tint,#fff1f2); color:var(--color-danger,#9f1239); }
-  .review-assessment-summary button, .review-summary-decision { margin-top:8px; }
-  .review-summary-decision > summary { cursor:pointer; color:var(--color-accent-primary,#6941c6); font-weight:600; }
-  .review-summary-decision label { display:block; margin-top:8px; }
-  .review-assessment-summary [data-summary-unsaved] { display:inline-block; margin-left:6px; padding:1px 5px; border-radius:var(--pill-radius); background:var(--color-warning-tint,#fffbeb); color:var(--color-warning,#92400e); font-size:10px; font-weight:400; }
-  .review-student-accordion > summary span { display:block; margin:3px 0 0 16px; color:var(--color-ink-muted,#475467); font-size:11px; }
-  .review-accordion > summary .review-header-mark, .review-student-accordion > summary .review-header-mark { display:inline-flex; flex-shrink:0; margin:0 0 0 8px; padding:3px 9px; border:1px solid var(--color-accent-secondary,#d6bbfb); border-radius:var(--pill-radius); background:var(--color-accent-tint,#f4f3ff); color:var(--color-accent-primary,#5925dc); font-size:12px; font-weight:600; line-height:1.5; }
+  .review-assessment-summary dd { color:var(--text); font-variant-numeric:tabular-nums; }
+  .review-assessment-summary .review-summary-total { border-left:2px solid var(--border); padding-left:var(--space-2); }
+  .review-assessment-summary .review-summary-total[data-resolved="true"] dd { color:var(--primary); font-weight:var(--fw-bold); }
+  .review-assessment-summary .review-summary-status dd { padding:2px 7px; border-radius:var(--radius-badge); background:var(--soft); color:var(--muted); font-size:var(--fs-body); }
+  .review-assessment-summary .review-summary-status[data-tone="complete"] dd { background:var(--success-tint); color:var(--success); }
+  .review-assessment-summary .review-summary-status[data-tone="pending"] dd { background:var(--warning-tint); color:var(--warning); }
+  .review-assessment-summary .review-summary-status[data-tone="exception"] dd { background:var(--danger-tint); color:var(--danger); }
+  .review-assessment-summary button, .review-summary-decision { margin-top:var(--space-2); }
+  .review-summary-decision > summary { cursor:pointer; color:var(--primary); font-weight:var(--fw-semibold); }
+  .review-summary-decision label { display:block; margin-top:var(--space-2); }
+  .review-assessment-summary [data-summary-unsaved] { display:inline-block; margin-left:6px; padding:1px 5px; border-radius:var(--radius-badge); background:var(--warning-tint); color:var(--warning); font-size:var(--fs-meta); font-weight:var(--fw-regular); }
+  .review-student-accordion > summary span { display:block; margin:3px 0 0 var(--space-4); color:var(--muted); font-size:var(--fs-meta); }
+  .review-accordion > summary .review-header-mark, .review-student-accordion > summary .review-header-mark { display:inline-flex; flex-shrink:0; margin:0 0 0 var(--space-2); padding:3px 9px; border:1px solid var(--border); border-radius:var(--radius-badge); background:var(--tint); color:var(--primary); font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-body); }
   .review-accordion > summary > .review-header-mark { float:right; }
-  .review-student-accordion > summary .review-student-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0; color:inherit; font-size:12px; }
+  .review-student-accordion > summary .review-student-heading { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); margin:0; color:inherit; font-size:var(--fs-meta); }
   .review-student-heading strong { min-width:0; overflow-wrap:anywhere; }
-  .review-student-accordion > summary .review-student-subheading { display:flex; justify-content:space-between; align-items:baseline; gap:8px; flex-wrap:wrap; margin:4px 0 0; }
+  .review-student-accordion > summary .review-student-subheading { display:flex; justify-content:space-between; align-items:baseline; gap:var(--space-2); flex-wrap:wrap; margin:var(--space-1) 0 0; }
   .review-student-accordion > summary .review-student-subheading > span { display:inline; margin:0; }
   .review-student-accordion > summary [data-assessment-status] { margin-left:auto !important; text-align:right; }
-  .review-team-rubric { border-color:var(--color-accent-secondary,#d6bbfb); border-left:4px solid var(--color-accent-primary,#6941c6); }
+  .review-team-rubric { border-color:var(--border); border-left:4px solid var(--primary); }
 
-  .review-student-accordion > summary .review-header-mark { border-color:var(--color-accent-secondary,#99f6e4); background:var(--color-accent-tint,#f0fdfa); color:var(--color-accent-primary,#115e59); }
-  .review-student-accordion > summary:focus-visible { outline:3px solid var(--color-accent-primary,#14b8a6); outline-offset:2px; }
-  .review-award { display:grid; grid-template-columns:minmax(0,1fr) 100px; align-items:center; gap:6px 8px; margin:10px 0; padding:8px; border:1px solid var(--color-border,#eaecf0); border-radius:var(--editorial-radius,8px); background:var(--color-canvas,#f9fafb); }
+  .review-student-accordion > summary .review-header-mark { border-color:var(--border); background:var(--tint); color:var(--primary); }
+  .review-student-accordion > summary:focus-visible { outline:3px solid var(--primary); outline-offset:2px; }
+  .review-award { display:grid; grid-template-columns:minmax(0,1fr) 100px; align-items:center; gap:6px var(--space-2); margin:10px 0; padding:var(--space-2); border:1px solid var(--border); border-radius:var(--radius-btn); background:var(--canvas); }
   .review-award-heading { display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
-  .review-award-heading label { margin:0; min-width:0; font-size:11px; font-weight:500; flex-shrink:0; }
-  .review-stepper { display:grid; grid-template-columns:26px minmax(0,1fr) 26px; align-items:stretch; gap:0; margin:0; padding:0; min-width:0; height:30px; box-sizing:border-box; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--editorial-radius,7px); background:var(--color-paper,#fff); }
-  .review-stepper button { display:flex; align-items:center; justify-content:center; box-sizing:border-box; width:100%; min-width:0; height:28px; margin:0; padding:0; border:0; background:var(--color-paper,#fff); color:var(--color-accent-primary,#6941c6); font-size:14px; line-height:1; }
-  .review-stepper button:first-child { border-radius:var(--editorial-radius,6px) 0 0 6px; }
-  .review-stepper button:last-child { border-radius:0 6px 6px 0; }
-  .review-criterion .review-stepper input { appearance:textfield; margin:0; padding:0 2px; border:0; border-left:1px solid var(--color-control-border,#d0d5dd); border-right:1px solid var(--color-control-border,#d0d5dd); border-radius:0; text-align:center; font-size:11px; font-weight:600; color:var(--color-accent-primary,#6941c6); min-width:0; width:100%; height:28px; line-height:normal; }
+  .review-award-heading label { margin:0; min-width:0; font-size:var(--fs-meta); font-weight:var(--fw-semibold); flex-shrink:0; }
+  .review-stepper { display:grid; grid-template-columns:26px minmax(0,1fr) 26px; align-items:stretch; gap:0; margin:0; padding:0; min-width:0; height:30px; box-sizing:border-box; border:1px solid var(--control-border); border-radius:var(--radius-btn); background:var(--paper); }
+  .review-stepper button { display:flex; align-items:center; justify-content:center; box-sizing:border-box; width:100%; min-width:0; height:28px; margin:0; padding:0; }
+  .review-criterion .review-stepper input { appearance:textfield; margin:0; padding:0 2px; border:0; border-left:1px solid var(--control-border); border-right:1px solid var(--control-border); border-radius:0; text-align:center; font-size:var(--fs-meta); font-weight:var(--fw-semibold); color:var(--primary); min-width:0; width:100%; height:28px; line-height:normal; }
   .review-stepper input::-webkit-inner-spin-button,.review-stepper input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
-  .review-criterion [data-marks-slider] { grid-column:1 / -1; width:100%; min-width:0; padding:0; margin:0; accent-color:var(--color-accent-primary,#7f56d9); }
-  .review-award [data-range] { margin:0; padding:0; color:var(--color-ink-muted,#667085); font-size:10px; font-weight:400; line-height:1.4; font-variant-numeric:tabular-nums; }
+  .review-criterion [data-marks-slider] { grid-column:1 / -1; width:100%; min-width:0; padding:0; margin:0; accent-color:var(--primary); }
+  .review-award [data-range] { margin:0; padding:0; color:var(--muted); font-size:var(--fs-meta); font-weight:var(--fw-regular); line-height:var(--lh-heading); font-variant-numeric:tabular-nums; }
   .review-awarded-total { display:none; }
-  .review-drawer .review-other-feedback { margin:4px 0 0; padding:5px 9px; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--editorial-radius,6px); background:var(--color-paper,#fff); color:var(--color-ink-muted,#475467); font-size:var(--font-size-body); }
-  .review-drawer .review-other-feedback[aria-pressed="true"] { border-color:var(--color-accent-secondary,#b692f6); background:var(--color-accent-tint,#faf5ff); color:var(--color-accent-primary,#6941c6); }
-  .review-criterion:is([data-level="0"],[data-level="1"]) .review-award [data-range] { border-color:var(--color-warning,#fec84b); background:var(--color-warning-tint,#fef0c7); color:var(--color-warning,#7a2e0e); }
-  .review-awarded-total { white-space:nowrap; font-size:11px; font-weight:600; color:var(--color-ink,#344054); }
-  .review-feedback-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; }
+  .review-drawer .review-other-feedback { margin:var(--space-1) 0 0; }
+  .review-criterion:is([data-level="0"],[data-level="1"]) .review-award [data-range] { border-color:var(--warning); background:var(--warning-tint); color:var(--warning); }
+  .review-awarded-total { white-space:nowrap; font-size:var(--fs-meta); font-weight:var(--fw-semibold); color:var(--text); }
+  .review-feedback-heading { display:flex; justify-content:space-between; align-items:center; gap:var(--space-2); font-size:var(--fs-meta); }
   .review-feedback-title { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
-  .review-feedback-title strong { color:var(--color-ink,#182230); }
-  .review-feedback-heading [data-feedback-required] { padding:2px 5px; border-radius:var(--pill-radius); background:var(--color-warning-tint,#fef0c7); color:var(--color-warning,#b54708); font-size:10px; font-weight:500; line-height:1.4; white-space:nowrap; }
-  .review-feedback-heading [data-feedback-status] { flex-shrink:0; font-size:10px; color:var(--color-ink-muted,#667085); }
-  .review-criterion:is([data-level="3"],[data-level="4"],[data-level="5"]) [data-feedback-status] { color:var(--color-success,#067647); background:var(--color-success-tint,#ecfdf3); border-radius:var(--pill-radius); padding:2px 6px; font-weight:500; line-height:1.4; }
-  .review-feedback-options { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
-  .review-feedback-options { --pill-border:var(--color-accent-secondary,#d6bbfb); --pill-bg:var(--color-accent-tint,#faf5ff); --pill-text:var(--color-accent-primary,#6941c6); --pill-active:var(--color-accent-primary,#6941c6); --pill-hover:var(--color-accent-hover,#53389e); }
-  .review-feedback-options button { max-width:100%; min-height:32px; padding:6px 12px; border:1px solid var(--pill-border); border-radius:var(--pill-radius); background:var(--pill-bg); color:var(--pill-text); text-align:left; font-size:11px; line-height:1.5; overflow-wrap:anywhere; transition:background-color .15s ease,color .15s ease,border-color .15s ease; }
-  .review-feedback-options button[aria-pressed="true"] { border-color:var(--pill-active); background:var(--pill-active); color:var(--color-paper,#fff); }
-  .review-feedback-options button:is(:hover,:focus-visible):enabled { border-color:var(--pill-hover); background:var(--pill-hover); color:var(--color-paper,#fff); }
-  .review-feedback-options button:focus-visible { outline:3px solid var(--color-accent-primary,#9e77ed); outline-offset:3px; }
-  .review-criterion:is([data-level="0"],[data-level="1"]) .review-feedback-options { --pill-border:var(--color-warning,#fedf89); --pill-bg:var(--color-warning-tint,#fffaeb); --pill-text:var(--color-warning,#93370d); --pill-active:var(--color-warning,#b54708); --pill-hover:var(--color-warning,#93370d); }
+  .review-feedback-title strong { color:var(--text); }
+  .review-feedback-heading [data-feedback-required] { padding:2px 5px; border-radius:var(--radius-badge); background:var(--warning-tint); color:var(--warning); font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-heading); white-space:nowrap; }
+  .review-feedback-heading [data-feedback-status] { flex-shrink:0; font-size:var(--fs-meta); color:var(--muted); }
+  .review-criterion:is([data-level="3"],[data-level="4"],[data-level="5"]) [data-feedback-status] { color:var(--success); background:var(--success-tint); border-radius:var(--radius-badge); padding:2px 6px; font-weight:var(--fw-semibold); line-height:var(--lh-heading); }
+  .review-criterion .review-feedback-options { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
+  .review-feedback-options button { max-width:100%; text-align:left; overflow-wrap:anywhere; }
+  .review-feedback-options button:focus-visible { outline:3px solid var(--primary); outline-offset:3px; }
   @media(prefers-reduced-motion:reduce) { .review-feedback-options button { transition:none; } }
-  .review-criterion .review-feedback-label { font-size:11px; font-weight:400; }
-  .review-criterion :is(textarea) { font-size:var(--font-size-body); line-height:1.5; min-height:48px; resize:vertical; }
-  .review-criterion:is([data-level="0"],[data-level="1"]) .review-descriptor { background:var(--color-warning-tint,#fffaeb); border-color:var(--color-warning,#fedf89); color:var(--color-warning,#93370d); }
-  .review-criterion:is([data-level="0"],[data-level="1"]) [data-feedback-status] { color:var(--color-warning,#b54708); }
-  .review-criterion:is([data-level="0"],[data-level="1"]) textarea { border-color:var(--color-warning,#fec84b); }
-  .review-progress { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0; font-size:11px; font-weight:500; line-height:1.5; color:var(--color-ink,#344054); }
-  .review-progress-students { color:var(--color-accent-primary,#6941c6); font-weight:600; white-space:nowrap; }
-  .review-progress-completion { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:4px 8px; min-width:0; margin-left:auto; }
-  .review-progress-students,.review-progress-completion > span { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
-  .review-progress-students::before,.review-progress-completion > span::before { content:""; width:6px; height:6px; flex-shrink:0; margin-right:2px; border-radius:50%; background:var(--color-accent-primary,#6941c6); }
-  .review-progress-completion > span::before { background:var(--color-warning,#f59e0b); }
-  .review-progress progress::-webkit-progress-bar { background:var(--color-border,#e2e8f0); border-radius:999px; }
-  .review-progress progress::-webkit-progress-value { background:var(--color-accent-primary,#6941c6); border-radius:999px; }
-  .review-progress progress::-moz-progress-bar { background:var(--color-accent-primary,#6941c6); border-radius:999px; }
-  .review-progress progress { width:80px; max-width:100%; height:5px; accent-color:var(--color-accent-primary,#6941c6); border:0; border-radius:999px; overflow:hidden; background:var(--color-border,#e2e8f0); }
-  @media(max-width:400px) { .review-criterion { padding:12px; } .review-drawer .team-drawer-content { padding:6px 14px 14px; } }
-  .review-drawer :is(button,input,select,textarea):focus-visible { outline:3px solid var(--color-accent-primary,#9e77ed); outline-offset:2px; }
-  .review-drawer .review-stepper :is(button,input):focus-visible { outline:2px solid var(--color-accent-primary,#6941c6); outline-offset:-2px; }
+  .review-criterion .review-feedback-label { font-size:var(--fs-meta); font-weight:var(--fw-regular); }
+  .review-criterion :is(textarea) { font-size:var(--fs-body); line-height:var(--lh-body); min-height:48px; resize:vertical; }
+  .review-criterion:is([data-level="0"],[data-level="1"]) .review-descriptor { background:var(--warning-tint); border-color:var(--warning); color:var(--warning); }
+  .review-criterion:is([data-level="0"],[data-level="1"]) [data-feedback-status] { color:var(--warning); }
+  .review-criterion:is([data-level="0"],[data-level="1"]) textarea { border-color:var(--warning); }
+  .review-progress { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:0; font-size:var(--fs-meta); font-weight:var(--fw-semibold); line-height:var(--lh-body); color:var(--text); }
+  .review-progress-students { color:var(--primary); font-weight:var(--fw-semibold); white-space:nowrap; }
+  .review-progress-completion { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:var(--space-1) var(--space-2); min-width:0; margin-left:auto; }
+  .review-progress-students,.review-progress-completion > span { display:inline-flex; align-items:center; gap:var(--space-1); white-space:nowrap; }
+  .review-progress-students::before,.review-progress-completion > span::before { content:""; width:6px; height:6px; flex-shrink:0; margin-right:2px; border-radius:50%; background:var(--primary); }
+  .review-progress-completion > span::before { background:var(--warning); }
+  .review-progress progress::-webkit-progress-bar { background:var(--border); border-radius:var(--radius-badge); }
+  .review-progress progress::-webkit-progress-value { background:var(--primary); border-radius:var(--radius-badge); }
+  .review-progress progress::-moz-progress-bar { background:var(--primary); border-radius:var(--radius-badge); }
+  .review-progress progress { width:80px; max-width:100%; height:5px; accent-color:var(--primary); border:0; border-radius:var(--radius-badge); overflow:hidden; background:var(--border); }
+  @media(max-width:400px) { .review-criterion { padding:var(--space-3); } .review-drawer .team-drawer-content { padding:6px 14px 14px; } }
+  .review-drawer :is(button,input,select,textarea):focus-visible { outline:3px solid var(--primary); outline-offset:2px; }
+  .review-drawer .review-stepper :is(button,input):focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
   .review-drawer [hidden] { display:none !important; }
-  .review-footer { flex:0 0 auto; min-width:0; max-height:45dvh; display:flex; flex-direction:column; background:var(--color-paper,#fff); border-top:1px solid var(--color-border,#eaecf0); }
-  .review-message { margin:0; padding:10px 14px; color:var(--color-ink,#344054); font-size:var(--font-size-body); line-height:1.5; overflow-wrap:anywhere; }
+  .review-footer { flex:0 0 auto; min-width:0; max-height:45dvh; display:flex; flex-direction:column; background:var(--paper); border-top:1px solid var(--border); }
+  .review-message { margin:0; padding:10px 14px; color:var(--text); font-size:var(--fs-body); line-height:var(--lh-body); overflow-wrap:anywhere; }
   .review-message:empty { padding:0; }
   .review-footer .review-message { min-height:0; overflow-y:auto; }
-  .review-actions { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:8px; flex:0 0 auto; width:100%; box-sizing:border-box; z-index:2; isolation:isolate; background:var(--color-paper,#fff); padding:12px 14px; padding-bottom:max(12px,env(safe-area-inset-bottom)); border-top:1px solid var(--color-border,#eaecf0); }
-  .review-actions button { padding:10px 12px; border:1px solid var(--color-control-border,#d0d5dd); border-radius:var(--editorial-radius,8px); background:var(--color-paper,#fff); }
-  .review-actions [data-submit] { background:var(--color-accent-primary,#6941c6); color:var(--color-paper,#fff); }
-  .review-drawer [data-target] { background:var(--color-accent-primary,#6941c6); color:var(--color-paper,#fff); margin-right:8px; }
+  .review-actions { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:var(--space-2); flex:0 0 auto; width:100%; box-sizing:border-box; z-index:var(--z-sticky); isolation:isolate; background:var(--paper); padding:var(--space-3) 14px; padding-bottom:max(var(--space-3),env(safe-area-inset-bottom)); border-top:1px solid var(--border); }
+  .review-drawer [data-target] { margin-right:var(--space-2); }
   .review-drawer :disabled:not(button) { cursor:default; opacity:.7; }`;
 }

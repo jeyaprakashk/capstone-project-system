@@ -1,0 +1,183 @@
+[getGuideStyles] .internal-publishing button :: padding border border-radius background color font font-size font-weight
+[getGuideStyles] .internal-publishing button:hover :: border-color background
+[getGuideStyles] .internal-publishing table button :: padding font-size
+[getGuideStyles] .internal-publishing table .publishing-icon-action :: padding
+[getGuideStyles] .internal-publishing table .publishing-icon-action :: padding
+[getGuideStyles] @media(max-width:640px) .internal-publishing table .publishing-icon-action :: padding
+[getGuideStyles] @media(max-width:640px) .internal-publishing table .publishing-icon-action :: padding
+[getGuideStyles] @media(max-width:640px) .internal-publishing table button :: padding
+[getGuideStyles] button, .btn-outline (+2 sel) :: padding border-radius font-size font-weight text-decoration border
+[getGuideStyles] .btn-outline :: background color
+[getGuideStyles] .btn-outline.reject :: color border-color
+[getGuideStyles] .btn-outline:hover :: background
+[getGuideStyles] .btn-solid :: background color border
+[getGuideStyles] .btn-solid:hover :: background
+[getGuideStyles] .mini :: padding border-radius font-size font-weight border background color
+[getGuideStyles] .mini.approve :: background color border
+[getGuideStyles] .mini.approve:hover :: background
+[getGuideStyles] .mini.revise :: color border-color background
+[getGuideStyles] .mini.revise:hover :: background
+[getGuideStyles] :is(button, a.btn):is(:disabled (+3 sel) :: color background border-color
+[getGuideStyles] E .guide-team-option :: font color
+[getGuideStyles] E .guide-view-nav button[aria-pressed="true"] :: border-color background
+[getGuideStyles] E .guide-view-nav button :: padding border border-radius background font color
+[getGuideStyles] @media(max-width:540px) E .guide-view-nav button :: padding
+[getCoordinatorStyles] .system-status-cards .system-card-header > button :: padding
+[getCoordinatorStyles] .system-status-cards .system-card-header > .publishing-toggle :: padding
+[getCoordinatorStyles] .system-status-heading button :: padding border border-radius background
+[getCoordinatorStyles] .internal-publishing button :: padding border border-radius background color font font-size font-weight
+[getCoordinatorStyles] .internal-publishing button:hover :: border-color background
+[getCoordinatorStyles] .internal-publishing table button :: padding font-size
+[getCoordinatorStyles] .internal-publishing table .publishing-icon-action :: padding
+[getCoordinatorStyles] .internal-publishing table .publishing-icon-action :: padding
+[getCoordinatorStyles] @media(max-width:640px) .internal-publishing table .publishing-icon-action :: padding
+[getCoordinatorStyles] @media(max-width:640px) .internal-publishing table .publishing-icon-action :: padding
+[getCoordinatorStyles] @media(max-width:640px) .internal-publishing table button :: padding
+[getCoordinatorStyles] .filter-tab :: padding border-radius font-size font-weight border background color
+[getCoordinatorStyles] .filter-tab:hover :: background
+[getCoordinatorStyles] .filter-tab.active :: background color border-color
+[getCoordinatorStyles] .review-config-heading button :: border border-radius padding background color
+[getCoordinatorStyles] .view-all :: color font-size
+[getCoordinatorStyles] .action-link :: color font-size
+[getCoordinatorStyles] .run-sync-btn :: padding border-radius background color border font-weight font-size
+[getCoordinatorStyles] .run-sync-btn:hover :: background
+[getCoordinatorStyles] .system-status-card .run-sync-btn :: padding border-radius font-family font-size
+[getCoordinatorStyles] @media (max-width:600px) .tracker-tabs .filter-tab :: padding
+[getCoordinatorStyles] .tracker-search .reset-btn (+2 sel) :: padding
+[getCoordinatorStyles] .tracker-tabs .filter-tab[data-filter="attention"] :: color border-color background
+[getCoordinatorStyles] .tracker-tabs .filter-tab[data-filter="ontrack"] :: color border-color background
+[getCoordinatorStyles] .tracker-tabs .deadline-pill :: color border-color background
+[getCoordinatorStyles] .tracker-tabs .deadline-pill.deadline-overdue :: color border-color background
+[getCoordinatorStyles] .tracker-tabs .filter-tab.active :: background color border-color
+[getCoordinatorStyles] .tracker-tabs .filter-tab:hover:not(.active) :: border-color
+[getCoordinatorStyles] .reset-btn :: padding border-radius background border font-weight font-size
+[getCoordinatorStyles] .team-action-icon :: border border-radius background color text-decoration padding
+[getCoordinatorStyles] .team-action-icon:hover :: background border-color
+[getCoordinatorStyles] .link-button :: border background padding font
+[getCoordinatorStyles] .team-drawer-close :: border border-radius background color
+[getCoordinatorStyles] .team-drawer-close:hover :: background
+[getCoordinatorStyles] .drawer-repo-link :: color text-decoration
+[getCoordinatorStyles] .drawer-repo-link:hover :: text-decoration
+[getWorkflowStyles_] .workflow-btn :: padding border-radius font-size font-weight background color text-decoration
+[getWorkflowStyles_] .workflow-btn:hover :: background
+[getWorkflowStyles_] .github-form-jump :: border background padding color font text-decoration
+[getWorkflowStyles_] .github-username-form button :: border font-family
+[getWorkflowStyles_] .workflow-btn.secondary :: background color border
+[getWorkflowStyles_] .workflow-btn.secondary:hover :: border-color color
+[getWorkflowStyles_] .announcement-add-btn, .announcement-refresh-btn (+2 sel) :: padding border border-radius font-family font-size font-weight text-decoration
+[getWorkflowStyles_] .announcement-refresh-btn :: background color
+[getWorkflowStyles_] .announcement-refresh-btn:hover :: background
+[getWorkflowStyles_] .announcement-add-btn :: background border-color color
+[getWorkflowStyles_] .announcement-add-btn:hover :: background color text-decoration
+[getWorkflowStyles_] E .announcement-hub .announcement-audience-filters button, E .announcement-hub .announcement-load-more button (+2 sel) :: background color border padding
+[getWorkflowStyles_] E .announcement-hub .announcement-audience-filters button[aria-pressed="true"] :: background color border-color
+[getReviewerStyles] .internal-publishing button :: padding border border-radius background color font font-size font-weight
+[getReviewerStyles] .internal-publishing button:hover :: border-color background
+[getReviewerStyles] .internal-publishing table button :: padding font-size
+[getReviewerStyles] .internal-publishing table .publishing-icon-action :: padding
+[getReviewerStyles] .internal-publishing table .publishing-icon-action :: padding
+[getReviewerStyles] @media(max-width:640px) .internal-publishing table .publishing-icon-action :: padding
+[getReviewerStyles] @media(max-width:640px) .internal-publishing table .publishing-icon-action :: padding
+[getReviewerStyles] @media(max-width:640px) .internal-publishing table button :: padding
+[getReviewerStyles] button, .btn-outline (+2 sel) :: padding border-radius font-size font-weight text-decoration border
+[getReviewerStyles] .btn-outline :: background color
+[getReviewerStyles] .btn-outline.reject :: color border-color
+[getReviewerStyles] .btn-outline:hover :: background
+[getReviewerStyles] .btn-solid :: background color border
+[getReviewerStyles] .btn-solid:hover :: background
+[getReviewerStyles] .mini :: padding border-radius font-size font-weight border background color
+[getReviewerStyles] .mini.approve :: background color border
+[getReviewerStyles] .mini.approve:hover :: background
+[getReviewerStyles] .mini.revise :: color border-color background
+[getReviewerStyles] .mini.revise:hover :: background
+[getReviewerStyles] :is(button, a.btn):is(:disabled (+3 sel) :: color background border-color
+[getReviewerStyles] .filter-tab :: padding border-radius font-size font-weight border background color
+[getReviewerStyles] .filter-tab:hover :: background
+[getReviewerStyles] .filter-tab.active :: background color border-color
+[getReviewEvaluationStyles_] .review-drawer .review-pi-pills button :: padding border border-radius background color font-size
+[getReviewEvaluationStyles_] .review-drawer .review-pi-pills button[aria-pressed="false"]:not(:disabled):hover :: border-color background color
+[getReviewEvaluationStyles_] .review-drawer .review-pi-pills button[aria-pressed="true"], .review-drawer .review-pi-pills button[aria-pressed="true"]:hover (+2 sel) :: border-color background color box-shadow
+[getReviewEvaluationStyles_] .review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="false"]:not(:disabled):hover :: border-color background color
+[getReviewEvaluationStyles_] .review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="true"], .review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="true"]:hover (+2 sel) :: border-color background color box-shadow
+[getReviewEvaluationStyles_] .review-criterion[data-index] .review-levels button[aria-pressed="true"] :: background color border-color
+[getReviewEvaluationStyles_] .review-criterion[data-index] .review-feedback-options button :: border-radius padding
+[getReviewEvaluationStyles_] .review-drawer .review-header-students button :: border border-radius padding background color font-size
+[getReviewEvaluationStyles_] .review-drawer .review-header-students button :: border-color background color
+[getReviewEvaluationStyles_] .review-drawer .review-header-students button[aria-pressed="false"]:not(:disabled):hover :: border-color background
+[getReviewEvaluationStyles_] .review-drawer .review-header-students button[aria-pressed="true"] :: background border-color color box-shadow
+[getReviewEvaluationStyles_] .review-drawer button :: font
+[getReviewEvaluationStyles_] .review-drawer .review-levels button :: padding border border-radius background color
+[getReviewEvaluationStyles_] .review-drawer .review-levels button[aria-pressed="true"] :: background border-color color box-shadow
+[getReviewEvaluationStyles_] .review-stepper button :: padding border background color font-size
+[getReviewEvaluationStyles_] .review-stepper button:first-child :: border-radius
+[getReviewEvaluationStyles_] .review-stepper button:last-child :: border-radius
+[getReviewEvaluationStyles_] .review-drawer .review-other-feedback :: padding border border-radius background color font-size
+[getReviewEvaluationStyles_] .review-drawer .review-other-feedback[aria-pressed="true"] :: border-color background color
+[getReviewEvaluationStyles_] .review-feedback-options button :: padding border border-radius background color font-size
+[getReviewEvaluationStyles_] .review-feedback-options button[aria-pressed="true"] :: border-color background color
+[getReviewEvaluationStyles_] .review-feedback-options button:is(:hover (+2 sel) :: border-color background color
+[getReviewEvaluationStyles_] .review-actions button :: padding border border-radius background
+[getSharedTimelineStyles_] .timeline-toggle :: padding border background color font font-size
+[getSharedTimelineStyles_] .timeline-toggle:hover :: text-decoration
+[getSharedTimelineStyles_] .timeline-retry :: padding border border-radius background color font
+[getDashboardSurfaceStyles_] .dashboard-body-surface) button (+2 sel) :: font-family font-size font-weight border-radius
+[router-inline] @media(max-width:1200px) .role-menu-toggle :: padding border border-radius background color font
+[router-inline] @media(max-width:1200px) .dashboard-navigation .role-tab-btn :: border-radius
+[router-inline] .role-tab-btn :: padding border-radius font-size font-weight border background color
+[router-inline] .role-tab-btn.active :: background color border-color
+[router-inline] @media(min-width:1201px) .dashboard-navigation .role-tab-btn :: padding border border-radius background color
+[router-inline] @media(min-width:1201px) .dashboard-navigation .role-tab-btn:hover :: background color
+[router-inline] @media(min-width:1201px) .dashboard-navigation .role-tab-btn.active :: background color box-shadow
+[router-inline] .rubric-assessment :: padding border border-radius background color font
+[router-inline] .rubric-assessment:hover:enabled :: border-color background
+[router-inline] @container rubrics (width < 480px) .shared-rubrics .rubric-view-button :: padding border border-radius background color font-family font-size font-weight
+[router-inline] @container rubrics (width < 480px) .shared-rubrics .rubric-view-button::before :: border border-radius background
+[router-inline] @container rubrics (width < 480px) .shared-rubrics .rubric-view-button:hover:enabled :: color
+[router-inline] @container rubrics (width < 480px) .shared-rubrics .rubric-view-button:hover:enabled::before :: background border-color
+[router-inline] .shared-rubrics-heading > button, #sharedRubricsContent > button (+2 sel) :: padding border border-radius background color font
+[router-inline] .shared-rubrics-heading > button:hover, #sharedRubricsContent > button:hover (+2 sel) :: background
+[getEditorialStyles_] E .drawer-repo-link (+9 sel) :: color
+[getEditorialStyles_] E .dashboard-navigation .role-tab-btn, E .role-menu-toggle (+2 sel) :: font-family background color border-radius box-shadow font-size
+[getEditorialStyles_] E .dashboard-navigation .role-tab-btn:hover, E .role-menu-toggle:hover (+2 sel) :: background color
+[getEditorialStyles_] E .dashboard-navigation .role-tab-btn.active :: background color box-shadow border-color
+[getEditorialStyles_] E .publishing-toggle (+2 sel) :: padding
+[getEditorialStyles_] E .publishing-toggle, E #sharedRubricsContent > button (+3 sel) :: background color border-color border-radius font-family
+[getEditorialStyles_] E #sharedRubricsContent > button:hover:enabled (+2 sel) :: background color border-color
+[getEditorialStyles_] E button, E .btn-outline, E .mini, E .announcement-add-btn (+8 sel) :: font-family
+[getEditorialStyles_] E button, E .dashboard-body-surface button, E .announcement-tab-surface button, E .btn-outline, E .mini, E .announcement-add-btn (+6 sel) :: border-radius font-size font-weight
+[getEditorialStyles_] E button, E .btn-outline, E .mini (+3 sel) :: border-color background color
+[getEditorialStyles_] E button:hover:enabled, E .btn-outline:hover, E .mini:hover (+3 sel) :: background border-color color
+[getEditorialStyles_] E .workflow-btn:not(.secondary), E .btn-solid, E .run-sync-btn, E .announcement-add-btn, E .tracker-tabs .filter-tab.active, E .filter-tab.active (+6 sel) :: background color border-color box-shadow
+[getEditorialStyles_] E .workflow-btn:not(.secondary):hover, E .btn-solid:hover:enabled, E .run-sync-btn:hover:enabled, E .announcement-add-btn:hover, E .tracker-tabs .filter-tab.active:hover (+5 sel) :: background color border-color
+[getEditorialStyles_] E .btn-outline.reject (+5 sel) :: color
+[getEditorialStyles_] E .shared-rubrics > button, E .shared-rubrics .rubric-view-button (+2 sel) :: background color border-color
+[getEditorialStyles_] E .shared-rubrics > button:hover, E .shared-rubrics .rubric-view-button:hover:enabled (+2 sel) :: background color border-color
+[getEditorialStyles_] E .rubric-assessment :: background color border-color border-radius padding font-family
+[getEditorialStyles_] E .rubric-assessment:hover:enabled :: background border-color
+[getEditorialStyles_] E .shared-rubrics .rubric-view-button::before, E .shared-rubrics .rubric-view-button:hover:enabled::before (+2 sel) :: background border-color
+[getEditorialStyles_] E .review-drawer .review-levels button, E .review-drawer .review-pi-pills button (+2 sel) :: font-family color background border-color box-shadow
+[getEditorialStyles_] E .review-drawer .review-levels button[aria-pressed="true"] :: background color border-color
+[getEditorialStyles_] E .review-drawer .review-pi-pills button[aria-pressed="true"], E .review-drawer .review-pi-pills button[aria-pressed="true"]:hover, E .review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="true"], E .review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="true"]:hover, E .review-drawer .review-levels button[aria-pressed="true"], E .review-criterion[data-index] .review-levels button[aria-pressed="true"] (+6 sel) :: background color border-color box-shadow
+[getEditorialStyles_] E .review-drawer .review-pi-pills button, E .review-criterion[data-index] .review-feedback-options button, E .tracker-tabs .filter-tab (+3 sel) :: border-radius
+[getEditorialStyles_] E .filter-tab.active:hover:enabled (+3 sel) :: background color border-color
+[getEditorialStyles_] E .mini.approve :: background color border-color
+[getEditorialStyles_] E .mini.approve:hover:enabled :: background color border-color
+[getEditorialStyles_] E .mini.revise :: background color border-color
+[getEditorialStyles_] E .tracker-tabs .deadline-pill :: background color border-color
+[getEditorialStyles_] E .tracker-tabs .filter-tab[data-filter="ontrack"] :: background color border-color
+[getEditorialStyles_] E .tracker-tabs .filter-tab[data-filter="attention"], E .tracker-tabs .deadline-pill.deadline-overdue (+2 sel) :: background color border-color
+[getEditorialStyles_] E .tracker-tabs .filter-tab.active, E .tracker-tabs .filter-tab.active:hover (+2 sel) :: background color border-color
+[getEditorialStyles_] E .review-drawer .review-pi-pills button[aria-pressed="false"]:not(:disabled):hover, E .review-drawer .review-pi-pills[data-individual-pills] button[aria-pressed="false"]:not(:disabled):hover (+2 sel) :: background color border-color
+[getEditorialStyles_] E .review-drawer .review-other-feedback[aria-pressed="true"] (+2 sel) :: background color border-color
+[getEditorialStyles_] E .review-drawer .review-header-students button :: background color border-color border-radius box-shadow font-family
+[getEditorialStyles_] E .review-drawer .review-header-students button[aria-pressed="false"]:not(:disabled):hover :: background border-color
+[getEditorialStyles_] E .review-drawer .review-header-students button[aria-pressed="true"], E .review-drawer .review-header-students button[aria-pressed="true"]:hover (+2 sel) :: background color border-color box-shadow
+[getEditorialStyles_] @media(max-width:760px) E .dashboard-navigation .role-tab-btn :: border-radius
+[getEditorialStyles_] @media(max-width:760px) E .dashboard-navigation .role-tab-btn.active :: box-shadow
+[getEditorialStyles_] E .announcement-hub .announcement-audience-filters button :: padding border background font-size color
+[getEditorialStyles_] E .announcement-hub .announcement-audience-filters button[aria-pressed="true"] :: background border-color color box-shadow
+[getEditorialStyles_] E .utility-body .utility-header .announcement-refresh-btn :: background border color
+[getEditorialStyles_] E .utility-body .utility-header .announcement-refresh-btn:hover:enabled :: background border-color
+[getEditorialStyles_] @media(min-width:1201px) E .dashboard-app-header .role-tab-btn :: font-size padding
+[getEditorialStyles_] E :is(button, a.btn):is(:disabled (+3 sel) :: color background border-color
+TOTAL 182

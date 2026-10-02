@@ -57,12 +57,13 @@ function buildDocumentLinksCompact(r) {
 function buildReviewerTitleApproval_(r, TS, status) {
   const teamId=escapeHtml(r[TS.TEAM_ID]);
   const editable=String(r[TS.TITLE] || '').trim() && textEquals_(r[TS.GUIDE_DECISION],'Approved') && !textEquals_(r[TS.REVIEWER_DECISION],'Approved');
-  return `<details class="reviewer-title-approval"><summary><span class="status-badge ${status[0]}">${status[1]}</span> ${editable ? 'Review title' : 'Details'}</summary>
+  const badgeClass=status[0] === 'green' ? 'badge badge--success' : status[0] === 'orange' ? 'badge badge--warning' : 'chip';
+  return `<details class="reviewer-title-approval"><summary><span class="${badgeClass}">${status[1]}</span> ${editable ? 'Review title' : 'Details'}</summary>
     <div class="reviewer-title-content" id="reviewer-decision-${teamId}"><strong>${escapeHtml(r[TS.TITLE] || 'Not submitted')}</strong>
     ${r[TS.SIMILARITY_FLAG] ? `<p class="flag-text">${renderLucideIcon_('triangle-alert','Similarity warning')} ${escapeHtml(r[TS.SIMILARITY_FLAG])}</p>` : ''}
     ${buildDocumentLinksCompact(r)}
     ${r[TS.REVIEWER_NOTES] ? `<p class="reviewer-previous-notes">${escapeHtml(r[TS.REVIEWER_NOTES])}</p>` : ''}
-    ${editable ? `<label for="reviewer-notes-${teamId}">Reviewer notes</label><textarea id="reviewer-notes-${teamId}" rows="3" placeholder="Notes (required for Revise)"></textarea><div class="reviewer-title-actions"><button type="button" class="mini approve app-btn btn-sm btn-success" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Approved')">Approve</button><button type="button" class="mini revise app-btn btn-sm btn-warning" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Revise')">Revise</button></div>` : ''}
+    ${editable ? `<label for="reviewer-notes-${teamId}">Reviewer notes</label><textarea id="reviewer-notes-${teamId}" rows="3" placeholder="Notes (required for Revise)"></textarea><div class="reviewer-title-actions"><button type="button" class="mini approve btn btn-sm btn-primary" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Approved')">Approve</button><button type="button" class="mini revise btn btn-sm btn-outline" data-team="${teamId}" onclick="reviewerDecide(this.dataset.team, 'Revise')">Revise</button></div>` : ''}
     <p id="reviewer-status-${teamId}" role="status"></p></div></details>`;
 }
 
@@ -75,7 +76,7 @@ function buildReviewerReviewCells_(r, TS, progress) {
     const enabled=available && state.readable && ready;
     const hint=!available ? (state && state.error || 'Marks unavailable.') : state.reason || state.status;
     const label=state && ['Submitted','Published'].includes(state.status) ? 'View marks' : state && state.completed ? 'Edit marks' : 'Enter marks';
-    const cell=`<td class="reviewer-review-cell"><button type="button" class="btn-outline app-btn btn-md btn-secondary" ${enabled ? '' : 'disabled'} data-team="${escapeHtml(r[TS.TEAM_ID])}" data-review="${escapeHtml(review.key)}" onclick="DashboardUI.openReviewerMarks(this.dataset.team, this.dataset.review, this)">${renderLucideIcon_(enabled ? 'clipboard-check' : 'lock-keyhole')} ${label}</button><small>${hint ? escapeHtml(hint) : state.completed ? 'Completed' : state.markedStudents + '/' + state.totalStudents + ' students marked'}</small></td>`;
+    const cell=`<td class="reviewer-review-cell"><button type="button" class="btn-outline btn" ${enabled ? '' : 'disabled'} data-team="${escapeHtml(r[TS.TEAM_ID])}" data-review="${escapeHtml(review.key)}" onclick="DashboardUI.openReviewerMarks(this.dataset.team, this.dataset.review, this)">${renderLucideIcon_(enabled ? 'clipboard-check' : 'lock-keyhole')} ${label}</button><small>${hint ? escapeHtml(hint) : state.completed ? 'Completed' : state.markedStudents + '/' + state.totalStudents + ' students marked'}</small></td>`;
     return cell;
   }).join('');
 }
@@ -95,11 +96,11 @@ function buildReviewerAssignedTeams_(data) {
     const search = [r[TS.TEAM_ID], r[TS.GUIDE_NAME], ...registers, r[TS.TITLE], r[TS.COMMITTEE_NUMBER], status[1]].join(' ').toLowerCase();
     return `<tr data-assigned-search="${escapeHtml(search)}"><td class="col-team"><strong>${escapeHtml(r[TS.TEAM_ID])}</strong></td><td class="col-guide">${escapeHtml(r[TS.GUIDE_NAME] || '—')}</td><td class="col-registers"><div class="tracker-registers">${registers.length ? registers.map(reg => `<span>${escapeHtml(reg)}</span>`).join('') : '—'}</div></td><td class="reviewer-assigned-title">${escapeHtml(title || 'Not submitted')}</td><td>${escapeHtml(r[TS.COMMITTEE_NUMBER] || '—')}</td><td class="reviewer-title-cell">${buildReviewerTitleApproval_(r,TS,status)}</td>${buildReviewerReviewCells_(r,TS,progress)}</tr>`;
   }).join('');
-  return `<section class="team-tracker-section reviewer-assigned-teams" aria-labelledby="reviewerAssignedHeading">
+  return `<section class="team-tracker-section reviewer-assigned-teams card" aria-labelledby="reviewerAssignedHeading">
     <div class="tracker-header"><h3 class="assessment-title tracker-title" id="reviewerAssignedHeading">Assigned Teams (${assigned.length} teams)</h3></div>
     <div class="tracker-search"><input type="search" id="reviewerAssignedSearch" aria-label="Search assigned teams" placeholder="Search team, guide, register number, or title…" oninput="DashboardUI.filterReviewerAssignedTeams()"></div>
     <p class="reviewer-scroll-hint" id="reviewerAssignedScrollHint">Scroll horizontally if more review columns are off-screen.</p>
-    <div class="tracker-table-scroll" role="region" aria-label="Assigned teams table, scroll horizontally for more columns" aria-describedby="reviewerAssignedScrollHint" tabindex="0"><table class="team-tracker-table"><thead><tr><th scope="col">Team</th><th scope="col">Guide</th><th scope="col">Register Numbers</th><th scope="col">Project Title</th><th scope="col">Committee</th><th scope="col">Title Approval</th>${progress.reviews.map(review=>`<th scope="col">${escapeHtml(review.label)}</th>`).join('')}</tr></thead><tbody id="reviewerAssignedBody">${rows}<tr id="reviewerAssignedEmpty" ${assigned.length ? 'hidden' : ''}><td colspan="${6 + progress.reviews.length}">${assigned.length ? 'No teams match your search.' : 'No teams are assigned to you.'}</td></tr></tbody></table></div>
+    <div class="tracker-table-scroll table-wrap" data-tooltip-boundary role="region" aria-label="Assigned teams table, scroll horizontally for more columns" aria-describedby="reviewerAssignedScrollHint" tabindex="0"><table class="team-tracker-table table table--compact"><thead><tr><th scope="col">Team</th><th scope="col">Guide</th><th scope="col">Register Numbers</th><th scope="col">Project Title</th><th scope="col">Committee</th><th scope="col">Title Approval</th>${progress.reviews.map(review=>`<th scope="col">${escapeHtml(review.label)}</th>`).join('')}</tr></thead><tbody id="reviewerAssignedBody">${rows}<tr id="reviewerAssignedEmpty" ${assigned.length ? 'hidden' : ''}><td colspan="${6 + progress.reviews.length}">${assigned.length ? 'No teams match your search.' : 'No teams are assigned to you.'}</td></tr></tbody></table></div>
     ${buildTeamPagination_('reviewerAssigned', 'reviewer', assigned.length)}
   </section>`;
 }
@@ -128,39 +129,38 @@ ${getStatCardStyles()}
 ${getTableStyles()}
 ${getButtonStyles()}
 ${getFormElementStyles()}
-${getStatusBadgeStyles()}
 ${getFilterTabStyles()}
 ${getCollapsibleStyles()}
-body { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+body { max-width: 980px; margin: var(--space-6) auto; padding: 0 var(--space-4); }
 .coord-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-.coord-stat { flex: 1; min-width: 100px; text-align: center; padding: 12px 6px; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-.coord-stat-num { display: block; font-size: 20px; font-weight: 700; }
-.coord-stat-label { display: block; font-size: 10px; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.4px; color: #8b8f99; }
-.coord-stat.orange .coord-stat-num { color: #f97316; }
-.coord-stat.green .coord-stat-num { color: #16a34a; }
-.coord-stat.red .coord-stat-num { color: #dc2626; }
-.coord-stat.gray .coord-stat-num { color: #6b7280; }
-.coord-stat.blue .coord-stat-num { color: #6366f1; }
-.guide-cell { font-size:var(--font-size-body); color: #6b7280; }
-.reviewer-assigned-teams { margin-bottom:24px; }
+.coord-stat { flex: 1; min-width: 100px; text-align: center; padding: var(--space-3) 6px; border-radius:var(--radius-card); background: var(--paper); box-shadow:var(--shadow-card); }
+.coord-stat-num { display: block; font-size: var(--fs-hero); font-weight: var(--fw-bold); }
+.coord-stat-label { display: block; font-size: var(--fs-meta); margin-top: 3px; text-transform: uppercase; color: var(--muted); }
+.coord-stat.orange .coord-stat-num { color: var(--warning); }
+.coord-stat.green .coord-stat-num { color: var(--success); }
+.coord-stat.red .coord-stat-num { color: var(--danger); }
+.coord-stat.gray .coord-stat-num { color: var(--primary); }
+.coord-stat.blue .coord-stat-num { color: var(--primary); }
+.guide-cell { font-size:var(--fs-body); color: var(--primary); }
+.reviewer-assigned-teams { margin-bottom:var(--space-6); }
 .reviewer-assigned-teams [hidden] { display:none !important; }
-.reviewer-assigned-teams .team-tracker-table th,.reviewer-assigned-teams .team-tracker-table td { padding:10px 8px; }
+.reviewer-assigned-teams .team-tracker-table th,.reviewer-assigned-teams .team-tracker-table td { padding:10px var(--space-2); }
 .reviewer-assigned-teams .reviewer-assigned-title { min-width:150px; max-width:320px; white-space:normal; overflow-wrap:anywhere; }
 .reviewer-assigned-teams .col-team { width:36px; min-width:36px; }
 .reviewer-assigned-teams .col-guide { min-width:120px; }
 .reviewer-assigned-teams .col-registers { min-width:92px; }
 .reviewer-assigned-teams .tracker-registers { display:flex; flex-direction:column; gap:3px; margin:0; }
 .reviewer-assigned-teams .tracker-registers span { display:block; white-space:nowrap; overflow-wrap:normal; }
-.reviewer-scroll-hint { margin:0 0 8px; font-size:12px; color:var(--color-ink-muted,#667085); }
+.reviewer-scroll-hint { margin:0 0 var(--space-2); font-size:var(--fs-meta); color:var(--muted); }
 .reviewer-title-cell { min-width:140px; }
-.reviewer-title-approval summary { cursor:pointer; font-size:12px; }
-.reviewer-title-content { padding:12px 0; min-width:0; }
-.reviewer-title-content label { display:block; margin-top:12px; }
+.reviewer-title-approval summary { cursor:pointer; font-size:var(--fs-meta); }
+.reviewer-title-content { padding:var(--space-3) 0; min-width:0; }
+.reviewer-title-content label { display:block; margin-top:var(--space-3); }
 .reviewer-title-content textarea { width:100%; }
-.reviewer-title-actions { display:flex; gap:8px; margin-top:8px; }
+.reviewer-title-actions { display:flex; gap:var(--space-2); margin-top:var(--space-2); }
 .reviewer-previous-notes { white-space:pre-wrap; }
 .reviewer-review-cell { min-width:120px; }
-.reviewer-review-cell small { display:block; margin-top:6px; color:#667085; }
+.reviewer-review-cell small { display:block; margin-top:6px; color:var(--primary); }
 `;
 }
 

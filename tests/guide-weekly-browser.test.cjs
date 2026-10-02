@@ -23,7 +23,7 @@ test('guide list defaults latest week, escapes content, renders absent score and
   assert.equal(f.host.week,'W2');assert.equal(f.host.querySelectorAll('[data-entry]').length,1);
   assert.match(f.host.textContent,/—/);assert.equal(f.host.querySelector('[data-decision-status]'),null);assert.equal(f.host.querySelector('script'),null);
   assert.equal(f.host.querySelector('[data-entry] b'),null);
-  f.host.querySelectorAll('[data-sign],[data-details]').forEach(button=>assert.match(button.className,/app-btn btn-sm/));
+  f.host.querySelectorAll('[data-sign],[data-details]').forEach(button=>assert.match(button.className,/\bbtn btn-sm\b/));
   f.host.querySelector('[data-week-step="1"]').onclick();
   assert(f.host.querySelector('.guide-weekly-student-header > .guide-weekly-deadline'));
   assert.match(f.host.textContent,/0\/10/);assert.equal(f.host.querySelector('[data-sign="DISCUSSED"]').getAttribute('aria-pressed'),'true');
@@ -39,10 +39,10 @@ test('guide required counts exclude ineligible and voluntary students without hi
 });
 
 test('weekly timeliness badges use recorded status and shared semantic colors',()=>{
-  for(const [timeliness,label,color] of [['ON_TIME','On-time submission','green'],['LATE','Late submission','orange'],[undefined,'Timing unavailable','gray']]) {
+  for(const [timeliness,label,classes] of [['ON_TIME','On-time submission','badge badge--success'],['LATE','Late submission','badge badge--danger'],[undefined,'Timing unavailable','chip']]) {
     const f=fixture();f.data.entries[0].timeliness=timeliness;f.api.load();f.reply();
     const badge=f.host.querySelector('[data-submission-timing]');
-    assert.equal(badge.textContent,label);assert.equal(badge.className,'tag '+color);
+    assert.equal(badge.textContent,label);assert.equal(badge.className,classes);
   }
 });
 
@@ -125,7 +125,7 @@ test('undo cancels before persistence and releases controls; detached notices ne
   const f=fixture();f.api.load();f.reply();
   const discussed=f.host.querySelector('[data-sign="DISCUSSED"]');
   assert.match(discussed.className,/btn-primary/);
-  assert.match(f.host.querySelector('[data-sign="NOT_DISCUSSED"]').className,/btn-secondary/);
+  assert.match(f.host.querySelector('[data-sign="NOT_DISCUSSED"]').className,/btn-outline/);
   discussed.onclick();assert.match(f.host.textContent,/will save in 5 seconds/);
   f.api.load();assert.equal(f.requests.length,1);
   f.host.querySelector('[data-sign-undo]').onclick();f.flush();
@@ -179,15 +179,15 @@ test('guide approval context matches the current title, reviewer and year and re
   c.projectDay_=date=>Math.floor(date.getTime()/86400000);
   c.formatProjectDay_=day=>new Date(day*86400000).toISOString().slice(0,10);
   const deadline=Math.floor(Date.parse('2026-09-29')/86400000),schedule={title:deadline,timezone:'UTC'},clock={today:deadline+2,now:new Date('2026-10-01T12:00:00Z')};
-  assert.match(c.buildGuideTitleTiming_('APPROVED',Date.parse('2026-09-29T23:59:59Z'),schedule,clock),/tag green/);
-  assert.match(c.buildGuideTitleTiming_('APPROVED',Date.parse('2026-09-30T00:00:00Z'),schedule,clock),/tag orange/);
+  assert.match(c.buildGuideTitleTiming_('APPROVED',Date.parse('2026-09-29T23:59:59Z'),schedule,clock),/badge badge--success/);
+  assert.match(c.buildGuideTitleTiming_('APPROVED',Date.parse('2026-09-30T00:00:00Z'),schedule,clock),/badge badge--danger/);
   assert.match(c.buildGuideTitleTiming_('APPROVED',undefined,schedule,clock),/Timing unavailable/);
-  assert.match(c.buildGuideTitleTiming_('AWAITING_REVIEWER',undefined,schedule,clock),/tag red/);
+  assert.match(c.buildGuideTitleTiming_('AWAITING_REVIEWER',undefined,schedule,clock),/badge badge--danger/);
   assert.match(c.buildGuideTitleTiming_('NEEDS_REVIEW',undefined,schedule,{...clock,today:deadline}),/Pending/);
   assert.match(c.buildGuideTitleTiming_('APPROVED',Date.parse('2026-09-30T00:00:00Z'),schedule,clock),/1 day after the deadline \(2026-09-29\)/);
   assert.match(c.buildGuideGithubTiming_({githubId:'123',status:'valid',access:'active',submittedAt:Date.parse('2026-09-30')},{...schedule,git:deadline,formation:deadline-20},clock),/GitHub account submitted 2026-09-30, 1 day after/);
   const joinedTiming=c.buildGuideGithubTiming_({githubId:'123',status:'valid',access:'active',submittedAt:Date.parse('2026-09-29')},{...schedule,git:deadline,formation:deadline-20},clock);
-  assert.match(joinedTiming,/tag green/);assert(joinedTiming.indexOf('<small>')<joinedTiming.indexOf('<span class="tag'));
+  assert.match(joinedTiming,/badge badge--success/);assert(joinedTiming.indexOf('<small>')<joinedTiming.indexOf('<span class="badge'));
   assert.equal(c.buildGuideGithubTiming_({githubId:'123',status:'valid',access:'invited',submittedAt:Date.parse('2026-09-29')},{...schedule,git:deadline},clock),'');
   c.readSheetRows_=()=>{throw Error('offline');};
   const unavailable=c.readGuideRecordContext_([row],TS);

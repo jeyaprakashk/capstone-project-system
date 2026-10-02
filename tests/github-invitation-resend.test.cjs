@@ -82,7 +82,7 @@ test('204 responses require verified identity and write access',()=>{
 });
 
 function browser() {
-  const markup=fs.readFileSync('coordinator-dashboard.js','utf8').match(/<section class="system-status-card" id="studentInvitationResend">[\s\S]*?<\/section>/)[0];
+  const markup=fs.readFileSync('coordinator-dashboard.js','utf8').match(/<section class="system-status-card(?: card)?" id="studentInvitationResend">[\s\S]*?<\/section>/)[0];
   const helper=fs.readFileSync('common-helpers.js','utf8');
   const helperContext=vm.createContext({escapeHtml:x=>x});
   vm.runInContext(helper.slice(helper.indexOf('function buildTeamPagination_('),helper.indexOf('/** Presentation only:',helper.indexOf('function buildTeamPagination_('))),helperContext);

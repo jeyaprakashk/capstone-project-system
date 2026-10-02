@@ -1,0 +1,1 @@
+module.exports=[{file:'dashboard-router.js',find:'<button type="button" class="role-menu-toggle" id="roleMenuToggle"',replace:'<button type="button" class="role-menu-toggle btn btn-outline" id="roleMenuToggle"'}];
