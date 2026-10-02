@@ -87,3 +87,26 @@ function buildSystemStatusDto_() {
 function API_coordinator_getSystemStatus() {
   return apiHandle_(() => coordinatorRead_('system-status', () => { coordinatorAccessOrThrow_(); return buildSystemStatusDto_(); }));
 }
+
+/** Weekly progress setup card: the existing readiness check and one-time setup actions. */
+function API_coordinator_getWeeklySetup() {
+  return apiHandle_(() => { coordinatorAccessOrThrow_(); return getWeeklyProgressPhase2Readiness(); });
+}
+
+/** kind is storage or triggers; the existing setup functions keep their rules and messages. */
+function API_coordinator_setupWeekly(kind) {
+  return apiHandle_(() => {
+    coordinatorAccessOrThrow_();
+    if (kind === 'storage') return setupWeeklyProgressPhase2Storage();
+    if (kind === 'triggers') return setupWeeklyProgressPhase2Triggers();
+    throw apiFail_('INVALID_INPUT', 'Unknown setup request.');
+  });
+}
+
+/** System Status card actions. The existing functions authorize the coordinator, validate and keep their rules and messages. */
+function API_coordinator_getCommitteeConfiguration() { return apiHandle_(() => getCoordinatorCommitteeConfiguration()); }
+function API_coordinator_getReviewConfiguration() { return apiHandle_(() => getCoordinatorReviewConfiguration()); }
+function API_coordinator_createDefinitions() { return apiHandle_(() => createAssessmentDefinitions()); }
+function API_coordinator_prepareStorage() { return apiHandle_(() => prepareReviewAssessmentStorage()); }
+function API_coordinator_syncGithub() { return apiHandle_(() => syncCoordinatorGithubAccess()); }
+function API_coordinator_resendInvitations(cursor) { return apiHandle_(() => resendExpiredStudentInvitations(cursor === undefined || cursor === null ? '' : String(cursor))); }

@@ -214,18 +214,20 @@ test('student answers join soft line breaks while retaining paragraphs and list 
 function setupFixture() {
   const f=fixture();f.host.id='weeklyPhase2Setup';f.host.innerHTML='<div data-weekly-setup-read>Skeleton</div><p data-weekly-setup-status></p>';
   f.c.DashboardUI.beginContentLoading=()=>()=>{};
-  f.api=f.c.weeklyPhase2SetupBrowser_();
+  const { Sync } = require('./sync-promise.cjs');
+  const record = (method, args) => { const p = new Sync(); f.requests.push({ method, args, success: v => p.resolve(v), failure: e => p.reject(e) }); return p; };
+  f.api = f.c.weeklyPhase2SetupBrowser_({ read: (key, method, args, options) => { f.readOptions = { key, options }; return record(method, args); }, write: (method, args) => record(method, args) });
   f.report={storageReady:false,triggerReady:false,canSetupStorage:true,canSetupTriggers:false,issues:[]};return f;
 }
 
 test('weekly setup hides each completed action and rechecks after setup without duplicate requests',()=>{
   const f=setupFixture();f.api.load();f.api.load();assert.equal(f.requests.length,1);f.requests[0].success(f.report);
   let buttons=f.host.querySelectorAll('button');assert.equal(buttons.length,2);assert.equal(buttons[0].disabled,false);assert.equal(buttons[1].disabled,true);
-  buttons[0].onclick();buttons[0].onclick();assert.equal(f.requests.length,2);assert.equal(f.requests[1].method,'setupWeeklyProgressPhase2Storage');
-  f.requests[1].success({ok:true});assert.equal(f.requests[2].method,'getWeeklyProgressPhase2Readiness');
+  buttons[0].onclick();buttons[0].onclick();assert.equal(f.requests.length,2);assert.equal(f.requests[1].method,'API_coordinator_setupWeekly');assert.deepEqual(Array.from(f.requests[1].args),['storage']);
+  f.requests[1].success({ok:true});assert.equal(f.requests[2].method,'API_coordinator_getWeeklySetup');
   f.requests[2].success({...f.report,storageReady:true,canSetupStorage:false,canSetupTriggers:true});
   buttons=f.host.querySelectorAll('button');assert.equal(buttons.length,1);assert.match(buttons[0].textContent,/schedule/);
-  buttons[0].onclick();assert.equal(f.requests[3].method,'setupWeeklyProgressPhase2Triggers');f.requests[3].success({ok:true});
+  buttons[0].onclick();assert.equal(f.requests[3].method,'API_coordinator_setupWeekly');assert.deepEqual(Array.from(f.requests[3].args),['triggers']);f.requests[3].success({ok:true});
   f.requests[4].success({...f.report,storageReady:true,triggerReady:true,canSetupStorage:false});assert.equal(f.host.querySelectorAll('button').length,0);
 });
 
@@ -365,4 +367,15 @@ test('team attention combines only guide actions, updates after decisions and di
   root.querySelector('[data-guide-tab="evaluation"]').disabled=true;
   f.api.load();assert.match(pill('A').textContent,/Skeleton/);f.requests.at(-1).failure('offline');
   assert.equal(pill('A').textContent,'Title review · 1');assert.equal(pill('A').hasAttribute('aria-busy'),false);
+});
+
+test('weekly setup card uses compiled Tailwind utilities and no legacy classes', () => {
+  const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
+  const f = setupFixture(); f.api.load(); f.requests[0].success({ ...f.report, issues: ['Something to fix'] });
+  assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
+  assert.equal(f.host.querySelector('.btn'), null);
+  assert.equal(f.readOptions.key, 'weekly-setup');
+  const src = fs.readFileSync('guide-weekly-client.js', 'utf8');
+  assert.doesNotMatch(f.c.weeklyPhase2SetupBrowser_.toString(), /guideRun|google.script/);
+  assert.deepEqual(missingClasses([...src.matchAll(/(?:PRIMARY|LINE)='([^']+)'/g)].flatMap(m => m[1].split(/\s+/))), []);
 });

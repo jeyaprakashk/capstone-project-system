@@ -308,12 +308,10 @@ function guideWeeklyBrowser_(bridge) {
   }
   return {load,selectTeam,selectView,evaluationStatus,positionTitleInfo};
 }
-function weeklyPhase2SetupBrowser_() {
+function weeklyPhase2SetupBrowser_(bridge) {
   const host=()=>document.getElementById('weeklyPhase2Setup');
-  function rpc(method,success,failure) {
-    try { DashboardUI.guideRun().withSuccessHandler(success).withFailureHandler(failure)[method](); }
-    catch(error) { failure(error); }
-  }
+  const PRIMARY='border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
+  const LINE='m-0 mt-1 text-sm text-ink-2';
   function controls(node,disabled) { node.querySelectorAll('button').forEach(button=>{button.disabled=disabled || button.dataset.allowed!=='true';}); }
   function current(node) { return node.isConnected && host()===node; }
   function load() {
@@ -321,19 +319,19 @@ function weeklyPhase2SetupBrowser_() {
     node.busy=true;controls(node,true);
     const finish=DashboardUI.beginContentLoading(node.querySelector('[data-weekly-setup-read]'),'Checking weekly progress setup',{compact:true,variant:'status'});
     function settle(){finish();node.busy=false;controls(node,false);}
-    rpc('getWeeklyProgressPhase2Readiness',report=>{
+    bridge.read('weekly-setup','API_coordinator_getWeeklySetup',[],{timeoutMs:120000}).then(report=>{
       settle();if(!current(node))return;
       const target=node.querySelector('[data-weekly-setup-read]');target.textContent='';
-      const summary=document.createElement('p');summary.textContent='Storage: '+(report.storageReady?'Ready':'Needs setup')+' · AI schedule: '+(report.triggerReady===true?'Ready':report.triggerReady===null?'Check with trigger owner':'Needs setup');target.appendChild(summary);
-      const actions=document.createElement('div');actions.className='';target.appendChild(actions);
+      const summary=document.createElement('p');summary.className=LINE;summary.textContent='Storage: '+(report.storageReady?'Ready':'Needs setup')+' · AI schedule: '+(report.triggerReady===true?'Ready':report.triggerReady===null?'Check with trigger owner':'Needs setup');target.appendChild(summary);
+      const actions=document.createElement('div');actions.className='mt-2 flex flex-wrap gap-2';target.appendChild(actions);
       [['storage',report.storageReady,report.canSetupStorage,'Create weekly progress storage'],['triggers',report.triggerReady!==false,report.canSetupTriggers,'Create weekly AI schedule']].forEach(([kind,ready,allowed,label])=>{
         if(ready)return;
-        const button=document.createElement('button');button.type='button';button.className='btn btn-primary';button.textContent=label;button.dataset.allowed=String(allowed);button.disabled=!allowed;button.onclick=()=>setup(node,kind);actions.appendChild(button);
+        const button=document.createElement('button');button.type='button';button.className=PRIMARY;button.textContent=label;button.dataset.allowed=String(allowed);button.disabled=!allowed;button.onclick=()=>setup(node,kind);actions.appendChild(button);
       });
-      report.issues.forEach(issue=>{const line=document.createElement('p');line.textContent=issue;target.appendChild(line);});
+      report.issues.forEach(issue=>{const line=document.createElement('p');line.className=LINE;line.textContent=issue;target.appendChild(line);});
       if(node.readError){node.querySelector('[data-weekly-setup-status]').textContent='';node.readError=false;}
     },error=>{
-      settle();if(!current(node))return;
+      settle();if(!current(node) || (error && error.superseded))return;
       node.readError=true;node.querySelector('[data-weekly-setup-status]').textContent='Could not check weekly setup: '+(error?.message || String(error))+'. Use Recheck to retry.';
     });
   }
@@ -341,10 +339,9 @@ function weeklyPhase2SetupBrowser_() {
     if(node.busy || !current(node))return;
     node.busy=true;controls(node,true);
     const status=node.querySelector('[data-weekly-setup-status]');status.textContent='Preparing weekly '+(kind==='storage'?'progress storage':'AI schedule')+'…';
-    const method=kind==='storage'?'setupWeeklyProgressPhase2Storage':'setupWeeklyProgressPhase2Triggers';
     function settle(message){node.busy=false;controls(node,false);if(!current(node))return;status.textContent=message;load();}
-    rpc(method,()=>settle('Weekly '+(kind==='storage'?'progress storage':'AI schedule')+' is ready.'),error=>settle('Setup stopped: '+(error?.message || String(error))));
+    bridge.write('API_coordinator_setupWeekly',[kind]).then(()=>settle('Weekly '+(kind==='storage'?'progress storage':'AI schedule')+' is ready.'),error=>settle('Setup stopped: '+(error?.message || String(error))));
   }
   return {load};
 }
-function getGuideWeeklyClientScript_() { return 'const GuideWeekly = ('+guideWeeklyBrowser_.toString()+')(DataBridge);\nconst WeeklyPhase2Setup = ('+weeklyPhase2SetupBrowser_.toString()+')();'; }
+function getGuideWeeklyClientScript_() { return 'const GuideWeekly = ('+guideWeeklyBrowser_.toString()+')(DataBridge);\nconst WeeklyPhase2Setup = ('+weeklyPhase2SetupBrowser_.toString()+')(DataBridge);'; }

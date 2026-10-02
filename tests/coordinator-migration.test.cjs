@@ -109,3 +109,35 @@ test('the activity endpoint returns the existing weekly activity and checks acce
   g.f.user('guide@example.com');
   assert.equal(JSON.parse(g.c.API_coordinator_getActivity()).error.code, 'UNAUTHORIZED');
 });
+
+test('weekly setup endpoints check access, keep the existing rules and reject unknown requests', () => {
+  const g = coordinatorFixture(), calls = [];
+  g.c.getWeeklyProgressPhase2Readiness = () => ({ storageReady: false, triggerReady: null, canSetupStorage: true, canSetupTriggers: false, issues: ['Missing sheet'] });
+  g.c.setupWeeklyProgressPhase2Storage = () => { calls.push('storage'); return { ok: true }; };
+  g.c.setupWeeklyProgressPhase2Triggers = () => { throw new Error('GEMINI_API_KEY not found.'); };
+  assert.equal(JSON.parse(g.c.API_coordinator_getWeeklySetup()).data.issues[0], 'Missing sheet');
+  assert.deepEqual(JSON.parse(g.c.API_coordinator_setupWeekly('storage')).data, { ok: true });
+  assert.deepEqual(JSON.parse(g.c.API_coordinator_setupWeekly('triggers')).error, { code: 'REJECTED', message: 'GEMINI_API_KEY not found.' });
+  assert.equal(JSON.parse(g.c.API_coordinator_setupWeekly('other')).error.code, 'INVALID_INPUT');
+  g.f.user('guide@example.com');
+  assert.equal(JSON.parse(g.c.API_coordinator_getWeeklySetup()).error.code, 'UNAUTHORIZED');
+  assert.equal(JSON.parse(g.c.API_coordinator_setupWeekly('storage')).error.code, 'UNAUTHORIZED');
+  assert.deepEqual(calls, ['storage']);
+});
+
+test('System Status card endpoints delegate to the existing functions and keep their messages', () => {
+  const g = coordinatorFixture(), seen = [];
+  const map = { API_coordinator_getCommitteeConfiguration: 'getCoordinatorCommitteeConfiguration', API_coordinator_getReviewConfiguration: 'getCoordinatorReviewConfiguration', API_coordinator_createDefinitions: 'createAssessmentDefinitions', API_coordinator_prepareStorage: 'prepareReviewAssessmentStorage', API_coordinator_syncGithub: 'syncCoordinatorGithubAccess' };
+  for (const [endpoint, legacy] of Object.entries(map)) {
+    g.c[legacy] = () => { seen.push(legacy); return { from: legacy }; };
+    assert.deepEqual(JSON.parse(g.c[endpoint]()).data, { from: legacy });
+  }
+  g.c.resendExpiredStudentInvitations = cursor => ({ cursor });
+  assert.deepEqual(JSON.parse(g.c.API_coordinator_resendInvitations('t4')).data, { cursor: 't4' });
+  assert.deepEqual(JSON.parse(g.c.API_coordinator_resendInvitations()).data, { cursor: '' });
+  g.c.createAssessmentDefinitions = () => { throw new Error('Coordinator access is required.'); };
+  assert.deepEqual(JSON.parse(g.c.API_coordinator_createDefinitions()).error, { code: 'REJECTED', message: 'Coordinator access is required.' });
+  assert.equal(seen.length, 5);
+  const fs = require('node:fs'), src = fs.readFileSync('dashboard-client-scripts.js', 'utf8');
+  for (const name of Object.values(map).concat('resendExpiredStudentInvitations')) assert.equal(src.includes('.' + name + '('), false, name + ' must go through the bridge');
+});

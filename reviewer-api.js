@@ -82,3 +82,22 @@ function API_reviewer_submitDecision(teamId, decision, notes) {
     return apiWorkflowResult_(submitReviewerDecision(String(teamId || ''), String(decision || ''), String(notes || '')), 'Decision saved.');
   });
 }
+
+/** Review marking: the rules code authorizes (assigned reviewer, or staff) and keeps its messages; the drawer reads and saves through the bridge. */
+const REVIEW_SAVE_KINDS_ = {draft:'saveReviewEvaluationDraft', submit:'submitReviewEvaluation', absence:'recordReviewAbsence', makeupDraft:'saveReviewMakeupDraft', makeupSubmit:'submitReviewMakeup'};
+
+function API_review_getEvaluation(teamId, assessmentId) {
+  return apiHandle_(() => loadReviewEvaluation(String(teamId || ''), String(assessmentId || '')));
+}
+
+/** kind is one of draft, submit, absence, makeupDraft, makeupSubmit; the rules function validates the input. */
+function API_review_save(kind, input) {
+  return apiHandle_(() => {
+    const method = REVIEW_SAVE_KINDS_[String(kind)];
+    if (!method) throw apiFail_('INVALID_INPUT', 'Unknown save request.');
+    const result = globalThis[method](input);
+    if (result && result.ok === false) throw apiFail_('REJECTED', result.message || 'The request was not accepted.');
+    return result;
+  });
+}
+  

@@ -1,4 +1,5 @@
 const {test}=require('node:test');
+const { Sync } = require('./sync-promise.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
@@ -86,7 +87,7 @@ function browser() {
   const viewContext=vm.createContext({});vm.runInContext(fs.readFileSync('system-status-view.js','utf8'),viewContext);
   const {document}=parseHTML('<html><body><div id="status"></div></body></html>');
   viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null).render(document.getElementById('status'),{github:{coordUsername:'',reposWithAccess:0,totalRepos:0},publishing:{configured:false,items:[]}});
-  const requests=[];const c=vm.createContext({document,Map,escapeClientHtml:x=>String(x).replaceAll('<','&lt;'),dashboardRun(){const r={};requests.push(r);return {withSuccessHandler(fn){r.success=fn;return this;},withFailureHandler(fn){r.failure=fn;return this;},resendExpiredStudentInvitations(cursor){r.cursor=cursor;}};}});
+  const requests=[];const c=vm.createContext({document,Map,escapeClientHtml:x=>String(x).replaceAll('<','&lt;'),DataBridge:{write:(method,args)=>{const p=new Sync(),r={method,cursor:args[0],success:v=>p.resolve(v),failure:e=>p.reject(e)};requests.push(r);return p;}}});
   const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
   c.byId=id=>document.getElementById(id);c.renderLucideIcon_=()=>'';
   // linkedom lacks the browser select.value setter used by the shared helper.
@@ -100,7 +101,7 @@ test('browser blocks duplicate clicks, accumulates batches, preserves results on
   const row={teamId:'T0',email:'a@x',student:'<student>',username:'user1',status:'invited',reason:'Created'};
   f.requests[0].success({results:[row],nextCursor:'t4',stopped:false});assert.equal(f.requests.length,2);
   f.requests[1].failure(Error('Offline'));assert.match(f.host.textContent,/Offline/);assert.match(f.host.textContent,/<student>/);assert.equal(f.host.querySelector('student'),null);
-  assert.equal(f.host.querySelector('button').disabled,false);f.run();assert.equal(f.requests[2].cursor,'t4');
+  assert.equal(f.host.querySelector('button').disabled,false);f.run();assert.equal(f.requests[2].cursor,'t4');assert.equal(f.requests[2].method,'API_coordinator_resendInvitations');
   f.requests[2].success({results:[],nextCursor:null,stopped:false});assert.match(f.host.textContent,/complete/);assert.equal(f.host.getAttribute('aria-busy'),'false');
 });
 test('browser stops on rate limits and replaces previous result when retried',()=>{

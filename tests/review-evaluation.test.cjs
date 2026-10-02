@@ -1,4 +1,5 @@
 const {test}=require('node:test');
+const { Sync } = require('./sync-promise.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
@@ -295,7 +296,10 @@ function browserFixture(extended=false,key='review1') {
   c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;
   c.DashboardUI.renderIcon=c.renderLucideIcon_;
   c.DashboardUI.renderExpandableText=c.renderExpandableText_;
-  vm.runInContext(fs.readFileSync('review-academic-policy.js','utf8'),c);vm.runInContext(fs.readFileSync('review-evaluation-client.js','utf8'),c);const api=c.reviewEvaluationBrowser_(key);
+  vm.runInContext(fs.readFileSync('review-academic-policy.js','utf8'),c);vm.runInContext(fs.readFileSync('review-evaluation-client.js','utf8'),c);const LEGACY={draft:'saveReviewEvaluationDraft',submit:'submitReviewEvaluation',absence:'recordReviewAbsence',makeupDraft:'saveReviewMakeupDraft',makeupSubmit:'submitReviewMakeup'};
+  const settle=(name,args)=>{const p=new Sync();requests.push({name,args,success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;};
+  const bridge={read:(readKey,method,args)=>settle('loadReviewEvaluation',args),write:(method,args)=>settle(LEGACY[args[0]],[args[1]])};
+  const api=c.reviewEvaluationBrowser_(key,bridge);
   const click=attr=>events.click({target:buttons.find(b=>b.hasAttribute(attr))});
   const data=JSON.parse(JSON.stringify(fixture().load()));
   return {api,drawer,requests,status,data,trigger,click,events,fields:()=>fields,discard:v=>discard=v,focus:()=>focusCount,absenceNodes:()=>absenceNodes,loading,context:c};
@@ -386,9 +390,9 @@ for(const key of ['review1','review2']) {
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(JSON.parse(JSON.stringify(server.load())));await f.click('data-target');
     const field=f.fields().find(field=>field.dataset.owner==='0'),summary=f.drawer.querySelector('[data-summary-values="0"]');
     field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='32';f.events.input();
-    assert.match(summary.innerHTML,/<dd>80 \/ 100<\/dd>/);assert.match(summary.innerHTML,/<dd>Completed<\/dd>/);
+    assert.match(summary.innerHTML,/<dd[^>]*>80 \/ 100<\/dd>/);assert.match(summary.innerHTML,/<dd[^>]*>Completed<\/dd>/);
     field.controls['[data-marks]'].value='';f.events.input();
-    assert.match(summary.innerHTML,/<dd>Pending \/ 100<\/dd>/);assert.match(summary.innerHTML,/<dd>Makeup Pending<\/dd>/);
+    assert.match(summary.innerHTML,/<dd[^>]*>Pending \/ 100<\/dd>/);assert.match(summary.innerHTML,/<dd[^>]*>Makeup Pending<\/dd>/);
     assert.equal(server.load().evaluation.students[0].assessment.status,'MAKEUP_PENDING');assert.equal(f.requests.length,1);
   });
   test(key+': unselected attendance survives a draft and cannot become an absent zero or submitted result',()=>{
@@ -474,18 +478,18 @@ for(const key of ['review1','review2']) {
     f.drawer.querySelector=selector=>selector==='[data-tab-progress]'?row:query(selector);
     f.api.open('T1',f.trigger);f.requests[0].success(f.data);
     for(const host of f.absenceNodes().values())host.controls.type.value='NORMAL';
-    assert.match(row.innerHTML,/Performance Indicators/);assert.match(row.innerHTML,/data-completion="empty">0 of 1 graded/);
+    assert.match(row.innerHTML,/Performance Indicators/);assert.match(row.innerHTML,/data-completion="empty"[^>]*>0 of 1 graded/);
     const team=f.fields()[0];team.controls['[data-level]'].value='3';team.controls['[data-marks]'].value='48';f.events.input();
-    assert.match(row.innerHTML,/data-completion="complete">1 of 1 graded/);
+    assert.match(row.innerHTML,/data-completion="complete"[^>]*>1 of 1 graded/);
     const tab={dataset:{criteriaTab:'individual'},hasAttribute:a=>a==='data-criteria-tab',closest:s=>s==='button'?tab:null};
     f.events.click({target:tab});assert.match(row.innerHTML,/Students/);assert.match(row.innerHTML,/0 of 2 graded/);
     const students=f.fields().filter(field=>field.dataset.owner!=='team');
     students[0].controls['[data-level]'].value='3';students[0].controls['[data-marks]'].value='32';f.events.input();
-    assert.match(row.innerHTML,/data-completion="partial">1 of 2 graded/);
+    assert.match(row.innerHTML,/data-completion="partial"[^>]*>1 of 2 graded/);
     students[1].controls['[data-level]'].value='3';students[1].controls['[data-marks]'].value='32';f.events.input();
-    assert.match(row.innerHTML,/data-completion="complete">2 of 2 graded/);
+    assert.match(row.innerHTML,/data-completion="complete"[^>]*>2 of 2 graded/);
     students[0].controls['[data-marks]'].value='99';f.events.input();
-    assert.match(row.innerHTML,/data-completion="partial">1 of 2 graded/);
+    assert.match(row.innerHTML,/data-completion="partial"[^>]*>1 of 2 graded/);
   });
   test(key+': component tabs switch without reload, preserve entries and support arrow navigation',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
@@ -511,9 +515,9 @@ for(const key of ['review1','review2']) {
     f.events.input();assert.equal(values.hidden,true);
     field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='48';f.events.input();
     assert.equal(values.hidden,false);assert.match(values.innerHTML,/<span>45<\/span>/);
-    assert.match(values.innerHTML,/<span class="text-strong">48<\/span>/);assert.match(values.innerHTML,/<span>50.5<\/span>/);
+    assert.match(values.innerHTML,/<span class="font-semibold text-primary">48<\/span>/);assert.match(values.innerHTML,/<span>50.5<\/span>/);
     field.controls['[data-level]'].value='5';field.controls['[data-marks]'].value='60';f.events.input();
-    assert.match(values.innerHTML,/<span>57<\/span>/);assert.match(values.innerHTML,/<span class="text-strong">60<\/span>/);
+    assert.match(values.innerHTML,/<span>57<\/span>/);assert.match(values.innerHTML,/<span class="font-semibold text-primary">60<\/span>/);
   });
   test(key+': compact student chips switch panels without RPC or losing unsaved entries',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
@@ -622,7 +626,7 @@ for(const key of ['review2','review3','design_gate'])test(key+' browser passes i
   const f=browserFixture(true,key);f.api.open('T1',f.trigger);assert.equal(f.requests[0].name,'loadReviewEvaluation');
   assert.deepEqual(Array.from(f.requests[0].args),['T1',key]);
   f.data.config.key=key;f.data.config.label='Configured Review';f.requests[0].success(f.data);
-  assert.match(f.drawer.innerHTML,/<span>Configured Review<\/span>/);
+  assert.match(f.drawer.innerHTML,/Configured Review<\/span>/);
   f.click('data-draft');assert.equal(f.requests[1].name,'saveReviewEvaluationDraft');assert.equal(f.requests[1].args[0].assessmentId,key);
 });
 
@@ -1107,4 +1111,21 @@ test('completed absence remains accessible alongside pending makeup; student swi
   b.discard(false);await switchStudent();assert.match(b.drawer.innerHTML,/data-record-absence="0"/);assert.equal(b.absenceNodes().get('0').controls.approved.value,'no');
   b.discard(true);await switchStudent();assert.equal(b.drawer.innerHTML.includes('data-record-absence'),false);assert.equal(b.absenceNodes().get('0').controls.approved.value,'yes');
   assert.match(b.drawer.innerHTML,/data-select-student="1" aria-pressed="true"/);
+});
+
+test('the drawer reads and saves through the bridge, and its markup uses only compiled Tailwind utilities', () => {
+  const { missingClasses } = require('./compiled-css.cjs');
+  const src = fs.readFileSync('review-evaluation-client.js', 'utf8');
+  assert.doesNotMatch(src, /google\.script\.run|guideRun|rpc\(/);
+  assert.match(src, /bridge\.read\('review-evaluation:'\+reviewKey,'API_review_getEvaluation'/);
+  assert.match(src, /bridge\.write\('API_review_save'/);
+  assert.match(src, /ReviewAssessmentBrowser\(key,DataBridge\)/);
+  const names = [...src.matchAll(/\b(?:SMALL|BUTTON|PRIMARY|SEGMENTED|PILL|LEVEL|TAB|CHIP|FIELD|LABEL)='([^']+)'/g)].flatMap(m => m[1].split(/\s+/));
+  assert.deepEqual(missingClasses(names), []);
+  const f = browserFixture(true, 'review1'); f.api.open('T1', f.trigger); f.requests[0].success(f.data);
+  const html = f.drawer.innerHTML;
+  assert.doesNotMatch(html, /\son[a-z]+=/i);
+  assert.doesNotMatch(html, /class="(?:btn|tile|tab|card|segmented|avatar)\b/);
+  const used = [...html.matchAll(/class="([^"]*)"/g)].flatMap(m => m[1].split(/\s+/)).filter(c => c && !/^(review-|team-drawer|lucide)/.test(c));
+  assert.deepEqual(missingClasses(used), []);
 });

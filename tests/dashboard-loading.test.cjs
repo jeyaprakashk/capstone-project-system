@@ -94,20 +94,20 @@ test('Coordinator storage setup displays journals, blocks duplicates and retries
  f.c.document.createElement=tag=>document.createElement(tag);
  const node=id=>document.getElementById(id),calls=()=>f.requests.filter(r=>r.key==='prepareReviewAssessmentStorage');
  const readiness=()=>({valid:true,ready:false,state:'setup-required',summary:'Assessment journals need setup',count:3,issues:[],links:{},checkedAt:new Date().toISOString(),storage:[{assessment:'review3',label:'Review 3',journal:'Assessment_review3',state:'MISSING'}]});
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',readiness());
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',readiness());await f.settle();
  assert.match(node('reviewConfigurationSummary').textContent,/need setup/);
  f.c.initializeAssessmentStorage();f.c.initializeAssessmentStorage();assert.equal(calls().length,1);
  const journals=[1,2,3].map(n=>({assessment:'review'+n,label:'Review '+n,journal:'Journal_review'+n,created:n===1,initialized:n===2}));
- calls()[0].success({done:true,journals});
+ calls()[0].success({done:true,journals});await f.settle();
  assert.equal(node('assessmentStorageResults').children.length,3);
  assert.match(node('assessmentStorageResults').textContent,/Review 3: Journal_review3 — existing storage retained/);
  assert.match(node('assessmentStorageStatus').textContent,/3 assessment journals ready/);
- f.done('getCoordinatorReviewConfiguration',readiness());
- f.c.initializeAssessmentStorage();calls()[1].failure({message:'Temporary failure'});
+ f.done('getCoordinatorReviewConfiguration',readiness());await f.settle();
+ f.c.initializeAssessmentStorage();calls()[1].failure({message:'Temporary failure'});await f.settle();
  assert.match(node('assessmentStorageStatus').textContent,/Retry/);
- f.done('getCoordinatorReviewConfiguration',readiness());
+ f.done('getCoordinatorReviewConfiguration',readiness());await f.settle();
  f.c.initializeAssessmentStorage();assert.equal(calls().length,3);
- calls()[2].success({done:true,journals});f.done('getCoordinatorReviewConfiguration',readiness());
+ calls()[2].success({done:true,journals});await f.settle();f.done('getCoordinatorReviewConfiguration',readiness());await f.settle();
  assert.equal(node('initializeAssessmentStorageButton').disabled,false);
 });
 test('assessment readiness renders server states and preserves results on failed refresh',async()=>{
@@ -115,14 +115,14 @@ test('assessment readiness renders server states and preserves results on failed
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
  const node=id=>document.getElementById(id),states=['READY','MISSING','EMPTY','ERROR'];
  const report={valid:false,ready:false,state:'invalid',summary:'Server readiness summary',count:4,checkedAt:new Date().toISOString(),links:{definitions:'https://example.test/definitions'},issues:[{sheet:'Future Review',message:'Storage conflict'}],storage:states.map((state,i)=>({assessment:'gate_'+i,label:'Gate '+i,journal:'Assessment_gate_'+i,state,...(state==='ERROR'?{error:'Storage conflict'}:{})}))};
- f.c.recheckReviewConfiguration();f.c.recheckReviewConfiguration();assert.equal(f.requests.length,1);f.done('getCoordinatorReviewConfiguration',report);
+ f.c.recheckReviewConfiguration();f.c.recheckReviewConfiguration();assert.equal(f.requests.length,1);f.done('getCoordinatorReviewConfiguration',report);await f.settle();
  assert.deepEqual(Array.from(node('reviewAssessmentReadiness').children,item=>item.getAttribute('data-state')),states);
  assert.equal(node('reviewConfigurationSummary').textContent,report.summary);assert.equal(node('initializeAssessmentStorageButton').disabled,true);
  assert.match(node('reviewAssessmentReadiness').textContent,/Storage conflict/);assert.equal(node('reviewDefinitionsLink').href,report.links.definitions);
- const before=node('reviewAssessmentReadiness').innerHTML;f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});
+ const before=node('reviewAssessmentReadiness').innerHTML;f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();
  assert.equal(node('reviewAssessmentReadiness').innerHTML,before);assert.equal(node('reviewConfigurationSummary').textContent,report.summary);
  assert.match(node('reviewConfigurationIssues').textContent,/Offline/);assert.equal(node('reviewConfigurationCard').getAttribute('aria-busy'),'false');assert.equal(node('reviewConfigurationRecheck').disabled,false);
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,valid:true,ready:true,state:'ready',summary:'All journals ready',issues:[],storage:report.storage.map(({error,...entry})=>({...entry,state:'READY'}))});
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,valid:true,ready:true,state:'ready',summary:'All journals ready',issues:[],storage:report.storage.map(({error,...entry})=>({...entry,state:'READY'}))});await f.settle();
  assert.equal(node('initializeAssessmentStorageButton').disabled,false);assert.equal(node('reviewConfigurationCard').getAttribute('data-state'),'ready');assert.equal(node('reviewConfigurationIssues').hidden,true);
 });
 
@@ -145,6 +145,8 @@ function fixture(system=false) {
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>{
   // Migrated reviewer role: log it like the role-content request, answering with an envelope.
   if(key==='API_coordinator_getSystemStatus')return requests.push({key:'loadCoordinatorSystemStatus',args,success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
+  const legacy={API_coordinator_getCommitteeConfiguration:'getCoordinatorCommitteeConfiguration',API_coordinator_getReviewConfiguration:'getCoordinatorReviewConfiguration',API_coordinator_createDefinitions:'createAssessmentDefinitions',API_coordinator_prepareStorage:'prepareReviewAssessmentStorage',API_coordinator_syncGithub:'syncCoordinatorGithubAccess',API_coordinator_resendInvitations:'resendExpiredStudentInvitations'}[key];
+  if(legacy)return requests.push({key:legacy,args,success:value=>success(JSON.stringify({ok:true,data:value})),failure});
   const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getDashboard:'student',API_coordinator_getOverview:'coord'}[key];
   if(migrated)return requests.push({key:'loadDashboardRoleContent',args:[migrated],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   return requests.push({key,args,success,failure});}}); }
@@ -586,16 +588,16 @@ test('Coordinator bootstrap follows server state, blocks duplicate calls and ref
  const api=vm.runInContext('DashboardUI',f.c),node=id=>document.getElementById(id);
  const missing={valid:false,ready:false,state:'definitions-missing',registryState:'MISSING',canBootstrap:true,summary:'AssessmentDefinitions is missing',issues:[{sheet:'AssessmentDefinitions',message:'Create the definitions tab'}],links:{},storage:[],checkedAt:new Date().toISOString()};
  api.bootstrapAssessmentDefinitions();assert.equal(f.requests.length,0);
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',missing);
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',missing);await f.settle();
  assert.equal(node('createAssessmentDefinitionsButton').hidden,false);assert.equal(node('createAssessmentDefinitionsButton').disabled,false);
  api.bootstrapAssessmentDefinitions();api.bootstrapAssessmentDefinitions();f.c.recheckReviewConfiguration();f.c.initializeAssessmentStorage();
  assert.equal(f.requests.filter(r=>r.key==='createAssessmentDefinitions').length,1);
  assert.equal(f.requests.filter(r=>r.key==='prepareReviewAssessmentStorage').length,0);
  assert.equal(node('reviewConfigurationCard').getAttribute('aria-busy'),'true');
- f.done('createAssessmentDefinitions',{created:true});
+ f.done('createAssessmentDefinitions',{created:true});await f.settle();
  assert.match(node('assessmentStorageStatus').textContent,/headers only/);
  const empty={...missing,state:'definitions-empty',registryState:'EMPTY',canBootstrap:false,summary:'Assessment definitions required',links:{definitions:'https://example.test/definitions'}};
- f.done('getCoordinatorReviewConfiguration',empty);
+ f.done('getCoordinatorReviewConfiguration',empty);await f.settle();
  assert.equal(node('reviewConfigurationCard').getAttribute('aria-busy'),'false');
  assert.equal(node('createAssessmentDefinitionsButton').hidden,true);assert.equal(node('initializeAssessmentStorageButton').disabled,true);
  assert.equal(node('reviewDefinitionsLink').href,empty.links.definitions);
@@ -607,14 +609,14 @@ test('failed bootstrap settles loading, keeps results, and allows a server-confi
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
  const api=vm.runInContext('DashboardUI',f.c),node=id=>document.getElementById(id);
  const missing={valid:false,state:'definitions-missing',canBootstrap:true,summary:'AssessmentDefinitions is missing',issues:[],links:{},storage:[],checkedAt:new Date().toISOString()};
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',missing);
- api.bootstrapAssessmentDefinitions();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Permission denied'});
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',missing);await f.settle();
+ api.bootstrapAssessmentDefinitions();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Permission denied'});await f.settle();
  assert.match(node('assessmentStorageStatus').textContent,/Permission denied/);
- f.done('getCoordinatorReviewConfiguration',missing);
+ f.done('getCoordinatorReviewConfiguration',missing);await f.settle();
  assert.equal(node('reviewConfigurationSummary').textContent,missing.summary);assert.equal(node('reviewConfigurationCard').getAttribute('aria-busy'),'false');
  assert.equal(node('createAssessmentDefinitionsButton').disabled,false);
  api.bootstrapAssessmentDefinitions();assert.equal(f.requests.filter(r=>r.key==='createAssessmentDefinitions').length,2);
- f.done('createAssessmentDefinitions',{created:false});f.done('getCoordinatorReviewConfiguration',{...missing,canBootstrap:false,state:'invalid',links:{definitions:'https://example.test/definitions'}});
+ f.done('createAssessmentDefinitions',{created:false});await f.settle();f.done('getCoordinatorReviewConfiguration',{...missing,canBootstrap:false,state:'invalid',links:{definitions:'https://example.test/definitions'}});await f.settle();
  assert.equal(node('createAssessmentDefinitionsButton').hidden,true);assert.match(node('assessmentStorageStatus').textContent,/left unchanged/);
 });
 
@@ -675,7 +677,7 @@ test('SEE-only readiness reports storage not required and prevents setup RPC',as
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body>'+['reviewConfigurationCard','createAssessmentDefinitionsButton','reviewDefinitionsLink','reviewAssessmentReadiness','reviewConfigurationRecheck','initializeAssessmentStorageButton','reviewConfigurationSummary','reviewConfigurationIssues','reviewConfigurationCheckedAt','reviewConfigLink','reviewRubricsLink'].map(id=>'<div id="'+id+'"></div>').join('')+'</body></html>');
  const original=f.c.document.getElementById;
  f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{valid:true,ready:true,canInitializeStorage:false,state:'ready',summary:'Configuration valid',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[{assessment:'see',label:'End Review (SEE)',journal:'',state:'NOT_REQUIRED',detail:'Not required - evaluated outside this app.'}]});
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{valid:true,ready:true,canInitializeStorage:false,state:'ready',summary:'Configuration valid',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[{assessment:'see',label:'End Review (SEE)',journal:'',state:'NOT_REQUIRED',detail:'Not required - evaluated outside this app.'}]});await f.settle();
  assert.equal(document.getElementById('initializeAssessmentStorageButton').disabled,true);
  assert.match(document.getElementById('reviewAssessmentReadiness').textContent,/Storage: Not required.*Evaluated outside this app/);
  assert.doesNotMatch(document.getElementById('reviewAssessmentReadiness').textContent,/Journal:/);
@@ -690,11 +692,11 @@ test('readiness cards render server rubric and overall states and preserve both 
   {assessment:'review1',label:'Review 1',state:'READY',journal:'Assessment_review1',ready:false,rubric:{state:'INVALID',error:'Rubrics Sheet row 9: <invalid criterion>'}},
   {assessment:'see',label:'End Review (SEE)',state:'NOT_REQUIRED',journal:'',ready:true,rubric:{state:'READY',criterionCount:4,maximumMarks:100}}
  ]};
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',report);
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',report);await f.settle();
  const host=document.getElementById('reviewAssessmentReadiness'),[review,see]=host.children;
  assert.match(review.textContent,/Review 1.*Needs attention/);assert.match(review.textContent,/Rubric: Invalid/);assert.match(review.textContent,/Storage: Ready/);assert.match(review.textContent,/row 9: <invalid criterion>/);assert.equal(review.querySelector('invalid'),null);
  assert.match(see.textContent,/End Review \(SEE\).*Ready/);assert.match(see.textContent,/Rubric: Ready.*4 criteria.*100 marks/);assert.match(see.textContent,/Storage: Not required.*Evaluated outside this app/);assert.doesNotMatch(see.textContent,/Journal:/);
- const before=host.innerHTML;f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});assert.equal(host.innerHTML,before);
+ const before=host.innerHTML;f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();assert.equal(host.innerHTML,before);
 });
 
 
@@ -711,20 +713,20 @@ test('configuration cards are siblings and committee refresh preserves expansion
  assert.equal(f.node('committeeConfigurationCard').parentNode,f.node('reviewConfigurationCard').parentNode);
  f.ui.recheckCommitteeConfiguration();f.ui.recheckCommitteeConfiguration();assert.equal(f.requests.filter(r=>r.key==='getCoordinatorCommitteeConfiguration').length,1);
  assert.equal(f.requests.filter(r=>r.key==='getCoordinatorReviewConfiguration').length,0);
- f.done('getCoordinatorCommitteeConfiguration',report);
+ f.done('getCoordinatorCommitteeConfiguration',report);await f.settle();
  f.node('committeeDirectoryContent').querySelector('details').setAttribute('open','');
- f.ui.recheckCommitteeConfiguration();f.done('getCoordinatorCommitteeConfiguration',report);assert.equal(f.node('committeeDirectoryContent').querySelector('details').open,true);
- const before=f.node('committeeDirectoryContent').innerHTML;f.ui.recheckCommitteeConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});
+ f.ui.recheckCommitteeConfiguration();f.done('getCoordinatorCommitteeConfiguration',report);await f.settle();assert.equal(f.node('committeeDirectoryContent').querySelector('details').open,true);
+ const before=f.node('committeeDirectoryContent').innerHTML;f.ui.recheckCommitteeConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();
  assert.equal(f.node('committeeDirectoryContent').innerHTML,before);assert.match(f.node('committeeConfigurationIssues').textContent,/Offline/);assert.equal(f.node('committeeConfigurationRecheck').disabled,false);
- f.ui.recheckCommitteeConfiguration();const old=f.node('committeeConfigurationCard'),replacement=old.cloneNode(true);old.replaceWith(replacement);replacement.querySelector('#committeeConfigurationSummary').textContent='New card';f.done('getCoordinatorCommitteeConfiguration',report);assert.equal(f.node('committeeConfigurationSummary').textContent,'New card');
+ f.ui.recheckCommitteeConfiguration();const old=f.node('committeeConfigurationCard'),replacement=old.cloneNode(true);old.replaceWith(replacement);replacement.querySelector('#committeeConfigurationSummary').textContent='New card';f.done('getCoordinatorCommitteeConfiguration',report);await f.settle();assert.equal(f.node('committeeConfigurationSummary').textContent,'New card');
 });
 
 test('storage creation area hides only after confirmed readiness and preserves visibility on refresh failure',async()=>{
  const f=configurationCardsFixture(),report={valid:true,ready:true,state:'ready',canInitializeStorage:false,storageComplete:true,summary:'All ready',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[]};
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',report);assert.equal(f.node('assessmentStorageSetup').hidden,true);assert.equal(f.node('initializeAssessmentStorageButton').disabled,true);
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,valid:false,ready:false,state:'invalid'});assert.equal(f.node('assessmentStorageSetup').hidden,true);
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,ready:false,storageComplete:false,canInitializeStorage:true,state:'storage-missing'});assert.equal(f.node('assessmentStorageSetup').hidden,false);assert.equal(f.node('initializeAssessmentStorageButton').disabled,false);
- f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});assert.equal(f.node('assessmentStorageSetup').hidden,false);
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',report);await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,true);assert.equal(f.node('initializeAssessmentStorageButton').disabled,true);
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,valid:false,ready:false,state:'invalid'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,true);
+ f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,ready:false,storageComplete:false,canInitializeStorage:true,state:'storage-missing'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,false);assert.equal(f.node('initializeAssessmentStorageButton').disabled,false);
+ f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,false);
 });
 
 test('configuration grids share columns across unequal counts and observer cleanup',async()=>{

@@ -203,7 +203,7 @@ const DashboardUI = (function() {
         return function() {
           const started = performance.now();
           // Follow-up reads started by utility callbacks stay in the utility lane.
-          const utility = utilityRequestContext || method === 'loadAnnouncementsForCurrentUser' || method === 'API_coordinator_getSystemStatus';
+          const utility = utilityRequestContext || method === 'loadAnnouncementsForCurrentUser' || method === 'API_coordinator_getSystemStatus' || method === 'API_coordinator_getWeeklySetup';
           pendingRequests++;
           if (!utility) { pendingRoleRequests++; clearTimeout(preloadTimer); }
           let finished = false;
@@ -1210,7 +1210,7 @@ const DashboardUI = (function() {
       [['committeeConfigLink','committees'],['committeeAssignmentsLink','assignments']].forEach(([id,key])=>{const link=byId(id),url=report.links[key];link.hidden=!url;if(url)link.href=url;});
       arrangeAssessmentReadiness();
     }
-    dashboardRun().withSuccessHandler(report=>finish(report,null)).withFailureHandler(error=>finish(null,errorMessage(error))).getCoordinatorCommitteeConfiguration();
+    DataBridge.read('committee-configuration','API_coordinator_getCommitteeConfiguration',[],{timeoutMs:120000}).then(report=>finish(report,null),error=>finish(null,errorMessage(error)));
   }
 
   let reviewConfigurationValid = false;
@@ -1278,9 +1278,8 @@ const DashboardUI = (function() {
         });
       }
     }
-    dashboardRun().withSuccessHandler(function(report) { finish(report, null); })
-      .withFailureHandler(function(err) { finish(null, 'Unable to check configuration: ' + errorMessage(err) + '. Try Recheck.'); })
-      .getCoordinatorReviewConfiguration();
+    DataBridge.read('review-configuration','API_coordinator_getReviewConfiguration',[],{timeoutMs:120000}).then(function(report) { finish(report, null); },
+      function(err) { finish(null, 'Unable to check configuration: ' + errorMessage(err) + '. Try Recheck.'); });
   }
 
   function bootstrapAssessmentDefinitions() {
@@ -1297,11 +1296,11 @@ const DashboardUI = (function() {
       setText('assessmentStorageStatus',message);
       recheckReviewConfiguration();
     }
-    dashboardRun().withSuccessHandler(function(result){
+    DataBridge.write('API_coordinator_createDefinitions',[]).then(function(result){
       finish(result.created?'AssessmentDefinitions created with headers only. Open Assessment definitions to configure the graded assessments, then Recheck.':'AssessmentDefinitions already exists. Existing configuration was left unchanged.');
-    }).withFailureHandler(function(err){
+    },function(err){
       finish('Definitions setup stopped: '+errorMessage(err));
-    }).createAssessmentDefinitions();
+    });
   }
 
   let initializingAssessmentStorage = false;
@@ -1318,7 +1317,7 @@ const DashboardUI = (function() {
       setText('assessmentStorageStatus',message);
       recheckReviewConfiguration();
     }
-    dashboardRun().withSuccessHandler(function(result){
+    DataBridge.write('API_coordinator_prepareStorage',[]).then(function(result){
       const journals=result.journals;
       journals.forEach(function(journal){
         if(!results)return;
@@ -1328,9 +1327,9 @@ const DashboardUI = (function() {
       });
       finish(journals.length+' assessment journals ready. Existing assessment data was left unchanged.');
       document.querySelectorAll('[data-publishing]').forEach(function(section){InternalAssessmentPublishing.refresh(section.dataset.publishing);});
-    }).withFailureHandler(function(err){
+    },function(err){
       finish('Setup stopped: '+errorMessage(err)+'. Retry to resume missing assessment storage.');
-    }).prepareReviewAssessmentStorage();
+    });
   }
 
   function runGithubSync() {
@@ -1341,8 +1340,8 @@ const DashboardUI = (function() {
       btn.textContent = 'Syncing...';
     }
 
-    dashboardRun()
-      .withSuccessHandler(function(result) {
+    DataBridge.write('API_coordinator_syncGithub',[])
+      .then(function(result) {
 
         // Update the displayed repository access count
         // without reloading the Apps Script page.
@@ -1368,8 +1367,7 @@ const DashboardUI = (function() {
           btn.disabled = false;
           btn.textContent = 'Run Sync';
         }
-      })
-      .withFailureHandler(function(error) {
+      }, function(error) {
 
         dialogs.notify(
           'GitHub access sync failed.\\n\\n' +
@@ -1382,8 +1380,7 @@ const DashboardUI = (function() {
           btn.disabled = false;
           btn.textContent = 'Run Sync';
         }
-      })
-      .syncCoordinatorGithubAccess();
+      });
   }
 
   let studentInvitationResendBusy = false;
@@ -1416,7 +1413,7 @@ const DashboardUI = (function() {
     }
     function batch(cursor) {
       status.textContent = 'Processing student invitations. Completed results remain below.';
-      dashboardRun().withSuccessHandler(function(result) {
+      DataBridge.write('API_coordinator_resendInvitations',[cursor]).then(function(result) {
         result.results.forEach(row => results.set(row.teamId + ':' + row.email, row));
         render();
         host.resendCursor = result.nextCursor;
@@ -1428,10 +1425,10 @@ const DashboardUI = (function() {
         }
         host.resendCursor = null;
         finish('Invitation check complete.', false);
-      }).withFailureHandler(function(error) {
+      }, function(error) {
         host.resendCursor = cursor;
         finish('Run interrupted: ' + (error && error.message || 'Unknown error') + '. Retry to recheck unfinished work.', true);
-      }).resendExpiredStudentInvitations(cursor);
+      });
     }
     batch(host.resendCursor || '');
   }

@@ -115,3 +115,19 @@ test('workflow rejections returned as {ok:false} are errors, never success', () 
   f.c.submitReviewerDecision = () => ({ ok: true, message: 'Decision recorded for Team T1.' });
   assert.deepEqual(JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Approved', '')).data, { message: 'Decision recorded for Team T1.' });
 });
+
+test('review marking endpoints map save kinds to the existing rules and keep their messages', () => {
+  const f = serverFixture(), calls = [];
+  f.c.loadReviewEvaluation = (team, key) => ({ team, key });
+  f.c.saveReviewEvaluationDraft = input => { calls.push(['draft', input]); return { ok: true, status: 'Draft' }; };
+  f.c.submitReviewEvaluation = () => { throw new Error('Select a proficiency level for every criterion.'); };
+  f.c.recordReviewAbsence = () => ({ ok: false, message: 'Stale revision.' });
+  assert.deepEqual(JSON.parse(f.c.API_review_getEvaluation('T1', 'review1')).data, { team: 'T1', key: 'review1' });
+  assert.deepEqual(JSON.parse(f.c.API_review_save('draft', { a: 1 })).data, { ok: true, status: 'Draft' });
+  assert.deepEqual(calls[0], ['draft', { a: 1 }]);
+  assert.deepEqual(JSON.parse(f.c.API_review_save('submit', {})).error, { code: 'REJECTED', message: 'Select a proficiency level for every criterion.' });
+  assert.deepEqual(JSON.parse(f.c.API_review_save('absence', {})).error, { code: 'REJECTED', message: 'Stale revision.' });
+  assert.equal(JSON.parse(f.c.API_review_save('nope', {})).error.code, 'INVALID_INPUT');
+  f.c.loadReviewEvaluation = () => { throw new Error('You are not an assigned reviewer for this team.'); };
+  assert.deepEqual(JSON.parse(f.c.API_review_getEvaluation('T1', 'review1')).error, { code: 'REJECTED', message: 'You are not an assigned reviewer for this team.' });
+});

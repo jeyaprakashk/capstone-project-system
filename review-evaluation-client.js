@@ -1,8 +1,19 @@
 /** Shared drawer classes supply layout; native dialog supplies modality and focus containment. */
-function reviewEvaluationBrowser_(reviewKey) {
+function reviewEvaluationBrowser_(reviewKey, bridge) {
   let reviewLabel=reviewKey;
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const rpc=(method,args,ok,fail)=>DashboardUI.guideRun().withSuccessHandler(ok).withFailureHandler(fail)[method](...args);
+  const SAVE_KINDS={saveReviewEvaluationDraft:'draft',submitReviewEvaluation:'submit',recordReviewAbsence:'absence',saveReviewMakeupDraft:'makeupDraft',submitReviewMakeup:'makeupSubmit'};
+  const SMALL='border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
+  const BUTTON='border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
+  const PRIMARY='border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
+  const SEGMENTED='inline-flex flex-wrap gap-1 rounded-xl bg-tint p-1';
+  const PILL='border-0 inline-flex items-center gap-2 rounded-lg bg-transparent px-3 py-2 text-left text-sm text-ink-2 aria-pressed:bg-paper aria-pressed:font-semibold aria-pressed:text-primary aria-pressed:shadow-selected disabled:opacity-50';
+  const LEVEL='border-0 flex min-w-14 flex-col items-center rounded-lg bg-transparent px-2 py-1.5 text-sm text-ink-2 aria-pressed:bg-paper aria-pressed:font-semibold aria-pressed:text-primary aria-pressed:shadow-selected disabled:opacity-50';
+  const TAB='border-x-0 border-t-0 inline-flex items-center gap-2 border-b-[3px] border-transparent bg-transparent px-4 py-3 text-sm text-muted aria-selected:border-primary aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50';
+  const CHIP='flex min-w-24 flex-col items-center gap-1 rounded-tile border border-edge bg-paper px-3 py-2 text-sm aria-pressed:border-primary aria-pressed:bg-tint disabled:opacity-60';
+  const AVATARS=['bg-teal-700','bg-purple-700','bg-primary'];
+  const FIELD='rounded-md border border-control px-3 py-1.5 text-sm';
+  const LABEL='mt-2 flex flex-col gap-1 text-sm font-semibold';
   const day=value=>new Date(value*86400000).toISOString().slice(0,10);
   const requestId=()=>window.crypto.randomUUID();
   const bands=[0,40,60,75,85,95,100];
@@ -50,9 +61,9 @@ function reviewEvaluationBrowser_(reviewKey) {
   function hiddenStudent(index) {return targeted?targeted.index!==index:focusedAssessment() && !pendingStudents().includes(index) && !absenceCorrectable(index);}
   function absenceCorrectable(index) {const a=savedStudent(index).assessment;return !!a && (['REVIEW_DAY_ABSENCE','PROLONGED'].includes(a.facts.type) || a.nextActions?.makeup);}
   function criteriaTabs() {
-    return '<div class="review-criteria-tabs tabs" role="tablist" aria-label="Assessment components">'+['team','individual'].map(component=>{
+    return '<div class="review-criteria-tabs flex gap-1 border-b border-edge" role="tablist" aria-label="Assessment components">'+['team','individual'].map(component=>{
       const label=component==='team'?'Team Criteria':'Individual',max=model.config.criteria.filter(c=>c.type.toLowerCase()===component).reduce((sum,c)=>sum+c.maxMarks,0);
-      return '<button type="button" class="tab" role="tab" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-selected="'+(activeCriteria===component)+'" tabindex="'+(activeCriteria===component?'0':'-1')+'"><span>'+DashboardUI.renderIcon(component==='team'?'users':'user')+label+'</span><span>'+max+' pts '+(component==='team'?'pool':'weight')+'</span></button>';
+      return '<button type="button" class="'+TAB+'" role="tab" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-selected="'+(activeCriteria===component)+'" tabindex="'+(activeCriteria===component?'0':'-1')+'"><span>'+DashboardUI.renderIcon(component==='team'?'users':'user')+label+'</span><span>'+max+' pts '+(component==='team'?'pool':'weight')+'</span></button>';
     }).join('')+'</div>';
   }
   let gradingProgress={team:{graded:0,total:0},individual:{graded:0,total:0}},activeTeamPI=null,activeStudentPIs={};
@@ -60,9 +71,9 @@ function reviewEvaluationBrowser_(reviewKey) {
     return '<span data-pi-icon>'+DashboardUI.renderIcon('clock')+'</span><span><strong>'+escape(c.pi+'–'+c.co)+'</strong><small>0–'+escape(c.maxMarks)+'</small></span>';
   }
   function individualPills(owner) {
-    return '<div class="segmented" data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators">'+model.config.criteria.map((c,index)=>{
+    return '<div class="'+SEGMENTED+'" data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators">'+model.config.criteria.map((c,index)=>{
       if(c.type!=='Individual' && !(targeted && targeted.index===owner && targeted.components.includes('team')))return '';
-      return '<button type="button" data-select-individual-pi="'+index+'" data-student="'+owner+'" aria-pressed="false" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>';
+      return '<button type="button" class="'+PILL+'" data-select-individual-pi="'+index+'" data-student="'+owner+'" aria-pressed="false" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>';
     }).join('')+'</div>';
   }
   function syncIndividualCards() {
@@ -82,12 +93,12 @@ function reviewEvaluationBrowser_(reviewKey) {
   function teamPills() {
     const criteria=model.config.criteria.map((c,index)=>({c,index})).filter(({c})=>c.type==='Team');
     if(!criteria.some(({index})=>index===activeTeamPI))activeTeamPI=criteria.length?criteria[0].index:null;
-    return '<div class="segmented" data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
+    return '<div class="'+SEGMENTED+'" data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" class="'+PILL+'" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
   }
   function updateTabProgress() {
     const row=drawer.querySelector('[data-tab-progress]');if(!row)return;
     const {graded,total}=gradingProgress[activeCriteria],status=total>0 && graded===total?'complete':graded>0?'partial':'empty';
-    row.innerHTML='<span>'+(activeCriteria==='team'?'Performance Indicators':'Students')+'</span><span data-completion="'+status+'">'+graded+' of '+total+' graded</span>';
+    row.innerHTML='<span class="font-semibold text-ink-2">'+(activeCriteria==='team'?'Performance Indicators':'Students')+'</span><span data-completion="'+status+'" class="ml-3 text-xs font-semibold text-muted">'+graded+' of '+total+' graded</span>';
   }
   function syncCriteriaTabs() {
     for(const component of ['team','individual']) {
@@ -117,7 +128,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     model.roster.students.forEach((student,index)=>{
       const selected=index===activeStudent,group=drawer.querySelector('[data-student-group="'+index+'"]'),chip=drawer.querySelector('[data-select-student="'+index+'"]');
       if(group){group.hidden=hiddenStudent(index) || !selected;group.open=selected;}
-      if(chip){chip.setAttribute('aria-pressed',String(selected));chip.classList.toggle('tile--selected',selected);chip.disabled=busy || reading;}
+      if(chip){chip.setAttribute('aria-pressed',String(selected));chip.disabled=busy || reading;}
       const summary=drawer.querySelector('[data-summary-student="'+index+'"]');
       if(summary)summary.hidden=hiddenStudent(index) || !selected;
     });
@@ -133,19 +144,19 @@ function reviewEvaluationBrowser_(reviewKey) {
     if(group)revealCriterion(group);
   }
   function studentChips(students) {
-    return '<ul data-review-students aria-label="Select student">'+students.map((s,index)=>{
+    return '<ul data-review-students aria-label="Select student" class="mt-2 flex list-none flex-wrap gap-2 p-0">'+students.map((s,index)=>{
       const words=String(s.name||s.register).trim().split(/\s+/),short=words[0]+(words.length>1?' '+words[words.length-1].charAt(0)+'.':'');
       const initials=words.map(w=>w.charAt(0)).slice(0,2).join('');
-      return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" class="tile'+(index===activeStudent?' tile--selected':'')+'" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" title="'+escape(s.name+' ('+s.register+')')+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'"><span class="avatar avatar-'+(index%3+1)+' review-avatar" aria-hidden="true">'+escape(initials)+'</span><span>'+escape(short)+'</span><small>'+escape(s.register)+'</small><span data-student-score="'+index+'">— / '+model.config.maximum+'</span></button></li>';
+      return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" class="'+CHIP+'" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" title="'+escape(s.name+' ('+s.register+')')+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'"><span class="inline-flex size-8 items-center justify-center rounded-full text-xs font-bold text-paper '+AVATARS[index%3]+'" aria-hidden="true">'+escape(initials)+'</span><span>'+escape(short)+'</span><small>'+escape(s.register)+'</small><span data-student-score="'+index+'">— / '+model.config.maximum+'</span></button></li>';
     }).join('')+'</ul>';
   }
   function assessmentSummaryCard(students) {
-    return '<section class="card" data-assessment-summary aria-live="polite" aria-label="Assessment Summary"><h3>Assessment Summary <small data-summary-unsaved hidden>Unsaved preview</small></h3>'+students.map((student,index)=>assessmentSummary(index)).join('')+'</section>';
+    return '<section class="mb-3 rounded-card border border-edge bg-paper p-4" data-assessment-summary aria-live="polite" aria-label="Assessment Summary"><h3 class="m-0 text-sm font-semibold text-ink">Assessment Summary <small data-summary-unsaved hidden class="ml-2 text-xs font-normal text-warning">Unsaved preview</small></h3>'+students.map((student,index)=>assessmentSummary(index)).join('')+'</section>';
   }
   function assessmentSummary(index) {
     const student=savedStudent(index).assessment?savedStudent(index):(model.assessmentResults||[]).find(s=>s.register===model.roster.students[index].register)||{};
     const actions=!model.availability.editable && !targeted && correctionIndex===null && student.assessment?makeupControls(index,student):'';
-    return '<div data-summary-student="'+index+'"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+'><dl data-summary-values="'+index+'">'+assessmentSummaryValues(student)+'</dl>'+actions+'</div>';
+    return '<div data-summary-student="'+index+'"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+'"><dl data-summary-values="'+index+'" class="m-0 mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">'+assessmentSummaryValues(student)+'</dl>'+actions+'</div>';
   }
   function assessmentSummaryValues(student) {
     const a=student.assessment||{},maximum=type=>model.config.criteria.filter(c=>c.type===type).reduce((sum,c)=>sum+c.maxMarks,0);
@@ -154,13 +165,13 @@ function reviewEvaluationBrowser_(reviewKey) {
     const labels={COMPLETED:'Completed',MAKEUP_PENDING:'Makeup Pending',INCOMPLETE:'Assessment Incomplete'};
     const cells=[['Team Mark',component(a.teamMark,a.teamState)+' / '+maximum('Team')],['Individual Mark',component(a.individualMark,a.individualState)+' / '+maximum('Individual')],['Review Total',(student.total==null?unresolved:mark(student.total))+' / '+model.config.maximum]];
     const tone=a.status==='COMPLETED'?'complete':a.status==='MAKEUP_PENDING'?'pending':'incomplete';
-    return cells.map(([label,value],index)=>'<div'+(index===2?' data-resolved="'+(student.total!=null)+'"':'')+'><dt>'+label+'</dt><dd>'+escape(value)+'</dd></div>').join('')+'<div data-tone="'+tone+'"><dt>Assessment Status</dt><dd>'+escape(labels[a.status]||'Assessment Incomplete')+'</dd></div>';
+    return cells.map(([label,value],index)=>'<div'+(index===2?' data-resolved="'+(student.total!=null)+'"':'')+'><dt class="text-xs text-muted">'+label+'</dt><dd class="m-0 font-semibold text-ink">'+escape(value)+'</dd></div>').join('')+'<div data-tone="'+tone+'"><dt class="text-xs text-muted">Assessment Status</dt><dd class="m-0 font-semibold text-ink">'+escape(labels[a.status]||'Assessment Incomplete')+'</dd></div>';
   }
   function canEditAbsence(index) {return !busy && !reading && !targeted && (model.availability.editable || correctionIndex===index);}
   const attendanceChoices=[['','Select attendance'],['NORMAL','Present'],['REVIEW_DAY_ABSENCE','Absent for Review'],['PROLONGED','Long Absent']];
   function attendancePicker(index,value) {
     const current=attendanceChoices.find(([key])=>key===value)||attendanceChoices[0];
-    return '<div><span id="'+reviewKey+'AttendanceLabel-'+index+'">Absence / exception</span><select data-fact="type" hidden aria-hidden="true" tabindex="-1">'+attendanceChoices.map(([key,label])=>'<option value="'+key+'"'+(key===current[0]?' selected':'')+'>'+label+'</option>').join('')+'</select><details class="review-attendance-picker" data-attendance-picker><summary aria-labelledby="'+reviewKey+'AttendanceLabel-'+index+' '+reviewKey+'AttendanceValue-'+index+'"><span data-attendance-label id="'+reviewKey+'AttendanceValue-'+index+'">'+current[1]+'</span>'+DashboardUI.renderIcon('chevron-down')+'</summary><div role="radiogroup" aria-labelledby="'+reviewKey+'AttendanceLabel-'+index+'">'+attendanceChoices.map(([key,label])=>'<label><input type="radio" name="'+reviewKey+'Attendance-'+index+'" data-attendance-option value="'+key+'"'+(key===current[0]?' checked':'')+'><span>'+label+'</span></label>').join('')+'</div></details></div>';
+    return '<div><span class="text-sm font-semibold" id="'+reviewKey+'AttendanceLabel-'+index+'">Absence / exception</span><select data-fact="type" hidden aria-hidden="true" tabindex="-1">'+attendanceChoices.map(([key,label])=>'<option value="'+key+'"'+(key===current[0]?' selected':'')+'>'+label+'</option>').join('')+'</select><details class="review-attendance-picker mt-1" data-attendance-picker><summary class="flex cursor-pointer items-center justify-between rounded-md border border-control bg-paper px-3 py-1.5 text-sm" aria-labelledby="'+reviewKey+'AttendanceLabel-'+index+' '+reviewKey+'AttendanceValue-'+index+'"><span data-attendance-label id="'+reviewKey+'AttendanceValue-'+index+'">'+current[1]+'</span>'+DashboardUI.renderIcon('chevron-down')+'</summary><div role="radiogroup" class="mt-1 flex flex-col gap-1 rounded-md border border-edge bg-paper p-2 text-sm" aria-labelledby="'+reviewKey+'AttendanceLabel-'+index+'">'+attendanceChoices.map(([key,label])=>'<label><input type="radio" name="'+reviewKey+'Attendance-'+index+'" data-attendance-option value="'+key+'"'+(key===current[0]?' checked':'')+'><span>'+label+'</span></label>').join('')+'</div></details></div>';
   }
   function focusAttendance(host) {
     const summary=host.querySelector('[data-attendance-picker] > summary');
@@ -197,18 +208,18 @@ function reviewEvaluationBrowser_(reviewKey) {
     return false;
   }
   function makeupControls(index,student) {
-    return student.assessment?.nextActions?.makeup?'<button class="btn btn-primary" type="button" data-target="'+index+'">Conduct Makeup Assessment</button>':'';
+    return student.assessment?.nextActions?.makeup?'<button class="'+PRIMARY+'" type="button" data-target="'+index+'">Conduct Makeup Assessment</button>':'';
   }
 
   function absenceEvidenceFields(index,f) {
     const options={MEDICAL_DOCUMENT:'Medical document provided',APPROVAL_DOCUMENT:'Official approval/permission provided',OTHER:'Other supporting evidence'};
-    return '<div data-absence-evidence hidden><fieldset><legend>Supporting absence evidence (optional)</legend>'+Object.entries(options).map(([value,label])=>'<label><input type="checkbox" data-supporting-evidence value="'+value+'"'+((f.supportingEvidence||[]).includes(value)?' checked':'')+'> '+label+'</label>').join('')+'</fieldset><label data-other-evidence-label hidden>Describe other supporting evidence<textarea data-other-evidence maxlength="2000">'+escape(f.otherEvidenceText||'')+'</textarea></label></div>';
+    return '<div data-absence-evidence hidden class="mt-2"><fieldset class="rounded-md border border-edge p-2 text-sm"><legend class="px-1 font-semibold">Supporting absence evidence (optional)</legend>'+Object.entries(options).map(([value,label])=>'<label><input type="checkbox" data-supporting-evidence value="'+value+'"'+((f.supportingEvidence||[]).includes(value)?' checked':'')+'> '+label+'</label>').join('')+'</fieldset><label data-other-evidence-label hidden>Describe other supporting evidence<textarea data-other-evidence class="'+FIELD+' mt-1 block w-full" maxlength="2000">'+escape(f.otherEvidenceText||'')+'</textarea></label></div>';
   }
 
   function absenceControl(index,student) {
     const f=student.assessment?.facts||{type:'UNSELECTED'};
-    const choice=(name,value)=>'<select data-fact="'+name+'"><option value="">Select</option><option value="yes"'+(value===true?' selected':'')+'>Yes</option><option value="no"'+(value===false?' selected':'')+'>No</option></select>';
-    return '<div class="review-criterion" data-absence="'+index+'"'+(targeted?' hidden':'')+'>'+attendancePicker(index,f.type)+'<div data-exception-fields><label data-approval-field>Absence Approved?'+choice('approved',f.approved)+'</label>'+absenceEvidenceFields(index,f)+'<div data-prolonged-fields><label>Contribution Established?'+choice('contribution',f.verifiedContribution)+'</label><p>The committee considers contribution evidence submitted by the team and endorsed by the Guide.</p><label>Attended the Review?'+choice('attended',f.attended)+'</label></div></div><div data-effective="'+index+'"></div>'+(!model.availability.editable && !targeted && absenceCorrectable(index)?(correctionIndex===index?'<button class="btn btn-outline" type="button" data-record-absence="'+index+'">Save absence details</button><button class="btn btn-outline" type="button" data-cancel-absence="'+index+'">Cancel editing</button>':correctionIndex===null?'<button class="btn btn-outline" type="button" data-edit-absence="'+index+'">Edit absence details</button>':''):'')+'</div>';
+    const choice=(name,value)=>'<select data-fact="'+name+'" class="'+FIELD+' font-normal"><option value="">Select</option><option value="yes"'+(value===true?' selected':'')+'>Yes</option><option value="no"'+(value===false?' selected':'')+'>No</option></select>';
+    return '<div class="review-criterion mb-3 rounded-lg border border-edge bg-paper p-3" data-absence="'+index+'"'+(targeted?' hidden':'')+'>'+attendancePicker(index,f.type)+'<div data-exception-fields><label class="'+LABEL+'" data-approval-field>Absence Approved?'+choice('approved',f.approved)+'</label>'+absenceEvidenceFields(index,f)+'<div data-prolonged-fields><label class="'+LABEL+'">Contribution Established?'+choice('contribution',f.verifiedContribution)+'</label><p>The committee considers contribution evidence submitted by the team and endorsed by the Guide.</p><label class="'+LABEL+'">Attended the Review?'+choice('attended',f.attended)+'</label></div></div><div data-effective="'+index+'"></div>'+(!model.availability.editable && !targeted && absenceCorrectable(index)?(correctionIndex===index?'<button class="'+BUTTON+'" type="button" data-record-absence="'+index+'">Save absence details</button><button class="'+BUTTON+'" type="button" data-cancel-absence="'+index+'">Cancel editing</button>':correctionIndex===null?'<button class="'+BUTTON+'" type="button" data-edit-absence="'+index+'">Edit absence details</button>':''):'')+'</div>';
   }
   async function close() {
     if (busy || (dirty && !await DashboardUI.ask('Discard unsaved '+reviewLabel+' marks?'))) return;
@@ -372,14 +383,14 @@ function reviewEvaluationBrowser_(reviewKey) {
     const timing=assessment && assessment.availability.timing || {tone:'neutral',label:''};
     const dateLabel=assessment?new Date(assessment.config.due*86400000).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}):'';
     const dateDetails=assessment?'Due '+day(assessment.config.due)+' · '+timing.label+' · '+assessment.status+' · Opens '+day(assessment.config.opens)+(assessment.availability.editable && assessment.availability.late?' · Late submissions allowed':''):'';
-    const meta=assessment?'<span data-timing="'+escape(timing.tone)+'" title="'+escape(dateDetails)+'">Due '+escape(dateLabel)+(timing.label?' · '+escape(timing.label):'')+'</span>':'';
+    const meta=assessment?'<span data-timing="'+escape(timing.tone)+'" class="text-xs text-muted" title="'+escape(dateDetails)+'">Due '+escape(dateLabel)+(timing.label?' · '+escape(timing.label):'')+'</span>':'';
     const projectTitle=assessment?String(assessment.details.title||'Project title not provided'):'';
-    const titleRow=assessment?'<details class="review-project-title-row"><summary title="'+escape(projectTitle)+'">'+DashboardUI.renderIcon('file-text')+'<span>'+escape(projectTitle)+'</span>'+DashboardUI.renderIcon('chevron-down','','review-title-chevron')+'</summary><p>'+escape(projectTitle)+'</p></details>':'';
-    const headerDetails=assessment?'<div><p>Guide: '+escape(assessment.details.guideName)+'</p><p>Committee: '+escape(assessment.details.committee)+'</p></div>':'';
-    const navigation=assessment?'<div>'+criteriaTabs()+'<div data-tab-progress aria-live="polite"></div>'+teamPills()+(students.length?studentChips(students):'')+'</div>':'';
+    const titleRow=assessment?'<details class="review-project-title-row mt-1 text-sm"><summary class="flex cursor-pointer items-center gap-1" title="'+escape(projectTitle)+'">'+DashboardUI.renderIcon('file-text')+'<span>'+escape(projectTitle)+'</span>'+DashboardUI.renderIcon('chevron-down','','review-title-chevron')+'</summary><p class="mt-1 text-ink-2">'+escape(projectTitle)+'</p></details>':'';
+    const headerDetails=assessment?'<div class="mt-1 text-sm text-ink-2"><p class="m-0">Guide: '+escape(assessment.details.guideName)+'</p><p class="m-0">Committee: '+escape(assessment.details.committee)+'</p></div>':'';
+    const navigation=assessment?'<div class="px-4 pt-2">'+criteriaTabs()+'<div data-tab-progress aria-live="polite" class="mt-2 flex items-center text-sm"></div>'+teamPills()+(students.length?studentChips(students):'')+'</div>':'';
     if(assessment && students.length)body=assessmentSummaryCard(students)+body;
-    const statusMessage='<p class="review-message" data-message role="status" aria-live="polite"></p>';
-    return '<div><div><div><h2 id="'+reviewKey+'Heading">'+escape(title)+'</h2><span>'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review-progress" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="btn btn-sm btn-outline" data-close data-drawer-close aria-label="Close '+escape(reviewLabel)+' drawer">'+DashboardUI.renderIcon('x')+'</button></div>'+navigation+'<div class="team-drawer-content" data-drawer-content>'+body+(footer?'':statusMessage)+'</div>'+(footer?'<div class="review-footer">'+statusMessage+footer+'</div>':'');
+    const statusMessage='<p class="review-message m-0 text-sm text-ink-2" data-message role="status" aria-live="polite"></p>';
+    return '<div class="flex items-start justify-between gap-3 border-b border-edge px-4 py-3"><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><h2 id="'+reviewKey+'Heading" class="m-0 text-base font-semibold text-ink">'+escape(title)+'</h2><span class="rounded-md bg-tint px-2 py-0.5 text-xs font-semibold text-primary">'+escape(reviewLabel)+'</span>'+meta+'</div>'+(assessment?'<div class="review-progress mt-1 text-sm text-ink-2" data-evaluation-progress aria-live="polite"></div>':'')+headerDetails+titleRow+'</div><button type="button" class="'+SMALL+'" data-close data-drawer-close aria-label="Close '+escape(reviewLabel)+' drawer">'+DashboardUI.renderIcon('x')+'</button></div>'+navigation+'<div class="team-drawer-content px-4 py-3" data-drawer-content>'+body+(footer?'':statusMessage)+'</div>'+(footer?'<div class="review-footer border-t border-edge px-4 py-3">'+statusMessage+footer+'</div>':'');
   }
 
   function open(team,button) {
@@ -393,23 +404,24 @@ function reviewEvaluationBrowser_(reviewKey) {
     const token=++sequence;
     if(!drawer.open)drawer.showModal();
     document.body.classList.add('team-drawer-open');
-    rpc('loadReviewEvaluation',[team,reviewKey],data=>{
+    bridge.read('review-evaluation:'+reviewKey,'API_review_getEvaluation',[team,reviewKey],{timeoutMs:60000}).then(data=>{
       if(token!==sequence || !drawer.open)return;
       if(finishRead)finishRead();finishRead=null;reading=false;
       model=data;reviewLabel=data.config.label;dirty=false;pending=null;targeted=null;correctionIndex=null;render();
     },error=>{
+      if(error && error.superseded)return;
       if(token!==sequence || !drawer.open)return;
       if(finishRead)finishRead();finishRead=null;reading=false;
       if(previous){model=previous;dirty=previousDirty;targeted=previousTarget;const reload=drawer.querySelector('[data-reload]');if(reload)reload.disabled=false;message(error.message+' Existing entries are retained. Use Reload to retry.');}
-      else {drawer.innerHTML=shell(team,'<button class="btn btn-sm btn-outline" type="button" data-reload>Retry</button>');message(error.message);}
+      else {drawer.innerHTML=shell(team,'<button class="'+SMALL+'" type="button" data-reload>Retry</button>');message(error.message);}
     });
   }
   function control(c,index,owner,score) {
     score=score||{};
-    return '<fieldset class="review-criterion card" data-index="'+index+'" data-owner="'+owner+'"'+(focusedAssessment() && (!targeted || String(owner)!==String(targeted.index) || !targeted.components.includes(c.type==='Team'?'team':'individual'))?' hidden':'')+'><legend class="review-criterion-accessible-title">'+escape(c.name)+'</legend><div><span>'+escape(c.pi+' · '+c.co)+'</span><span>Max '+c.maxMarks+' marks</span></div><h3 class="review-card-title">'+escape(c.name)+'</h3><p>Proficiency level</p><select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select><div class="segmented" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+'" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div><div data-descriptor aria-live="polite"></div><details><summary>View full rubric descriptors</summary>'+c.descriptors.map((text,i)=>'<p><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><div><div><label for="reviewMarks-'+owner+'-'+index+'">Fine-tune mark</label><span data-range></span></div><div><button class="btn btn-sm btn-outline" type="button" data-step="-0.5" aria-label="Decrease marks">'+DashboardUI.renderIcon('minus')+'</button><input data-marks id="reviewMarks-'+owner+'-'+index+'" aria-describedby="reviewMarksError-'+owner+'-'+index+'" type="number" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button class="btn btn-sm btn-outline" type="button" data-step="0.5" aria-label="Increase marks">'+DashboardUI.renderIcon('plus')+'</button></div><input data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total" data-awarded-total></span><div data-slider-values aria-label="Selectable marks"></div></div><p data-marks-error id="reviewMarksError-'+owner+'-'+index+'" aria-live="polite" hidden></p><div><div><strong>Criterion Feedback</strong><span data-feedback-required></span></div><span data-feedback-status></span></div><div class="segmented" data-feedback-options aria-label="Feedback suggestions"></div><button type="button" class="btn btn-sm btn-outline" data-other-feedback aria-pressed="false">Other remarks</button><label data-custom-feedback-label hidden>Other remarks<textarea data-custom-feedback maxlength="2000" rows="2" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden maxlength="2000">'+escape(score.remark||'')+'</textarea></fieldset>';
+    return '<fieldset class="review-criterion mb-3 rounded-lg border border-edge bg-paper p-3" data-index="'+index+'" data-owner="'+owner+'"'+(focusedAssessment() && (!targeted || String(owner)!==String(targeted.index) || !targeted.components.includes(c.type==='Team'?'team':'individual'))?' hidden':'')+'><legend class="review-criterion-accessible-title">'+escape(c.name)+'</legend><div class="flex items-center justify-between gap-2 text-xs text-muted"><span class="font-semibold text-ink-2">'+escape(c.pi+' · '+c.co)+'</span><span>Max '+c.maxMarks+' marks</span></div><h3 class="review-card-title">'+escape(c.name)+'</h3><p class="m-0 mt-2 text-sm font-semibold text-ink">Proficiency level</p><select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select><div class="'+SEGMENTED+'" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" class="'+LEVEL+'" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+'" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div><div data-descriptor aria-live="polite" class="mt-2 text-sm text-ink-2"></div><details class="mt-2"><summary class="cursor-pointer text-sm font-semibold text-primary">View full rubric descriptors</summary>'+c.descriptors.map((text,i)=>'<p class="mt-1 text-sm text-ink-2"><strong>Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</details><div class="mt-3"><div class="flex items-center justify-between"><label class="text-sm font-semibold" for="reviewMarks-'+owner+'-'+index+'">Fine-tune mark</label><span data-range class="text-xs text-muted"></span></div><div class="mt-1 flex items-center gap-2"><button class="'+SMALL+'" type="button" data-step="-0.5" aria-label="Decrease marks">'+DashboardUI.renderIcon('minus')+'</button><input class="'+FIELD+' w-24" data-marks id="reviewMarks-'+owner+'-'+index+'" aria-describedby="reviewMarksError-'+owner+'-'+index+'" type="number" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button class="'+SMALL+'" type="button" data-step="0.5" aria-label="Increase marks">'+DashboardUI.renderIcon('plus')+'</button></div><input class="mt-2 w-full" data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total" data-awarded-total></span><div data-slider-values aria-label="Selectable marks" class="mt-1 flex flex-wrap gap-2 text-xs text-muted"></div></div><p class="mt-1 text-sm text-danger" data-marks-error id="reviewMarksError-'+owner+'-'+index+'" aria-live="polite" hidden></p><div class="mt-3 flex items-center justify-between gap-2 text-sm"><div><strong>Criterion Feedback</strong> <span data-feedback-required class="text-xs text-muted"></span></div><span data-feedback-status class="text-xs text-muted"></span></div><div class="'+SEGMENTED+'" data-feedback-options aria-label="Feedback suggestions"></div><button type="button" class="'+SMALL+'" data-other-feedback aria-pressed="false">Other remarks</button><label data-custom-feedback-label hidden>Other remarks<textarea class="'+FIELD+' mt-1 block w-full" data-custom-feedback maxlength="2000" rows="2" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden maxlength="2000">'+escape(score.remark||'')+'</textarea></fieldset>';
   }
   function accordion(title,description,content) {
-    return '<details class="review-accordion" data-criteria-group="'+(title==='Team Criteria'?'team':'individual')+'" name="review-criteria" id="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-panel" role="tabpanel" aria-labelledby="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-tab"'+(focusedAssessment()?(title==='Team Criteria'?' hidden':' open'):'')+'><summary><strong>'+title+'</strong>'+(title==='Team Criteria'?'<span data-team-mark aria-label="Common team score"></span>':'')+(description?'<span>'+description+'</span>':'')+'</summary><div>'+content+'</div></details>';
+    return '<details class="review-accordion mt-3" data-criteria-group="'+(title==='Team Criteria'?'team':'individual')+'" name="review-criteria" id="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-panel" role="tabpanel" aria-labelledby="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-tab"'+(focusedAssessment()?(title==='Team Criteria'?' hidden':' open'):'')+'><summary><strong>'+title+'</strong>'+(title==='Team Criteria'?'<span data-team-mark aria-label="Common team score"></span>':'')+(description?'<span>'+description+'</span>':'')+'</summary><div>'+content+'</div></details>';
   }
   function validateClosingGroup(group) {
     if(!model.availability.editable)return true;
@@ -454,10 +466,10 @@ function reviewEvaluationBrowser_(reviewKey) {
     const teamFields=criteria.map((c,i)=>c.type==='Team'?control(c,i,'team',team[c.pi]):'').join('');
     const individual=d.roster.students.map((s,index)=>{
       const student=savedStudents.find(v=>v.register===s.register)||{},a=student.assessment||{},draft=a.makeupDraft||{},scores=targeted && targeted.index===index?(draft.scores||{}):!d.availability.editable && a.individualSource==='makeup'?(a.makeup?.scores||{}):(student.scores||{});
-      return '<details class="review-student-accordion" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary><span><strong>'+escape(s.name)+'</strong><span data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div>'+absenceControl(index,student)+individualPills(index)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
+      return '<details class="review-student-accordion mt-3" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary><span><strong>'+escape(s.name)+'</strong><span data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div>'+absenceControl(index,student)+individualPills(index)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
     }).join('');
-    drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div data-review-actions>'+(d.availability.editable?'<button class="btn btn-outline" type="button" data-draft>Save Draft</button><button class="btn btn-lg btn-primary" type="button" data-submit>Submit Evaluation</button>':'')+'<button class="btn btn-sm btn-outline" type="button" data-reload>Reload</button><button class="btn btn-sm btn-outline" type="button" data-close>Close</button></div>');
-    if(targeted)drawer.querySelector('[data-review-actions]').innerHTML='<button class="btn btn-outline" type="button" data-target-draft>Save Makeup Draft</button><button class="btn btn-lg btn-primary" type="button" data-target-submit>Submit Makeup</button><button class="btn btn-sm btn-outline" type="button" data-reload>Cancel / Reload</button><button class="btn btn-sm btn-outline" type="button" data-close>Close</button>';
+    drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div data-review-actions class="mt-2 flex flex-wrap items-center gap-2">'+(d.availability.editable?'<button class="'+BUTTON+'" type="button" data-draft>Save Draft</button><button class="'+PRIMARY+'" type="button" data-submit>Submit Evaluation</button>':'')+'<button class="'+SMALL+'" type="button" data-reload>Reload</button><button class="'+SMALL+'" type="button" data-close>Close</button></div>');
+    if(targeted)drawer.querySelector('[data-review-actions]').innerHTML='<button class="'+BUTTON+'" type="button" data-target-draft>Save Makeup Draft</button><button class="'+PRIMARY+'" type="button" data-target-submit>Submit Makeup</button><button class="'+SMALL+'" type="button" data-reload>Cancel / Reload</button><button class="'+SMALL+'" type="button" data-close>Close</button>';
     drawer.querySelector('form').addEventListener('submit',event=>event.preventDefault());
     drawer.querySelectorAll('[data-absence] input,[data-absence] select,[data-absence] textarea').forEach(el=>el.disabled=!!targeted);
     syncStudentSelection();syncCriteriaTabs();updateRanges();drawer.querySelector('[data-close]').focus();
@@ -539,7 +551,7 @@ function reviewEvaluationBrowser_(reviewKey) {
         const values=field.querySelector('[data-slider-values]');
         if(values) {
           values.hidden=level==='' || range.max<range.min;
-          values.innerHTML=values.hidden?'':Array.from({length:Math.round((range.max-range.min)*2)+1},(_,i)=>{const value=range.min+i/2;return '<span'+(marks!=='' && Number(marks)===value?' class="text-strong"':'')+'>'+value+'</span>';}).join('');
+          values.innerHTML=values.hidden?'':Array.from({length:Math.round((range.max-range.min)*2)+1},(_,i)=>{const value=range.min+i/2;return '<span'+(marks!=='' && Number(marks)===value?' class="font-semibold text-primary"':'')+'>'+value+'</span>';}).join('');
         }
         if(level!=='' && range.max<range.min)text.textContent='No whole or half mark fits this level. Choose another level or ask the coordinator to check the rubric.';
         field.querySelectorAll('[data-step]').forEach(button=>{button.disabled=slider.disabled;});
@@ -552,7 +564,7 @@ function reviewEvaluationBrowser_(reviewKey) {
         if(options.dataset.level!==level || options.dataset.pendingMessage!==pendingMessage) {
           options.dataset.level=level;
           options.dataset.pendingMessage=pendingMessage;
-          options.innerHTML=pendingIndividual?'<small>'+escape(pendingMessage)+'</small>':level===''?'<small>Select a level for suggested feedback.</small>':feedbackOptions(c,n).map((suggestion,i)=>'<button type="button" data-feedback="'+i+'" aria-pressed="false" aria-label="'+escape(suggestion)+'" title="Add this feedback">'+DashboardUI.renderIcon('plus')+' '+escape(suggestion)+'</button>').join('');
+          options.innerHTML=pendingIndividual?'<small>'+escape(pendingMessage)+'</small>':level===''?'<small>Select a level for suggested feedback.</small>':feedbackOptions(c,n).map((suggestion,i)=>'<button type="button" class="'+PILL+'" data-feedback="'+i+'" aria-pressed="false" aria-label="'+escape(suggestion)+'" title="Add this feedback">'+DashboardUI.renderIcon('plus')+' '+escape(suggestion)+'</button>').join('');
         }
         const suggestions=feedbackOptions(c,n),selected=selectedFeedback(remark.value);
         options.querySelectorAll('button').forEach(button=>{
@@ -678,7 +690,7 @@ function reviewEvaluationBrowser_(reviewKey) {
   function sendAcademic(method,input) {
     const signature=JSON.stringify({method,input});if(!pending || pending.signature!==signature)pending={signature,id:requestId()};
     input.requestId=pending.id;setBusy(true);message('Saving assessment…');
-    rpc(method,[input],result=>{
+    bridge.write('API_review_save',[SAVE_KINDS[method],input]).then(result=>{
       busy=false;dirty=false;pending=null;targeted=null;correctionIndex=null;model.revision=result.revision;model.status=result.status;model.evaluation=result.evaluation;
       render();message('Assessment saved. Changed results require publication.');refreshTable();
     },error=>{setBusy(false);message(error.message+' Your entries are retained.');});
@@ -721,7 +733,7 @@ function reviewEvaluationBrowser_(reviewKey) {
     const method=submit?'submitReviewEvaluation':'saveReviewEvaluationDraft', signature=JSON.stringify({method,payload});
     if(!pending || pending.signature!==signature)pending={signature,id:requestId()};
     payload.requestId=pending.id;setBusy(true);message('Saving '+reviewLabel+'…');
-    rpc(method,[{...payload,assessmentId:reviewKey}],result=>{
+    bridge.write('API_review_save',[SAVE_KINDS[method],{...payload,assessmentId:reviewKey}]).then(result=>{
       dirty=false;pending=null;model.revision=result.revision;model.status=result.status;
       model.evaluation=result.evaluation || {...payload,status:result.status,submittedAt:result.submittedAt,submittedDay:result.submittedDay,late:result.late};model.availability.editable=result.status==='Draft';
       if(result.timing)model.availability.timing=result.timing;
@@ -736,5 +748,5 @@ function reviewEvaluationBrowser_(reviewKey) {
   return {open,admin};
 }
 function getReviewEvaluationClientScript_() {
-  return [reviewPolicyFacts_,reviewPolicyScoresComplete_,reviewPolicyCalculate_].map(f=>f.toString()).join('\n')+'\nconst ReviewAssessmentBrowser = '+reviewEvaluationBrowser_.toString()+'; const ReviewEvaluations = (()=>{const instances=new Map();const get=key=>{if(!instances.has(key))instances.set(key,ReviewAssessmentBrowser(key));return instances.get(key);};return {open:(team,key,button)=>get(key).open(team,button),admin:key=>get(key).admin()};})();';
+  return [reviewPolicyFacts_,reviewPolicyScoresComplete_,reviewPolicyCalculate_].map(f=>f.toString()).join('\n')+'\nconst ReviewAssessmentBrowser = '+reviewEvaluationBrowser_.toString()+'; const ReviewEvaluations = (()=>{const instances=new Map();const get=key=>{if(!instances.has(key))instances.set(key,ReviewAssessmentBrowser(key,DataBridge));return instances.get(key);};return {open:(team,key,button)=>get(key).open(team,button),admin:key=>get(key).admin()};})();';
 }
