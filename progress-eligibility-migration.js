@@ -188,3 +188,19 @@ function initializeProgressEligibilityMigration(cutoverIso) {
     return {ok:true,students:plan.students.length,cutover:plan.cutover,cutoverWeek:plan.cutoverWeek};
   });
 }
+
+/** TEMPORARY: run once in the Apps Script editor after every cohort member is fixed. */
+function cleanupProgressEligibilityMigrationProperties() {
+  progressEligibilityCoordinator_();
+  return weeklyLock_(()=>{
+    const plan = readProgressEligibilityMigration_();
+    if (!plan || plan.state !== 'INITIALIZED') throw new Error('Initialized migration snapshot is required for cleanup.');
+    const records = readProgressEligibility_(), windows = getWeeklySubmissionWindows_();
+    const unresolved = plan.students.filter(student=>!progressStudentEligibility_(student,records,windows).eligibleFrom);
+    if (unresolved.length) throw new Error('Migration cleanup blocked: '+unresolved.length+' cohort students remain unresolved.');
+    const properties = PropertiesService.getScriptProperties();
+    for (let index=0;index<plan.chunks;index++) properties.deleteProperty('PROGRESS_ELIGIBILITY_MIGRATION_COHORT_'+index);
+    properties.deleteProperty('PROGRESS_ELIGIBILITY_MIGRATION');
+    return {ok:true,students:plan.students.length,chunksDeleted:plan.chunks};
+  });
+}

@@ -162,6 +162,11 @@ Cleanup deletes the entire migration module, including its cohort preview,
 initialization, evidence preview, execution, registration-date helper and migration
 calculation. Delete properties `PROGRESS_ELIGIBILITY_MIGRATION` and
 `PROGRESS_ELIGIBILITY_MIGRATION_COHORT_<n>` and migration-specific tests/runbook steps.
+The temporary editor function `cleanupProgressEligibilityMigrationProperties()`
+deletes only those migration properties after checking that every saved cohort
+member has a fixed eligibility week. Run it as the coordinator after verification;
+it leaves `PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS` intact. Remove the function
+with the rest of the migration module during final code cleanup.
 There are no migration branches in production to retain. The retired audit-mode
 property can also be removed if present; no code reads it.
 

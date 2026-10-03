@@ -292,6 +292,22 @@ test('migration snapshot excludes later arrivals and historical registration ref
  assert.equal(result.source,'FIRST_DETECTED');assert.equal(result.effectiveDate.toISOString(),'2026-01-02T00:00:00.000Z');
 });
 
+test('temporary migration property cleanup requires a fixed cohort and coordinator',()=>{
+ const f=fixture();f.c.initializeProgressEligibilityMigration();
+ const before=JSON.stringify([...f.properties]);
+ assert.throws(()=>f.c.cleanupProgressEligibilityMigrationProperties(),/2 cohort students remain unresolved/);
+ assert.equal(JSON.stringify([...f.properties]),before);
+ f.user('one@example.com');
+ assert.throws(()=>f.c.cleanupProgressEligibilityMigrationProperties(),/Coordinator access is required/);
+ f.user('coord@example.com');f.setEligibility('W1');
+ f.properties.set('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS','["001"]');
+ const result=f.c.cleanupProgressEligibilityMigrationProperties();
+ assert.equal(result.students,2);assert.equal(result.chunksDeleted,1);
+ assert.equal(f.properties.has('PROGRESS_ELIGIBILITY_MIGRATION'),false);
+ assert.equal(f.properties.has('PROGRESS_ELIGIBILITY_MIGRATION_COHORT_0'),false);
+ assert.equal(f.properties.get('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS'),'["001"]');
+});
+
 test('production contains no audit policy, migration calculation or registration timestamp source',()=>{
  const text=fs.readFileSync('progress-eligibility.js','utf8');
  assert.doesNotMatch(text,/audit-log|AUDIT_LOG|AUDIT_MODE|progressAuditEvidence_|migrationRegistration|MIGRATION_|cutover|accountRows\[[^\]]+\]\[0\]/);
