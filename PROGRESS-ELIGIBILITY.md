@@ -156,22 +156,21 @@ These coordinator operations require authorization; the live outcome is recorded
    it ignores automated-reconciliation holds and retains the original policy.
 6. Retain the migration module and cohort properties while exceptions still need
    the original migration policy. Initialization or installation of holds alone
-   is not completed migration. A cohort member without a repository or saved
-   access evidence may instead be explicitly moved to the normal daily policy;
-   clear that member's migration floor and hold before deleting the snapshot.
+   is not completed migration. If the coordinator elects the normal daily policy
+   for all remaining unresolved members, clear their migration floors and holds
+   before deleting the snapshot.
 
 Cleanup deletes the entire migration module, including its cohort preview,
 initialization, evidence preview, execution, registration-date helper and migration
 calculation. Delete properties `PROGRESS_ELIGIBILITY_MIGRATION` and
 `PROGRESS_ELIGIBILITY_MIGRATION_COHORT_<n>` and migration-specific tests/runbook steps.
 The temporary editor function `cleanupProgressEligibilityMigrationProperties()`
-can retire the snapshot when remaining cohort members have no team repositories
-and no saved access evidence. It clears their migration enforcement floors and
-removes only their reconciliation holds so daily steady-state eligibility can
-process them when their repositories exist. It preserves fixed rows and unrelated
-holds. The function stops if an unresolved member has a repository or saved
-evidence requiring manual review. Run it as coordinator after reviewing the
-cohort; remove it with the rest of the migration module during code cleanup.
+retires the snapshot after moving every unresolved cohort member to normal daily
+eligibility. It clears their migration floors and only their reconciliation holds,
+then derives effective dates solely from steady-state first detection or commit
+evidence. It preserves fixed rows and unrelated holds. A team repository URL
+does not establish individual participation. Run it as coordinator after reviewing
+the cohort; remove it with the rest of the migration module during code cleanup.
 There are no migration branches in production to retain. The retired audit-mode
 property can also be removed if present; no code reads it.
 
@@ -234,6 +233,10 @@ are inert. Daily reconciliation completed at 11:05:03 IST with
 comparison confirmed no row changed. Never clear these holds or delete the
 cohort/module to let steady state finish an exception. Once genuine prerequisites
 arrive, manually resume migration using the saved cohort and original cutover.
+
+The later coordinator decision to move unresolved cohort members to normal daily
+eligibility supersedes that cleanup restriction. The temporary cleanup function
+clears their floors and holds before removing the migration snapshot.
 
 The coordinator-owned daily trigger was installed and its Day timer, 2–3 AM
 GMT+05:30 schedule verified. All five existing triggers were retained:

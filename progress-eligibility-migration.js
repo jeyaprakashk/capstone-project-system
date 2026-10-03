@@ -189,7 +189,7 @@ function initializeProgressEligibilityMigration(cutoverIso) {
   });
 }
 
-/** TEMPORARY: move no-repository cohort exceptions to steady state, then retire the snapshot. */
+/** TEMPORARY: move unresolved cohort exceptions to steady state, then retire the snapshot. */
 function cleanupProgressEligibilityMigrationProperties() {
   progressEligibilityCoordinator_();
   return weeklyLock_(()=>{
@@ -199,14 +199,12 @@ function cleanupProgressEligibilityMigrationProperties() {
     const unresolved = plan.students.map(student=>progressStudentEligibility_(student,records,windows))
       .filter(record=>!record.eligibleFrom);
     unresolved.forEach(record=>{
-      if (!record.rowNumber || getRepoUrlForTeam(record.teamId)) throw new Error('Migration cleanup requires a saved unresolved student with no team repository: '+record.regNo);
-      if (record.firstDetected || record.firstCommit || record.effectiveDate || record.fixingDate || record.source || record.evidence) {
-        throw new Error('Migration cleanup requires manual review of saved evidence: '+record.regNo);
-      }
+      if (!record.rowNumber) throw new Error('Migration cleanup requires a saved cohort row: '+record.regNo);
     });
     const properties = PropertiesService.getScriptProperties();
     const holds = progressEligibilityHolds_();
-    unresolved.forEach(record=>writeProgressEligibility_({...record,enforcedFrom:'',status:'PENDING',checkedAt:'',error:''}));
+    unresolved.forEach(record=>writeProgressEligibility_({...record,...progressSelectEvidenceDate_(record),
+      enforcedFrom:'',fixingDate:'',status:'PENDING',checkedAt:'',error:''}));
     unresolved.forEach(record=>holds.delete(normalizeText_(record.regNo)));
     if (properties.getProperty('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS')) {
       properties.setProperty('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS',JSON.stringify([...holds]));
