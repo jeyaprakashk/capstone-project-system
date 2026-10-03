@@ -27,7 +27,7 @@ function studentViewBrowser_(bridge, getUi) {
 
   function rosterMarkup(roster) {
     return '<div class="mt-3 flex flex-wrap gap-3">' + roster.map((r, i) =>
-      '<div class="flex items-center gap-2 rounded-lg border border-edge bg-paper px-3 py-2"><span class="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold text-paper ' + AVATAR[i % 3] + '">' + escape(r.initials) + '</span>' +
+      '<div class="flex items-center gap-2 rounded-card border border-edge bg-paper shadow-card px-3 py-2"><span class="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold text-paper ' + AVATAR[i % 3] + '">' + escape(r.initials) + '</span>' +
       '<div><div class="text-sm font-semibold text-ink">' + escape(r.name) + (r.isMe ? ' <span class="ml-1 rounded-md bg-tint px-1.5 py-0.5 text-xs font-semibold text-primary">you</span>' : '') + '</div><div class="text-xs text-muted">' + escape(r.regno) + '</div></div></div>').join('') + '</div>';
   }
   function stepNode(number, state) {
@@ -95,14 +95,14 @@ function studentViewBrowser_(bridge, getUi) {
       (dto.titleApproved ? '<a class="text-sm text-primary underline" href="#studentWeeklyProgress" data-action="open-logs">View all logs</a>' : '') + '</header>' +
       '<div id="studentRecentActivity" class="mt-2">' + (dto.titleApproved ? ui.renderSkeleton('panel', 'Loading recent logs') : '<p class="text-sm text-muted">Weekly logs will appear after project setup.</p>') + '</div></section>' +
       '<section class="' + CARD + ' p-4" aria-label="Assessments"><header><h3 class="text-base font-semibold text-ink">Assessments</h3></header><div class="mt-2 flex flex-col gap-3">' +
-      a.reviews.map(r => '<section id="studentAssessment-' + escape(r.key) + '" data-review-result="' + escape(r.key) + '" data-assessment-label="' + escape(r.label) + '" class="rounded-lg border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading ' + r.label + ' results') + '</section>').join('') +
-      '<section id="studentGuideEvaluation" data-assessment-label="' + escape(a.guideEvaluationLabel) + '" class="rounded-lg border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading guide evaluation') + '</section></div></section></div>';
+      a.reviews.map(r => '<section id="studentAssessment-' + escape(r.key) + '" data-review-result="' + escape(r.key) + '" data-assessment-label="' + escape(r.label) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading ' + r.label + ' results') + '</section>').join('') +
+      '<section id="studentGuideEvaluation" data-assessment-label="' + escape(a.guideEvaluationLabel) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading guide evaluation') + '</section></div></section></div>';
   }
 
   function render(host, dto) {
     state.host = host; state.dto = dto;
     const ui = getUi();
-    host.innerHTML = '<div><h2 class="text-lg font-semibold text-ink">Team <span class="text-primary">' + escape(dto.teamId) + '</span></h2>' + rosterMarkup(dto.roster) + '<div class="mt-4">' + setupMarkup(dto) + '</div>' +
+    host.innerHTML = '<div><h2 class="text-xl font-semibold text-ink">Team <span class="text-primary">' + escape(dto.teamId) + '</span></h2>' + rosterMarkup(dto.roster) + '<div class="mt-4">' + setupMarkup(dto) + '</div>' +
       (dto.titleApproved ? weeklyMarkup(ui) : '') + sideMarkup(dto, ui) + '</div>';
     host.onclick = onClick;
     host.onsubmit = onSubmit;

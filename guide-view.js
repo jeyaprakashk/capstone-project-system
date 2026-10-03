@@ -28,7 +28,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   const PRIMARY = 'border-0 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
   const PILL = 'flex items-center gap-2 border-0 rounded-lg bg-transparent px-3 py-1.5 text-sm text-ink-2 aria-pressed:bg-paper aria-pressed:text-primary aria-pressed:shadow-selected';
   const STEP = 'flex w-full flex-col gap-0.5 border-0 rounded-lg bg-transparent px-3 py-2 text-left text-sm hover:bg-tint aria-pressed:bg-tint disabled:opacity-60';
-  const TILE ='flex w-full flex-col gap-1 rounded-lg border border-edge border-l-4 border-l-transparent bg-paper p-3 text-left text-sm hover:bg-tint aria-pressed:border-l-primary aria-pressed:bg-tint disabled:opacity-60';
+  const TILE ='flex w-full flex-col gap-1 rounded-card border border-edge border-l-4 shadow-card border-l-transparent bg-paper p-3 text-left text-sm hover:bg-tint aria-pressed:border-l-primary aria-pressed:bg-tint disabled:opacity-60';
 
   const timingBadge = (state, label) => '<span class="' + TONE[(TIMING[state] || TIMING.unknown)[0]] + '">' + escape(label || (TIMING[state] || TIMING.unknown)[1]) + '</span>';
   let tooltipSequence = 0;
@@ -53,7 +53,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   }
   function githubCard(team, githubDue) {
     const g = team.github;
-    return '<aside class="rounded-lg border border-edge border-l-4 bg-paper p-4 ' + (g ? CARD_EDGE[g.tone] || CARD_EDGE.gray : CARD_EDGE.gray) + '"><div><h3 class="text-base font-semibold text-ink">GitHub status</h3><p class="text-sm text-muted">Due: ' + escape(githubDue || 'Date unavailable') + '</p></div>' +
+    return '<aside class="rounded-card border border-edge border-l-4 bg-paper shadow-card p-4 ' + (g ? CARD_EDGE[g.tone] || CARD_EDGE.gray : CARD_EDGE.gray) + '"><div><h3 class="text-base font-semibold text-ink">GitHub status</h3><p class="text-sm text-muted">Due: ' + escape(githubDue || 'Date unavailable') + '</p></div>' +
       (g ? '<ul aria-label="Team GitHub status" class="mt-2 divide-y divide-edge">' + g.members.map(githubMemberMarkup).join('') + '</ul>' : '<p role="status" class="mt-2 text-sm text-muted">GitHub status unavailable. Refresh the dashboard to retry.</p>') +
       repositoryLine(team.repoUrl) + '</aside>';
   }
@@ -100,7 +100,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
       else if (key === 'REJECTED_BY_GUIDE') body += p('<strong>Your note:</strong> ' + escape(team.guideNotes || '(none)')) + p('Waiting on the team to resubmit.');
       else if (key === 'REVISE_AWAITING_STUDENT') body += p('<strong>Reviewer\'s note:</strong> ' + escape(team.reviewerNotes || '(none)')) + p('Waiting for the team to resubmit — nothing for you to do until they do.');
     }
-    return '<div id="card-' + id + '" class="rounded-lg border border-edge border-l-4 bg-paper p-4 ' + (CARD_EDGE[status.tone] || CARD_EDGE.gray) + '">' +
+    return '<div id="card-' + id + '" class="rounded-card border border-edge border-l-4 bg-paper shadow-card p-4 ' + (CARD_EDGE[status.tone] || CARD_EDGE.gray) + '">' +
       '<div class="flex flex-wrap items-center gap-2"><h3 class="text-base font-semibold text-ink">Title approval</h3><span class="' + (TONE[status.tone] || TONE.gray) + '">Team ' + id + ' · ' + escape(status.text) + '</span>' +
       (team.titleTiming ? '<span class="inline-flex items-center gap-2">' + timingBadge(team.titleTiming.state) + '<small class="text-xs text-muted">' + escape(team.titleTiming.explanation) + '</small></span>' : '') + '</div>' +
       (team.overdueLogs ? p(team.overdueLogs + ' student weekly log(s) overdue', 'text-danger') : '') +
@@ -128,13 +128,13 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   function panelMarkup(team, index, githubDue) {
     return '<section data-guide-team="' + escape(team.teamId) + '" data-guide-students="' + escape(JSON.stringify(team.registerNumbers)) + '"' + (index ? ' hidden' : '') + '>' +
       '<div data-guide-view="title"><div class="grid gap-4 lg:grid-cols-3"><div class="lg:order-last">' + githubCard(team, githubDue) + '</div><div class="lg:col-span-2">' + titleCard(team) + '</div></div></div>' +
-      '<div data-guide-view="documents" hidden class="rounded-lg border border-edge bg-paper p-4">' + documentsView(team) + '</div></section>';
+      '<div data-guide-view="documents" hidden class="rounded-card border border-edge bg-paper shadow-card p-4">' + documentsView(team) + '</div></section>';
   }
   function tabMarkup(view, iconName, title, subtitle, selected, disabled) {
     return '<button type="button" class="' + STEP + '" data-guide-tab="' + view + '" aria-pressed="' + selected + '"' + (disabled ? ' disabled title="' + escape(subtitle) + '"' : '') + '><strong class="flex items-center gap-1">' + icon(iconName) + title + '</strong><span class="text-xs text-muted">' + escape(disabled ? subtitle : subtitle) + '</span></button>';
   }
   function headerMarkup(updated) {
-    return '<div class="flex items-start justify-between gap-4"><div><h2 class="text-lg font-semibold text-ink">Guide Dashboard</h2><p id="guideUpdated" class="text-sm text-muted">' + escape(updated) + '</p></div>' +
+    return '<div class="flex items-start justify-between gap-4"><div><h2 class="text-xl font-semibold text-ink">Guide Dashboard</h2><p id="guideUpdated" class="text-sm text-muted">' + escape(updated) + '</p></div>' +
       '<button type="button" class="' + BUTTON + ' inline-flex items-center gap-1" data-refresh-button id="guideRefresh" aria-label="Refresh Guide Dashboard" data-action="refresh">' + icon('refresh-cw') + 'Refresh</button></div>' +
       '<p id="guideRefreshStatus" class="mt-1 text-sm text-muted" data-refresh-status role="status" aria-live="polite"></p>';
   }
@@ -152,10 +152,10 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
         tabMarkup('documents', 'file-text', 'Documents', 'Submitted files', false) +
         (evaluation.enabled ? tabMarkup('evaluation', 'graduation-cap', 'Guide Evaluation', 'Individual assessment', false) : tabMarkup('evaluation', 'lock-keyhole', 'Guide Evaluation', evaluation.notice, false, true)) + '</nav></div>' +
       '<div class="mt-3">' + teams.map((t, i) => panelMarkup(t, i, dto.githubDue)).join('') + '</div>' +
-      '<section id="guideWeeklyProgress" data-guide-weeks="' + escape(JSON.stringify(dto.weeks)) + '" class="mt-3 rounded-lg border border-edge bg-paper p-4" hidden aria-label="Weekly progress confirmation">' +
-        '<div><h2 class="text-lg font-semibold text-ink">Weekly Progress</h2></div><p data-guide-weekly-status role="status" class="text-sm text-muted"></p>' +
+      '<section id="guideWeeklyProgress" data-guide-weeks="' + escape(JSON.stringify(dto.weeks)) + '" class="mt-3 rounded-card border border-edge bg-paper shadow-card p-4" hidden aria-label="Weekly progress confirmation">' +
+        '<div><h2 class="text-xl font-semibold text-ink">Weekly Progress</h2></div><p data-guide-weekly-status role="status" class="text-sm text-muted"></p>' +
         '<div data-guide-weekly-read>' + ui.renderSkeleton('panel', 'Reading weekly progress') + '</div></section>' +
-      '<section id="guideEvaluationEditor" class="mt-3 rounded-lg border border-edge bg-paper p-4" hidden aria-label="Guide evaluation editor"></section>' +
+      '<section id="guideEvaluationEditor" class="mt-3 rounded-card border border-edge bg-paper shadow-card p-4" hidden aria-label="Guide evaluation editor"></section>' +
       '</div>';
   }
 

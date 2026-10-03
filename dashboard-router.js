@@ -80,12 +80,14 @@ function buildDashboardShell(email, views) {
 
   // Role tabs are followed by common utility tabs (Rubrics, System Status). They are not roles.
   const roleIcons = { student:'graduation-cap', guide:'book-open', reviewer:'clipboard-check', coord:'network' };
+  const TAB = "border-0 inline-flex w-full items-center gap-2 rounded-lg bg-transparent px-3 py-2 text-left text-sm text-ink-2 hover:bg-tint aria-selected:bg-tint aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50";
+  const initials = escapeHtml(String(email).split("@")[0].split(/[._-]+/).filter(Boolean).slice(0, 2).map(p => p[0]).join("").toUpperCase());
   const roleButtons = views.map((view, index) =>
-    `<button type="button" class="border-x-0 border-t-0 -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-[3px] border-transparent bg-transparent px-4 py-3 text-sm text-muted hover:text-ink aria-selected:border-primary aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml(view.key)}" aria-controls="rolePanel-${escapeHtml(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml(view.key)}">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml(view.label)}</button>`
+    `<button type="button" class="${TAB}${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml(view.key)}" aria-controls="rolePanel-${escapeHtml(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml(view.key)}">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml(view.label)}</button>`
   ).join('');
-  const rubricsButton = `<button type="button" class="border-x-0 border-t-0 -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-[3px] border-transparent bg-transparent px-4 py-3 text-sm text-muted hover:text-ink aria-selected:border-primary aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50" role="tab" id="roleTab-rubrics" aria-controls="rolePanel-rubrics" aria-selected="false" tabindex="-1" data-role-tab="rubrics">${renderLucideIcon_('book-open')}Timeline &amp; Rubrics</button>`;
+  const rubricsButton = `<button type="button" class="${TAB}" role="tab" id="roleTab-rubrics" aria-controls="rolePanel-rubrics" aria-selected="false" tabindex="-1" data-role-tab="rubrics">${renderLucideIcon_('book-open')}Timeline &amp; Rubrics</button>`;
   const hasCoordinator = views.some(view => view.key === 'coord');
-  const systemButton = hasCoordinator ? `<button type="button" class="border-x-0 border-t-0 -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-[3px] border-transparent bg-transparent px-4 py-3 text-sm text-muted hover:text-ink aria-selected:border-primary aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50" role="tab" id="roleTab-system-status" aria-controls="rolePanel-system-status" aria-selected="false" tabindex="-1" data-role-tab="system-status">${renderLucideIcon_('activity')}System Status</button>` : '';
+  const systemButton = hasCoordinator ? `<button type="button" class="${TAB}" role="tab" id="roleTab-system-status" aria-controls="rolePanel-system-status" aria-selected="false" tabindex="-1" data-role-tab="system-status">${renderLucideIcon_('activity')}System Status</button>` : '';
   const systemPanel = hasCoordinator ? `<section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-system-status" role="tabpanel" aria-labelledby="roleTab-system-status" data-role-panel="system-status" hidden>${buildDashboardContainerHeader_('System Status', 'systemStatus')}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
 
   const rolePanels = views.map((view, index) =>
@@ -103,21 +105,23 @@ function buildDashboardShell(email, views) {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
 ${HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent()}
 </head>
-<body class="mx-auto max-w-[1100px] px-4 pb-10 pt-6">
-<header class="mb-4">
-<h1 class="m-0 text-xl font-semibold text-ink">Dashboard</h1>
-<p class="m-0 mb-3 text-sm text-muted">Signed in as ${escapeHtml(email)}</p>
+<body class="min-h-screen bg-canvas md:pl-60">
+<header class="border-b border-edge bg-paper px-4 py-3 md:fixed md:inset-y-0 md:left-0 md:w-60 md:overflow-y-auto md:border-b-0 md:border-r">
+<h1 class="m-0 mb-3 text-base font-semibold text-ink">Dashboard</h1>
 <nav class="dashboard-navigation group/nav" id="dashboardNavigation" aria-label="Dashboard sections">
-<button type="button" class="role-menu-toggle hidden max-[1200px]:flex border-0 items-center gap-2 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span id="roleMenuLabel">${escapeHtml(views[0].label)}</span><span>Menu</span></button>
-<div class="role-tabs flex max-[1200px]:hidden max-[1200px]:group-[.menu-open]/nav:flex gap-1 overflow-x-auto overflow-y-hidden border-b border-edge" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}${rubricsButton}${systemButton}</div>
+<button type="button" class="role-menu-toggle flex md:hidden border-0 items-center gap-2 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span id="roleMenuLabel">${escapeHtml(views[0].label)}</span><span>Menu</span></button>
+<div class="role-tabs hidden group-[.menu-open]/nav:flex md:flex flex-col gap-1 mt-2 md:mt-0" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}${rubricsButton}${systemButton}</div>
 </nav>
 </header>
+<div class="flex items-center justify-between gap-3 border-b border-edge bg-paper px-4 py-3 text-sm text-muted"><span>Workspace</span><span class="inline-flex items-center gap-2">Signed in as ${escapeHtml(email)}<span class="inline-flex size-8 items-center justify-center rounded-full bg-tint text-xs font-semibold text-primary">${initials}</span></span></div>
+<main class="mx-auto max-w-[1100px] px-4 pb-10">
 <section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-rubrics" role="tabpanel" aria-labelledby="roleTab-rubrics" data-role-panel="rubrics" hidden>
-<section id="sharedProjectTimeline" hidden aria-label="Project timeline" aria-busy="true"><div><h2>Project timeline</h2></div>${getSkeletonMarkup_('timeline', 'Loading project timeline')}</section>
+<section id="sharedProjectTimeline" hidden class="mb-4 rounded-card border border-edge bg-paper p-4 shadow-card" aria-label="Project timeline" aria-busy="true"><div><h2>Project timeline</h2></div>${getSkeletonMarkup_('timeline', 'Loading project timeline')}</section>
 <section id="sharedRubrics" hidden class="shared-rubrics @container/rubrics rounded-card border border-edge bg-paper shadow-card" aria-labelledby="sharedRubricsHeading" aria-busy="true"><div><h2 id="sharedRubricsHeading">Rubrics &amp; Guidelines</h2></div><div id="sharedRubricsContent">${getSkeletonMarkup_('panel', 'Loading assessment rubrics')}</div></section>
 </section>
 ${rolePanels}
 ${systemPanel}
+</main>
 <div id="rubricDrawerBackdrop" class="team-drawer-backdrop fixed inset-0 z-40 bg-scrim animate-[fade-in_.15s_cubic-bezier(.2,0,0,1)]" hidden aria-hidden="true"></div>
 <aside id="rubricDrawer" class="fixed inset-y-0 right-0 z-40 flex w-full max-w-[420px] flex-col bg-paper shadow-overlay animate-[slide-in-right_.25s_cubic-bezier(.2,0,0,1)]" data-tooltip-boundary role="dialog" aria-modal="true" aria-labelledby="rubricDrawerTitle" aria-hidden="true" inert hidden>
   <div class="flex items-center justify-between gap-3 border-b border-edge px-5 py-4"><div><div>ASSESSMENT RUBRIC</div><h2 id="rubricDrawerTitle"></h2></div>

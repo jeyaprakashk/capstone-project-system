@@ -25,7 +25,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
     success:BADGE + 'bg-success-tint text-success ring-success/20', warning:BADGE + 'bg-warning-tint text-warning ring-warning/20',
     danger:BADGE + 'bg-danger-tint text-danger ring-danger/20', info:BADGE + 'bg-info-tint text-info ring-info/20'
   };
-  const CARD_TONE = {complete:'border-l-success', danger:'border-l-danger', warning:'border-l-accent', neutral:'border-l-control'};
+  const DOT = {complete:'bg-success', danger:'bg-danger', warning:'bg-accent', neutral:'bg-control'};
   const SORT_TYPE = {pair:'pair', text:'text'};
 
   const effective = () => state.progress || state.overview;
@@ -39,8 +39,8 @@ function coordinatorViewBrowser_(bridge, getUi) {
 
   // ---- summary cards ----
   function statCard(c) {
-    return '<div class="rounded-card border border-edge border-l-4 bg-paper p-4 shadow-card ' + CARD_TONE[c.tone] + '" data-stat-card' + (c.progress ? ' data-progress-stat' : '') + ' data-completion-tone="' + c.tone + '">' +
-      '<div class="flex items-center justify-between gap-2 text-sm font-semibold text-ink-2"><span>' + c.label + '</span>' + icon(c.icon) + '</div>' +
+    return '<div class="rounded-card border border-edge bg-paper p-4 shadow-card" data-stat-card' + (c.progress ? ' data-progress-stat' : '') + ' data-completion-tone="' + c.tone + '">' +
+      '<div class="flex items-center justify-between gap-2 text-sm font-semibold text-ink-2"><span class="inline-flex items-center gap-2"><span class="size-2 rounded-full ' + DOT[c.tone] + '"></span>' + c.label + '</span>' + icon(c.icon) + '</div>' +
       '<div class="mt-2 flex items-baseline gap-2"><div class="text-kpi font-semibold tabular-nums text-ink" data-stat-value' + (c.ids ? ' id="coordinatorActiveTeams"' : '') + '>' + c.value + '</div>' +
       '<div class="stat-pct text-sm text-muted empty:hidden"' + (c.ids ? ' id="coordinatorActiveTeamsPct"' : '') + '>' + c.note + '</div></div><div class="mt-2 text-xs text-muted">' + c.detail + '</div></div>';
   }
@@ -162,7 +162,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
     const th = (label, type, column, title) => {
       const selected = sort.column === column, direction = selected ? sort.direction : 'none';
       const attr = (type ? ' data-sort-type="' + type + '" aria-sort="' + direction + '"' : '') + (title ? ' title="' + escape(title) + '"' : '');
-      return '<th class="px-3 py-2 text-left text-xs font-semibold text-ink-2" scope="col"' + attr + '>' + (type
+      return '<th class="px-3 py-2 text-left text-xs font-semibold text-muted" scope="col"' + attr + '>' + (type
         ? '<button type="button" class="' + SMALL + '" data-action="sort" data-column="' + column + '" data-type="' + type + '" data-sort-direction="' + direction + '" aria-label="Sort by ' + escape(label) + (selected && sort.direction === 'ascending' ? ' descending' : ' ascending') + '">' + escape(label) + '</button>'
         : escape(label)) + '</th>';
     };
@@ -199,7 +199,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
       '<div class="mt-3 inline-flex flex-wrap gap-1 rounded-xl bg-tint p-1" data-tracker-filters></div>' +
       '<div class="mt-2"><button class="' + BUTTON + '" type="button" id="weeklyActivityRetry" data-action="activity-retry" hidden>Retry activity</button><p id="weeklyActivityStatus" class="text-xs text-muted" role="status" aria-live="polite"></p></div>' +
       '<div class="mt-3 flex flex-wrap gap-2"><input type="text" id="trackerSearch" class="w-full max-w-md rounded-md border border-control px-3 py-2 text-sm" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" data-action="search"><button class="' + BUTTON + '" type="button" data-action="reset">Reset</button></div>' +
-      '<div class="tracker-table-scroll max-w-full overflow-x-auto overscroll-x-contain mt-3 rounded-tile border border-edge" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="w-full border-collapse text-sm"><thead class="bg-soft"></thead><tbody id="trackerBody"></tbody></table></div><div data-tracker-pagination></div></div>';
+      '<div class="tracker-table-scroll max-w-full overflow-x-auto overscroll-x-contain mt-3 rounded-card border border-edge" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="w-full border-collapse text-sm"><thead class="bg-soft"></thead><tbody id="trackerBody"></tbody></table></div><div data-tracker-pagination></div></div>';
   }
 
   // ---- frame ----
@@ -211,7 +211,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
       '<div id="teamDrawerContent" class="team-drawer-content flex-1 overflow-auto p-5" data-drawer-content></div><div class="flex justify-end gap-2 border-t border-edge px-5 py-3" hidden></div></aside>';
   }
   function headerMarkup() {
-    return '<div class="flex items-start justify-between gap-4"><div><h2 class="text-lg font-semibold text-ink">Coordinator Dashboard</h2><p id="coordUpdated" class="text-sm text-muted">Waiting for data…</p></div>' +
+    return '<div class="flex items-start justify-between gap-4"><div><h2 class="text-xl font-semibold text-ink">Coordinator Dashboard</h2><p id="coordUpdated" class="text-sm text-muted">Waiting for data…</p></div>' +
       '<button type="button" class="' + BUTTON + ' inline-flex items-center gap-1" data-refresh-button id="coordRefresh" aria-label="Refresh Coordinator Dashboard" data-action="refresh">' + icon('refresh-cw') + 'Refresh</button></div>' +
       '<p id="coordRefreshStatus" class="mt-1 text-sm text-muted" data-refresh-status role="status" aria-live="polite"></p>';
   }
