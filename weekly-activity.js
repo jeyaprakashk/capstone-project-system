@@ -15,7 +15,7 @@ function weeklyActivityContext_() {
     const schedule = getProjectSchedule_(), clock = getProjectClock_(schedule);
     const windows = getWeeklySubmissionWindows_(), now = clock.now || new Date();
     const window = windows.find(w=>now.getTime() >= w.opens_at && now.getTime() <= w.deadline_at);
-    return {schedule, clock, window, state:window ? 'active' : now.getTime() < windows[0].opens_at ? 'not-started' : 'ended'};
+    return {schedule, clock, window, state:window ? 'active' : now.getTime() < windows[0].opens_at ? 'not-started' : now.getTime() > windows[windows.length-1].deadline_at ? 'ended' : 'between'};
   } catch (err) { return {state:'unavailable'}; }
 }
 

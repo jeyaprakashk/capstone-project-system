@@ -35,6 +35,9 @@ function guideEnsureRows_(sheet, lastRow) {
 }
 function guideJournalName_() {return assessmentJournal_(assessmentDefinition_('guide_eval')).name;}
 function guideRecords_() {
+  return dashboardMemo_('guideRecords',guideRecordsUncached_);
+}
+function guideRecordsUncached_() {
   const sheet = getSheet(guideJournalName_());
   if (!sheet) throw new Error(assessmentStorageMissing_(guideJournalName_()));
   const values = sheet.getDataRange().getValues();

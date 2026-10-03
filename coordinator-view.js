@@ -31,7 +31,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
   const SORT_TYPE = {pair:'pair', text:'text'};
 
   const effective = () => state.progress || state.overview;
-  const activityLabel = result => result.state === 'active' ? 'Logs / commit records this week' : result.state === 'not-started' ? 'Weekly logging has not started' : result.state === 'ended' ? 'Weekly logging has ended' : 'Activity unavailable: check project dates';
+  const activityLabel = result => result.state === 'active' ? 'Logs / commit records this week' : result.state === 'not-started' ? 'Weekly logging has not started' : result.state === 'between' ? 'Next weekly window has not opened yet' : result.state === 'ended' ? 'Weekly logging has ended' : 'Activity unavailable: check project dates';
   const pct = (n, total) => total > 0 ? Math.round(n / total * 100) : 0;
   const completionTone = (total, value, color, note) => {
     if (!total || typeof value !== 'number' || /unavailable/i.test(note)) return 'neutral';

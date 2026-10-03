@@ -39,10 +39,23 @@ function parseAssessmentDefinitions_(rows,timezone) {
   definitions.forEach(visit);
   return definitions.sort((a,b)=>a.sequence-b.sequence||a.key.localeCompare(b.key));
 }
+/** Memoizes a derived read for the lifetime of one read-only dashboard snapshot (a no-op outside one), errors included. */
+function dashboardMemo_(key, compute) {
+  const snapshot = typeof dashboardReadSnapshot_ === 'undefined' ? null : dashboardReadSnapshot_;
+  if (!snapshot) return compute();
+  const memoKey = 'memo:' + key;
+  if (!Object.prototype.hasOwnProperty.call(snapshot, memoKey)) {
+    try { snapshot[memoKey] = {value:compute()}; } catch (error) { snapshot[memoKey] = {error}; }
+  }
+  if (snapshot[memoKey].error) throw snapshot[memoKey].error;
+  return snapshot[memoKey].value;
+}
 function getAssessmentDefinitions_() {
-  const sheet=getSheet('AssessmentDefinitions');
-  if(!sheet)return [];
-  return parseAssessmentDefinitions_(sheet.getDataRange().getValues(),getSpreadsheet().getSpreadsheetTimeZone());
+  return dashboardMemo_('assessmentDefinitions',()=>{
+    const sheet=getSheet('AssessmentDefinitions');
+    if(!sheet)return [];
+    return parseAssessmentDefinitions_(sheet.getDataRange().getValues(),getSpreadsheet().getSpreadsheetTimeZone());
+  });
 }
 /** Required consumers distinguish unfinished setup from a configured registry. */
 function requireAssessmentDefinitions_() {
@@ -58,6 +71,9 @@ function assessmentDefinition_(id) {
 }
 function isReviewAssessment_(key) {return getAssessmentDefinitions_().some(d=>d.key===key && d.type==='REVIEW');}
 function assessmentRubric_(definition) {
+  return dashboardMemo_('rubric:'+definition.key,()=>assessmentRubricUncached_(definition));
+}
+function assessmentRubricUncached_(definition) {
   const sheet=getSheet('Rubrics');if(!sheet)throw new Error('Rubrics tab is required.');
   const rows=sheet.getDataRange().getValues(),col=(rows[0]||[]).map(normalizeText_).indexOf('assessment id');
   if(col<0)throw new Error('Rubrics requires Assessment ID column.');
@@ -77,6 +93,9 @@ function assessmentPrerequisiteBlock_(definition,team) {
 /** Resolve configured storage, recognizing existing journals by assessment identity,
  * never by Review number. Reads do not create, rename, clear or migrate sheets. */
 function assessmentJournal_(definition) {
+  return dashboardMemo_('journal:'+definition.key+':'+definition.journal,()=>assessmentJournalUncached_(definition));
+}
+function assessmentJournalUncached_(definition) {
   if(definition.type==='SEE')throw new Error('SEE is evaluated outside this app and has no assessment journal.');
   const configured=getSheet(definition.journal);
   const inspect=(sheet,name)=>{

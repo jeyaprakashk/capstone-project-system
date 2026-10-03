@@ -28,7 +28,7 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | Endpoint | Role | Request | `data` shape | Replaces |
 | --- | --- | --- | --- | --- |
 | `API_coordinator_getOverview()` / `API_coordinator_getProgress()` | Coordinator | none | `CoordinatorDashboard` (below); overview has `loading:true` | `buildCoordinatorContent`, `loadCoordinatorSection` (removed) |
-| `API_coordinator_getActivity()` | Coordinator | none | `{state, week, checkedAt, teams:{<teamId lower-case>:{logs,commits}}, totalTeams, activeTeams}` | `loadAllTeamsWeeklyActivity` (wrapped) |
+| `API_coordinator_getActivity()` | Coordinator | none | `{state (`active`, `between` weeks, `not-started`, `ended`, `unavailable`), week, checkedAt, teams:{<teamId lower-case>:{logs,commits}}, totalTeams, activeTeams}` | `loadAllTeamsWeeklyActivity` (wrapped) |
 | `API_coordinator_getSystemStatus()` | Coordinator | none | `SystemStatus` (below) | `loadCoordinatorSystemStatus` (removed) |
 | `API_student_getWeekly()` / `API_student_submitWeekly(input)` | Student | input: `{requestId, weekId, workCompleted, guideDiscussion, blockers, nextAction}` | the existing weekly-progress object (`ready, weeks, actions, history, evidence, allWeeks, timezone, checkedAt …`) / `{ok, entryId, weekId, entryStatus, timeliness, firstSubmittedAt, message}` | `loadStudentWeeklyProgress` / `submitWeeklyProgress` called directly |
 | `API_guide_getWeekly()` / `API_guide_signWeekly(entryId, status)` | Guide | `status` is `DISCUSSED` or `NOT_DISCUSSED` | `{checkedAt, timezone, weeks, entries, requiredByWeek …}` / `{ok, entryId, status, message}` | `loadGuideWeeklyProgress` / `submitWeeklyGuideSignoff` called directly |

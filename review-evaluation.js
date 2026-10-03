@@ -35,6 +35,9 @@ function reviewContext_(teamId, staff, key) {
 }
 
 function reviewRecords_(key) {
+  return dashboardMemo_('reviewRecords:'+key,()=>reviewRecordsUncached_(key));
+}
+function reviewRecordsUncached_(key) {
   const storage=assessmentJournal_(assessmentDefinition_(key)),name=storage.name,sheet=storage.sheet;
   if (!sheet) return {sheet:null,records:[]};
   if(storage.state==='EMPTY')throw new Error(assessmentStorageMissing_(name));
