@@ -26,7 +26,9 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   const CARD_EDGE = {green:'border-l-success', orange:'border-l-accent', red:'border-l-danger', gray:'border-l-control'};
   const BUTTON = 'border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const PRIMARY = 'border-0 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
-  const TILE = 'flex w-full flex-col gap-1 rounded-lg border border-edge border-l-4 border-l-transparent bg-paper p-3 text-left text-sm hover:bg-tint aria-pressed:border-l-primary aria-pressed:bg-tint disabled:opacity-60';
+  const PILL = 'flex items-center gap-2 border-0 rounded-lg bg-transparent px-3 py-1.5 text-sm text-ink-2 aria-pressed:bg-paper aria-pressed:text-primary aria-pressed:shadow-selected';
+  const STEP = 'flex w-full flex-col gap-0.5 border-0 rounded-lg bg-transparent px-3 py-2 text-left text-sm hover:bg-tint aria-pressed:bg-tint disabled:opacity-60';
+  const TILE ='flex w-full flex-col gap-1 rounded-lg border border-edge border-l-4 border-l-transparent bg-paper p-3 text-left text-sm hover:bg-tint aria-pressed:border-l-primary aria-pressed:bg-tint disabled:opacity-60';
 
   const timingBadge = (state, label) => '<span class="' + TONE[(TIMING[state] || TIMING.unknown)[0]] + '">' + escape(label || (TIMING[state] || TIMING.unknown)[1]) + '</span>';
   let tooltipSequence = 0;
@@ -114,10 +116,8 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
 
   function selectorMarkup(team, index) {
     const id = escape(team.teamId), attention = team.status.key === 'NEEDS_REVIEW';
-    return '<button type="button" class="' + TILE + '" data-guide-select="' + id + '" data-title-attention="' + attention + '" data-documents-attention="' + team.documents.length + '" aria-pressed="' + (index === 0) + '">' +
-      '<span class="flex items-center justify-between gap-2"><strong>Team ' + id + '</strong><span data-team-attention role="status">' + (attention ? '<span class="' + TONE.orange + '">Title review &middot; 1</span>' : getUi().renderSkeleton('inline', 'Checking team actions')) + '</span></span>' +
-      '<span class="text-ink-2">' + escape(team.title || 'No title submitted yet') + '</span>' +
-      '<span class="inline-flex items-center gap-1 text-xs text-muted">' + icon('users') + plural(team.members.length, 'member') + '</span></button>';
+    return '<button type="button" class="' + PILL + '" data-guide-select="' + id + '" data-title-attention="' + attention + '" data-documents-attention="' + team.documents.length + '" aria-pressed="' + (index === 0) + '" title="' + escape(team.title || 'No title submitted yet') + '">' +
+      '<strong>' + id + '</strong><span data-team-attention role="status">' + (attention ? '<span class="' + TONE.orange + '">1</span>' : getUi().renderSkeleton('inline', 'Checking team actions')) + '</span></button>';
   }
   const memberNames = team => team.members.map(m => m.regno ? escape(m.name) + ' (' + escape(m.regno) + ')' : escape(m.name)).join(', ');
   function headingMarkup(team, index) {
@@ -131,7 +131,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
       '<div data-guide-view="documents" hidden class="rounded-lg border border-edge bg-paper p-4">' + documentsView(team) + '</div></section>';
   }
   function tabMarkup(view, iconName, title, subtitle, selected, disabled) {
-    return '<button type="button" class="' + TILE + '" data-guide-tab="' + view + '" aria-pressed="' + selected + '"' + (disabled ? ' disabled title="' + escape(subtitle) + '"' : '') + '><strong class="flex items-center gap-1">' + icon(iconName) + title + '</strong><span class="text-xs text-muted">' + escape(disabled ? subtitle : subtitle) + '</span></button>';
+    return '<button type="button" class="' + STEP + '" data-guide-tab="' + view + '" aria-pressed="' + selected + '"' + (disabled ? ' disabled title="' + escape(subtitle) + '"' : '') + '><strong class="flex items-center gap-1">' + icon(iconName) + title + '</strong><span class="text-xs text-muted">' + escape(disabled ? subtitle : subtitle) + '</span></button>';
   }
   function headerMarkup(updated) {
     return '<div class="flex items-start justify-between gap-4"><div><h2 class="text-lg font-semibold text-ink">Guide Dashboard</h2><p id="guideUpdated" class="text-sm text-muted">' + escape(updated) + '</p></div>' +
@@ -143,20 +143,20 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   function workspaceMarkup(dto) {
     const teams = dto.teams, ui = getUi();
     const evaluation = dto.evaluation;
-    return '<div data-guide-workspace class="mt-4 grid gap-4 lg:grid-cols-4">' +
-      '<aside aria-label="My teams" class="lg:col-span-1"><div class="mb-2 flex items-center justify-between"><h3 class="text-base font-semibold text-ink">My teams</h3><span class="text-sm text-muted">' + plural(teams.length, 'team') + '</span></div>' +
-      '<div class="flex flex-col gap-2">' + teams.map(selectorMarkup).join('') + '</div></aside>' +
-      '<div class="lg:col-span-3">' + teams.map(headingMarkup).join('') +
-      '<nav class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Team workspace">' +
+    return '<div data-guide-workspace class="mt-4 flex flex-col gap-4">' +
+      '<aside aria-label="My teams"><h3 class="text-base font-semibold text-ink">My Teams</h3><p class="text-sm text-muted">Pick a team to review its progress.</p>' +
+      '<div class="mt-3 inline-flex flex-wrap gap-1 rounded-xl bg-tint p-1">' + teams.map(selectorMarkup).join('') + '</div></aside>' +
+      '<div class="grid rounded-card border border-edge bg-paper shadow-card lg:grid-cols-3"><div class="p-5 lg:col-span-2">' + teams.map(headingMarkup).join('') + '</div>' +
+      '<nav class="flex flex-col gap-1 border-t border-edge p-3 lg:border-l lg:border-t-0" aria-label="Team workspace">' +
         tabMarkup('title', 'tag', 'Title review', 'Submission & decision', true) + tabMarkup('weekly', 'trending-up', 'Weekly progress', 'Student updates & discussion', false) +
         tabMarkup('documents', 'file-text', 'Documents', 'Submitted files', false) +
-        (evaluation.enabled ? tabMarkup('evaluation', 'graduation-cap', 'Guide Evaluation', 'Individual assessment', false) : tabMarkup('evaluation', 'lock-keyhole', 'Guide Evaluation', evaluation.notice, false, true)) + '</nav>' +
+        (evaluation.enabled ? tabMarkup('evaluation', 'graduation-cap', 'Guide Evaluation', 'Individual assessment', false) : tabMarkup('evaluation', 'lock-keyhole', 'Guide Evaluation', evaluation.notice, false, true)) + '</nav></div>' +
       '<div class="mt-3">' + teams.map((t, i) => panelMarkup(t, i, dto.githubDue)).join('') + '</div>' +
       '<section id="guideWeeklyProgress" data-guide-weeks="' + escape(JSON.stringify(dto.weeks)) + '" class="mt-3 rounded-lg border border-edge bg-paper p-4" hidden aria-label="Weekly progress confirmation">' +
         '<div><h2 class="text-lg font-semibold text-ink">Weekly Progress</h2></div><p data-guide-weekly-status role="status" class="text-sm text-muted"></p>' +
         '<div data-guide-weekly-read>' + ui.renderSkeleton('panel', 'Reading weekly progress') + '</div></section>' +
       '<section id="guideEvaluationEditor" class="mt-3 rounded-lg border border-edge bg-paper p-4" hidden aria-label="Guide evaluation editor"></section>' +
-      '</div></div>';
+      '</div>';
   }
 
   function render(host, dto) {
