@@ -292,20 +292,33 @@ test('migration snapshot excludes later arrivals and historical registration ref
  assert.equal(result.source,'FIRST_DETECTED');assert.equal(result.effectiveDate.toISOString(),'2026-01-02T00:00:00.000Z');
 });
 
-test('temporary migration property cleanup requires a fixed cohort and coordinator',()=>{
+test('temporary cleanup moves only no-repository exceptions to steady state',()=>{
  const f=fixture();f.c.initializeProgressEligibilityMigration();
  const before=JSON.stringify([...f.properties]);
- assert.throws(()=>f.c.cleanupProgressEligibilityMigrationProperties(),/2 cohort students remain unresolved/);
+ assert.throws(()=>f.c.cleanupProgressEligibilityMigrationProperties(),/no team repository/);
  assert.equal(JSON.stringify([...f.properties]),before);
  f.user('one@example.com');
  assert.throws(()=>f.c.cleanupProgressEligibilityMigrationProperties(),/Coordinator access is required/);
- f.user('coord@example.com');f.setEligibility('W1');
- f.properties.set('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS','["001"]');
+ f.user('coord@example.com');f.setEligibility('W1','001');f.set('Repo URL','');
+ f.properties.set('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS','["002","other"]');
  const result=f.c.cleanupProgressEligibilityMigrationProperties();
- assert.equal(result.students,2);assert.equal(result.chunksDeleted,1);
+ assert.equal(result.students,2);assert.equal(result.movedToSteadyState,1);assert.equal(result.chunksDeleted,1);
  assert.equal(f.properties.has('PROGRESS_ELIGIBILITY_MIGRATION'),false);
  assert.equal(f.properties.has('PROGRESS_ELIGIBILITY_MIGRATION_COHORT_0'),false);
- assert.equal(f.properties.get('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS'),'["001"]');
+ assert.equal(f.properties.get('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS'),'["other"]');
+ assert.equal(f.record('001').eligibleFrom,'W1');assert.equal(f.record('002').enforcedFrom,'');
+ f.set('Repo URL','https://github.com/org/team');
+ assert.equal(f.run().fixed,1);assert.equal(f.record('002').eligibleFrom,'W1');
+});
+
+test('temporary cleanup preserves cohort properties when an exception has saved evidence',()=>{
+ const f=fixture();f.c.initializeProgressEligibilityMigration();f.set('Repo URL','');
+ const columns=f.pe.rows[0], row=f.pe.rows[1];
+ row[columns.indexOf('Collaborator First Detected At')]=new Date('2026-01-01');
+ const before=JSON.stringify([...f.properties]);
+ assert.throws(()=>f.c.cleanupProgressEligibilityMigrationProperties(),/manual review of saved evidence/);
+ assert.equal(JSON.stringify([...f.properties]),before);
+ assert.equal(f.record('001').enforcedFrom,'W1');
 });
 
 test('production contains no audit policy, migration calculation or registration timestamp source',()=>{

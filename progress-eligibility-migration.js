@@ -189,18 +189,30 @@ function initializeProgressEligibilityMigration(cutoverIso) {
   });
 }
 
-/** TEMPORARY: run once in the Apps Script editor after every cohort member is fixed. */
+/** TEMPORARY: move no-repository cohort exceptions to steady state, then retire the snapshot. */
 function cleanupProgressEligibilityMigrationProperties() {
   progressEligibilityCoordinator_();
   return weeklyLock_(()=>{
     const plan = readProgressEligibilityMigration_();
     if (!plan || plan.state !== 'INITIALIZED') throw new Error('Initialized migration snapshot is required for cleanup.');
     const records = readProgressEligibility_(), windows = getWeeklySubmissionWindows_();
-    const unresolved = plan.students.filter(student=>!progressStudentEligibility_(student,records,windows).eligibleFrom);
-    if (unresolved.length) throw new Error('Migration cleanup blocked: '+unresolved.length+' cohort students remain unresolved.');
+    const unresolved = plan.students.map(student=>progressStudentEligibility_(student,records,windows))
+      .filter(record=>!record.eligibleFrom);
+    unresolved.forEach(record=>{
+      if (!record.rowNumber || getRepoUrlForTeam(record.teamId)) throw new Error('Migration cleanup requires a saved unresolved student with no team repository: '+record.regNo);
+      if (record.firstDetected || record.firstCommit || record.effectiveDate || record.fixingDate || record.source || record.evidence) {
+        throw new Error('Migration cleanup requires manual review of saved evidence: '+record.regNo);
+      }
+    });
     const properties = PropertiesService.getScriptProperties();
+    const holds = progressEligibilityHolds_();
+    unresolved.forEach(record=>writeProgressEligibility_({...record,enforcedFrom:'',status:'PENDING',checkedAt:'',error:''}));
+    unresolved.forEach(record=>holds.delete(normalizeText_(record.regNo)));
+    if (properties.getProperty('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS')) {
+      properties.setProperty('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS',JSON.stringify([...holds]));
+    }
     for (let index=0;index<plan.chunks;index++) properties.deleteProperty('PROGRESS_ELIGIBILITY_MIGRATION_COHORT_'+index);
     properties.deleteProperty('PROGRESS_ELIGIBILITY_MIGRATION');
-    return {ok:true,students:plan.students.length,chunksDeleted:plan.chunks};
+    return {ok:true,students:plan.students.length,movedToSteadyState:unresolved.length,chunksDeleted:plan.chunks};
   });
 }
