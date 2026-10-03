@@ -16,7 +16,7 @@ function weeklyFixture() {
       })};
     sheets.set(name,value);return value;
   }
-  const props={getProperty:k=>properties.get(k)||null,setProperty:(k,v)=>properties.set(k,v),deleteProperty:k=>properties.delete(k)};
+  const props={getProperty:k=>properties.get(k)||null,getProperties:()=>Object.fromEntries(properties),setProperty:(k,v)=>properties.set(k,v),deleteProperty:k=>properties.delete(k)};
   const book={getSpreadsheetTimeZone:()=> 'Asia/Kolkata',getSheetByName:n=>sheets.get(n)||null,getSheets:()=>[...sheets.values()],insertSheet:n=>sheet(n,[])};
   const lock={hasLock:()=>locked,tryLock:()=>{if(locked)return false;locked=true;return true;},waitLock:()=>{locked=true;},releaseLock:()=>{locked=false;}};
   const c=vm.createContext({Date:Clock,console:{log(){},error:m=>errors.push(m)},PropertiesService:{getScriptProperties:()=>props},
@@ -32,6 +32,7 @@ function weeklyFixture() {
   const member={'Team ID':'T1','Student 1 Name':'One','Student 1 Register No':'001','Student 1 Email':'one@example.com','Student 2 Name':'Two','Student 2 Register No':'002','Student 2 Email':'two@example.com','Title':'Project','Reviewer Decision':'Approved','Repo URL':'https://github.com/org/team'};
   const status=sheet('TeamStatus',[ts,ts.map(h=>member[h]||'')]),roster=sheet('TeamRoster',[tr,tr.map(h=>member[h]||'')]);
   sheet('LogEntries',[Object.values(definitions.LOG_ENTRIES)]);
+  sheet('WeeklyReminders',[Object.values(definitions.WEEKLY_REMINDERS)]);
   sheet('WeeklyWindows',[Object.values(definitions.WEEKLY_WINDOWS),
     ['W1',new Clock('2026-01-01T00:00:00Z'),new Clock('2026-01-05T18:00:00Z'),new Clock('2026-01-14T23:59:59Z')],
     ['W2',new Clock('2026-01-08T00:00:00Z'),new Clock('2026-01-12T18:00:00Z'),new Clock('2026-01-21T23:59:59Z')]]);

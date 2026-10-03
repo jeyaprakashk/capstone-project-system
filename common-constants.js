@@ -14,6 +14,7 @@ const SHEET_NAMES = {
   TEAM_INTAKE_RAW: 'TeamIntakeRaw',
   MASTER_REGISTRY: 'MasterRegistry',
   LOG_ENTRIES: 'LogEntries',
+  WEEKLY_REMINDERS: 'WeeklyReminders',
   WEEKLY_WINDOWS: 'WeeklyWindows',
   GuideSignoff: 'GuideSignoff',
   AIProgressAnalysis: 'AIProgressAnalysis',
@@ -29,6 +30,7 @@ const FIELD_DEFINITIONS = {
   GuideSignoff: {id:'Signoff ID', entryId:'Entry ID', status:'Status', guideEmail:'Guide Email', signedAt:'Signed At'},
   AIProgressAnalysis: {id:'Analysis ID', entryId:'Entry ID', technical_substance:'Technical Substance', specificity:'Specificity', outcome:'Outcome', next_action:'Next Action', github_support:'GitHub Support', score:'AI Score', comment:'Comment', analyzedAt:'Analyzed At'},
   COMMIT_COLLECTION_STATUS: {TEAM_ID:'Team ID', STATUS:'Status', UPDATED_AT:'Updated At'},
+  WEEKLY_REMINDERS: {regNo:'Reg No',weekId:'Week ID',sentAt:'Sent At'},
   WEEKLY_WINDOWS: {weekId:'Week ID', opens_at:'Opens At', deadline_at:'Deadline At', late_until:'Late Until'},
   // Authoritative six-column order: A:F, with Commit SHA at index 5.
   COMMITS: { DATE:'Date', TEAM_ID:'Team ID', MESSAGE:'Commit Message', USERNAME:'GitHub Username', REPO_URL:'Repository URL', SHA:'Commit SHA' },

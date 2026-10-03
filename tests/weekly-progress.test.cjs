@@ -86,15 +86,34 @@ test('one pre-deadline reminder only; actual submissions suppress it; no other w
  f.time('2026-01-04T18:00:00Z');f.c.submitWeeklyProgress(f.input());f.c.processWeeklySubmissionSchedule();
  assert.equal(f.mails.length,1);assert.equal(f.mails[0][0],'two@example.com');
  f.c.processWeeklySubmissionSchedule();assert.equal(f.mails.length,1);
- f.time('2026-01-05T18:00:00Z');for(const key of f.properties.keys())if(key.startsWith('weekly-reminder:'))f.properties.delete(key);f.c.processWeeklySubmissionSchedule();assert.equal(f.mails.length,1);
+ assert.equal(f.sheets.get('WeeklyReminders').rows.length,2);
+ f.time('2026-01-05T18:00:00Z');f.c.processWeeklySubmissionSchedule();assert.equal(f.mails.length,1);
  f.time('2026-01-08T00:00:00Z');f.c.processWeeklySubmissionSchedule();f.user('two@example.com');f.c.submitWeeklyProgress(f.input());assert.equal(f.mails.length,1);
  assert.equal((fs.readFileSync('logbook-tracker.js','utf8').match(/MailApp\.sendEmail/g)||[]).length,1);
 });
 
 test('mail failure retries without marking delivery; previously successful recipients remain deduplicated',()=>{
  const f=weeklyFixture();f.setEligibility('W1');f.time('2026-01-04T18:00:00Z');f.mailFails(true);
- f.c.processWeeklySubmissionSchedule();assert.equal([...f.properties.keys()].filter(k=>k.startsWith('weekly-reminder:')).length,0);assert.equal(f.errors.length,2);assert.equal(f.locked(),false);
+ f.c.processWeeklySubmissionSchedule();assert.equal(f.sheets.get('WeeklyReminders').rows.length,1);assert.equal(f.errors.length,2);assert.equal(f.locked(),false);
  f.mailFails(false);f.c.processWeeklySubmissionSchedule();f.c.processWeeklySubmissionSchedule();assert.equal(f.mails.length,2);
+ assert.equal(f.sheets.get('WeeklyReminders').rows.length,3);
+});
+
+test('storage setup transfers legacy reminder receipts before removing properties',()=>{
+ const f=weeklyFixture();f.properties.set('weekly-reminder:002:W1','2026-01-04T18:00:00.000Z');
+ f.user('coord@example.com');f.c.setupWeeklySubmissionStorage();f.c.setupWeeklySubmissionStorage();
+ assert.equal(f.properties.has('weekly-reminder:002:W1'),false);
+ assert.equal(f.sheets.get('WeeklyReminders').rows.length,2);
+ f.setEligibility('W1');f.time('2026-01-04T18:00:00Z');f.c.processWeeklySubmissionSchedule();
+ assert.equal(f.mails.length,1);assert.equal(f.mails[0][0],'one@example.com');
+});
+
+test('missing or malformed reminder storage stops scheduling before mail',()=>{
+ for(const mutate of [f=>f.sheets.delete('WeeklyReminders'),f=>f.sheets.get('WeeklyReminders').rows[0][1]='Wrong',
+  f=>f.sheets.get('WeeklyReminders').rows.push(['001','W1','text'])]){
+  const f=weeklyFixture();f.setEligibility('W1');f.time('2026-01-04T18:00:00Z');mutate(f);
+  assert.throws(()=>f.c.processWeeklySubmissionSchedule(),/WeeklyReminders/);assert.equal(f.mails.length,0);
+ }
 });
 
 test('sheet windows reject missing, empty, text dates, duplicate, overlapping and reversed rows',()=>{

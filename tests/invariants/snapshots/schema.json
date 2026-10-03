@@ -7,6 +7,7 @@
     "TEAM_INTAKE_RAW": "TeamIntakeRaw",
     "MASTER_REGISTRY": "MasterRegistry",
     "LOG_ENTRIES": "LogEntries",
+    "WEEKLY_REMINDERS": "WeeklyReminders",
     "WEEKLY_WINDOWS": "WeeklyWindows",
     "GuideSignoff": "GuideSignoff",
     "AIProgressAnalysis": "AIProgressAnalysis",
@@ -38,6 +39,11 @@
       "TEAM_ID": "Team ID",
       "STATUS": "Status",
       "UPDATED_AT": "Updated At"
+    },
+    "WEEKLY_REMINDERS": {
+      "regNo": "Reg No",
+      "weekId": "Week ID",
+      "sentAt": "Sent At"
     },
     "WEEKLY_WINDOWS": {
       "weekId": "Week ID",

@@ -255,11 +255,14 @@ is no actual submission. There are no confirmation, MISSED, late, guide,
 coordinator, flag, escalation or sign-off emails. Dashboard status messages
 communicate save results. Existing title/intake emails remain unrelated.
 
-Successful sends are recorded in Script Properties under
-`weekly-reminder:<encoded-reg-no>:<week-id>`. Failed sends can retry; recorded
-successful sends are suppressed. No report-only or flag logic gates reminders.
-Apps Script scheduling is approximate. Delivery and its property marker are not
-transactional, so a crash after sending but before recording can duplicate an email.
+Successful sends are recorded in `WeeklyReminders` (`Reg No`, `Week ID`, `Sent At`).
+`setupWeeklySubmissionStorage()` creates the tab and transfers existing
+`weekly-reminder:<encoded-reg-no>:<week-id>` Script Properties before removing
+them. Run setup before the scheduler uses this version. Failed sends can retry;
+recorded successful sends are suppressed. No report-only or flag logic gates
+reminders. Apps Script scheduling is approximate. Delivery and the sheet receipt
+are not transactional, so a crash after sending but before recording can duplicate
+an email.
 
 No snapshots, verification flags, guide sign-off, PROGRESS_SUMMARY,
 REVIEW_SNAPSHOT, escalation or marks integration are implemented.
