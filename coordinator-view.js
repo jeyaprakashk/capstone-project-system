@@ -1,8 +1,9 @@
 /**
  * COORDINATOR VIEW — browser module serialized into the dashboard shell as `CoordinatorView`.
  * Renders the coordinator DTOs (DATA-CONTRACTS.md) with Tailwind utilities: summary cards and the
- * team tracker (search, filters, sorting, pagination). Three reads feed it in parallel — overview
- * (rendered first), progress (assessments, health) and weekly activity — each settling on its own.
+ * team tracker (search, filters, sorting, pagination). The overview renders first; then one read per
+ * Review, the Guide Evaluation, health and weekly activity run in parallel, each settling (or failing,
+ * with its own Retry) on its own.
  * It never calls google.script.run; the team drawer stays in DashboardUI.
  */
 function coordinatorViewBrowser_(bridge, getUi) {
@@ -30,7 +31,29 @@ function coordinatorViewBrowser_(bridge, getUi) {
   const STAT_TINT = {complete:'bg-success-tint', danger:'bg-danger-tint', warning:'bg-warning-tint', neutral:'bg-canvas'};
   const SORT_TYPE = {pair:'pair', text:'text'};
 
-  const effective = () => state.progress || state.overview;
+  const reviewStatus = key => state.reviews[key] ? 'ready' : state.reviewErrors[key] ? 'failed' : 'loading';
+  const guideStatus = () => state.guide ? 'ready' : state.guideError ? 'failed' : 'loading';
+  const healthStatus = () => state.health ? 'ready' : state.healthError ? 'failed' : 'loading';
+  const settled = (map, id, status) => status === 'ready' ? (map[id] || 'Unavailable') : status === 'failed' ? 'Unavailable' : 'Loading…';
+  /** The overview with every section that has arrived merged in; sections still pending or failed say so per value. */
+  function effective() {
+    const o = state.overview, health = state.health, h = healthStatus(), g = state.guide, gs = guideStatus();
+    const healthOf = team => health ? health.teams[team.teamId] : null;
+    return {
+      ...o,
+      healthStatus:h,
+      stats:{...o.stats,
+        needsAttention:health ? health.needsAttention : null,
+        guideEvaluation:{status:gs, available:g ? g.available : false, completed:g ? g.completed : 0},
+        reviews:o.stats.reviews.map(r => { const d = state.reviews[r.key]; return {...r, status:reviewStatus(r.key), known:!!d, completed:d ? d.completed : null, unavailable:d ? d.unavailable : 0}; })},
+      teams:o.teams.map(t => ({...t,
+        reviews:Object.fromEntries(o.reviewColumns.map(c => [c.key, settled(state.reviews[c.key] ? state.reviews[c.key].teams : {}, t.teamId, reviewStatus(c.key))])),
+        guideEvaluation:settled(g ? g.teams : {}, t.teamId, gs),
+        health:health ? (healthOf(t) ? healthOf(t).health : 'unavailable') : h === 'failed' ? 'unavailable' : 'loading',
+        pendingDeadlines:healthOf(t) ? healthOf(t).pendingDeadlines : []})),
+      deadlinePills:health ? health.deadlinePills : o.deadlinePills
+    };
+  }
   const activityLabel = result => result.state === 'active' ? 'Logs / commit records this week' : result.state === 'not-started' ? 'Weekly logging has not started' : result.state === 'between' ? 'Next weekly window has not opened yet' : result.state === 'ended' ? 'Weekly logging has ended' : 'Activity unavailable: check project dates';
   const pct = (n, total) => total > 0 ? Math.round(n / total * 100) : 0;
   const completionTone = (total, value, color, note) => {
@@ -51,7 +74,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
       '<div class="flex justify-between"><span>' + left + '</span><span>' + right + '</span></div>';
   }
   function statCards() {
-    const dto = effective(), s = dto.stats, total = s.total, loading = dto.loading, failed = state.progressError && !state.progress;
+    const dto = effective(), s = dto.stats, total = s.total;
     const cards = [];
     const add = (label, value, color, note, iconName, detail, extra) => cards.push({label, value, color, note, icon:iconName, detail, tone:completionTone(total, typeof value === 'number' ? value : NaN, color, String(note)), ...extra});
     add('Total Teams', total, 'blue', 'Teams Roster', 'users', '<span>●</span> Teams registered');
@@ -66,13 +89,14 @@ function coordinatorViewBrowser_(bridge, getUi) {
     } else cards.push({label:'Active This Week', value:skeleton('Loading activity'), note:skeleton('Loading activity'), icon:'trending-up', detail:'Weekly repository activity', tone:'neutral', ids:true});
     const unavailable = '<span>Unavailable</span>';
     s.reviews.forEach((r, index) => {
-      const value = failed ? unavailable : loading ? skeleton('Loading ' + r.label) : r.known ? r.completed : '—';
-      const note = failed ? '' : loading ? '' : !r.known ? 'Unavailable' : r.unavailable ? r.unavailable + ' unavailable' : pct(r.completed, total) + '% (' + r.completed + '/' + total + ')';
+      const value = r.status === 'failed' ? unavailable : r.status === 'loading' ? skeleton('Loading ' + r.label) : r.known ? r.completed : '—';
+      const note = r.status !== 'ready' ? '' : !r.known ? 'Unavailable' : r.unavailable ? r.unavailable + ' unavailable' : pct(r.completed, total) + '% (' + r.completed + '/' + total + ')';
       add(escape(r.label) + ' Completed', value, 'teal', note, ['clipboard-check', 'file-text', 'book-open'][index % 3], 'Team review completion', {progress:true});
     });
-    const g = s.guideEvaluation, gAvailable = g && g.available;
-    add('Guide Evaluation Completed', failed ? unavailable : loading ? skeleton('Loading guide evaluation') : gAvailable ? g.completed : '—', 'teal', failed || loading ? '' : gAvailable ? pct(g.completed, total) + '% evaluated' : 'Unavailable', 'graduation-cap', 'Guide assessment completion', {progress:true});
-    add('Need Attention', failed ? unavailable : loading ? skeleton('Loading attention count') : s.needsAttention, 'red', failed || loading ? '' : pct(s.needsAttention, total) + '% of cohort', 'triangle-alert', 'Teams with overdue requirements', {progress:true});
+    const g = s.guideEvaluation, gAvailable = g.status === 'ready' && g.available;
+    add('Guide Evaluation Completed', g.status === 'failed' ? unavailable : g.status === 'loading' ? skeleton('Loading guide evaluation') : gAvailable ? g.completed : '—', 'teal', g.status !== 'ready' ? '' : gAvailable ? pct(g.completed, total) + '% evaluated' : 'Unavailable', 'graduation-cap', 'Guide assessment completion', {progress:true});
+    const hs = dto.healthStatus;
+    add('Need Attention', hs === 'failed' ? unavailable : hs === 'loading' ? skeleton('Loading attention count') : s.needsAttention, 'red', hs !== 'ready' ? '' : pct(s.needsAttention, total) + '% of cohort', 'triangle-alert', 'Teams with overdue requirements', {progress:true});
     return '<div class="coordinator-stats-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-4">' + cards.map(statCard).join('') + '</div>';
   }
   function renderStats() { const el = q('#coordinatorStats'); if (el) el.innerHTML = statCards(); }
@@ -136,7 +160,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
     return '<div class="flex gap-1"><button type="button" class="' + SMALL + '" data-action="view-team" data-team="' + label + '" aria-label="View team ' + label + '" title="View team details">' + icon('eye') + '</button>' + email + '</div>';
   }
   function rowMarkup(t, reviewColumns) {
-    const failed = state.progressError && !state.progress, loadingRow = t.health === 'loading';
+    const unavailableHealth = t.health === 'unavailable', loadingRow = t.health === 'loading';
     const titleBadge = t.titleStatus === 'APPROVED' ? TONE.success + '">Approved' : t.titleStatus === 'NEEDS_REVIEW' ? TONE.warning + '">Review' : t.titleStatus === 'REJECTED_BY_GUIDE' ? TONE.danger + '">Rejected' : TONE.info + '">Pending';
     const repoLabel = escape([t.repoStatus === 'ready' ? 'Repository URL recorded' : 'Pending', t.githubMessage, t.githubTiming, t.repoUrl ? 'Repository available' : ''].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' · '));
     const health = t.health === 'ontrack' ? [TONE.success, 'On track'] : t.health === 'monitor' ? [TONE.warning, 'Monitor'] : [TONE.danger, 'Needs attention'];
@@ -147,13 +171,13 @@ function coordinatorViewBrowser_(bridge, getUi) {
       '<td class="' + cell + '"><span class="' + (t.repoStatus === 'ready' ? TONE.success : TONE.danger) + '" tabindex="0" aria-label="' + repoLabel + '" title="' + repoLabel + '">' + (t.repoStatus === 'ready' ? 'Ready' : 'Pending') + '</span></td>' +
       '<td class="' + cell + '"><span class="' + titleBadge + '</span></td>' +
       '<td class="' + cell + '" data-col="activity"' + (activity === null ? '' : ' title="' + escape(activityLabel(state.activity)) + '"') + '>' + (activity === null ? skeleton('Loading weekly activity') : escape(activity)) + '</td>' +
-      reviewColumns.map(r => '<td class="' + cell + '" data-col="review">' + (failed ? unavailableCell() : loadingRow ? skeleton('Loading ' + r.label) : completion(t.reviews[r.key])) + '</td>').join('') +
-      '<td class="' + cell + '" data-col="guide-evaluation">' + (failed ? unavailableCell() : completion(t.guideEvaluation)) + '</td>' +
-      '<td class="' + cell + '" data-col="health">' + (failed ? unavailableCell() : loadingRow ? skeleton('Loading health') : '<span class="' + health[0] + '" tabindex="0" aria-label="' + health[1] + '" title="' + health[1] + '">' + health[1] + '</span>') + '</td>' +
+      reviewColumns.map(r => '<td class="' + cell + '" data-col="review">' + (reviewStatus(r.key) === 'failed' ? unavailableCell() : completion(t.reviews[r.key])) + '</td>').join('') +
+      '<td class="' + cell + '" data-col="guide-evaluation">' + (guideStatus() === 'failed' ? unavailableCell() : completion(t.guideEvaluation)) + '</td>' +
+      '<td class="' + cell + '" data-col="health">' + (unavailableHealth ? unavailableCell() : loadingRow ? skeleton('Loading health') : '<span class="' + health[0] + '" tabindex="0" aria-label="' + health[1] + '" title="' + health[1] + '">' + health[1] + '</span>') + '</td>' +
       '<td class="' + cell + '">' + teamActions(t) + '</td></tr>';
   }
   function filterButtons() {
-    const dto = effective(), teams = dto.teams, anyLoading = teams.some(t => t.health === 'loading'), failed = state.progressError && !state.progress;
+    const dto = effective(), teams = dto.teams, anyLoading = dto.healthStatus !== 'ready', failed = dto.healthStatus === 'failed';
     const count = (predicate, label) => anyLoading ? (failed ? 'Unavailable' : skeleton('Loading ' + label)) : teams.filter(predicate).length;
     const tab = (filter, html, disabled, title) => '<button type="button" class="border-0 rounded-md px-3 py-1.5 text-sm font-semibold text-ink-2 aria-pressed:bg-paper aria-pressed:text-primary aria-pressed:shadow-selected disabled:opacity-50" data-action="filter" data-filter="' + escape(filter) + '" aria-pressed="' + (state.filter === filter) + '"' + (disabled ? ' disabled' : '') + (title ? ' title="' + escape(title) + '"' : '') + '>' + html + '</button>';
     return tab('all', 'All (' + teams.length + ')', false) + tab('attention', 'Attention (' + count(t => t.health === 'attention', 'attention count') + ')', anyLoading) + tab('ontrack', 'On Track (' + count(t => t.health === 'ontrack', 'on-track count') + ')', anyLoading) +
@@ -219,17 +243,50 @@ function coordinatorViewBrowser_(bridge, getUi) {
   }
   const updatedLabel = () => 'Last updated: ' + new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true}) + ' IST';
 
-  function setProgressStatus(message, retryAction) {
+  /** Shows what failed (with Retry) or, when everything arrived, that some review data is partial. */
+  function setProgressStatus() {
     const el = q('#coordinatorProgressStatus');
     if (!el) return;
-    el.innerHTML = message ? '<span class="text-sm text-ink-2">' + escape(message) + '</span> ' + (retryAction ? '<button type="button" class="' + SMALL + '" data-action="' + retryAction + '">Retry</button>' : '') : '';
+    const failures = failedSections().map(item => 'Unable to load ' + item.label + ': ' + (item.error && item.error.message || 'The server did not provide error details') + '.');
+    const partial = !failures.length && Object.values(state.reviews).some(review => review.unavailable);
+    const message = failures.length ? failures.join(' ') : partial ? 'Some assessment data is unavailable. Counts are partial; unavailable reviews are excluded from overdue alerts.' : '';
+    el.innerHTML = message ? '<span class="text-sm text-ink-2">' + escape(message) + '</span> <button type="button" class="' + SMALL + '" data-action="progress-retry">Retry</button>' : '';
+  }
+  function failedSections() {
+    const failed = state.overview.reviewColumns.filter(c => state.reviewErrors[c.key]).map(c => ({label:c.label, error:state.reviewErrors[c.key]}));
+    if (state.guideError) failed.push({label:'guide evaluation', error:state.guideError});
+    if (state.healthError) failed.push({label:'health', error:state.healthError});
+    return failed;
+  }
+  function refreshSections() {
+    renderStats(); updateTracker(); setProgressStatus();
+    const updated = q('#coordUpdated'); if (updated) updated.textContent = updatedLabel();
   }
 
-  /** Replaces the host content with the overview and attaches the parallel progress and activity reads. */
+  const readReview = key => bridge.read('coord:review:' + key, 'API_coordinator_getReviewProgress', [key], READ);
+  const readGuide = () => bridge.read('coord:guide', 'API_coordinator_getGuideProgress', [], READ);
+  const readHealth = () => bridge.read('coord:health', 'API_coordinator_getHealth', [], READ);
+  const readActivity = () => bridge.read('coord:activity', 'API_coordinator_getActivity', [], READ);
+
+  /** Applies a settled read to the current render only; a replaced render (or a superseded read) is ignored. */
+  function settle(promise, gen, apply, fail) {
+    promise.then(value => { if (gen === generation) apply(value); }, error => { if (gen === generation && !error.superseded) fail(error); });
+  }
+  const sections = {
+    review: key => ({read:() => readReview(key), apply:dto => { state.reviews[key] = dto; delete state.reviewErrors[key]; refreshSections(); }, fail:error => { if (!state.reviews[key]) { state.reviewErrors[key] = error; refreshSections(); } }}),
+    guide: () => ({read:readGuide, apply:dto => { state.guide = dto; state.guideError = null; refreshSections(); }, fail:error => { if (!state.guide) { state.guideError = error; refreshSections(); } }}),
+    health: () => ({read:readHealth, apply:dto => {
+      state.health = dto; state.healthError = null;
+      if (state.filter !== 'all' && !(state.filter.indexOf('deadline:') === 0 ? dto.deadlinePills.some(p => 'deadline:' + p.key === state.filter) : ['attention', 'ontrack'].includes(state.filter))) state.filter = 'all';
+      refreshSections();
+    }, fail:error => { if (!state.health) { state.healthError = error; refreshSections(); } }})
+  };
+
+  /** Replaces the host content with the overview and attaches the parallel reads started by load(). */
   function render(target, overview) {
     host = target;
     const wasPending = pending && pending.gen === generation ? pending : null;
-    Object.assign(state, {overview, progress:null, progressError:null, activity:null, filter:'all', query:'', page:1, partial:false});
+    Object.assign(state, {overview, reviews:{}, reviewErrors:{}, guide:null, guideError:null, health:null, healthError:null, activity:null, filter:'all', query:'', page:1});
     host.innerHTML = headerMarkup() + '<div id="coordinatorAsyncRoot" class="mt-4 flex flex-col gap-4"><div id="coordinatorOverviewStatus" role="status"></div>' +
       (overview.reviewConfigurationError ? '<p role="status" class="text-sm text-warning">Review configuration unavailable. Check System Status.</p>' : '') +
       '<div id="coordinatorStats"></div><div id="coordinatorProgressStatus" role="status"></div><div id="coordinatorTracker">' + trackerMarkup() + '</div></div>' + drawerMarkup();
@@ -237,24 +294,14 @@ function coordinatorViewBrowser_(bridge, getUi) {
     renderStats(); updateTracker();
     const gen = generation;
     if (wasPending) {
-      wasPending.progress.then(dto => { if (gen === generation) applyProgress(dto); }, error => { if (gen === generation && !error.superseded) failProgress(error); });
-      wasPending.activity.then(result => { if (gen === generation) applyActivity(result); }, error => { if (gen === generation && !error.superseded) failActivity(error); });
+      Object.keys(wasPending.reviews).forEach(key => { const section = sections.review(key); settle(wasPending.reviews[key], gen, section.apply, section.fail); });
+      const guide = sections.guide(), health = sections.health();
+      settle(wasPending.guide, gen, guide.apply, guide.fail);
+      settle(wasPending.health, gen, health.apply, health.fail);
+      settle(wasPending.activity, gen, applyActivity, failActivity);
     }
   }
 
-  function applyProgress(dto) {
-    state.progress = dto; state.progressError = null; state.partial = !!dto.partial;
-    if (state.filter !== 'all' && !(state.filter.indexOf('deadline:') === 0 ? dto.deadlinePills.some(p => 'deadline:' + p.key === state.filter) : ['attention', 'ontrack'].includes(state.filter))) state.filter = 'all';
-    renderStats(); updateTracker();
-    const updated = q('#coordUpdated'); if (updated) updated.textContent = updatedLabel();
-    setProgressStatus(dto.partial ? 'Some assessment data is unavailable. Counts are partial; unavailable reviews are excluded from overdue alerts.' : '', dto.partial ? 'progress-retry' : null);
-  }
-  function failProgress(error) {
-    if (state.progress) return;
-    state.progressError = error;
-    renderStats(); updateTracker();
-    setProgressStatus('Unable to load progress: ' + (error && error.message || 'The server did not provide error details'), 'progress-retry');
-  }
   function applyActivity(result) {
     state.activity = result; renderStats(); updateTracker();
     const status = q('#weeklyActivityStatus'); if (status) status.textContent = activityLabel(result) + ' · Updated ' + new Date(result.checkedAt).toLocaleString();
@@ -267,24 +314,35 @@ function coordinatorViewBrowser_(bridge, getUi) {
     const retry = q('#weeklyActivityRetry'); if (retry) retry.hidden = false;
   }
 
+  /** Re-reads the sections that failed; when none failed (partial data), re-reads them all. */
   function retryProgress() {
-    const gen = generation;
-    state.progressError = null; setProgressStatus('', null);
-    bridge.read('coord:progress', 'API_coordinator_getProgress', [], READ).then(dto => { if (gen === generation) applyProgress(dto); }, error => { if (gen === generation && !error.superseded) failProgress(error); });
+    const gen = generation, all = !failedSections().length;
+    const reviewKeys = state.overview.reviewColumns.map(c => c.key).filter(key => all || state.reviewErrors[key]);
+    const jobs = reviewKeys.map(key => sections.review(key));
+    if (all || state.guideError) jobs.push(sections.guide());
+    if (all || state.healthError) jobs.push(sections.health());
+    reviewKeys.forEach(key => delete state.reviewErrors[key]);
+    if (all || state.guideError) state.guideError = null;
+    if (all || state.healthError) state.healthError = null;
+    refreshSections();
+    jobs.forEach(job => settle(job.read(), gen, job.apply, job.fail));
   }
   function retryActivity() {
     const gen = generation, retry = q('#weeklyActivityRetry'), status = q('#weeklyActivityStatus');
     if (retry) retry.hidden = true; if (status) status.innerHTML = skeleton('Loading weekly activity');
-    bridge.read('coord:activity', 'API_coordinator_getActivity', [], READ).then(result => { if (gen === generation) applyActivity(result); }, error => { if (gen === generation && !error.superseded) failActivity(error); });
+    settle(readActivity(), gen, applyActivity, failActivity);
   }
 
-  /** Starts the overview read; progress and activity start at once so all three overlap. */
+  /** Starts the overview read; health, guide and activity start with it, and each Review read as soon as the overview names it. */
   function load() {
     const gen = ++generation;
-    const progress = bridge.read('coord:progress', 'API_coordinator_getProgress', [], READ), activity = bridge.read('coord:activity', 'API_coordinator_getActivity', [], READ);
-    progress.catch(() => {}); activity.catch(() => {});
-    pending = {gen, progress, activity};
-    return bridge.read('role:coord', 'API_coordinator_getOverview', [], READ);
+    const started = {health:readHealth(), guide:readGuide(), activity:readActivity()};
+    Object.values(started).forEach(promise => promise.catch(() => {}));
+    pending = {gen, ...started, reviews:{}};
+    return bridge.read('role:coord', 'API_coordinator_getOverview', [], READ).then(overview => {
+      if (pending && pending.gen === gen) (overview.reviewColumns || []).forEach(column => { const promise = readReview(column.key); promise.catch(() => {}); pending.reviews[column.key] = promise; });
+      return overview;
+    });
   }
 
   // ---- events ----

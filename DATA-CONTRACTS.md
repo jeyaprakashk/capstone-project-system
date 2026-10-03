@@ -28,6 +28,9 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | Endpoint | Role | Request | `data` shape | Replaces |
 | --- | --- | --- | --- | --- |
 | `API_coordinator_getOverview()` / `API_coordinator_getProgress()` | Coordinator | none | `CoordinatorDashboard` (below); overview has `loading:true` | `buildCoordinatorContent`, `loadCoordinatorSection` (removed) |
+| `API_coordinator_getReviewProgress(key)` | Coordinator | `key` is a configured Review key | `{key, label, total, completed, unavailable, teams:{<teamId>:'Completed'\|'Pending'\|'Unavailable'}}`; rejected for an unknown key | the Review part of `getProgress` |
+| `API_coordinator_getGuideProgress()` | Coordinator | none | `{available, completed, teams:{<teamId>:'Completed'\|'Pending'\|'Unavailable'}}` | the Guide Evaluation part of `getProgress` |
+| `API_coordinator_getHealth()` | Coordinator | none | `{needsAttention, partial, teams:{<teamId>:{health, pendingDeadlines}}, deadlinePills}` | the health and deadline part of `getProgress` |
 | `API_coordinator_getActivity()` | Coordinator | none | `{state (`active`, `between` weeks, `not-started`, `ended`, `unavailable`), week, checkedAt, teams:{<teamId lower-case>:{logs,commits}}, totalTeams, activeTeams}` | `loadAllTeamsWeeklyActivity` (wrapped) |
 | `API_coordinator_getSystemStatus()` | Coordinator | none | `SystemStatus` (below) | `loadCoordinatorSystemStatus` (removed) |
 | `API_student_getWeekly()` / `API_student_submitWeekly(input)` | Student | input: `{requestId, weekId, workCompleted, guideDiscussion, blockers, nextAction}` | the existing weekly-progress object (`ready, weeks, actions, history, evidence, allWeeks, timezone, checkedAt …`) / `{ok, entryId, weekId, entryStatus, timeliness, firstSubmittedAt, message}` | `loadStudentWeeklyProgress` / `submitWeeklyProgress` called directly |
@@ -85,8 +88,10 @@ Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invaria
   deadlinePills:[{key,label,count,due:string,overdue:boolean}] }
 ```
 
-The overview renders first; progress and weekly activity are requested at the same time and settle independently
-(each failure is isolated, with its own retry). Percentages, tones and badge labels are derived in the view.
+The overview renders first. Then one `getReviewProgress` per `reviewColumns` entry, `getGuideProgress`, `getHealth` and weekly
+activity run in parallel and settle independently: each fills only its own card and tracker column, and a failure or
+timeout is isolated to that section, with its own message and Retry. `getProgress` still returns everything in one call
+and is kept until the split reads are verified in production; the view no longer calls it. Percentages, tones and badge labels are derived in the view.
 The team drawer is still driven by DashboardUI. Contract tests: `tests/coordinator-migration.test.cjs`
 (snapshot `tests/invariants/snapshots/coordinator-legacy-facts.json`, captured from the removed HTML for the overview,
 progress and no-reviews cases).

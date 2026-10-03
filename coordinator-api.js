@@ -65,6 +65,63 @@ function API_coordinator_getProgress() {
   }));
 }
 
+/**
+ * The progress stage as independent reads, so each card and tracker column settles (or fails) on its own and
+ * the calls can run in parallel. Together they carry what `API_coordinator_getProgress` returns.
+ */
+function coordinatorTeamRows_() {
+  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  return getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]).map(row => ({teamId:String(row[TS.TEAM_ID]), key:normalizeText_(row[TS.TEAM_ID])}));
+}
+
+function buildReviewProgressDto_(key) {
+  const review = getInternalReviews_().find(item => item.key === key);
+  if (!review) throw new Error('Unknown review.');
+  const completion = getAllReviewCompletionStatus_(undefined, key), teams = {};
+  let completed = 0, unavailable = 0;
+  const rows = coordinatorTeamRows_();
+  rows.forEach(row => {
+    const result = completion[row.key] && completion[row.key][key];
+    if (!result || result.available === false) { unavailable++; teams[row.teamId] = 'Unavailable'; }
+    else { if (result.completed === true) completed++; teams[row.teamId] = result.completed ? 'Completed' : 'Pending'; }
+  });
+  return {key:String(key), label:String(review.label), total:rows.length, completed, unavailable, teams};
+}
+
+function API_coordinator_getReviewProgress(key) {
+  return apiHandle_(() => coordinatorRead_('review-progress', () => { coordinatorAccessOrThrow_(); return buildReviewProgressDto_(normalizeText_(key)); }));
+}
+
+function buildGuideProgressDto_() {
+  const guide = guideCompletion_(), teams = {};
+  coordinatorTeamRows_().forEach(row => { teams[row.teamId] = !guide.available ? 'Unavailable' : guide.teams[row.key] ? 'Completed' : 'Pending'; });
+  return {available:!!guide.available, completed:Number(guide.completed) || 0, teams};
+}
+
+function API_coordinator_getGuideProgress() {
+  return apiHandle_(() => coordinatorRead_('guide-progress', () => { coordinatorAccessOrThrow_(); return buildGuideProgressDto_(); }));
+}
+
+/** Health needs the logs, review completion and deadlines together, so it is its own (heaviest) read. */
+function buildHealthDto_(data) {
+  const dto = buildCoordinatorDto_(data);
+  return {
+    needsAttention:dto.stats.needsAttention,
+    partial:dto.partial,
+    teams:Object.fromEntries(dto.teams.map(team => [team.teamId, {health:team.health, pendingDeadlines:team.pendingDeadlines}])),
+    deadlinePills:dto.deadlinePills
+  };
+}
+
+function API_coordinator_getHealth() {
+  return apiHandle_(() => coordinatorRead_('health', () => {
+    coordinatorAccessOrThrow_();
+    const timings = [], data = getCoordinatorDashboardData_(false, true, timings);
+    console.log(JSON.stringify({event:'coordinator_phases', section:'health', timings}));
+    return buildHealthDto_(data);
+  }));
+}
+
 function API_coordinator_getActivity() {
   return apiHandle_(() => { coordinatorAccessOrThrow_(); return loadAllTeamsWeeklyActivity(); });
 }

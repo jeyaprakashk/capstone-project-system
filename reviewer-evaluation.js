@@ -11,19 +11,33 @@ function reviewerTeamContext_(teamId) {
   return {TS,row,committee,students,team:String(row[TS.TEAM_ID]),title:String(row[TS.TITLE] || '')};
 }
 
-function getReviewerReviewProgress_(rows) {
+/** Progress for the given team rows. `onlyKey` limits the work to one Review; its prerequisites are still read once each. */
+function getReviewerReviewProgress_(rows, onlyKey) {
   const TS=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
   const result={reviews:[],teams:Object.create(null),error:''};
-  try {result.reviews=getReviewDefinitions_();}
+  let definitions;
+  try {result.reviews=getReviewDefinitions_();definitions=getAssessmentDefinitions_();}
   catch(err){result.error=err.message;return result;}
-  result.reviews.forEach(review=>{
-    let history,config,error='';
-    try {config=reviewConfiguration_(review.key);history=reviewRecords_(review.key);if(!history.sheet)throw new Error(assessmentStorageMissing_(reviewHistoryName_(review.key)));}
+  const histories=Object.create(null);
+  const history=key=>{
+    if(!Object.prototype.hasOwnProperty.call(histories,key)){try{histories[key]={value:reviewRecords_(key)};}catch(err){histories[key]={error:err};}}
+    if(histories[key].error)throw histories[key].error;
+    return histories[key].value;
+  };
+  let guide=null;
+  const loaded={
+    definition:id=>{const found=definitions.find(d=>d.key===normalizeText_(id));if(!found)throw new Error('Unknown assessment. Configure '+id+' in AssessmentDefinitions.');return found;},
+    reviewRecords:key=>history(key).records,
+    guideRecords:()=>guide||(guide=guideRecords_().records)
+  };
+  result.reviews.filter(review=>!onlyKey||review.key===onlyKey).forEach(review=>{
+    let current,config,error='';
+    try {config=reviewConfiguration_(review.key);current=history(review.key);if(!current.sheet)throw new Error(assessmentStorageMissing_(reviewHistoryName_(review.key)));}
     catch(err){error=err.message;}
     rows.forEach(row=>{
       const team=normalizeReviewKey_(row[TS.TEAM_ID]);
       if(!result.teams[team])result.teams[team]={};
-      result.teams[team][review.key]=error?{available:false,completed:false,error}:reviewProgress_(row,TS,history.records,config);
+      result.teams[team][review.key]=error?{available:false,completed:false,error}:reviewProgress_(row,TS,current.records,config,review,loaded);
     });
   });
   return result;

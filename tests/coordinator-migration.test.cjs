@@ -102,6 +102,37 @@ test('progress survives unavailable marks and the DTO contains no markup', () =>
   assert.doesNotMatch(JSON.stringify(frame.data), /<(div|td|tr|span|button)\b|class=|onclick=/);
 });
 
+test('the split progress endpoints together carry what getProgress carries', () => {
+  const g = coordinatorFixture(), call = (name, ...args) => JSON.parse(g.c[name](...args)).data;
+  const progress = call('API_coordinator_getProgress'), guide = call('API_coordinator_getGuideProgress'), health = call('API_coordinator_getHealth');
+  const reviews = Object.fromEntries(progress.reviewColumns.map(c => [c.key, call('API_coordinator_getReviewProgress', c.key)]));
+  for (const review of progress.stats.reviews) {
+    const part = reviews[review.key];
+    assert.deepEqual({ completed: part.completed, unavailable: part.unavailable, label: part.label }, { completed: review.completed, unavailable: review.unavailable, label: review.label });
+  }
+  assert.deepEqual({ available: guide.available, completed: guide.completed }, progress.stats.guideEvaluation);
+  assert.equal(health.needsAttention, progress.stats.needsAttention);
+  assert.equal(health.partial, progress.partial);
+  assert.deepEqual(health.deadlinePills, progress.deadlinePills);
+  for (const team of progress.teams) {
+    assert.equal(guide.teams[team.teamId], team.guideEvaluation, team.teamId);
+    assert.deepEqual(health.teams[team.teamId], { health: team.health, pendingDeadlines: team.pendingDeadlines }, team.teamId);
+    for (const key of Object.keys(team.reviews)) assert.equal(reviews[key].teams[team.teamId], team.reviews[key], team.teamId + ' ' + key);
+  }
+  assert.doesNotMatch(JSON.stringify([guide, health, reviews]), /<(div|td|tr|span|button)|class=|onclick=/);
+});
+
+test('the split endpoints check access, reject unknown reviews and fail independently', () => {
+  const g = coordinatorFixture();
+  const endpoints = [['API_coordinator_getReviewProgress', 'review1'], ['API_coordinator_getGuideProgress'], ['API_coordinator_getHealth']];
+  assert.equal(JSON.parse(g.c.API_coordinator_getReviewProgress('nope')).error.code, 'REJECTED');
+  g.c.guideCompletion_ = () => { throw new Error('guide journal unreadable'); };
+  assert.equal(JSON.parse(g.c.API_coordinator_getGuideProgress()).error.message, 'guide journal unreadable');
+  assert.equal(JSON.parse(g.c.API_coordinator_getReviewProgress('review1')).ok, true, 'a guide failure does not touch a review read');
+  g.f.user('guide@example.com');
+  for (const [name, ...args] of endpoints) assert.equal(JSON.parse(g.c[name](...args)).error.code, 'UNAUTHORIZED', name);
+});
+
 test('the activity endpoint returns the existing weekly activity and checks access', () => {
   const g = coordinatorFixture();
   g.c.loadAllTeamsWeeklyActivity = () => ({ state: 'active', teams: {}, totalTeams: 5, activeTeams: 2, checkedAt: '2026-01-10T00:00:00.000Z' });

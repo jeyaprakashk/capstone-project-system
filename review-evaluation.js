@@ -35,9 +35,6 @@ function reviewContext_(teamId, staff, key) {
 }
 
 function reviewRecords_(key) {
-  return dashboardMemo_('reviewRecords:'+key,()=>reviewRecordsUncached_(key));
-}
-function reviewRecordsUncached_(key) {
   const storage=assessmentJournal_(assessmentDefinition_(key)),name=storage.name,sheet=storage.sheet;
   if (!sheet) return {sheet:null,records:[]};
   if(storage.state==='EMPTY')throw new Error(assessmentStorageMissing_(name));
@@ -248,7 +245,7 @@ function reviewMakeup_(latest,action,input,actor) {
   delete payload.publishedStudents;return payload;
 }
 
-function reviewProgress_(row, columns, records, config) {
+function reviewProgress_(row, columns, records, config, definition, loaded) {
   const roster=getStudentsFromTeamStatusRow_(row,columns), totalStudents=roster.length;
   const latest=reviewLatest_(records,row[columns.TEAM_ID]);
   const currentRoster={team:normalizeReviewKey_(row[columns.TEAM_ID]),committee:String(row[columns.COMMITTEE_NUMBER] || '').trim(),
@@ -258,7 +255,7 @@ function reviewProgress_(row, columns, records, config) {
   const markedStudents=submitted?latest.students.filter(isComplete).length:0;
   const recorded=submitted;
   const completed=submitted && markedStudents===totalStudents;
-  const prerequisiteReason=assessmentPrerequisiteBlock_(assessmentDefinition_(config.key),row[columns.TEAM_ID]);
+  const prerequisiteReason=assessmentPrerequisiteBlock_(definition||assessmentDefinition_(config.key),row[columns.TEAM_ID],loaded);
   const availability=reviewAvailability_({eligibility:{...reviewEligibility_(row,columns),...(prerequisiteReason?{reason:prerequisiteReason}:{})}},config,latest);
   return {completed,recorded,prerequisiteReason,markedStudents,totalStudents,available:true,status:latest?latest.status:'Not started',...availability};
 }

@@ -4,17 +4,17 @@ function getReviewDefinitions_() {
   if(!definitions.length)throw new Error('No REVIEW assessments are configured in AssessmentDefinitions. Ask the Coordinator to configure the required assessments.');
   return definitions.map(d=>({...d,rubric:assessmentRubric_(d)}));
 }
-function getAllReviewCompletionStatus_(timings) {return collectReviewCompletion_(undefined,timings);}
+function getAllReviewCompletionStatus_(timings,onlyKey) {return collectReviewCompletion_(undefined,timings,onlyKey);}
 function getTeamReviewCompletionStatus_(teamId) {
   const key=normalizeReviewKey_(teamId);
   return key?collectReviewCompletion_(key)[key]||null:null;
 }
-function collectReviewCompletion_(requestedTeamId,timings) {
+function collectReviewCompletion_(requestedTeamId,timings,onlyKey) {
   const started=Date.now();let success=false;
   try {
     const TS=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
     const rows=getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row=>normalizeReviewKey_(row[TS.TEAM_ID])&&(!requestedTeamId||normalizeReviewKey_(row[TS.TEAM_ID])===requestedTeamId));
-    const progress=getReviewerReviewProgress_(rows);
+    const progress=getReviewerReviewProgress_(rows,onlyKey);
     if(progress.error)throw new Error(progress.error);
     const result=Object.create(null);
     rows.forEach(row=>{

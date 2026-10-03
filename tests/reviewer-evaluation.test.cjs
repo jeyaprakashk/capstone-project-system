@@ -25,6 +25,16 @@ test('reviewer progress reads only registry journals and isolates a missing jour
  assert.equal(progress.teams.g18.review1.available,true);assert.equal(progress.teams.g18.review2.available,false);
  assert.match(progress.teams.g18.review2.error,/Error in Initialization/);
 });
+test('progress for one Review matches the full result and reads each journal once, not once per team',()=>{
+ const f=setup(),c=f.c,reads={};
+ const records=c.reviewRecords_;c.reviewRecords_=key=>{reads[key]=(reads[key]||0)+1;return records(key);};
+ const full=c.getReviewerReviewProgress_(f.rows),before={...reads};
+ assert(Object.values(before).every(n=>n===1),'every journal is read once for the whole cohort: '+JSON.stringify(before));
+ for(const key of Object.keys(before))delete reads[key];
+ const one=c.getReviewerReviewProgress_(f.rows,'review1');
+ for(const team of Object.keys(full.teams))assert.equal(JSON.stringify(one.teams[team]),JSON.stringify({review1:full.teams[team].review1}));
+ assert.equal(reads.review2,undefined,'an unrelated Review journal is not read');
+});
 test('numbered endpoints and legacy level-sheet mutation endpoints are absent',()=>{
  const f=setup();
  for(const name of ['getReviewerEvaluation','saveReviewerEvaluation','reviewerEvaluationContext_','reviewerReviewRows_','getReview1Evaluation','getReview2Evaluation','saveReview1EvaluationDraft','submitReview2Evaluation','publishReview1Evaluation','reopenReview2Evaluation','loadPublishedReview1Evaluation'])assert.equal(f.c[name],undefined,name);

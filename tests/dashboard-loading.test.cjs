@@ -396,16 +396,17 @@ test('diagnostics record errors and preloading can be disabled for baseline meas
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
  assert(f.c.window.DashboardPerformance.snapshot().some(e=>e.event==='request'&&!e.ok));
 });
-test('Coordinator load starts overview, progress and activity together; their failures do not stall preloading',async()=>{
+test('Coordinator load starts overview, health, guide progress and activity together; their failures do not stall preloading',async()=>{
  const f=fixture();
  f.click('guide');f.done('loadDashboardRoleContent');await f.settle();f.tick();
  assert.equal(f.requests.at(-1).args[0],'reviewer');f.done('loadDashboardRoleContent');await f.settle();f.tick();
  assert.equal(f.requests.at(-1).args[0],'coord');
  const coordinatorReads=f.requests.filter(r=>/^API_coordinator_/.test(r.key)||(r.key==='loadDashboardRoleContent'&&r.args[0]==='coord'));
- assert.equal(coordinatorReads.filter(r=>r.key==='API_coordinator_getProgress').length,1);
+ assert.equal(coordinatorReads.filter(r=>r.key==='API_coordinator_getHealth').length,1);
+ assert.equal(coordinatorReads.filter(r=>r.key==='API_coordinator_getGuideProgress').length,1);
  assert.equal(coordinatorReads.filter(r=>r.key==='API_coordinator_getActivity').length,1);
  f.click('coord');
- assert.equal(f.requests.filter(r=>r.key==='API_coordinator_getProgress').length,1,'selecting the loading role does not repeat reads');
+ assert.equal(f.requests.filter(r=>r.key==='API_coordinator_getHealth').length,1,'selecting the loading role does not repeat reads');
 });
 
 test('failed roles advance once; clicking ahead keeps earlier queued roles',async()=>{
@@ -413,8 +414,8 @@ test('failed roles advance once; clicking ahead keeps earlier queued roles',asyn
  f.requests[0].failure(new Error('offline'));f.requests[0].done=true;await f.settle();
  f.tick();assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
  f.done('loadDashboardRoleContent');await f.settle();
- // The coordinator's own progress and activity reads share the role lane; settle them before the next preload.
- f.requests.filter(r=>/^API_coordinator_get(Progress|Activity)$/.test(r.key)).forEach(r=>{r.done=true;r.failure(new Error('offline'));});await f.settle();f.tick();
+ // The coordinator's own section and activity reads share the role lane; settle them before the next preload.
+ f.requests.filter(r=>/^API_coordinator_get(Health|GuideProgress|ReviewProgress|Activity)$/.test(r.key)).forEach(r=>{r.done=true;r.failure(new Error('offline'));});await f.settle();f.tick();
  assert.equal(lastRole(),'reviewer');
  f.done('loadDashboardRoleContent');await f.settle();f.tick();f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,3);

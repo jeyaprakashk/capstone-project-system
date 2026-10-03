@@ -39,23 +39,10 @@ function parseAssessmentDefinitions_(rows,timezone) {
   definitions.forEach(visit);
   return definitions.sort((a,b)=>a.sequence-b.sequence||a.key.localeCompare(b.key));
 }
-/** Memoizes a derived read for the lifetime of one read-only dashboard snapshot (a no-op outside one), errors included. */
-function dashboardMemo_(key, compute) {
-  const snapshot = typeof dashboardReadSnapshot_ === 'undefined' ? null : dashboardReadSnapshot_;
-  if (!snapshot) return compute();
-  const memoKey = 'memo:' + key;
-  if (!Object.prototype.hasOwnProperty.call(snapshot, memoKey)) {
-    try { snapshot[memoKey] = {value:compute()}; } catch (error) { snapshot[memoKey] = {error}; }
-  }
-  if (snapshot[memoKey].error) throw snapshot[memoKey].error;
-  return snapshot[memoKey].value;
-}
 function getAssessmentDefinitions_() {
-  return dashboardMemo_('assessmentDefinitions',()=>{
-    const sheet=getSheet('AssessmentDefinitions');
-    if(!sheet)return [];
-    return parseAssessmentDefinitions_(sheet.getDataRange().getValues(),getSpreadsheet().getSpreadsheetTimeZone());
-  });
+  const sheet=getSheet('AssessmentDefinitions');
+  if(!sheet)return [];
+  return parseAssessmentDefinitions_(sheet.getDataRange().getValues(),getSpreadsheet().getSpreadsheetTimeZone());
 }
 /** Required consumers distinguish unfinished setup from a configured registry. */
 function requireAssessmentDefinitions_() {
@@ -71,21 +58,20 @@ function assessmentDefinition_(id) {
 }
 function isReviewAssessment_(key) {return getAssessmentDefinitions_().some(d=>d.key===key && d.type==='REVIEW');}
 function assessmentRubric_(definition) {
-  return dashboardMemo_('rubric:'+definition.key,()=>assessmentRubricUncached_(definition));
-}
-function assessmentRubricUncached_(definition) {
   const sheet=getSheet('Rubrics');if(!sheet)throw new Error('Rubrics tab is required.');
   const rows=sheet.getDataRange().getValues(),col=(rows[0]||[]).map(normalizeText_).indexOf('assessment id');
   if(col<0)throw new Error('Rubrics requires Assessment ID column.');
   const key=definition.key;
   return parseRubricRows_([rows[0],...rows.slice(1).filter(r=>normalizeText_(r[col])===key)],[{key}])[key];
 }
-function assessmentPrerequisiteBlock_(definition,team) {
+/** `loaded` lets a bulk caller hand over records it already read: {definition(id), reviewRecords(key), guideRecords()}. */
+function assessmentPrerequisiteBlock_(definition,team,loaded) {
+  const source=loaded||{};
   for(const prerequisite of definition.prerequisites) {
-    const prior=assessmentDefinition_(prerequisite.assessmentId);
+    const prior=(source.definition||assessmentDefinition_)(prerequisite.assessmentId);
     let recorded;
-    if(prior.type==='REVIEW'){const latest=reviewLatest_(reviewRecords_(prior.key).records,team);recorded=!!latest&&['Submitted','Published'].includes(latest.status);}
-    else {const roster=guideRoster_(team,guideActor_(false),true),records=guideRecords_().records;recorded=roster.students.every(s=>{const latest=guideLatest_(records,roster.team,s.register);return latest&&['Submitted','Published'].includes(latest.status);});}
+    if(prior.type==='REVIEW'){const latest=reviewLatest_((source.reviewRecords||(key=>reviewRecords_(key).records))(prior.key),team);recorded=!!latest&&['Submitted','Published'].includes(latest.status);}
+    else {const roster=guideRoster_(team,guideActor_(false),true),records=(source.guideRecords||(()=>guideRecords_().records))();recorded=roster.students.every(s=>{const latest=guideLatest_(records,roster.team,s.register);return latest&&['Submitted','Published'].includes(latest.status);});}
     if(!recorded)return 'Submit '+prior.label+' before entering '+definition.label+' marks.';
   }
   return '';
@@ -93,9 +79,6 @@ function assessmentPrerequisiteBlock_(definition,team) {
 /** Resolve configured storage, recognizing existing journals by assessment identity,
  * never by Review number. Reads do not create, rename, clear or migrate sheets. */
 function assessmentJournal_(definition) {
-  return dashboardMemo_('journal:'+definition.key+':'+definition.journal,()=>assessmentJournalUncached_(definition));
-}
-function assessmentJournalUncached_(definition) {
   if(definition.type==='SEE')throw new Error('SEE is evaluated outside this app and has no assessment journal.');
   const configured=getSheet(definition.journal);
   const inspect=(sheet,name)=>{
