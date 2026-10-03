@@ -26,6 +26,8 @@ function coordinatorViewBrowser_(bridge, getUi) {
     danger:BADGE + 'bg-danger-tint text-danger ring-danger/20', info:BADGE + 'bg-info-tint text-info ring-info/20'
   };
   const DOT = {complete:'bg-success', danger:'bg-danger', warning:'bg-accent', neutral:'bg-control'};
+  const STAT_TEXT = {complete:'text-success', danger:'text-danger', warning:'text-warning', neutral:'text-primary'};
+  const STAT_TINT = {complete:'bg-success-tint', danger:'bg-danger-tint', warning:'bg-warning-tint', neutral:'bg-canvas'};
   const SORT_TYPE = {pair:'pair', text:'text'};
 
   const effective = () => state.progress || state.overview;
@@ -40,9 +42,9 @@ function coordinatorViewBrowser_(bridge, getUi) {
   // ---- summary cards ----
   function statCard(c) {
     return '<div class="rounded-card border border-edge bg-paper p-4 shadow-card" data-stat-card' + (c.progress ? ' data-progress-stat' : '') + ' data-completion-tone="' + c.tone + '">' +
-      '<div class="flex items-center justify-between gap-2 text-sm font-semibold text-ink-2"><span class="inline-flex items-center gap-2"><span class="size-2 rounded-full ' + DOT[c.tone] + '"></span>' + c.label + '</span>' + icon(c.icon) + '</div>' +
-      '<div class="mt-2 flex items-baseline gap-2"><div class="text-kpi font-semibold tabular-nums text-ink" data-stat-value' + (c.ids ? ' id="coordinatorActiveTeams"' : '') + '>' + c.value + '</div>' +
-      '<div class="stat-pct text-sm text-muted empty:hidden"' + (c.ids ? ' id="coordinatorActiveTeamsPct"' : '') + '>' + c.note + '</div></div><div class="mt-2 text-xs text-muted">' + c.detail + '</div></div>';
+      '<div class="flex items-center justify-between gap-2 text-sm font-semibold text-ink-2"><span class="inline-flex items-center gap-2"><span class="size-2 rounded-full ' + DOT[c.tone] + '"></span>' + c.label + '</span>' + '<span class="inline-flex rounded-md p-1.5 ' + STAT_TEXT[c.tone] + ' ' + STAT_TINT[c.tone] + '">' + icon(c.icon) + '</span></div>' +
+      '<div class="mt-2 flex items-baseline gap-2"><div class="text-kpi font-semibold tabular-nums ' + STAT_TEXT[c.tone] + '" data-stat-value' + (c.ids ? ' id="coordinatorActiveTeams"' : '') + '>' + c.value + '</div>' +
+      '<div class="stat-pct rounded-md px-1.5 text-sm empty:hidden ' + STAT_TEXT[c.tone] + ' ' + STAT_TINT[c.tone] + '"' + (c.ids ? ' id="coordinatorActiveTeamsPct"' : '') + '>' + c.note + '</div></div><div class="mt-2 text-xs text-muted">' + c.detail + '</div></div>';
   }
   function progressBar(value, total, left, right) {
     return '<div class="h-2 overflow-hidden rounded bg-tint" aria-hidden="true"><span class="block h-full rounded bg-primary" style="width:' + pct(value, total) + '%"></span></div>' +
