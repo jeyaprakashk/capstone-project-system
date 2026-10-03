@@ -258,7 +258,10 @@ communicate save results. Existing title/intake emails remain unrelated.
 Successful sends are recorded in `WeeklyReminders` (`Reg No`, `Week ID`, `Sent At`).
 `setupWeeklySubmissionStorage()` creates the tab and transfers existing
 `weekly-reminder:<encoded-reg-no>:<week-id>` Script Properties before removing
-them. Run setup before the scheduler uses this version. Failed sends can retry;
+them. Run setup before the scheduler uses this version.
+`cleanupWeeklyReminderScriptProperties()` is a repeatable coordinator editor
+function for any remaining legacy receipts; it returns migrated and deleted counts.
+Failed sends can retry;
 recorded successful sends are suppressed. No report-only or flag logic gates
 reminders. Apps Script scheduling is approximate. Delivery and the sheet receipt
 are not transactional, so a crash after sending but before recording can duplicate

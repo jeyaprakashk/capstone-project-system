@@ -108,6 +108,20 @@ test('storage setup transfers legacy reminder receipts before removing propertie
  assert.equal(f.mails.length,1);assert.equal(f.mails[0][0],'one@example.com');
 });
 
+test('standalone reminder cleanup transfers stragglers and leaves other properties',()=>{
+ const f=weeklyFixture();f.properties.set('weekly-reminder:002:W1','2026-01-04T18:00:00.000Z');
+ f.properties.set('SHEET_ID','sheet-id');
+ assert.throws(()=>f.c.cleanupWeeklyReminderScriptProperties(),/Coordinator/);
+ f.user('coord@example.com');
+ assert.equal(f.c.cleanupWeeklyReminderScriptProperties().migrated,1);
+ assert.equal(f.properties.has('weekly-reminder:002:W1'),false);
+ assert.equal(f.properties.get('SHEET_ID'),'sheet-id');
+ f.properties.set('weekly-reminder:002:W1','2026-01-04T18:00:00.000Z');
+ assert.equal(f.c.cleanupWeeklyReminderScriptProperties().migrated,0);
+ assert.equal(f.sheets.get('WeeklyReminders').rows.length,2);
+ assert.equal(f.c.cleanupWeeklyReminderScriptProperties().deleted,0);
+});
+
 test('missing or malformed reminder storage stops scheduling before mail',()=>{
  for(const mutate of [f=>f.sheets.delete('WeeklyReminders'),f=>f.sheets.get('WeeklyReminders').rows[0][1]='Wrong',
   f=>f.sheets.get('WeeklyReminders').rows.push(['001','W1','text'])]){

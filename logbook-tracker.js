@@ -527,7 +527,17 @@ function migrateWeeklyReminderProperties_(sheet,seen) {
     SpreadsheetApp.flush();
   }
   old.forEach(([key])=>properties.deleteProperty(key));
-  return pending.length;
+  return {migrated:pending.length,deleted:old.length};
+}
+
+/** Run in the editor to transfer and remove any remaining legacy reminder properties. */
+function cleanupWeeklyReminderScriptProperties() {
+  const email = Session.getActiveUser().getEmail();
+  if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
+  return weeklyLock_(()=>{
+    const sheet = weeklyReminderSheet_(false);
+    return migrateWeeklyReminderProperties_(sheet,weeklyReminderReceipts_(sheet));
+  });
 }
 
 function processWeeklySubmissionSchedule() {
