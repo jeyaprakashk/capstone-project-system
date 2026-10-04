@@ -9,7 +9,7 @@ const { studentFixture, SCENARIOS } = require('./student-fixture.cjs');
 const dtoFor = (name, options) => { const s = studentFixture(name, options); return JSON.parse(s.c.API_student_getDashboard()).data; };
 
 function setup(dto) {
-  const { document } = parseHTML('<html><body><div id="studentContent"></div></body></html>');
+  const { document, window } = parseHTML('<html><body><div id="studentContent"></div></body></html>');
   const calls = { jump: [], refresh: 0, weekly: 0, logs: [], preview: [] };
   const c = loadSources(['data-bridge-client.js', 'student-view.js'], { document, Promise, JSON });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
@@ -23,7 +23,7 @@ function setup(dto) {
   const view = c.__make(bridge, () => ui);
   const host = document.getElementById('studentContent');
   view.render(host, dto);
-  return { view, host, document, calls, bridge, click: el => host.onclick({ target: el, preventDefault() {} }) };
+  return { view, host, document, calls, bridge, window, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })) };
 }
 const norm = n => n.textContent.replace(/\s+/g, ' ').trim();
 
@@ -121,8 +121,7 @@ test('delegated actions reach the dashboard modules without inline handlers', ()
   const link = f.host.querySelector('[data-action="open-logs"]'); f.click(link); assert.deepEqual(f.calls.logs, [link]);
   const g = setup(dtoFor('githubActive'));
   g.click(g.host.querySelector('[data-action="github-refresh"]')); assert.equal(g.calls.refresh, 1);
-  const form = g.host.querySelector('[data-github-form]'); let prevented = false;
-  g.host.onsubmit({ target: form, preventDefault() { prevented = true; } });
+  const form = g.host.querySelector('[data-github-form]'); const submit = new g.window.Event('submit', { bubbles: true, cancelable: true }); form.dispatchEvent(submit);
   assert.equal(g.calls.preview.length, 1); assert.equal(g.calls.preview[0][1], form);
   for (const host of [f.host, g.host]) assert.deepEqual(Array.from(host.querySelectorAll('*')).flatMap(n => Array.from(n.attributes).map(a => a.name)).filter(name => /^on/i.test(name)), []);
 });
@@ -160,7 +159,7 @@ test('the endpoint authorizes on the server and returns safe errors', () => {
   s.f.user('');
   assert.equal(JSON.parse(s.c.API_student_getDashboard()).error.code, 'UNAUTHENTICATED');
   const broken = studentFixture('approved');
-  broken.c.getStudentDashboardData = () => { throw new TypeError('column 9 undefined'); };
+  broken.c.getStudentDashboardData_ = () => { throw new TypeError('column 9 undefined'); };
   const failure = JSON.parse(broken.c.API_student_getDashboard());
   assert.equal(failure.error.code, 'INTERNAL'); assert.doesNotMatch(failure.error.message, /column/);
 });

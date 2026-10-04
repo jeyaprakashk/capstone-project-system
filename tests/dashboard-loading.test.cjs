@@ -2,26 +2,6 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
-test('shared sorting handles natural IDs, numeric pairs, missing data and accessible toggles',async()=>{
- const {document}=require('linkedom').parseHTML('<table><thead><tr><th data-sort-type="text">Team</th><th data-sort-type="pair">Activity</th><th>Actions</th></tr></thead><tbody>'+[['T10','2/10'],['T2','2/9'],['T1','10/1'],['T3','—']].map(([id,v])=>'<tr><td>'+id+'</td><td>'+v+'</td><td>View</td></tr>').join('')+'</tbody></table>');
- const c=vm.createContext({document,Intl});
- const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
- vm.runInContext(source.slice(source.indexOf('  function sortTableRows('),source.indexOf('  function renderTeamPagination(')),c);
- const table=document.querySelector('table'), state={};
- c.initializeTableSorting(table,{state});
- const buttons=table.querySelectorAll('button'), ids=()=>Array.from(table.querySelectorAll('tbody tr')).map(r=>r.firstElementChild.textContent);
- assert.equal(buttons.length,2);
- buttons[0].click();assert.deepEqual(ids(),['T1','T2','T3','T10']);
- assert.equal(table.querySelector('th').getAttribute('aria-sort'),'ascending');
- buttons[0].click();assert.deepEqual(ids(),['T10','T3','T2','T1']);
- buttons[1].click();assert.deepEqual(ids(),['T2','T10','T1','T3']);
- buttons[1].click();assert.deepEqual(ids(),['T1','T10','T2','T3']);
- assert.equal(table.querySelector('th').getAttribute('aria-sort'),'none');
- assert.match(buttons[1].getAttribute('aria-label'),/ascending/);
- const replacement=table.cloneNode(true);c.initializeTableSorting(replacement,{state});
- assert.equal(replacement.querySelectorAll('th')[1].getAttribute('aria-sort'),'descending');
-});
-
 function dialogFixture() {
  const {document,window}=require('linkedom').parseHTML('<html><body><button id="previous">Previous</button></body></html>');
  document.activeElement=document.getElementById('previous');
@@ -92,22 +72,22 @@ test('Coordinator storage setup displays journals, blocks duplicates and retries
  const original=f.c.document.getElementById;
  f.c.document.getElementById=id=>document.getElementById(id)||original(id);
  f.c.document.createElement=tag=>document.createElement(tag);
- const node=id=>document.getElementById(id),calls=()=>f.requests.filter(r=>r.key==='prepareReviewAssessmentStorage');
+ const node=id=>document.getElementById(id),calls=()=>f.requests.filter(r=>r.key==='prepareReviewAssessmentStorage_');
  const readiness=()=>({valid:true,ready:false,state:'setup-required',summary:'Assessment journals need setup',count:3,issues:[],links:{},checkedAt:new Date().toISOString(),storage:[{assessment:'review3',label:'Review 3',journal:'Assessment_review3',state:'MISSING'}]});
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',readiness());await f.settle();
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',readiness());await f.settle();
  assert.match(node('reviewConfigurationSummary').textContent,/need setup/);
- f.c.initializeAssessmentStorage();f.c.initializeAssessmentStorage();assert.equal(calls().length,1);
+ vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);assert.equal(calls().length,1);
  const journals=[1,2,3].map(n=>({assessment:'review'+n,label:'Review '+n,journal:'Journal_review'+n,created:n===1,initialized:n===2}));
  calls()[0].success({done:true,journals});await f.settle();
  assert.equal(node('assessmentStorageResults').children.length,3);
  assert.match(node('assessmentStorageResults').textContent,/Review 3: Journal_review3 — existing storage retained/);
  assert.match(node('assessmentStorageStatus').textContent,/3 assessment journals ready/);
- f.done('getCoordinatorReviewConfiguration',readiness());await f.settle();
- f.c.initializeAssessmentStorage();calls()[1].failure({message:'Temporary failure'});await f.settle();
+ f.done('getCoordinatorReviewConfiguration_',readiness());await f.settle();
+ vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);calls()[1].failure({message:'Temporary failure'});await f.settle();
  assert.match(node('assessmentStorageStatus').textContent,/Retry/);
- f.done('getCoordinatorReviewConfiguration',readiness());await f.settle();
- f.c.initializeAssessmentStorage();assert.equal(calls().length,3);
- calls()[2].success({done:true,journals});await f.settle();f.done('getCoordinatorReviewConfiguration',readiness());await f.settle();
+ f.done('getCoordinatorReviewConfiguration_',readiness());await f.settle();
+ vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);assert.equal(calls().length,3);
+ calls()[2].success({done:true,journals});await f.settle();f.done('getCoordinatorReviewConfiguration_',readiness());await f.settle();
  assert.equal(node('initializeAssessmentStorageButton').disabled,false);
 });
 test('assessment readiness renders server states and preserves results on failed refresh',async()=>{
@@ -115,14 +95,14 @@ test('assessment readiness renders server states and preserves results on failed
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
  const node=id=>document.getElementById(id),states=['READY','MISSING','EMPTY','ERROR'];
  const report={valid:false,ready:false,state:'invalid',summary:'Server readiness summary',count:4,checkedAt:new Date().toISOString(),links:{definitions:'https://example.test/definitions'},issues:[{sheet:'Future Review',message:'Storage conflict'}],storage:states.map((state,i)=>({assessment:'gate_'+i,label:'Gate '+i,journal:'Assessment_gate_'+i,state,...(state==='ERROR'?{error:'Storage conflict'}:{})}))};
- f.c.recheckReviewConfiguration();f.c.recheckReviewConfiguration();assert.equal(f.requests.length,1);f.done('getCoordinatorReviewConfiguration',report);await f.settle();
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);assert.equal(f.requests.length,1);f.done('getCoordinatorReviewConfiguration_',report);await f.settle();
  assert.deepEqual(Array.from(node('reviewAssessmentReadiness').children,item=>item.getAttribute('data-state')),states);
  assert.equal(node('reviewConfigurationSummary').textContent,report.summary);assert.equal(node('initializeAssessmentStorageButton').disabled,true);
  assert.match(node('reviewAssessmentReadiness').textContent,/Storage conflict/);assert.equal(node('reviewDefinitionsLink').href,report.links.definitions);
- const before=node('reviewAssessmentReadiness').innerHTML;f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();
+ const before=node('reviewAssessmentReadiness').innerHTML;vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();
  assert.equal(node('reviewAssessmentReadiness').innerHTML,before);assert.equal(node('reviewConfigurationSummary').textContent,report.summary);
  assert.match(node('reviewConfigurationIssues').textContent,/Offline/);assert.equal(node('reviewConfigurationCard').getAttribute('aria-busy'),'false');assert.equal(node('reviewConfigurationRecheck').disabled,false);
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,valid:true,ready:true,state:'ready',summary:'All journals ready',issues:[],storage:report.storage.map(({error,...entry})=>({...entry,state:'READY'}))});await f.settle();
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{...report,valid:true,ready:true,state:'ready',summary:'All journals ready',issues:[],storage:report.storage.map(({error,...entry})=>({...entry,state:'READY'}))});await f.settle();
  assert.equal(node('initializeAssessmentStorageButton').disabled,false);assert.equal(node('reviewConfigurationCard').getAttribute('data-state'),'ready');assert.equal(node('reviewConfigurationIssues').hidden,true);
 });
 
@@ -133,7 +113,7 @@ test('Reviewer dashboard opens the shared Review UI directly for arbitrary asses
  assert.deepEqual(calls,[['T1','design_gate',button]]);assert.equal(f.requests.length,0);
 });
 function fixture(system=false) {
- const loadingNode=()=>({attrs:{},children:[],inert:false,setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},classList:{add(){},remove(){},toggle(){}},appendChild(node){this.children.push(node);node.remove=()=>{this.children=this.children.filter(child=>child!==node);};}});
+ const loadingNode=()=>({attrs:{},children:[],inert:false,addEventListener(){},querySelector(){return null;},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},classList:{add(){},remove(){},toggle(){}},appendChild(node){this.children.push(node);node.remove=()=>{this.children=this.children.filter(child=>child!==node);};}});
  const requests=[], timers=new Map(), listeners={}; let id=0;
  const panels=['guide','reviewer','coord'].map(key=>({...loadingNode(),innerHTML:'',getAttribute:()=>key}));
  const systemContent={...loadingNode(),innerHTML:'',querySelectorAll:()=>[]};
@@ -144,17 +124,17 @@ function fixture(system=false) {
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>{
   // Migrated reviewer role: log it like the role-content request, answering with an envelope.
   if(key==='API_coordinator_getSystemStatus')return requests.push({key:'loadCoordinatorSystemStatus',args,success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
-  const legacy={API_coordinator_getCommitteeConfiguration:'getCoordinatorCommitteeConfiguration',API_coordinator_getReviewConfiguration:'getCoordinatorReviewConfiguration',API_coordinator_createDefinitions:'createAssessmentDefinitions',API_coordinator_prepareStorage:'prepareReviewAssessmentStorage',API_coordinator_syncGithub:'syncCoordinatorGithubAccess',API_coordinator_resendInvitations:'resendExpiredStudentInvitations',API_shared_getTimeline:'loadSharedProjectTimeline',API_shared_getRubrics:'loadSharedRubrics',API_coordinator_getTeamDrawer:'loadCoordinatorDrawerSection'}[key];
+  const legacy={API_coordinator_getCommitteeConfiguration:'getCoordinatorCommitteeConfiguration_',API_coordinator_getReviewConfiguration:'getCoordinatorReviewConfiguration_',API_coordinator_createDefinitions:'createAssessmentDefinitions_',API_coordinator_prepareStorage:'prepareReviewAssessmentStorage_',API_coordinator_syncGithub:'syncCoordinatorGithubAccess_',API_coordinator_resendInvitations:'resendExpiredStudentInvitations_',API_shared_getTimeline:'loadSharedProjectTimeline_',API_shared_getRubrics:'loadSharedRubrics_',API_coordinator_getTeamDrawer:'loadCoordinatorDrawerSection_'}[key];
   if(legacy)return requests.push({key:legacy,args,success:value=>success(JSON.stringify({ok:true,data:value})),failure});
   const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getDashboard:'student',API_coordinator_getOverview:'coord'}[key];
   if(migrated)return requests.push({key:'loadDashboardRoleContent',args:[migrated],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   return requests.push({key,args,success,failure});}}); }
  const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:(fn,delay)=>{timers.set(++id,Object.assign(()=>fn(),{delay}));return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
- for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').split('function renderAssessmentHistory_')[1].replace(/^/, 'function renderAssessmentHistory_'):fs.readFileSync(file,'utf8'),c);
+ for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
  vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
- for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','system-status-view.js','student-weekly-view.js','student-results-view.js','coordinator-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=SystemStatusView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript(),c);
- return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>c.showRoleTab(key),tick:()=>{ /* bridge read timeouts (30s+) are not part of idle/preload timing */ const entries=[...timers.entries()].filter(([,fn])=>!(fn.delay>=10000));entries.forEach(([key])=>timers.delete(key));entries.forEach(([,fn])=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
+ for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js','system-status-view.js','student-weekly-view.js','student-results-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=SystemStatusView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript_(),c);
+ return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>vm.runInContext('DashboardUI',c).showRoleTab(key),tick:()=>{ /* bridge read timeouts (30s+) are not part of idle/preload timing */ const entries=[...timers.entries()].filter(([,fn])=>!(fn.delay>=10000));entries.forEach(([key])=>timers.delete(key));entries.forEach(([,fn])=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
 }
 
 test('common theme applies to all tabs immediately, cached content and late responses cannot change it',async()=>{
@@ -208,9 +188,9 @@ test('student rubric tab reuses shared content and switching back restores My Te
 test('shell selects the common theme before scripts or fonts load',async()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
  for(const file of ['common-styles.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript','getGuideEvaluationClientScript','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_']) c[name]=()=>'';
+ for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_']) c[name]=()=>'';
  for(const key of ['student','guide','reviewer','coord']) {
-  const html=c.buildDashboardShell('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
+  const html=c.buildDashboardShell_('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
   assert.match(html,/<body class="[^"]*">/);
   const {document}=require('linkedom').parseHTML(html);
   assert.equal(document.querySelectorAll('h1').length,1);
@@ -223,7 +203,7 @@ test('shell selects the common theme before scripts or fonts load',async()=>{
   assert.match(html,/Source\+Sans\+3/);
   assert.doesNotMatch(html,/Source\+Serif\+4|Space\+Grotesk|JetBrains\+Mono|family=Inter/);
  }
- const html=c.buildDashboardShell('preview@example.test',[{key:'student',label:'My Team',contentId:'studentContent'},{key:'guide',label:'Guide',contentId:'guideContent'}]);
+ const html=c.buildDashboardShell_('preview@example.test',[{key:'student',label:'My Team',contentId:'studentContent'},{key:'guide',label:'Guide',contentId:'guideContent'}]);
  assert.match(html,/<body class="[^"]*">/);
  assert.match(html,/data-role-tab="rubrics"/);
  assert.match(html,/id="sharedRubrics" hidden/);
@@ -264,10 +244,9 @@ function rubricClientFixture() {
  for(const id of ['sharedRubrics','sharedRubricsContent','sharedRubricsToggle','rubricDrawer','rubricDrawerBackdrop','rubricDrawerTitle','rubricDrawerContent','rubricDrawerClose','teamDrawer','teamDrawerBackdrop','teamDrawerContent','teamDrawerTitle','teamDrawerClose']) {
   const classes=new Set();nodes[id]={innerHTML:'',attrs:{},dataset:{},isConnected:true,setAttribute(k,v){this.attrs[k]=v;},
    classList:{add:k=>classes.add(k),remove:k=>classes.delete(k),contains:k=>classes.has(k)},
-   querySelectorAll:()=>[],focus(){document.activeElement=this;}};
+   querySelectorAll:()=>[],querySelector:()=>null,addEventListener(){},focus(){document.activeElement=this;}};
  }
- const retry={addEventListener(name,fn){this.click=fn;}};
- nodes.sharedRubricsContent.querySelector=()=>retry;
+ nodes.sharedRubricsContent.addEventListener=function(name,fn){this.listeners=this.listeners||{};this.listeners[name]=fn;};
  nodes.rubricDrawer.querySelectorAll=()=>[nodes.rubricDrawerClose];
  nodes.rubricDrawer.contains=el=>el===nodes.rubricDrawerClose;
  nodes.teamDrawer.querySelectorAll=()=>[nodes.teamDrawerClose];
@@ -277,23 +256,25 @@ function rubricClientFixture() {
  const ui=vm.runInContext('DashboardUI',f.c);
  const data={assessments:[{key:'review1',label:'Review 1',weight:12.5,available:true,criterionCount:1,totalMarks:100,criteria:[{pi:'PI1',co:'CO1',type:'Team',maxMarks:100,name:'<unsafe>',descriptors:['<level>','','','','','Excellent']}]},
   {key:'see',label:'SEE',weight:40,available:false,status:'Rubric not configured'}]};
+ // The view listens once on the content host; Retry is a delegated click on its data hook.
+ const retry={click:()=>nodes.sharedRubricsContent.listeners.click({target:{closest:selector=>selector==='[data-rubric-retry]'?{}:null}})};
  return {...f,nodes,ui,data,retry};
 }
 
 test('rubrics start alongside pending role and timeline, deduplicate and survive role switches',async()=>{
  const f=rubricClientFixture();const query=f.c.document.querySelector;
  f.c.document.querySelector=selector=>selector==='[data-role-panel]:not([hidden])'?{getAttribute:()=> 'guide'}:query(selector);
- f.c.initializeFirstRoleTab();
- for(const key of ['loadDashboardRoleContent','loadSharedProjectTimeline','loadSharedRubrics']) assert(f.requests.some(r=>r.key===key),key);
- const promise=f.ui.loadSharedRubrics();assert.equal(f.ui.loadSharedRubrics(),promise);
- f.done('loadSharedRubrics',f.data);await promise;
- f.click('reviewer');await f.ui.loadSharedRubrics();
- assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
+ f.c.initializeFirstRoleTab_();
+ for(const key of ['loadDashboardRoleContent','loadSharedProjectTimeline_','loadSharedRubrics_']) assert(f.requests.some(r=>r.key===key),key);
+ const promise=f.ui.loadSharedRubrics_();assert.equal(f.ui.loadSharedRubrics_(),promise);
+ f.done('loadSharedRubrics_',f.data);await promise;
+ f.click('reviewer');await f.ui.loadSharedRubrics_();
+ assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics_').length,1);
  assert.match(f.nodes.sharedRubricsContent.innerHTML,/12.5%<span class="rubric-mobile-hidden"> weight<\/span>/);
  assert.match(f.nodes.sharedRubricsContent.innerHTML,/<span class="rubric-mobile-hidden">View rubric<\/span>/);
  const mobileRows=[...f.nodes.sharedRubricsContent.innerHTML.matchAll(/<div class="rubric-mobile-row[^"]*">([\s\S]*?)<\/button><\/div>/g)];
  assert.equal(mobileRows.length,2);
- assert.match(mobileRows[0][1],/<strong>Review 1<\/strong><span aria-label="[^"]*% weight">/);
+ assert.match(mobileRows[0][1],/<strong[^>]*>Review 1<\/strong><span[^>]*aria-label="[^"]*% weight">/);
  assert.match(mobileRows[0][1],/<button type="button" class="[^"]*" data-rubric-key="review1"/);
  assert.equal((mobileRows[0][1].match(/data-rubric-key=/g)||[]).length,1,'only the action button opens the mobile rubric');
  assert.match(mobileRows[1][1],/Rubric not configured/);
@@ -304,25 +285,25 @@ test('rubrics start alongside pending role and timeline, deduplicate and survive
 test('rubrics appear only in their dedicated tab for every role and after async loading',async()=>{
  const f=rubricClientFixture(),section=f.nodes.sharedRubrics,content=f.nodes.sharedRubricsContent;
  f.click('guide');assert.equal(section.hidden,true);
- const pending=f.ui.loadSharedRubrics();
- f.done('loadSharedRubrics',f.data);await pending;
+ const pending=f.ui.loadSharedRubrics_();
+ f.done('loadSharedRubrics_',f.data);await pending;
  assert.equal(section.hidden,true);assert.match(content.innerHTML,/data-rubric-key="review1"/);
  for(const role of ['student','guide','reviewer','coord','system-status']) {
   f.click('rubrics');assert.equal(section.hidden,false);
   f.click(role);assert.equal(section.hidden,true);
  }
- assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
+ assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics_').length,1);
 });
 
 test('rubrics remain hidden on role dashboards through failure and retry',async()=>{
  const f=rubricClientFixture();f.click('reviewer');
- const pending=f.ui.loadSharedRubrics();
- const request=f.requests.find(r=>r.key==='loadSharedRubrics');request.done=true;request.failure(new Error('offline'));
+ const pending=f.ui.loadSharedRubrics_();
+ const request=f.requests.find(r=>r.key==='loadSharedRubrics_');request.done=true;request.failure(new Error('offline'));
  await assert.rejects(pending,/offline/);
  assert.equal(f.nodes.sharedRubrics.hidden,true);
  assert.match(f.nodes.sharedRubricsContent.innerHTML,/Retry/);
- f.retry.click();const retried=f.ui.loadSharedRubrics();
- f.done('loadSharedRubrics',f.data);await retried;
+ f.retry.click();const retried=f.ui.loadSharedRubrics_();
+ f.done('loadSharedRubrics_',f.data);await retried;
  assert.equal(f.nodes.sharedRubrics.hidden,true);
  assert.equal(f.nodes.sharedRubrics.attrs['aria-busy'],'false');
 });
@@ -337,15 +318,15 @@ test('shared rubric shell follows timeline and reuses responsive drawer styles',
 });
 
 test('rubric request failures release loading state and retry successfully',async()=>{
- const f=rubricClientFixture();const promise=f.ui.loadSharedRubrics();
+ const f=rubricClientFixture();const promise=f.ui.loadSharedRubrics_();
  f.requests[0].done=true;f.requests[0].failure(new Error('offline'));
  await assert.rejects(promise,/offline/);assert.equal(f.nodes.sharedRubrics.attrs['aria-busy'],'false');
- f.retry.click();const retried=f.ui.loadSharedRubrics();f.done('loadSharedRubrics',f.data);await retried;
- assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,2);
+ f.retry.click();const retried=f.ui.loadSharedRubrics_();f.done('loadSharedRubrics_',f.data);await retried;
+ assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics_').length,2);
 });
 
 test('rubric drawer escapes text, traps focus, closes on Escape and excludes team drawer',async()=>{
- const f=rubricClientFixture();const promise=f.ui.loadSharedRubrics();f.done('loadSharedRubrics',f.data);await promise;
+ const f=rubricClientFixture();const promise=f.ui.loadSharedRubrics_();f.done('loadSharedRubrics_',f.data);await promise;
  const trigger={isConnected:true,focus(){f.c.document.activeElement=this;}};
  f.nodes.teamDrawer.classList.add('open');f.nodes.teamDrawer.dataset.open='true';f.ui.openRubricDrawer('review1',trigger);
  assert(!f.nodes.teamDrawer.classList.contains('open'));assert(f.nodes.rubricDrawer.classList.contains('open'));
@@ -356,7 +337,7 @@ test('rubric drawer escapes text, traps focus, closes on Escape and excludes tea
  f.fire('keydown',{key:'Escape',preventDefault(){}});assert.equal(f.c.document.activeElement,trigger);assert.equal(f.nodes.rubricDrawer.inert,true);
  f.ui.openRubricDrawer('see',trigger);assert(!f.nodes.rubricDrawer.classList.contains('open'));
  f.ui.openRubricDrawer('review1',trigger);f.ui.focusCoordinatorTeam('1');assert(!f.nodes.rubricDrawer.classList.contains('open'));
- assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics').length,1);
+ assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics_').length,1);
 });
 test('coordinator drawer shares focus trap, Escape and trigger focus return',async()=>{
  const f=rubricClientFixture(),trigger={isConnected:true,focus(){f.c.document.activeElement=this;}};
@@ -429,16 +410,16 @@ test('Student background results finish before the next role and are not repeate
  doc.querySelectorAll=selector=>selector==='[data-role-content]'?[queryAll(selector)[0],student,queryAll(selector)[1]]:
   selector==='[data-review-result]'?[{dataset:{reviewResult:'review1'}}]:queryAll(selector);
  const ui=vm.runInContext('DashboardUI',f.c);
- vm.runInContext("StudentResults.all=()=>{DashboardUI.run().withSuccessHandler(()=>{}).loadPublishedGuideEvaluation();DashboardUI.run().withSuccessHandler(()=>{}).loadPublishedReviewEvaluation('review1');}",f.c);
+ vm.runInContext("StudentResults.all=()=>{DashboardUI.run().withSuccessHandler(()=>{}).loadPublishedGuideEvaluation_();DashboardUI.run().withSuccessHandler(()=>{}).loadPublishedReviewEvaluation_('review1');}",f.c);
  f.click('guide');f.done('loadDashboardRoleContent');await f.settle();f.tick();
  f.done('loadDashboardRoleContent');await f.settle();f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
  assert.equal(doc.body.attrs['data-dashboard-theme'],undefined);
- f.done('loadPublishedGuideEvaluation');f.tick();
+ f.done('loadPublishedGuideEvaluation_');f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);
- f.done('loadPublishedReviewEvaluation');f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
- f.click('student');assert.equal(f.requests.filter(r=>r.key==='loadPublishedGuideEvaluation').length,1);
- assert.equal(f.requests.filter(r=>r.key==='loadPublishedReviewEvaluation').length,1);
+ f.done('loadPublishedReviewEvaluation_');f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
+ f.click('student');assert.equal(f.requests.filter(r=>r.key==='loadPublishedGuideEvaluation_').length,1);
+ assert.equal(f.requests.filter(r=>r.key==='loadPublishedReviewEvaluation_').length,1);
 });
 
 test('utilities and role queue resume after visibility and preload setting changes',async()=>{
@@ -586,20 +567,20 @@ test('Coordinator bootstrap follows server state, blocks duplicate calls and ref
  const api=vm.runInContext('DashboardUI',f.c),node=id=>document.getElementById(id);
  const missing={valid:false,ready:false,state:'definitions-missing',registryState:'MISSING',canBootstrap:true,summary:'AssessmentDefinitions is missing',issues:[{sheet:'AssessmentDefinitions',message:'Create the definitions tab'}],links:{},storage:[],checkedAt:new Date().toISOString()};
  api.bootstrapAssessmentDefinitions();assert.equal(f.requests.length,0);
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',missing);await f.settle();
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',missing);await f.settle();
  assert.equal(node('createAssessmentDefinitionsButton').hidden,false);assert.equal(node('createAssessmentDefinitionsButton').disabled,false);
- api.bootstrapAssessmentDefinitions();api.bootstrapAssessmentDefinitions();f.c.recheckReviewConfiguration();f.c.initializeAssessmentStorage();
- assert.equal(f.requests.filter(r=>r.key==='createAssessmentDefinitions').length,1);
- assert.equal(f.requests.filter(r=>r.key==='prepareReviewAssessmentStorage').length,0);
+ api.bootstrapAssessmentDefinitions();api.bootstrapAssessmentDefinitions();vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);
+ assert.equal(f.requests.filter(r=>r.key==='createAssessmentDefinitions_').length,1);
+ assert.equal(f.requests.filter(r=>r.key==='prepareReviewAssessmentStorage_').length,0);
  assert.equal(node('reviewConfigurationCard').getAttribute('aria-busy'),'true');
- f.done('createAssessmentDefinitions',{created:true});await f.settle();
+ f.done('createAssessmentDefinitions_',{created:true});await f.settle();
  assert.match(node('assessmentStorageStatus').textContent,/headers only/);
  const empty={...missing,state:'definitions-empty',registryState:'EMPTY',canBootstrap:false,summary:'Assessment definitions required',links:{definitions:'https://example.test/definitions'}};
- f.done('getCoordinatorReviewConfiguration',empty);await f.settle();
+ f.done('getCoordinatorReviewConfiguration_',empty);await f.settle();
  assert.equal(node('reviewConfigurationCard').getAttribute('aria-busy'),'false');
  assert.equal(node('createAssessmentDefinitionsButton').hidden,true);assert.equal(node('initializeAssessmentStorageButton').disabled,true);
  assert.equal(node('reviewDefinitionsLink').href,empty.links.definitions);
- api.bootstrapAssessmentDefinitions();assert.equal(f.requests.filter(r=>r.key==='createAssessmentDefinitions').length,1);
+ api.bootstrapAssessmentDefinitions();assert.equal(f.requests.filter(r=>r.key==='createAssessmentDefinitions_').length,1);
 });
 
 test('failed bootstrap settles loading, keeps results, and allows a server-confirmed retry',async()=>{
@@ -607,37 +588,42 @@ test('failed bootstrap settles loading, keeps results, and allows a server-confi
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
  const api=vm.runInContext('DashboardUI',f.c),node=id=>document.getElementById(id);
  const missing={valid:false,state:'definitions-missing',canBootstrap:true,summary:'AssessmentDefinitions is missing',issues:[],links:{},storage:[],checkedAt:new Date().toISOString()};
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',missing);await f.settle();
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',missing);await f.settle();
  api.bootstrapAssessmentDefinitions();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Permission denied'});await f.settle();
  assert.match(node('assessmentStorageStatus').textContent,/Permission denied/);
- f.done('getCoordinatorReviewConfiguration',missing);await f.settle();
+ f.done('getCoordinatorReviewConfiguration_',missing);await f.settle();
  assert.equal(node('reviewConfigurationSummary').textContent,missing.summary);assert.equal(node('reviewConfigurationCard').getAttribute('aria-busy'),'false');
  assert.equal(node('createAssessmentDefinitionsButton').disabled,false);
- api.bootstrapAssessmentDefinitions();assert.equal(f.requests.filter(r=>r.key==='createAssessmentDefinitions').length,2);
- f.done('createAssessmentDefinitions',{created:false});await f.settle();f.done('getCoordinatorReviewConfiguration',{...missing,canBootstrap:false,state:'invalid',links:{definitions:'https://example.test/definitions'}});await f.settle();
+ api.bootstrapAssessmentDefinitions();assert.equal(f.requests.filter(r=>r.key==='createAssessmentDefinitions_').length,2);
+ f.done('createAssessmentDefinitions_',{created:false});await f.settle();f.done('getCoordinatorReviewConfiguration_',{...missing,canBootstrap:false,state:'invalid',links:{definitions:'https://example.test/definitions'}});await f.settle();
  assert.equal(node('createAssessmentDefinitionsButton').hidden,true);assert.match(node('assessmentStorageStatus').textContent,/left unchanged/);
 });
 
 
 test('shared team pagination handles All, empty results, page clamping and navigation',async()=>{
- const nodes={demoPaginationInfo:{},demoPageSize:{},demoPaginationButtons:{children:[],set innerHTML(value){this.children=[];},appendChild(node){this.children.push(node);}}};
+ const {document,window}=require('linkedom').parseHTML('<html><body><span id="demoPaginationInfo"></span><select id="demoPageSize"></select><div id="demoPaginationButtons"></div></body></html>');
+ const info=document.getElementById('demoPaginationInfo'),strip=document.getElementById('demoPaginationButtons'),select=document.getElementById('demoPageSize');
+ Object.defineProperty(select,'value',{value:'',writable:true});
  let changes=0;
- const c=vm.createContext({byId:id=>nodes[id],document:{createElement:()=>({classList:{add(){}},setAttribute(){},addEventListener(event,fn){this.click=fn;}})}});
- const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
- for(const file of ['lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- vm.runInContext(source.slice(source.indexOf('  function renderTeamPagination('),source.indexOf('  function changeTeamPageSize(')),c);
+ const c=vm.createContext({document});
+ for(const file of ['lucide-icons.js','icon-renderer.js','system-status-actions.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ const paginate=c.systemStatusActionsBrowser_(null,()=>({renderIcon:c.renderLucideIcon_})).renderTeamPagination;
+ const click=el=>el.dispatchEvent(new window.Event('click',{bubbles:true}));
+ const last=()=>strip.querySelector('button:last-of-type');
  const state={page:1,size:10};
- let bounds=c.renderTeamPagination(15,state,'demo',()=>changes++);
+ let bounds=paginate(15,state,'demo',()=>changes++);
  assert.equal(bounds.start,0);assert.equal(bounds.end,10);
- nodes.demoPaginationButtons.children.at(-1).click();assert.equal(state.page,2);assert.equal(changes,1);
- bounds=c.renderTeamPagination(15,state,'demo',()=>{});assert.equal(bounds.start,10);assert.equal(bounds.end,15);
- state.size='all';bounds=c.renderTeamPagination(57,state,'demo',()=>{});
- assert.equal(state.page,1);assert.equal(bounds.end,57);assert.equal(nodes.demoPageSize.value,'all');
- assert(nodes.demoPaginationButtons.children.at(-1).disabled);
- state.size=25;state.page=9;bounds=c.renderTeamPagination(26,state,'demo',()=>{});
+ click(last());assert.equal(state.page,2);assert.equal(changes,1);
+ bounds=paginate(15,state,'demo',()=>{changes++;});click(strip.querySelector('[data-page="1"]'));assert.equal(state.page,1);assert.equal(changes,2,'re-rendering keeps one listener');
+ state.page=2;bounds=paginate(15,state,'demo',()=>{});assert.equal(bounds.start,10);assert.equal(bounds.end,15);
+ state.size='all';bounds=paginate(57,state,'demo',()=>{});
+ assert.equal(state.page,1);assert.equal(bounds.end,57);assert.equal(select.value,'all');
+ assert(last().disabled);
+ state.size=25;state.page=9;bounds=paginate(26,state,'demo',()=>{});
  assert.equal(state.page,2);assert.equal(bounds.start,25);assert.equal(bounds.end,26);
- bounds=c.renderTeamPagination(0,state,'demo',()=>{});assert.equal(state.page,1);assert.equal(bounds.start,0);assert.equal(bounds.end,0);
- assert.equal(nodes.demoPaginationInfo.textContent,'Showing 0 - 0 of 0 teams');
+ bounds=paginate(0,state,'demo',()=>{});assert.equal(state.page,1);assert.equal(bounds.start,0);assert.equal(bounds.end,0);
+ assert.equal(info.textContent,'Showing 0 - 0 of 0 teams');
+ assert.deepEqual(require('./compiled-css.cjs').missingClasses(require('./compiled-css.cjs').renderedClasses(strip).filter(name=>!name.startsWith('lucide'))),[]);
 });
 
 
@@ -663,7 +649,7 @@ test('responsive menu toggles, dismisses and resets focus across breakpoints',as
 
 test('SEE rubric cards omit external evaluation text while the drawer retains it',async()=>{
  const f=rubricClientFixture();f.data.assessments[1]={...f.data.assessments[0],key:'see',label:'End Review (SEE)',evaluator:'SEE Committee (includes external members)',evaluationNotice:'Evaluated outside this app'};
- const promise=f.ui.loadSharedRubrics();f.done('loadSharedRubrics',f.data);await promise;
+ const promise=f.ui.loadSharedRubrics_();f.done('loadSharedRubrics_',f.data);await promise;
  assert.equal((f.nodes.sharedRubricsContent.innerHTML.match(/Evaluated outside this app/g)||[]).length,0);
  f.ui.openRubricDrawer('see');assert(f.nodes.rubricDrawer.classList.contains('open'));
  assert.match(f.nodes.rubricDrawerContent.innerHTML,/SEE Committee \(includes external members\)/);
@@ -675,11 +661,11 @@ test('SEE-only readiness reports storage not required and prevents setup RPC',as
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body>'+['reviewConfigurationCard','createAssessmentDefinitionsButton','reviewDefinitionsLink','reviewAssessmentReadiness','reviewConfigurationRecheck','initializeAssessmentStorageButton','reviewConfigurationSummary','reviewConfigurationIssues','reviewConfigurationCheckedAt','reviewConfigLink','reviewRubricsLink'].map(id=>'<div id="'+id+'"></div>').join('')+'</body></html>');
  const original=f.c.document.getElementById;
  f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{valid:true,ready:true,canInitializeStorage:false,state:'ready',summary:'Configuration valid',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[{assessment:'see',label:'End Review (SEE)',journal:'',state:'NOT_REQUIRED',detail:'Not required - evaluated outside this app.'}]});await f.settle();
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{valid:true,ready:true,canInitializeStorage:false,state:'ready',summary:'Configuration valid',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[{assessment:'see',label:'End Review (SEE)',journal:'',state:'NOT_REQUIRED',detail:'Not required - evaluated outside this app.'}]});await f.settle();
  assert.equal(document.getElementById('initializeAssessmentStorageButton').disabled,true);
  assert.match(document.getElementById('reviewAssessmentReadiness').textContent,/Storage: Not required.*Evaluated outside this app/);
  assert.doesNotMatch(document.getElementById('reviewAssessmentReadiness').textContent,/Journal:/);
- f.c.initializeAssessmentStorage();assert(!f.requests.some(r=>r.key==='prepareReviewAssessmentStorage'));
+ vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);assert(!f.requests.some(r=>r.key==='prepareReviewAssessmentStorage_'));
 });
 
 
@@ -690,11 +676,11 @@ test('readiness cards render server rubric and overall states and preserve both 
   {assessment:'review1',label:'Review 1',state:'READY',journal:'Assessment_review1',ready:false,rubric:{state:'INVALID',error:'Rubrics Sheet row 9: <invalid criterion>'}},
   {assessment:'see',label:'End Review (SEE)',state:'NOT_REQUIRED',journal:'',ready:true,rubric:{state:'READY',criterionCount:4,maximumMarks:100}}
  ]};
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',report);await f.settle();
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',report);await f.settle();
  const host=document.getElementById('reviewAssessmentReadiness'),[review,see]=host.children;
  assert.match(review.textContent,/Review 1.*Needs attention/);assert.match(review.textContent,/Rubric: Invalid/);assert.match(review.textContent,/Storage: Ready/);assert.match(review.textContent,/row 9: <invalid criterion>/);assert.equal(review.querySelector('invalid'),null);
  assert.match(see.textContent,/End Review \(SEE\).*Ready/);assert.match(see.textContent,/Rubric: Ready.*4 criteria.*100 marks/);assert.match(see.textContent,/Storage: Not required.*Evaluated outside this app/);assert.doesNotMatch(see.textContent,/Journal:/);
- const before=host.innerHTML;f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();assert.equal(host.innerHTML,before);
+ const before=host.innerHTML;vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();assert.equal(host.innerHTML,before);
 });
 
 
@@ -709,31 +695,22 @@ function configurationCardsFixture(){
 test('configuration cards are siblings and committee refresh preserves expansion, retries and ignores replaced cards',async()=>{
  const f=configurationCardsFixture(),report={state:'ready',summary:'Review committees configured',issues:[],links:{committees:'https://example.test/committees'},checkedAt:new Date().toISOString(),committees:[{number:'C1',members:[{name:'Reviewer',email:'r@example.test'}],teams:['T1']}]};
  assert.equal(f.node('committeeConfigurationCard').parentNode,f.node('reviewConfigurationCard').parentNode);
- f.ui.recheckCommitteeConfiguration();f.ui.recheckCommitteeConfiguration();assert.equal(f.requests.filter(r=>r.key==='getCoordinatorCommitteeConfiguration').length,1);
- assert.equal(f.requests.filter(r=>r.key==='getCoordinatorReviewConfiguration').length,0);
- f.done('getCoordinatorCommitteeConfiguration',report);await f.settle();
+ f.ui.recheckCommitteeConfiguration();f.ui.recheckCommitteeConfiguration();assert.equal(f.requests.filter(r=>r.key==='getCoordinatorCommitteeConfiguration_').length,1);
+ assert.equal(f.requests.filter(r=>r.key==='getCoordinatorReviewConfiguration_').length,0);
+ f.done('getCoordinatorCommitteeConfiguration_',report);await f.settle();
  f.node('committeeDirectoryContent').querySelector('details').setAttribute('open','');
- f.ui.recheckCommitteeConfiguration();f.done('getCoordinatorCommitteeConfiguration',report);await f.settle();assert.equal(f.node('committeeDirectoryContent').querySelector('details').open,true);
+ f.ui.recheckCommitteeConfiguration();f.done('getCoordinatorCommitteeConfiguration_',report);await f.settle();assert.equal(f.node('committeeDirectoryContent').querySelector('details').open,true);
  const before=f.node('committeeDirectoryContent').innerHTML;f.ui.recheckCommitteeConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();
  assert.equal(f.node('committeeDirectoryContent').innerHTML,before);assert.match(f.node('committeeConfigurationIssues').textContent,/Offline/);assert.equal(f.node('committeeConfigurationRecheck').disabled,false);
- f.ui.recheckCommitteeConfiguration();const old=f.node('committeeConfigurationCard'),replacement=old.cloneNode(true);old.replaceWith(replacement);replacement.querySelector('#committeeConfigurationSummary').textContent='New card';f.done('getCoordinatorCommitteeConfiguration',report);await f.settle();assert.equal(f.node('committeeConfigurationSummary').textContent,'New card');
+ f.ui.recheckCommitteeConfiguration();const old=f.node('committeeConfigurationCard'),replacement=old.cloneNode(true);old.replaceWith(replacement);replacement.querySelector('#committeeConfigurationSummary').textContent='New card';f.done('getCoordinatorCommitteeConfiguration_',report);await f.settle();assert.equal(f.node('committeeConfigurationSummary').textContent,'New card');
 });
 
 test('storage creation area hides only after confirmed readiness and preserves visibility on refresh failure',async()=>{
  const f=configurationCardsFixture(),report={valid:true,ready:true,state:'ready',canInitializeStorage:false,storageComplete:true,summary:'All ready',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[]};
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',report);await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,true);assert.equal(f.node('initializeAssessmentStorageButton').disabled,true);
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,valid:false,ready:false,state:'invalid'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,true);
- f.c.recheckReviewConfiguration();f.done('getCoordinatorReviewConfiguration',{...report,ready:false,storageComplete:false,canInitializeStorage:true,state:'storage-missing'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,false);assert.equal(f.node('initializeAssessmentStorageButton').disabled,false);
- f.c.recheckReviewConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,false);
-});
-
-test('configuration grids share columns across unequal counts and observer cleanup',async()=>{
- const source=fs.readFileSync('dashboard-client-scripts.js','utf8'),helper=source.slice(source.indexOf('  let configurationGridObserver'),source.indexOf('  let checkingCommitteeConfiguration'));
- let callback,disconnected=0;
- const grids={committeeReadinessGrid:{clientWidth:900,style:{}},reviewAssessmentReadiness:{clientWidth:800,style:{}}};
- const c=vm.createContext({byId:id=>grids[id],ResizeObserver:class{constructor(fn){callback=fn;}observe(){}disconnect(){disconnected++;}}});vm.runInContext(helper,c);
- for(const count of [0,1,3,5,6,20]){grids.committeeReadinessGrid.children=Array(count);grids.reviewAssessmentReadiness.children=Array(count+2);c.arrangeAssessmentReadiness();assert.equal(grids.committeeReadinessGrid.style.gridTemplateColumns,'repeat(3, minmax(0, 1fr))');assert.equal(grids.committeeReadinessGrid.style.gridTemplateColumns,grids.reviewAssessmentReadiness.style.gridTemplateColumns);}
- grids.reviewAssessmentReadiness.clientWidth=400;callback();assert.equal(grids.committeeReadinessGrid.style.gridTemplateColumns,'repeat(1, minmax(0, 1fr))');c.disconnectConfigurationGrids();assert.equal(disconnected,6);
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',report);await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,true);assert.equal(f.node('initializeAssessmentStorageButton').disabled,true);
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{...report,valid:false,ready:false,state:'invalid'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,true);
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{...report,ready:false,storageComplete:false,canInitializeStorage:true,state:'storage-missing'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,false);assert.equal(f.node('initializeAssessmentStorageButton').disabled,false);
+ vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,false);
 });
 
 test('the shell markup has no inline handlers and no legacy component classes; actions are delegated',()=>{
@@ -741,5 +718,5 @@ test('the shell markup has no inline handlers and no legacy component classes; a
   for(const [name,src] of [['router',router],['helpers',helpers]])assert.doesNotMatch(src,/\son(click|change|input|keydown|submit)=/i,name);
   assert.doesNotMatch(router,/class="(?:[^"]*\s)?(tab|tabs|tabpanel|card|drawer|drawer-header|drawer-body|drawer-footer|drawer-scrim)(?:\s[^"]*)?"/);
   for(const hook of ["closest('[data-role-tab]')","closest('#roleMenuToggle')","closest('#rubricDrawerClose')","closest('[data-shell-refresh]')"])assert(client.includes(hook),hook);
-  assert(helpers.includes('data-shell-refresh="${escapeHtml(key)}"'));
+  assert(router.includes('data-shell-refresh="systemStatus"'));
 });

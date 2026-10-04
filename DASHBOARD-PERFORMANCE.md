@@ -174,7 +174,7 @@ review completion, provisioning, guide workflow, and tab-loading regressions.
 
 Weekly activity lives in `weekly-activity.js`. Browser callers can independently
 invoke `loadStudentWeeklyActivity(email)`, `loadTeamWeeklyActivity(teamId)`, or
-`loadAllTeamsWeeklyActivity()` through `google.script.run`. Each endpoint authorizes
+`loadAllTeamsWeeklyActivity_()` through `google.script.run`. Each endpoint authorizes
 its requested scope. Student access is limited to their own individual activity
 and their team's totals; assigned guides/reviewers and coordinators have scoped
 staff access. Only coordinators/PD can request every team.

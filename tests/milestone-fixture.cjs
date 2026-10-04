@@ -3,7 +3,7 @@ exports.install=function(c,count=2){
  c.getAssessmentDefinitions_=()=>c.definitions;
  c.requireAssessmentDefinitions_=()=>{if(!c.definitions.length)throw Error("AssessmentDefinitions contains no graded assessments.");return c.definitions;};
  const source=fs.readFileSync(path.join(__dirname,'..','common-helpers.js'),'utf8');
- for(const name of ['getInternalReviewsCount_','getInternalReviews_','normalizeText_','projectDay_']) {
+ for(const name of ['getInternalReviews_','normalizeText_','projectDay_']) {
   const match=source.match(new RegExp('function '+name+'\\([^)]*\\) \\{[\\s\\S]*?\\n\\}'));
   vm.runInContext(match[0],c);
  }

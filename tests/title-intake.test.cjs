@@ -27,18 +27,18 @@ function setup(guideDecision = '', reviewerDecision = 'Revise') {
   };
   const c = createSheetReadContext({
     recordWeeklyEligibilityIfConfigured_:()=>{},
-    getCoordinatorEmail:() => 'coordinator@example.com', getAcademicYear:() => '2026', getConfig:() => '',
+    getCoordinatorEmail_:() => 'coordinator@example.com', getAcademicYear_:() => '2026', getConfig_:() => '',
     SHEET_NAMES:{ TEAM_INTAKE_RAW:'TeamIntakeRaw', TEAM_STATUS:'TeamStatus' },
-    FIELD_DEFINITIONS:{ TEAM_STATUS:{} }, getColumnMap:() => TS,
+    FIELD_DEFINITIONS:{ TEAM_STATUS:{} }, getColumnMap_:() => TS,
     textEquals_:(a,b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(),
-    normalizeEmail:s => String(s).trim().toLowerCase(), driveFileUrl:s => s,
-    requireTeamGithubReady_:() => {}, getSheet:() => sheet, findTeamStatusRow:() => 2,
+    normalizeEmail_:s => String(s).trim().toLowerCase(), driveFileUrl_:s => s,
+    requireTeamGithubReady_:() => {}, getSheet_:() => sheet, findTeamStatusRow_:() => 2,
     MailApp:{ sendEmail:(...args) => emails.push(args) },
-    getHubRegistrySheet:() => ({ getDataRange:() => ({ getValues:() => [[]] }) }),
-    setStatusFields:(_sheet, _row, fields) => {
+    getHubRegistrySheet_:() => ({ getDataRange:() => ({ getValues:() => [[]] }) }),
+    setStatusFields_:(_sheet, _row, fields) => {
       writes.push(fields);
       Object.entries(fields).forEach(([key,value]) => row[TS[key]] = value);
-    }, getDashboardUrl:() => 'https://example.com/dashboard'
+    }, getDashboardUrl_:() => 'https://example.com/dashboard'
   });
   for (const file of ['intake-approval-workflow.js', 'guide-dashboard.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), c);
@@ -56,9 +56,9 @@ function setupGuideEdit(registryTitles = []) {
     PropertiesService:{ getScriptProperties:() => ({ getProperty:() => '' }) }
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'common-helpers.js'), 'utf8'), helpers);
-  f.c.similarity = helpers.similarity;
-  f.c.emailsMatch = helpers.emailsMatch;
-  f.c.getHubRegistrySheet = () => ({ getDataRange:() => ({ getValues:() => [
+  f.c.similarity_ = helpers.similarity_;
+  f.c.emailsMatch_ = helpers.emailsMatch_;
+  f.c.getHubRegistrySheet_ = () => ({ getDataRange:() => ({ getValues:() => [
     [], ...registryTitles.map(title => ['2025', '7', 'T1', 'other@example.com', title])
   ] }) });
   return f;
@@ -71,7 +71,7 @@ for (const [title, percent] of [
   test(`guide title edit at ${percent}% registry similarity is rejected before any changes`, () => {
     const f = setupGuideEdit(['Smart Campus Monitoring System']);
     const before = f.row.slice();
-    const result = f.c.applyGuideDecision('G4', 'Approved', 'Approved notes', 'guide@example.com', title);
+    const result = f.c.applyGuideDecision_('G4', 'Approved', 'Approved notes', 'guide@example.com', title);
     assert.equal(result.ok, false);
     assert.match(result.message, new RegExp(`${percent}% similar`));
     assert.match(result.message, /Smart Campus Monitoring System/);
@@ -83,7 +83,7 @@ for (const [title, percent] of [
 
 test('guide title edit below 75% saves the title, warning and decision', () => {
   const f = setupGuideEdit(['Smart Campus Monitoring System']);
-  const result = f.c.applyGuideDecision('G4', 'Approved', 'Approved notes', 'guide@example.com', 'Smart Campus Monitoring Platform');
+  const result = f.c.applyGuideDecision_('G4', 'Approved', 'Approved notes', 'guide@example.com', 'Smart Campus Monitoring Platform');
   assert.equal(result.ok, true);
   assert.equal(f.row[f.TS.TITLE], 'SMART CAMPUS MONITORING PLATFORM');
   assert.match(f.row[f.TS.SIMILARITY_FLAG], /^60% similar/);
@@ -93,8 +93,8 @@ test('guide title edit below 75% saves the title, warning and decision', () => {
 
 test('guide title edit cannot bypass registry validation when the registry is unavailable', () => {
   const f = setupGuideEdit();
-  f.c.getHubRegistrySheet = () => { throw new Error('Unavailable'); };
-  const result = f.c.applyGuideDecision('G4', 'Approved', '', 'guide@example.com', 'New title');
+  f.c.getHubRegistrySheet_ = () => { throw new Error('Unavailable'); };
+  const result = f.c.applyGuideDecision_('G4', 'Approved', '', 'guide@example.com', 'New title');
   assert.equal(result.ok, false);
   assert.match(result.message, /Could not check the master registry/);
   assert.equal(f.writes.length, 0);
@@ -103,11 +103,11 @@ test('guide title edit cannot bypass registry validation when the registry is un
 
 test('reviewer revision after Reviewer Notes accepts resubmission and returns to guide review', () => {
   const f = setup();
-  assert.equal(f.c.getTeamStatus(f.row), 'REVISE_AWAITING_STUDENT');
+  assert.equal(f.c.getTeamStatus_(f.row), 'REVISE_AWAITING_STUDENT');
   f.submit();
   assert.equal(f.row[f.TS.TITLE], 'REVISED TITLE');
   assert.equal(f.row[f.TS.REVIEWER_DECISION], '');
-  assert.equal(f.c.getTeamStatus(f.row), 'NEEDS_REVIEW');
+  assert.equal(f.c.getTeamStatus_(f.row), 'NEEDS_REVIEW');
   assert.equal(f.emails.length, 1);
   assert.equal(f.emails[0][0], 'guide@example.com');
   assert.match(f.emails[0][1], /New\/Updated Title Submission/);
@@ -131,7 +131,7 @@ test('guide rejection still permits a revised submission', () => {
   const f = setup('Rejected', '');
   f.submit();
   assert.equal(f.row[f.TS.TITLE], 'REVISED TITLE');
-  assert.equal(f.c.getTeamStatus(f.row), 'NEEDS_REVIEW');
+  assert.equal(f.c.getTeamStatus_(f.row), 'NEEDS_REVIEW');
 });
 
 for (const decision of ['Revise', 'Approved']) {
@@ -143,11 +143,11 @@ for (const decision of ['Revise', 'Approved']) {
     f.row[2] = '7';
     f.row[27] = '1';
     const registry = [];
-    f.c.getCommitteeInfo = number => number === '1' ? { reviewer1Email:'reviewer@example.com' } : null;
-    f.c.getRepoUrlForTeam = () => 'https://example.com/repo';
-    f.c.getHubRegistrySheet = () => ({ appendRow:row => registry.push(row) });
-    f.c.buildTeamMembersField = row => row[f.TS.S1_EMAIL];
-    const result = f.c.applyReviewerDecision('G4', decision, 'Reviewer feedback', 'reviewer@example.com');
+    f.c.getCommitteeInfo_ = number => number === '1' ? { reviewer1Email:'reviewer@example.com' } : null;
+    f.c.getRepoUrlForTeam_ = () => 'https://example.com/repo';
+    f.c.getHubRegistrySheet_ = () => ({ appendRow:row => registry.push(row) });
+    f.c.buildTeamMembersField_ = row => row[f.TS.S1_EMAIL];
+    const result = f.c.applyReviewerDecision_('G4', decision, 'Reviewer feedback', 'reviewer@example.com');
     assert.equal(result.ok, true);
     assert.equal(f.row[f.TS.REVIEWER_DECISION], decision);
     assert.equal(f.row[f.TS.REVIEWER_NOTES], 'Reviewer feedback');

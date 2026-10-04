@@ -89,90 +89,12 @@ no qualifying commit permits first detection alone. Permission failures do not
 invalidate already established reliable dates. Scans are bounded to 100 pages and
 four minutes per run; exceeding those limits remains an error for retry/review.
 
-## Temporary migration policy
+## Retired migration
 
-Every migration function lives in `progress-eligibility-migration.js`. No production
-file depends on that module or calls a migration function.
-
-```text
-Migration Effective Collaborator Date = earliest valid available(
-  GitHub account submission date, first qualifying commit, first detection)
-Migration Progress Fixing Date = max(Migration Effective Collaborator Date,
-                                    authoritative Title Confirmation Date)
-Historical eligible week = first normal deadline >= Migration Progress Fixing Date
-Cutover current week = first normal deadline >= immutable Cutover Timestamp
-Enforced From Week = later ordered week(historical eligible week, cutover current week)
-```
-
-Submission dates are read ONLY here from `GitHubAccounts.Timestamp`, matching the
-student's roster email, team and stored numeric GitHub ID. Choose the earliest valid
-non-future matching record; blank, invalid, future and mismatched records do not
-qualify. Username spelling is not identity evidence. Registration may be the only
-available migration date and is deliberately accepted as a student-benefit proxy,
-not represented as proof of historical access. If selected, the source is
-`MIGRATION_REGISTRATION`; otherwise it is FIRST_COMMIT or FIRST_DETECTED. Ties keep
-the steady-state source. Missing authoritative title evidence still defers fixing.
-
-The cohort is snapshotted once. Later arrivals are not added to it. Resume attempts
-use the original cutover and cohort, preserve first detection and fixed results,
-and revalidate membership, identity, repository and title before writes. Network
-requests occur outside the script lock.
-
-Earlier historically eligible weeks remain voluntary under the existing timing,
-commit and freezing rules. They create no reminders, new MISSED records, missing
-counts, penalties or incompleteness. Existing logs, MISSED rows, revisions, guide
-sign-offs and AI analyses are never rewritten or deleted.
-
-## Migration workflow and later cleanup
-
-These coordinator operations require authorization; the live outcome is recorded below:
-
-1. Set up storage only after separate authorization.
-2. `previewProgressEligibilityMigration(cutoverIso)` previews cohort/cutover only.
-   `previewProgressEligibilityMigrationEvidence(cutoverIso)` additionally performs
-   read-only historical evidence checks and returns proposed student records and
-   unresolved counts, without saving first observations or changing properties.
-   Each evidence pass selects at most 20 unresolved students, with a 90-second
-   evidence-read budget to leave time for persistence. Unchecked students precede
-   previously checked exceptions. Deferred students are not written.
-   Batch-level fixed-row checks reuse one validated WeeklyWindows snapshot;
-   per-student writes still reread current authorities under the script lock.
-3. After authorization, `initializeProgressEligibilityMigration(cutoverIso)` saves
-   the immutable cohort/cutover and seeds enforcement floors. Partial writes can
-   resume. Pass the same reviewed timestamp when initializing after a preview.
-4. `executeProgressEligibilityMigration()` reconstructs and persists individual
-   eligibility under the migration policy. It requires completed initialization,
-   can resume unresolved students, and never refreshes already-fixed students.
-   Run repeatedly until no unchecked/deferred cohort members remain, then review
-   exceptions. Each execution logs fixed, unresolved and deferred counts.
-5. Verify results and review all migration-cohort exceptions. Run
-   `holdProgressEligibilityMigrationExceptions()` to persist holds for unresolved
-   cohort members, preserving existing holds, cohort, cutover and sheet records.
-   The coordinator authorized this exception policy on October 1, 2026. Once the
-   holds and daily skip behavior are verified, the authorized daily trigger may be
-   activated for other students. Do not use steady-state reconciliation to finish
-   migration exceptions: it cannot use registration dates or calculate a cutover.
-   When prerequisites arrive, resume `executeProgressEligibilityMigration()` manually;
-   it ignores automated-reconciliation holds and retains the original policy.
-6. Retain the migration module and cohort properties while exceptions still need
-   the original migration policy. Initialization or installation of holds alone
-   is not completed migration. If the coordinator elects the normal daily policy
-   for all remaining unresolved members, clear their migration floors and holds
-   before deleting the snapshot.
-
-Cleanup deletes the entire migration module, including its cohort preview,
-initialization, evidence preview, execution, registration-date helper and migration
-calculation. Delete properties `PROGRESS_ELIGIBILITY_MIGRATION` and
-`PROGRESS_ELIGIBILITY_MIGRATION_COHORT_<n>` and migration-specific tests/runbook steps.
-The temporary editor function `cleanupProgressEligibilityMigrationProperties()`
-retires the snapshot after moving every unresolved cohort member to normal daily
-eligibility. It clears their migration floors and only their reconciliation holds,
-then derives effective dates solely from steady-state first detection or commit
-evidence. It preserves fixed rows and unrelated holds. A team repository URL
-does not establish individual participation. Run it as coordinator after reviewing
-the cohort; remove it with the rest of the migration module during code cleanup.
-There are no migration branches in production to retain. The retired audit-mode
-property can also be removed if present; no code reads it.
+The one-time migration of existing students (preview, initialization, execution, exception holds and
+property clean-up) has been completed and its code, tests and runbook steps were removed. Nothing in
+production reads its cohort properties. Persisted individual eligibility and enforced boundaries are
+ordinary data, described below.
 
 Persisted Enforced From Week remains ordinary individual data consumed by required
 counts; retaining it preserves the historical exemption without retaining migration
@@ -188,12 +110,10 @@ MISSED generation, individual summaries, team aggregates and guide/coordinator
 indicators use persisted individual enforced boundaries. Guide `requiredByWeek`
 counts exclude students without an obligation; voluntary logs remain visible.
 
-`setupProgressEligibilityStorage()` initializes/validates storage only.
-`setupProgressEligibilityTrigger()` creates one coordinator-owned daily trigger
-around 2 AM in the spreadsheet timezone, retains an existing installation and
-rejects duplicate/other-owner configurations. Its ordinary property is
-`PROGRESS_ELIGIBILITY_TRIGGER_OWNER`. No existing hourly weekly, commit-collection
-or AI trigger is altered by the new setup.
+`setupProgressEligibilityStorage()` initializes/validates storage only. The daily
+reconciliation trigger (around 2 AM in the spreadsheet timezone) is installed and
+owned in the Apps Script project; no existing hourly weekly, commit-collection or
+AI trigger depends on it.
 
 Submission fields, numeric attribution, own qualifying-commit requirements,
 ON_TIME/LATE timing, retry deduplication, freezing, guide sign-off, AI scheduling
@@ -226,17 +146,8 @@ Remaining prerequisites (11 unique students; two have both kinds of issue):
 | Authoritative title approval | G50 | 9923005154, 9923005308, 9923005087 |
 | Authoritative title approval | G56 | 9923005192, 9923005220, 9923005025 |
 
-Persistent holds were verified for all 11 unresolved students. The hold list
-retains its 117 entries from installation during migration; already-fixed entries
-are inert. Daily reconciliation completed at 11:05:03 IST with
-`checked:0, fixed:0, deferred:0, held:11`, and a complete eligibility-sheet
-comparison confirmed no row changed. Never clear these holds or delete the
-cohort/module to let steady state finish an exception. Once genuine prerequisites
-arrive, manually resume migration using the saved cohort and original cutover.
-
-The later coordinator decision to move unresolved cohort members to normal daily
-eligibility supersedes that cleanup restriction. The temporary cleanup function
-clears their floors and holds before removing the migration snapshot.
+The one-time migration is complete and retired: unresolved cohort members were moved to normal daily
+eligibility and the migration code, cohort properties and runbook steps were removed.
 
 The coordinator-owned daily trigger was installed and its Day timer, 2–3 AM
 GMT+05:30 schedule verified. All five existing triggers were retained:
@@ -247,7 +158,7 @@ Only the obsolete TeamStatus column was deleted after rechecking its unique
 header at AC. Readback confirmed 28 remaining columns, unchanged A:AB data and
 unchanged structures for all other sheets. Logs, revisions, sign-offs, AI analyses
 and other history were not rewritten or deleted. Migration code and properties
-remain necessary for the exceptions; cleanup has not been performed.
+were removed after the exceptions were resolved.
 
 The live source was compared with local code before edits, preserving the
 20-student/90-second batching fix. Saved source readback matched the tested local

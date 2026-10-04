@@ -7,6 +7,7 @@
  */
 function studentWeeklyViewBrowser_(bridge, getUi) {
   'use strict';
+  const delegated = new WeakSet();
   const FIELDS = [
     ['workCompleted', 'Work Completed', 'Built, tested, learned — share your progress.'],
     ['guideDiscussion', 'Guide Discussion/Decision', 'What did you discuss or decide?'],
@@ -144,8 +145,7 @@ function studentWeeklyViewBrowser_(bridge, getUi) {
       esc(entry.entryStatus === 'MISSED' ? 'Missed' : entry.timeliness === 'ON_TIME' ? 'Submitted on time' : 'Submitted late') + '</span><time class="text-xs text-muted">' + esc(weeklyDate(entry.recordedAt, data.timezone)) + '</time></div>').join('') || '<p class="text-sm text-muted">No weekly submissions yet.</p>';
   }
   function bind(host) {
-    host.onclick = onClick;
-    host.onsubmit = onSubmit;
+    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); }
   }
   function load() {
     const host = byId('studentWeeklyProgress');

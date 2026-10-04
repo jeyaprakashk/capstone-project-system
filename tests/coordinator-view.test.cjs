@@ -20,7 +20,7 @@ const sections = options => {
 const ACTIVITY = { state: 'active', week: 'W2', checkedAt: '2026-01-10T12:00:00Z', totalTeams: 5, activeTeams: 2, teams: { t1: { logs: 3, commits: 7 }, t2: { logs: 0, commits: 1 } } };
 
 function setup({ data = sections(), activity = ACTIVITY } = {}) {
-  const { document } = parseHTML('<html><body><div id="coordinatorContent"></div></body></html>');
+  const { document, window } = parseHTML('<html><body><div id="coordinatorContent"></div></body></html>');
   const calls = { view: [], close: 0, refresh: 0, requests: [] };
   const c = loadSources(['data-bridge-client.js', 'coordinator-view.js'], { document, Promise, JSON, Intl, Date, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
@@ -39,7 +39,7 @@ function setup({ data = sections(), activity = ACTIVITY } = {}) {
   const view = c.__make(bridge, () => ui);
   const host = document.getElementById('coordinatorContent');
   const flush = () => new Promise(r => setImmediate(r));
-  return { view, host, document, calls, s, flush, click: el => host.onclick({ target: el }),
+  return { view, host, document, calls, s, flush, fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), click: el => el.dispatchEvent(new window.Event('click', { bubbles: true })),
     start: async () => { const overviewDto = await view.load(); view.render(host, overviewDto); await flush(); } };
 }
 const HELD = ['guide', 'health', 'activity', 'review:review1', 'review:review2'];
@@ -190,7 +190,7 @@ test('filters, search and reset narrow the tracker; a vanished filter falls back
   assert.equal(f.host.querySelector('[data-filter="deadline:weekly-logs"]').getAttribute('aria-pressed'), 'true');
   filter('all');
   const box = f.host.querySelector('#trackerSearch');
-  for (const [query, expected] of [['dr. c', ['T3']], ['005', ['T4']], ['t5', ['T5']], ['zzz', []]]) { box.value = query; f.host.oninput({ target: box }); assert.deepEqual(rowIds(f), expected, query); }
+  for (const [query, expected] of [['dr. c', ['T3']], ['005', ['T4']], ['t5', ['T5']], ['zzz', []]]) { box.value = query; f.fire(box, 'input'); assert.deepEqual(rowIds(f), expected, query); }
   f.click(f.host.querySelector('[data-action="reset"]'));
   assert.equal(box.value, ''); assert.equal(rowIds(f).length, 5);
   assert.equal(f.host.querySelector('[data-filter="all"]').getAttribute('aria-pressed'), 'true');
@@ -222,8 +222,9 @@ test('pagination follows the page size, clamps pages and supports All', async ()
   assert.match(f.host.querySelector('#trackerPaginationInfo').textContent, /Showing 1 - 10 of 23 teams/);
   f.click(f.host.querySelector('[data-action="page"][data-page="3"]')); assert.equal(rowIds(f).length, 3);
   assert(f.host.querySelector('[data-action="page"][aria-current="page"]'));
-  f.host.onchange({ target: { getAttribute: () => 'size', value: 'all' } }); assert.equal(rowIds(f).length, 23);
-  f.host.onchange({ target: { getAttribute: () => 'size', value: '10' } }); assert.equal(rowIds(f).length, 10);
+  const size = value => { const select = f.host.querySelector('#trackerPageSize'); Object.defineProperty(select, 'value', { value, configurable: true }); f.fire(select, 'change'); };
+  size('all'); assert.equal(rowIds(f).length, 23);
+  size('10'); assert.equal(rowIds(f).length, 10);
 });
 
 test('team actions open the drawer, email the team, or explain why they cannot', async () => {

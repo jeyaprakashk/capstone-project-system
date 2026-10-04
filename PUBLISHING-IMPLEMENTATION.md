@@ -14,8 +14,8 @@ SEE is display-only and is excluded from publication discovery and commands.
 
 The public commands are:
 
-- `publishInternalAssessment({assessmentId, team, student?, revision, requestId})`
-- `reopenInternalAssessment({assessmentId, team, student?, revision, requestId, reason})`
+- `publishInternalAssessment_({assessmentId, team, student?, revision, requestId})`
+- `reopenInternalAssessment_({assessmentId, team, student?, revision, requestId, reason})`
 
 Commands use explicit assessment IDs. Student result endpoints read publication snapshots.
 

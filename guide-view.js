@@ -8,6 +8,7 @@
  */
 function guideViewBrowser_(bridge, getUi, getWeekly) {
   'use strict';
+  const delegated = new WeakSet();
   const state = {dto:null, host:null, busyTeam:null};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
@@ -162,7 +163,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   function render(host, dto) {
     state.host = host; state.dto = dto;
     host.innerHTML = headerMarkup(updatedLabel()) + (dto.teams.length ? workspaceMarkup(dto) : '<p class="mt-4 text-sm text-muted">You have no teams assigned.</p>');
-    host.onclick = onClick;
+    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); }
     if (!host.guideToggleBound) {
       host.guideToggleBound = true;
       // The toggle event does not bubble; capture it to position the timing explanation.

@@ -9,14 +9,14 @@ function guideActor_(coordinator) {
   return email;
 }
 function guideRoster_(teamId, actor, staff) {
-  const cols = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(r => textEquals_(r[cols.TEAM_ID], teamId));
+  const cols = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const rows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r => textEquals_(r[cols.TEAM_ID], teamId));
   if (rows.length !== 1) throw new Error('Team is missing or ambiguous.');
   const row = rows[0];
-  if (!staff && !emailsMatch(row[cols.GUIDE_EMAIL], actor)) throw new Error('Only the assigned guide can evaluate this team.');
-  const students = getStudentsFromTeamStatusRow_(row, cols).map(s => ({register:normalizeText_(s.regNo), name:String(s.name || ''), email:normalizeEmail(s.email)}));
+  if (!staff && !emailsMatch_(row[cols.GUIDE_EMAIL], actor)) throw new Error('Only the assigned guide can evaluate this team.');
+  const students = getStudentsFromTeamStatusRow_(row, cols).map(s => ({register:normalizeText_(s.regNo), name:String(s.name || ''), email:normalizeEmail_(s.email)}));
   if (!students.length || new Set(students.map(s => s.register)).size !== students.length) throw new Error('Student roster is missing or ambiguous.');
-  return {team:normalizeText_(row[cols.TEAM_ID]), guide:normalizeEmail(row[cols.GUIDE_EMAIL]), students};
+  return {team:normalizeText_(row[cols.TEAM_ID]), guide:normalizeEmail_(row[cols.GUIDE_EMAIL]), students};
 }
 function guideFingerprint_(value) {
   return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, JSON.stringify(value)));
@@ -26,7 +26,7 @@ function guideConfiguration_() {
   if(definition.type!=='GUIDE_EVALUATION')throw new Error('Configure guide_eval as GUIDE_EVALUATION in AssessmentDefinitions.');
   const criteria=assessmentRubric_(definition);
   if(criteria.some(c=>c.type!=='Individual'||c.descriptors.some(t=>!t)))throw new Error('Guide rubric requires individual criteria with all Level 0–5 descriptors.');
-  return {key:definition.key,label:definition.label,criteria,maximum:criteria.reduce((n,c)=>n+c.maxMarks,0),due:definition.day,opens:definition.opens,timezone:getSpreadsheet().getSpreadsheetTimeZone(),policy:definition.academicPolicyVersion,weight:definition.weight/100};
+  return {key:definition.key,label:definition.label,criteria,maximum:criteria.reduce((n,c)=>n+c.maxMarks,0),due:definition.day,opens:definition.opens,timezone:getSpreadsheet_().getSpreadsheetTimeZone(),policy:definition.academicPolicyVersion,weight:definition.weight/100};
 }
 
 function guideEnsureRows_(sheet, lastRow) {
@@ -35,7 +35,7 @@ function guideEnsureRows_(sheet, lastRow) {
 }
 function guideJournalName_() {return assessmentJournal_(assessmentDefinition_('guide_eval')).name;}
 function guideRecords_() {
-  const sheet = getSheet(guideJournalName_());
+  const sheet = getSheet_(guideJournalName_());
   if (!sheet) throw new Error(assessmentStorageMissing_(guideJournalName_()));
   const values = sheet.getDataRange().getValues();
   if (GUIDE_EVAL_HEADERS_.some((h,i) => values[0][i] !== h)) throw new Error('GuideEvaluations headers do not match.');
@@ -79,19 +79,18 @@ function guideScore_(criteria, scores, complete, weight) {
   });
   return {scores:clean, total:cents/100, weighted:Math.round(cents / criteria.reduce((sum,c)=>sum+c.maxMarks,0) * weight * 100)/100};
 }
-function loadGuideEvaluation(teamId, register) {
+function loadGuideEvaluation_(teamId, register) {
   const actor = guideActor_(false), roster = guideRoster_(teamId, actor, false);
   const config = guideConfiguration_(), {records} = guideRecords_();
   const student = register ? roster.students.find(s => s.register === normalizeText_(register)) : roster.students[0];
   if (!student) throw new Error('Student is not in the current team.');
   const latest = guideLatest_(records, roster.team, student.register);
   const overdue = projectDay_(new Date(),config.timezone) > config.due;
-  const repository = typeof getRepoUrlForTeam === 'function' ? getRepoUrlForTeam(roster.team) : '';
+  const repository = typeof getRepoUrlForTeam_ === 'function' ? getRepoUrlForTeam_(roster.team) : '';
   return {roster, student, config, overdue, repository, token:guideFingerprint_({roster,config}), revision:latest ? latest.revision : 0,
     evaluation:latest, statuses:roster.students.map(s => ({register:s.register,status:(guideLatest_(records,roster.team,s.register)||{}).status || 'Not started'}))};
 }
 function guideWrite_(action, input) {
-  if(action==='publish')return publishInternalAssessment({...input,assessmentId:'guide_eval'});
   const staff = action === 'reopen';
   const actor = guideActor_(staff);
   return evaluationCommand_(action,input,fingerprint=>{
@@ -135,18 +134,17 @@ function guideWrite_(action, input) {
     return {revision,status:payload.status,total:payload.total,weighted:payload.weighted};
   });
 }
-function saveGuideEvaluationDraft(input) { return guideWrite_('draft',input); }
-function submitGuideEvaluation(input) { return guideWrite_('submit',input); }
-function publishGuideEvaluation(input) { return guideWrite_('publish',input); }
-function reopenGuideEvaluation(input) { return guideWrite_('reopen',input); }
-function loadCoordinatorGuideEvaluations() {
+function saveGuideEvaluationDraft_(input) { return guideWrite_('draft',input); }
+function submitGuideEvaluation_(input) { return guideWrite_('submit',input); }
+function reopenGuideEvaluation_(input) { return guideWrite_('reopen',input); }
+function loadCoordinatorGuideEvaluations_() {
   guideActor_(true);
   let config;
   try { config = guideConfiguration_(); } catch(err) { return {ready:false,error:err.message,students:[]}; }
   let records;
   try { records = guideRecords_().records; } catch(err) { return {ready:false,error:err.message,students:[]}; }
-  const cols = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const students = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(r=>r[cols.TEAM_ID]).flatMap(row => {
+  const cols = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const students = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r=>r[cols.TEAM_ID]).flatMap(row => {
     const team = normalizeText_(row[cols.TEAM_ID]);
     return getStudentsFromTeamStatusRow_(row,cols).map(s => {
       const register = normalizeText_(s.regNo), last = guideLatest_(records,team,register);
@@ -155,11 +153,11 @@ function loadCoordinatorGuideEvaluations() {
   });
   return {ready:true,students,due:config.due};
 }
-function loadPublishedGuideEvaluation() {return loadPublishedAssessment_('guide_eval');}
+function loadPublishedGuideEvaluation_() {return loadPublishedAssessment_('guide_eval');}
 
 function guideCompletion_() {
   try {
-    const report = loadCoordinatorGuideEvaluations();
+    const report = loadCoordinatorGuideEvaluations_();
     if (!report.ready) return {available:false,completed:0,teams:{}};
     const teams = {};
     report.students.forEach(s => { if (!(s.team in teams)) teams[s.team]=true; teams[s.team] = teams[s.team] && ['Submitted','Published'].includes(s.status); });

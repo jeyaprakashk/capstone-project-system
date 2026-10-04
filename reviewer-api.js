@@ -53,9 +53,9 @@ function reviewerTeamDto_(row, TS, progress) {
   };
 }
 
-/** Pure DTO builder over getReviewerDashboardData(); no sheet or layout knowledge leaves it. */
+/** Pure DTO builder over getReviewerDashboardData_(); no sheet or layout knowledge leaves it. */
 function buildReviewerDto_(data) {
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const progress = getReviewerReviewProgress_(data.assigned);
   return {
     summary:{pending:data.pending.length, approved:data.approved.length, awaitingGuide:data.notYetGuideApproved.length, total:data.total},
@@ -68,26 +68,26 @@ function buildReviewerDto_(data) {
 function reviewerEmailOrThrow_() {
   const email = Session.getActiveUser().getEmail();
   if (!email) throw apiFail_('UNAUTHENTICATED', 'Could not identify your account.');
-  if (!getCommitteeNumbersForReviewer(email).length) throw apiFail_('UNAUTHORIZED', 'You do not have Reviewer access.');
+  if (!getCommitteeNumbersForReviewer_(email).length) throw apiFail_('UNAUTHORIZED', 'You do not have Reviewer access.');
   return email;
 }
 
 function API_reviewer_getDashboard() {
-  return apiHandle_(() => withDashboardRead_(() => buildReviewerDto_(getReviewerDashboardData(reviewerEmailOrThrow_()))));
+  return apiHandle_(() => withDashboardRead_(() => buildReviewerDto_(getReviewerDashboardData_(reviewerEmailOrThrow_()))));
 }
 
 function API_reviewer_submitDecision(teamId, decision, notes) {
   return apiHandle_(() => {
     reviewerEmailOrThrow_();
-    return apiWorkflowResult_(submitReviewerDecision(String(teamId || ''), String(decision || ''), String(notes || '')), 'Decision saved.');
+    return apiWorkflowResult_(submitReviewerDecision_(String(teamId || ''), String(decision || ''), String(notes || '')), 'Decision saved.');
   });
 }
 
 /** Review marking: the rules code authorizes (assigned reviewer, or staff) and keeps its messages; the drawer reads and saves through the bridge. */
-const REVIEW_SAVE_KINDS_ = {draft:'saveReviewEvaluationDraft', submit:'submitReviewEvaluation', absence:'recordReviewAbsence', makeupDraft:'saveReviewMakeupDraft', makeupSubmit:'submitReviewMakeup'};
+const REVIEW_SAVE_KINDS_ = {draft:'saveReviewEvaluationDraft_', submit:'submitReviewEvaluation_', absence:'recordReviewAbsence_', makeupDraft:'saveReviewMakeupDraft_', makeupSubmit:'submitReviewMakeup_'};
 
 function API_review_getEvaluation(teamId, assessmentId) {
-  return apiHandle_(() => loadReviewEvaluation(String(teamId || ''), String(assessmentId || '')));
+  return apiHandle_(() => loadReviewEvaluation_(String(teamId || ''), String(assessmentId || '')));
 }
 
 /** kind is one of draft, submit, absence, makeupDraft, makeupSubmit; the rules function validates the input. */

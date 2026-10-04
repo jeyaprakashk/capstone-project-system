@@ -9,7 +9,7 @@ const { Sync } = require('./sync-promise.cjs');
 const { publishingFixture } = require('./internal-publishing-fixture.cjs');
 
 const id = () => crypto.randomUUID();
-function reopen(f, key, student) { const t = f.report().teams[0]; return f.c.reopenInternalAssessment({ assessmentId: key, team: 'g18', student, revision: student ? t.students.find(s => s.register === student).revision : t.revision, requestId: id(), reason: 'Private correction reason' }); }
+function reopen(f, key, student) { const t = f.report().teams[0]; return f.c.reopenInternalAssessment_({ assessmentId: key, team: 'g18', student, revision: student ? t.students.find(s => s.register === student).revision : t.revision, requestId: id(), reason: 'Private correction reason' }); }
 
 function panel(html) {
   const { window } = parseHTML('<html><body>' + html + '</body></html>'), document = window.document, calls = [];
@@ -25,7 +25,7 @@ const GUIDE = '<section id="studentGuideEvaluation" data-assessment-label="Guide
 
 for (const key of ['review1', 'guide_eval']) test(key + ' student release refresh preserves content, deduplicates, retries and ignores detached callbacks', () => {
   const f = publishingFixture(key);
-  if (key === 'review1') { f.submit(); f.publish(); } else { f.guideSubmit('s1'); f.report(); f.c.publishGuideEvaluation({ team: 'g18', student: 's1', revision: 1, requestId: id() }); }
+  if (key === 'review1') { f.submit(); f.publish(); } else { f.guideSubmit('s1'); f.report(); f.c.publishInternalAssessment_({...{ team: 'g18', student: 's1', revision: 1, requestId: id() },assessmentId:'guide_eval'}); }
   reopen(f, key, key === 'guide_eval' ? 's1' : undefined); f.actor('one@x');
   const result = JSON.parse(JSON.stringify(f.c.loadPublishedAssessment_(key)));
   const p = panel(key === 'review1' ? REVIEW : GUIDE), host = p.document.querySelector('section');

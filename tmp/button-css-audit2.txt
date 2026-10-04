@@ -1,5 +1,0 @@
-[getGuideStyles] a.btn :: text-decoration
-[getReviewerStyles] a.btn :: text-decoration
-[getReviewEvaluationStyles_] .review-stepper button :: padding
-[getEditorialStyles_] E .drawer-repo-link (+9 sel) :: color
-TOTAL 4

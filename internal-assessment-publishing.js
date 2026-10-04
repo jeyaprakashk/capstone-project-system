@@ -1,7 +1,7 @@
 /** Type adapters normalize publication views; academic outcomes are persisted inputs. */
 function internalPublishingConfig_(key) {
   const d=publicationDefinition_(key),a=publicationAdapters_()[d.type];
-  return {key,title:d.label,type:d.type,publishMethod:'publishInternalAssessment',reopenMethod:'reopenInternalAssessment',teamPublication:a.teamPublication,reopenScope:a.reopenScope,reopenDescription:a.reopenDescription};
+  return {key,title:d.label,type:d.type,publishMethod:'publishInternalAssessment_',reopenMethod:'reopenInternalAssessment_',teamPublication:a.teamPublication,reopenScope:a.reopenScope,reopenDescription:a.reopenDescription};
 }
 function internalPublishingState_(team) {
   const students=team.students;
@@ -12,17 +12,17 @@ function internalPublishingState_(team) {
   if(students.some(s=>s.publicationPermission==='ALLOWED'||s.submissionStatus==='Submitted'))return 'PARTIAL_OR_EXCEPTION';
   return 'AWAITING_EVALUATION';
 }
-function loadInternalAssessmentPublishing(key) {
+function loadInternalAssessmentPublishing_(key) {
   const actor=guideActor_(true),definition=publicationDefinition_(key),adapter=publicationAdapters_()[definition.type],config=internalPublishingConfig_(key);
   let records,assessmentConfig,configurationError='';
   try {const history=adapter.read(key);if(!history.sheet)throw new Error('Assessment journal is missing.');records=history.records;}
   catch(error){return {ready:false,config,error:error.message,teams:[]};}
   try {assessmentConfig=adapter.config(key);}catch(error){configurationError=error.message;}
-  const cols=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS),rows=getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(r=>r[cols.TEAM_ID]);
+  const cols=getColumnMap_(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS),rows=getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r=>r[cols.TEAM_ID]);
   const teams=rows.map(row=>{
     const team=normalizeText_(row[cols.TEAM_ID]),issues=[];
     let roster;
-    try{roster=publicationRoster_(team);}catch(error){issues.push(error.message);roster={team,students:getStudentsFromTeamStatusRow_(row,cols).map(s=>({register:normalizeText_(s.regNo),name:String(s.name||''),email:normalizeEmail(s.email)}))};}
+    try{roster=publicationRoster_(team);}catch(error){issues.push(error.message);roster={team,students:getStudentsFromTeamStatusRow_(row,cols).map(s=>({register:normalizeText_(s.regNo),name:String(s.name||''),email:normalizeEmail_(s.email)}))};}
     const rosterIssue=issues[0]||'',latest=adapter.reopenScope==='team'?adapter.latest(records,team):null;
     const reopenInfo=record=>{
       if(!record||!['Submitted','Published'].includes(record.status))return {canReopen:false,reopenChanges:[],reopenReason:'A submitted evaluation is required.'};
@@ -63,10 +63,10 @@ function loadInternalAssessmentPublishing(key) {
 }
 
 /** Publication card: reads and the publish / reopen requests the card sends. The existing functions authorize and validate. */
-const PUBLISHING_RUN_METHODS_ = {publishInternalAssessment:true, reopenInternalAssessment:true};
+const PUBLISHING_RUN_METHODS_ = {publishInternalAssessment_:true, reopenInternalAssessment_:true};
 
 function API_publishing_get(key) {
-  return apiHandle_(() => loadInternalAssessmentPublishing(String(key || '')));
+  return apiHandle_(() => loadInternalAssessmentPublishing_(String(key || '')));
 }
 
 function API_publishing_run(method, input) {

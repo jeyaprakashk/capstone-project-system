@@ -29,16 +29,16 @@ function fixture() {
     Session: { getActiveUser: () => ({ getEmail: () => user }) },
     LockService: { getScriptLock: () => ({ waitLock: () => { locked = true; }, releaseLock: () => { locked = false; } }) },
     SpreadsheetApp: { flush() {} },
-    getColumnMap: () => columns,
-    getSheet: name => name === 'usernames' ? sheet : {},
-    getSheetRows: name => name === 'usernames' ? rows.slice(1) : [team],
+    getColumnMap_: () => columns,
+    getSheet_: name => name === 'usernames' ? sheet : {},
+    getSheetRows_: name => name === 'usernames' ? rows.slice(1) : [team],
     getOptionalHeaderIndex_: () => 5,
-    getRepoUrlForTeam:()=>team[5],
+    getRepoUrlForTeam_:()=>team[5],
     getCollaboratorPermission_:()=>({status:200,body:{permission:'write'}}),
-    normalizeEmail: v => String(v || '').trim().toLowerCase(),
-    emailsMatch: (a,b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(),
+    normalizeEmail_: v => String(v || '').trim().toLowerCase(),
+    emailsMatch_: (a,b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(),
     textEquals_: (a,b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(),
-    makeGithubRequest: (method,path) => {
+    makeGithubRequest_: (method,path) => {
       calls.push({ method,path });
       if (response instanceof Error) throw response;
       if (!response && path.startsWith('/repos/')) return {status:200,body:path.includes('/invitations?')?[]:{html_url:'https://github.com/org/repo'}};
@@ -47,7 +47,7 @@ function fixture() {
     },
     provisionTeamRepos_: teamId => { calls.push({teamId}); return {failed:[],waiting:[],success:[{message:'Team checked'}]}; },
     getGithubRepoSlug_: () => 'org/repo',
-    addCollaborator: (slug, username) => { calls.push({slug, username}); return {status:201}; }
+    addCollaborator_: (slug, username) => { calls.push({slug, username}); return {status:201}; }
   });
   vm.runInContext(fs.readFileSync('github-identity.js','utf8'),c);
   c.weeklyStudents_=()=>[];
@@ -60,15 +60,15 @@ function fixture() {
 
 test('setup uses the shared team workflow even for existing repositories', () => {
   const f=fixture();
-  f.c.completeStudentGithubSetup();
+  f.c.completeStudentGithubSetup_();
   assert.deepEqual(f.calls[0],{teamId:'T1'});
   f.rows.push(['','one@example.com','T1','valid']);
   f.team[5]='https://github.com/org/repo';
-  assert.equal(f.c.completeStudentGithubSetup().message,'Team checked');
+  assert.equal(f.c.completeStudentGithubSetup_().message,'Team checked');
   assert.deepEqual(f.calls.at(-1),{teamId:'T1'});
   assert.equal(f.locked(),false);
   f.user('outsider@example.com');
-  assert.throws(()=>f.c.completeStudentGithubSetup(),/Student team/);
+  assert.throws(()=>f.c.completeStudentGithubSetup_(),/Student team/);
 });
 
 test('batch and student collaborator repair share team readiness without skipping existing repos', () => {
@@ -77,11 +77,11 @@ test('batch and student collaborator repair share team readiness without skippin
   const visited=[];
   Object.assign(f.c, {
     SHEET_NAMES:{TEAM_STATUS:'teams',TEAM_ROSTER:'roster'},
-    getSheetRows:name=>name==='teams'?[['T1'],['T2']]:[],
-    getColumnMap:()=>({TEAM_ID:0}),
+    getSheetRows_:name=>name==='teams'?[['T1'],['T2']]:[],
+    getColumnMap_:()=>({TEAM_ID:0}),
     recordWeeklyEligibilityIfConfigured_:()=>{},
     repairTeamGithubSetup_:id=>{visited.push(id);return {ready:id==='T2',usernamesComplete:id==='T2',message:'Waiting',repoUrl:'https://github.com/org/repo',members:[]};},
-    getConfig:()=>'', Logger:{log(){}}
+    getConfig_:()=>'', Logger:{log(){}}
   });
   const first=f.c.provisionTeamRepos_('T1');
   assert.equal(first.waiting.length,1);
@@ -101,10 +101,10 @@ test('repository backfill writes only exact current-team matches to TeamStatus',
   vm.runInContext(fs.readFileSync('github-provisioning.js','utf8'),f.c);
   const saved=[];
   Object.assign(f.c,{
-    getAcademicYear:()=> '2026-27',
-    getColumnMap:()=>({TEAM_ID:0,SEMESTER:1}),
-    getSheetRows:name=>{assert.equal(name,'teams');return [['T1','Odd'],['T2','Odd'],['T3','Odd']];},
-    getRepoUrlMap:()=>({t2:'https://github.com/org/keep'}),
+    getAcademicYear_:()=> '2026-27',
+    getColumnMap_:()=>({TEAM_ID:0,SEMESTER:1}),
+    getSheetRows_:name=>{assert.equal(name,'teams');return [['T1','Odd'],['T2','Odd'],['T3','Odd']];},
+    getRepoUrlMap_:()=>({t2:'https://github.com/org/keep'}),
     getAllGithubOrgRepos_:()=>[
       {name:'capstone-2025-26-odd-team-T1',html_url:'wrong year'},
       {name:'capstone-odd-team-T1',html_url:'old name'},
@@ -127,13 +127,13 @@ test('coordinator access sync reads and deduplicates TeamStatus repository URLs'
   vm.runInContext(fs.readFileSync('github-provisioning.js','utf8'),f.c);
   const checked=[];
   Object.assign(f.c,{
-    getConfig:key=>key==='COLLABORATOR_GITHUB_USERNAME'?'coordinator':'maintain',
-    getRepoUrlMap:()=>({t1:'https://github.com/org/one',t2:'https://github.com/org/one',t3:'https://github.com/org/two'}),
-    getSheetRows:()=>{throw Error('Sync must use the TeamStatus repository map');},
+    getConfig_:key=>key==='COLLABORATOR_GITHUB_USERNAME'?'coordinator':'maintain',
+    getRepoUrlMap_:()=>({t1:'https://github.com/org/one',t2:'https://github.com/org/one',t3:'https://github.com/org/two'}),
+    getSheetRows_:()=>{throw Error('Sync must use the TeamStatus repository map');},
     getCollaboratorPermission_:slug=>{checked.push(slug);return {status:200};},
-    setConfig(){},Logger:{log(){}}
+    setConfig_(){},Logger:{log(){}}
   });
-  f.c.syncCoordinatorGithubAccess();
+  f.c.syncCoordinatorGithubAccess_();
   assert.deepEqual(checked,['org/one','org/two']);
   assert.equal(f.locked(),false);
 });

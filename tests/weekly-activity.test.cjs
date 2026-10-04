@@ -12,10 +12,10 @@ function fixture() {
  usernames:[[1,'a@x','T1','Alice','101'],[1,'b@x','T1','Bob','102']]};
  let user='coord@x', active=true;
  const norm=value=>String(value??'').trim().toLowerCase();
- const c=vm.createContext({Date,normalizeText_:norm,normalizeEmail:norm,emailsMatch:(a,b)=>norm(a)===norm(b),textEquals_:(a,b)=>norm(a)===norm(b),
+ const c=vm.createContext({Date,normalizeText_:norm,normalizeEmail_:norm,emailsMatch_:(a,b)=>norm(a)===norm(b),textEquals_:(a,b)=>norm(a)===norm(b),
   SHEET_NAMES:{TEAM_STATUS:'teams',LOG_ENTRIES:'logs',COMMITS:'commits',GITHUB_ACCOUNTS:'usernames'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},
-  getColumnMap:()=>columns,getSheet:()=>({getLastColumn:()=>5}),getSheetRows:name=>{calls.push(['all',name]);return rows[name];},
-  withDashboardRead_:fn=>fn(),Session:{getActiveUser:()=>({getEmail:()=>user})},getCoordinatorEmail:()=> 'coord@x',getConfig:()=> 'pd@x',getCommitteeNumbersForReviewer:()=>[],
+  getColumnMap_:()=>columns,getSheet_:()=>({getLastColumn:()=>5}),getSheetRows_:name=>{calls.push(['all',name]);return rows[name];},
+  withDashboardRead_:fn=>fn(),Session:{getActiveUser:()=>({getEmail:()=>user})},getCoordinatorEmail_:()=> 'coord@x',getConfig_:()=> 'pd@x',getCommitteeNumbersForReviewer_:()=>[],
   getWeeklySubmissionWindows_:()=>[{weekId:'W1',opens_at:10,deadline_at:11,late_until:12}],getEffectiveLogEntries_:records=>[...new Map(records.map(r=>[r.regNo+':'+r.weekId,r])).values()],getProjectSchedule_:()=>({week1:10}),getProjectClock_:()=>({active,today:active?10:9,week:active?1:0,now:new Date(active?10:9)}),isCurrentProjectWeek_:date=>date===10
  });
  vm.runInContext(fs.readFileSync('github-identity.js','utf8'),c);
@@ -29,31 +29,16 @@ function fixture() {
  c.readCollectedCommits_=team=>{calls.push(['commits',team?1:null]);return rows.commits.filter(r=>!team||norm(r.teamId)===norm(team));};
  return {c,rows,calls,user:value=>user=value,inactive:()=>active=false};
 }
-test('team and all-team scopes agree without calling each other; batch reads each activity sheet once',()=>{
- const f=fixture();const all=f.c.loadAllTeamsWeeklyActivity();
+test('the all-teams read counts logs and commits per team and reads each activity sheet once',()=>{
+ const f=fixture();const all=f.c.loadAllTeamsWeeklyActivity_();
  assert.equal(all.teams.t1.logs,2);assert.equal(all.teams.t1.commits,1);assert.equal(all.activeTeams,2);
  assert.equal(f.calls.filter(call=>call[0]==='logs').length,1);assert.equal(f.calls.filter(call=>call[0]==='commits').length,1);
- f.c.loadAllTeamsWeeklyActivity=()=>{throw Error('must not call all');};f.calls.length=0;
- const team=f.c.loadTeamWeeklyActivity(' T1 ');
- assert.equal(JSON.stringify(team.teams.t1),JSON.stringify(all.teams.t1));
- assert(!f.calls.some(call=>call[0]==='all'));assert(f.calls.filter(call=>['logs','commits'].includes(call[0])).every(call=>call[1]!==null));
 });
-test('student scope counts own logs and mapped commits, excluding unknown authors',()=>{
+test('a non-coordinator fails before reading activity; inactive periods do not read activity',()=>{
  const f=fixture();f.user('a@x');
- f.c.loadAllTeamsWeeklyActivity=f.c.loadTeamWeeklyActivity=()=>{throw Error('must not call another scope');};
- const result=f.c.loadStudentWeeklyActivity();
- assert.equal(result.teams.t1.logs,1);assert.equal(result.teams.t1.commits,1);
- f.rows.usernames.push([2,'b@x','T1','alice','101']);f.calls.length=0;
- const ambiguous=f.c.loadStudentWeeklyActivity();assert.equal(ambiguous.teams.t1.commits,null);
- assert.equal(ambiguous.commitAttribution,'unavailable');assert(!f.calls.some(call=>call[0]==='commits'));
-});
-test('unauthorized scopes fail before reading activity; inactive periods do not read activity',()=>{
- const f=fixture();f.user('a@x');
- assert.throws(()=>f.c.loadAllTeamsWeeklyActivity(),/Coordinator/);
- assert.throws(()=>f.c.loadTeamWeeklyActivity('T2'),/denied/);
- assert.throws(()=>f.c.loadStudentWeeklyActivity('b@x'),/denied/);
+ assert.throws(()=>f.c.loadAllTeamsWeeklyActivity_(),/Coordinator/);
  assert(!f.calls.some(call=>['logs','commits','usernames'].includes(call[0])));
  f.user('coord@x');f.inactive();f.calls.length=0;
- const result=f.c.loadAllTeamsWeeklyActivity();assert.equal(result.state,'not-started');assert.equal(result.teams.t1.logs,null);
+ const result=f.c.loadAllTeamsWeeklyActivity_();assert.equal(result.state,'not-started');assert.equal(result.teams.t1.logs,null);
  assert(!f.calls.some(call=>['logs','commits'].includes(call[0])));
 });

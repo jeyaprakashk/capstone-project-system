@@ -25,7 +25,7 @@ function weeklyFixture() {
     MailApp:{sendEmail:(...args)=>{if(mailFails)throw Error('Mail unavailable');mails.push(args);}},
     ScriptApp:{getProjectTriggers:()=>triggers.slice(),deleteTrigger:t=>triggers.splice(triggers.indexOf(t),1),newTrigger:name=>({timeBased(){return this;},everyHours(n){this.hours=n;return this;},atHour(n){this.hour=n;return this;},everyDays(n){this.days=n;return this;},inTimezone(tz){this.timezone=tz;return this;},create(){triggers.push({getHandlerFunction:()=>name,hours:this.hours,hour:this.hour,days:this.days,timezone:this.timezone});}})}
   });
-  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','weekly-activity.js','logbook-tracker.js','progress-eligibility.js','progress-eligibility-migration.js','team-github-setup.js','weekly-progress-phase2.js','marks-tracker.js','guide-dashboard.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','weekly-activity.js','logbook-tracker.js','progress-eligibility.js','team-github-setup.js','weekly-progress-phase2.js','marks-tracker.js','guide-dashboard.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
   c.parseGithubRepoUrl_=url=>{const m=String(url).match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+?)(?:\.git)?\/?$/i);return m?{owner:m[1],repo:m[2]}:null;};
   const definitions=vm.runInContext('FIELD_DEFINITIONS',c);
   const ts=Object.values(definitions.TEAM_STATUS).concat('Repo URL'),tr=Object.values(definitions.TEAM_ROSTER);
@@ -46,8 +46,8 @@ function weeklyFixture() {
       [new Clock(date),'T1','Project work',member.username,githubSetup.repoUrl,String(i*2+j+1).padStart(40,'0'),member.githubId]))]);
   sheet('CommitCollectionStatus',[Object.values(definitions.COMMIT_COLLECTION_STATUS),['T1','ok',new Clock()]]);
   const collectionStatus=value=>sheets.get('CommitCollectionStatus').rows[1][1]=value;
-  Object.assign(c,{getConfig:key=>{if(!(key in config))throw Error('Missing '+key);return config[key];},getCoordinatorEmail:()=> 'coord@example.com',
-    activityIsCoordinator_:email=>email==='coord@example.com',getDashboardUrl:()=> 'https://script.google.com/dashboard',
+  Object.assign(c,{getConfig_:key=>{if(!(key in config))throw Error('Missing '+key);return config[key];},getCoordinatorEmail_:()=> 'coord@example.com',
+    activityIsCoordinator_:email=>email==='coord@example.com',getDashboardUrl_:()=> 'https://script.google.com/dashboard',
     getTeamGithubSetup_:()=>({...githubSetup,ready,message:ready?'Ready':'Unavailable'}),requireTeamGithubReady_:()=>{if(!ready)throw Error('GitHub unavailable');return c.getTeamGithubSetup_();}});
   const fields=vm.runInContext('PROGRESS_ELIGIBILITY_FIELDS_',c), peHeaders=Object.values(fields);
   const pe=sheet('ProgressEligibility',[peHeaders,...['001','002'].map(reg=>peHeaders.map(h=>({'Register Number':reg,'Team':'T1','Progress Eligible From Week ID':'W1','Enforced From Week ID':'W1','Eligibility Fixed At':new Clock(),'Status':'FIXED'}[h]||'')))]);

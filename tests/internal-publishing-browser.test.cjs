@@ -7,7 +7,7 @@ const flush=async()=>{for(let i=0;i<15;i++)await Promise.resolve();};
 test('native uncertain publication reconciles from its journal event after a later reopen',async()=>{
  const f=fixture();await f.load();f.host().querySelector('[data-publish]').click();await flush();const request=f.calls[1];
  f.server.report();f.server.c[request.method](request.args[0]);
- const revision=f.server.report().teams[0].revision;f.server.c.reopenInternalAssessment({assessmentId:'review1',team:'g18',revision,requestId:crypto.randomUUID(),reason:'Correction'});
+ const revision=f.server.report().teams[0].revision;f.server.c.reopenInternalAssessment_({assessmentId:'review1',team:'g18',revision,requestId:crypto.randomUUID(),reason:'Correction'});
  await f.settleMutation(request,'Network disconnected');await f.settleRead();
  assert(!f.host().querySelector('[data-retry-operation]'));assert.match(f.section().textContent,/1\/1 publication requests confirmed/);assert.match(f.host().textContent,/Under correction/);
 });
@@ -28,20 +28,20 @@ function fixture(key='review1') {
     guideRun:()=>runner(),ask:async text=>{questions.push(text);return approve;},requestText:async text=>{questions.push(text);return approve?'Correction':null;},
     beginContentLoading:host=>{loading.begun++;host.setAttribute('aria-busy','true');let done=false;return ()=>{if(done)return;done=true;loading.settled++;host.removeAttribute('aria-busy');};}
   }});
-  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js','internal-assessment-publishing-client.js'])vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):fs.readFileSync(file,'utf8'),c);c.DashboardUI.renderIcon=c.renderLucideIcon_;c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;const { Sync } = require('./sync-promise.cjs');
+  for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js','internal-assessment-publishing-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);c.DashboardUI.renderIcon=c.renderLucideIcon_;c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;const { Sync } = require('./sync-promise.cjs');
   const record = (method, args) => { const p = new Sync(); calls.push({ method, args, ok: v => p.resolve(v), fail: e => p.reject(e) }); return p; };
-  const bridge = { read: (key, endpoint, args, options) => { assert.equal(endpoint, 'API_publishing_get'); assert.equal(options.timeoutMs, 120000); return record('loadInternalAssessmentPublishing', args); },
+  const bridge = { read: (key, endpoint, args, options) => { assert.equal(endpoint, 'API_publishing_get'); assert.equal(options.timeoutMs, 120000); return record('loadInternalAssessmentPublishing_', args); },
     write: (endpoint, args) => { assert.equal(endpoint, 'API_publishing_run'); return record(args[0], [args[1]]); } };
   const api=c.internalAssessmentPublishingBrowser_(bridge);
   const section=()=>document.querySelector('[data-publishing]'),host=()=>document.querySelector('[data-publishing-content]');
   async function load(){const promise=api.refresh(key);calls.at(-1).ok(server.report());await promise;}
   async function settleMutation(call,fail){if(fail)call.fail({message:fail});else {server.report();call.ok(server.c[call.method](call.args[0]));}await flush();}
-  async function settleRead(){const read=calls.at(-1);assert.equal(read.method,'loadInternalAssessmentPublishing');read.ok(server.report());await flush();}
+  async function settleRead(){const read=calls.at(-1);assert.equal(read.method,'loadInternalAssessmentPublishing_');read.ok(server.report());await flush();}
   return {server,document,window,api,calls,questions,loading,timers,section,host,load,settleMutation,settleRead,initTooltips:()=>c.initializeDashboardTooltips_(),approve:value=>approve=value};
 }
 
 test('refresh lifecycle retains content, deduplicates reads, retries and restores controls',async()=>{
-  const f=fixture();await f.load();const before=f.host().innerHTML,search=f.host().querySelector('[data-search]');search.value='Alex';search.dispatchEvent(new f.window.Event('input'));
+  const f=fixture();await f.load();const before=f.host().innerHTML,search=f.host().querySelector('[data-search]');search.value='Alex';search.dispatchEvent(new f.window.Event('input',{bubbles:true}));
   const pending=f.api.refresh('review1');await f.api.refresh('review1');assert.equal(f.calls.length,2);assert(f.section().querySelector('[data-refresh]').disabled);
   f.calls[1].fail({message:'Offline'});await pending;assert.equal(f.host().querySelector('[data-search]'),search);assert.equal(search.value,'Alex');assert.match(f.section().querySelector('[data-notice]').textContent,/Offline/);assert(!f.section().querySelector('[data-refresh]').disabled);assert.equal(f.loading.begun,f.loading.settled);
   f.section().querySelector('[data-notice] button').click();assert.equal(f.calls.length,3);f.calls[2].ok(f.server.report());await flush();assert.equal(f.host().querySelector('[data-search]').value,'Alex');assert.equal(f.loading.begun,f.loading.settled);assert(before.includes('Publish Team'));
@@ -53,14 +53,14 @@ test('failed initial read settles skeleton and retry; detached screen ignores st
 });
 
 test('search, publication filter and explicit details work without changing publication actions',async()=>{
-  const f=fixture();await f.load();const host=f.host(),search=host.querySelector('[data-search]');search.value='Bea';search.dispatchEvent(new f.window.Event('input'));assert(!host.querySelector('[data-team]').hidden);
-  search.value='unknown';search.dispatchEvent(new f.window.Event('input'));assert(host.querySelector('[data-team]').hidden);assert(!host.querySelector('[data-empty]').hidden);
-  search.value='';search.dispatchEvent(new f.window.Event('input'));const filter=host.querySelector('[data-filter]');filter.querySelector('[value="PUBLISHED"]').selected=true;filter.dispatchEvent(new f.window.Event('change'));assert(host.querySelector('[data-team]').hidden);
-  filter.querySelector('[value="all"]').selected=true;filter.dispatchEvent(new f.window.Event('change'));const details=host.querySelector('[data-details]');details.click();assert.equal(details.getAttribute('aria-expanded'),'true');assert(!host.querySelector('[data-detail-row]').hidden);details.click();assert(host.querySelector('[data-detail-row]').hidden);
+  const f=fixture();await f.load();const host=f.host(),search=host.querySelector('[data-search]');search.value='Bea';search.dispatchEvent(new f.window.Event('input',{bubbles:true}));assert(!host.querySelector('[data-team]').hidden);
+  search.value='unknown';search.dispatchEvent(new f.window.Event('input',{bubbles:true}));assert(host.querySelector('[data-team]').hidden);assert(!host.querySelector('[data-empty]').hidden);
+  search.value='';search.dispatchEvent(new f.window.Event('input',{bubbles:true}));const filter=host.querySelector('[data-filter]');filter.querySelector('[value="PUBLISHED"]').selected=true;filter.dispatchEvent(new f.window.Event('change',{bubbles:true}));assert(host.querySelector('[data-team]').hidden);
+  filter.querySelector('[value="all"]').selected=true;filter.dispatchEvent(new f.window.Event('change',{bubbles:true}));const details=host.querySelector('[data-details]');details.click();assert.equal(details.getAttribute('aria-expanded'),'true');assert(!host.querySelector('[data-detail-row]').hidden);details.click();assert(host.querySelector('[data-detail-row]').hidden);
 });
 
 for(const key of ['review1','review2'])test(key+': team UI calls native endpoint once and blocks double clicks',async()=>{
-  const f=fixture(key);await f.load();const button=f.host().querySelector('[data-publish]:not([data-student])');button.click();button.click();await flush();assert.equal(f.questions.length,1);assert.equal(f.calls.length,2);assert.equal(f.calls[1].method,'publishInternalAssessment');assert.equal(f.calls[1].args[0].student,undefined);
+  const f=fixture(key);await f.load();const button=f.host().querySelector('[data-publish]:not([data-student])');button.click();button.click();await flush();assert.equal(f.questions.length,1);assert.equal(f.calls.length,2);assert.equal(f.calls[1].method,'publishInternalAssessment_');assert.equal(f.calls[1].args[0].student,undefined);
   await f.settleMutation(f.calls[1]);await f.settleRead();assert.match(f.host().textContent,/Published/);assert(!f.host().querySelector('[data-publish]'));
 });
 
@@ -84,8 +84,8 @@ test('Guide unknown completion reconciles by request ID and never republishes co
 
 test('Guide individual action calls only the selected existing student endpoint',async()=>{
   const f=fixture('guide_eval');await f.load();f.host().querySelector('[data-details]').click();f.host().querySelector('[data-publish][data-student="1"]').click();await flush();
-  assert.equal(f.calls[1].method,'publishInternalAssessment');assert.equal(f.calls[1].args[0].student,'s2');await f.settleMutation(f.calls[1]);await f.settleRead();
-  assert.equal(f.calls.filter(call=>call.method==='publishInternalAssessment').length,1);const team=f.server.report().teams[0];assert.equal(team.publishedStudents,1);assert.equal(team.students[0].publicationStatus,'NOT_PUBLISHED');
+  assert.equal(f.calls[1].method,'publishInternalAssessment_');assert.equal(f.calls[1].args[0].student,'s2');await f.settleMutation(f.calls[1]);await f.settleRead();
+  assert.equal(f.calls.filter(call=>call.method==='publishInternalAssessment_').length,1);const team=f.server.report().teams[0];assert.equal(team.publishedStudents,1);assert.equal(team.students[0].publicationStatus,'NOT_PUBLISHED');
 });
 
 test('reopening sends reason with team scope for Review and student scope for Guide',async()=>{
@@ -148,7 +148,7 @@ test('publishing cards start collapsed and disclosure survives refresh for every
   f.api.toggle(key);assert.equal(body.hidden,false);assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.match(toggle.getAttribute('aria-label'),/^Collapse /);
   const loaded=f.host().innerHTML;f.api.toggle(key);assert.equal(body.hidden,true);assert.equal(f.host().innerHTML,loaded);
   await f.load();assert.equal(body.hidden,true);assert.equal(toggle.getAttribute('aria-expanded'),'false');
-  f.api.toggle(key);assert.equal(body.hidden,false);assert.equal(f.calls.filter(call=>call.method==='loadInternalAssessmentPublishing').length,2);
+  f.api.toggle(key);assert.equal(body.hidden,false);assert.equal(f.calls.filter(call=>call.method==='loadInternalAssessmentPublishing_').length,2);
  }
 });
 

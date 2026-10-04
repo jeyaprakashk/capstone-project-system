@@ -8,6 +8,8 @@ function createSheetReadContext(globals) {
   const context = vm.createContext(globals);
   vm.runInContext(source, context);
   context.getAssessmentDefinitions_=()=>[];
+  // The entry-point guard has its own tests; contexts that skip common-helpers run entry points as a trigger.
+  if(!context.requireTriggerOrOperator_)context.requireTriggerOrOperator_=()=>{};
   return context;
 }
 module.exports = { createSheetReadContext };

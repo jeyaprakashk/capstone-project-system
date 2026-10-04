@@ -9,7 +9,7 @@ const {randomUUID}=require('node:crypto');
 const {Sync}=require('./sync-promise.cjs');
 
 function fixture() {
- const {document}=parseHTML('<html><body><section id="studentWeeklyProgress"><div data-weekly-read><span>Skeleton</span></div><p data-weekly-status></p><button data-weekly-refresh>Refresh weekly progress</button><div data-weekly-form></div></section></body></html>');
+ const {document,window}=parseHTML('<html><body><section id="studentWeeklyProgress"><div data-weekly-read><span>Skeleton</span></div><p data-weekly-status></p><button data-weekly-refresh>Refresh weekly progress</button><div data-weekly-form></div></section></body></html>');
  const host=document.querySelector('section'),requests=[];let starts=0,finishes=0;
  const bridge={
   read:(key,method)=>{const p=new Sync();requests.push({method:'load',success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;},
@@ -25,7 +25,8 @@ function fixture() {
   actions:[{weekId:'W1',state:'OPEN',editable:true,deadline:'2026-01-05T18:00:00Z',cutoff:'2026-01-14T23:59:59Z'}]};
  function form() {const el=host.querySelector('form');const elements=Array.from(el.querySelectorAll('textarea,button'));elements.forEach(e=>{if(e.name)elements[e.name]=e;});Object.defineProperty(el,'elements',{value:elements,configurable:true});el.reportValidity=()=>true;return el;}
  return {c:context,api,ui,document,host,requests,data,form,counts:()=>[starts,finishes],load:()=>api.load(),reply:(d=data)=>requests.at(-1).success({...d,weeks:d.weeks || d.actions}),
-  click:target=>host.onclick({target}),submit:formElement=>host.onsubmit({target:formElement,preventDefault(){}})};
+  click:async target=>{target.dispatchEvent(new window.Event('click',{bubbles:true,cancelable:true}));await new Promise(r=>setImmediate(r));},
+  submit:formElement=>formElement.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}))};
 }
 
 test('guide confirmation makes a submitted week read-only with an explicit explanation',()=>{

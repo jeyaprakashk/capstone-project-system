@@ -16,10 +16,9 @@ avoid retaining empty space from setup actions.
 
 ## Refreshing existing content
 
-For tabs with a refresh action, render the header with
-`buildTabHeader_(title, key, action, updated)`; role dashboards use
-`buildDashboardContainerHeader_(title, key)`. Pass the tab's own refresh action
-and update its timestamp only after a successful read.
+For tabs with a refresh action, the view renders its own header with a
+`data-refresh-button` and a `data-action="refresh"` (the System Status header is part of the
+static shell and uses `data-shell-refresh`). Update the timestamp only after a successful read.
 
 Use `DashboardUI.beginContentLoading(element, label)`. It covers the existing DOM
 with the shared skeleton, retains the content's height and event handlers, sets

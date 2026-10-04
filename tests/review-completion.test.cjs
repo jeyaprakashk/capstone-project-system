@@ -17,10 +17,10 @@ test('bulk and single-team completion agree using submitted academic revisions',
  assert.equal(f.c.getTeamReviewCompletionStatus_('missing'),null);
 });
 test('draft and missing journals cannot falsely complete an assessment',()=>{
- const f=setup();f.c.saveReviewEvaluationDraft({...f.input(),assessmentId:'review1'});
+ const f=setup();f.c.saveReviewEvaluationDraft_({...f.input(),assessmentId:'review1'});
  assert.equal(f.c.getTeamReviewCompletionStatus_('G18').review1.completed,false);
- const get=f.c.getSheet;f.c.getSheet=name=>name==='Review1Evaluations'?null:get(name);
- f.c.getSpreadsheet=()=>({getSheets:()=>[],getSpreadsheetTimeZone:()=> 'UTC'});
+ const get=f.c.getSheet_;f.c.getSheet_=name=>name==='Review1Evaluations'?null:get(name);
+ f.c.getSpreadsheet_=()=>({getSheets:()=>[],getSpreadsheetTimeZone:()=> 'UTC'});
  const result=f.c.getTeamReviewCompletionStatus_('G18');assert.equal(result.review1.available,false);assert.equal(result.review2.available,true);
 });
 test('completion timing reports journal reads without changing results',()=>{

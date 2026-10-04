@@ -5,13 +5,13 @@ function publicationAdapters_() {
     REVIEW: {teamPublication:'native',reopenScope:'team',
       read:key=>reviewRecords_(key), config:key=>reviewConfiguration_(key),
       latest:(records,team)=>reviewLatest_(records,team),
-      reopen:input=>reopenReviewEvaluation(input),
+      reopen:input=>reopenReviewEvaluation_(input),
       reopenDescription:'Copies evidence into a correction draft. The previous publication remains visible under correction.',
       reopenChanges:(record,key,roster)=>evaluationReopenChanges_(record,reviewConfiguration_(key),roster)},
     GUIDE_EVALUATION: {teamPublication:'sequential',reopenScope:'student',
       read:()=>guideRecords_(),config:()=>guideConfiguration_(),
       latest:(records,team,student)=>guideLatest_(records,team,student),
-      reopen:input=>reopenGuideEvaluation(input),
+      reopen:input=>reopenGuideEvaluation_(input),
       reopenDescription:'Opens a new Guide correction draft. The previous publication remains visible under correction.',
       reopenChanges:()=>[]}
   };
@@ -26,10 +26,10 @@ function publicationDefinition_(key) {
   return d;
 }
 function publicationRoster_(team) {
-  const columns=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
-  const rows=getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(r=>textEquals_(r[columns.TEAM_ID],team));
+  const columns=getColumnMap_(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
+  const rows=getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r=>textEquals_(r[columns.TEAM_ID],team));
   if(rows.length!==1)throw new Error('Team is missing or ambiguous.');
-  const row=rows[0],roster={team:normalizeText_(team),students:getStudentsFromTeamStatusRow_(row,columns).map(s=>({register:normalizeText_(s.regNo),name:String(s.name||''),email:normalizeEmail(s.email)}))};
+  const row=rows[0],roster={team:normalizeText_(team),students:getStudentsFromTeamStatusRow_(row,columns).map(s=>({register:normalizeText_(s.regNo),name:String(s.name||''),email:normalizeEmail_(s.email)}))};
   evaluationMembership_(roster);
   return roster;
 }
@@ -83,7 +83,7 @@ function publicationLatestRelease_(records,team,student) {
   const record=records.filter(r=>r.team===team&&r.publication&&r.publication.releases.some(s=>s.student===student)).sort((a,b)=>b.revision-a.revision)[0];
   return record?{record,release:record.publication.releases.find(s=>s.student===student)}:null;
 }
-function publishInternalAssessment(input) {
+function publishInternalAssessment_(input) {
   const actor=guideActor_(true),definition=publicationDefinition_(input&&input.assessmentId),adapter=publicationAdapters_()[definition.type];
   return evaluationCommand_('publish',input,fingerprint=>{
     const roster=publicationRoster_(input.team),{sheet,records}=adapter.read(definition.key);
@@ -106,14 +106,14 @@ function publishInternalAssessment(input) {
     return {revision,status:adapter.reopenScope==='student'||!student||latest.students.every(s=>s.register===student||!s.needsPublication)?'Published':'Submitted'};
   });
 }
-function reopenInternalAssessment(input) {
+function reopenInternalAssessment_(input) {
   guideActor_(true);const d=publicationDefinition_(input&&input.assessmentId);
   return publicationAdapters_()[d.type].reopen(input);
 }
 function loadPublishedAssessment_(key) {
   const actor=guideActor_(false),d=publicationDefinition_(key),adapter=publicationAdapters_()[d.type];
-  const columns=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
-  const matches=getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(r=>r[columns.TEAM_ID]).flatMap(row=>getStudentsFromTeamStatusRow_(row,columns).filter(s=>emailsMatch(s.email,actor)).map(s=>({team:normalizeText_(row[columns.TEAM_ID]),student:normalizeText_(s.regNo)})));
+  const columns=getColumnMap_(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
+  const matches=getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r=>r[columns.TEAM_ID]).flatMap(row=>getStudentsFromTeamStatusRow_(row,columns).filter(s=>emailsMatch_(s.email,actor)).map(s=>({team:normalizeText_(row[columns.TEAM_ID]),student:normalizeText_(s.regNo)})));
   if(matches.length!==1)throw new Error('Student assignment is missing or ambiguous.');
   const match=matches[0],roster=publicationRoster_(match.team);evaluationMembership_(roster);
   const {records}=adapter.read(key),published=publicationLatestRelease_(records,match.team,match.student);if(!published)return null;

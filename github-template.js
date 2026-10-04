@@ -4,7 +4,7 @@ function githubTemplatePendingKey_(slug) {
 }
 
 function githubTemplateRequest_(method, path, payload, expected) {
-  const response = makeGithubRequest(method, path, payload);
+  const response = makeGithubRequest_(method, path, payload);
   if (!(expected || [200, 201]).includes(response.status)) {
     const error = new Error('Template GitHub request failed: ' + method + ' ' + path + ' (HTTP ' + response.status + ').');
     error.githubStatus = response.status;
@@ -18,9 +18,9 @@ function githubTemplateSnapshot_(slug) {
   const repo = githubTemplateRequest_('GET', base);
   if (!repo.default_branch) throw new Error('Repository has no default branch.');
   const branch = repo.default_branch;
-  const ref = makeGithubRequest('GET', base + '/git/ref/heads/' + encodeURIComponent(branch));
+  const ref = makeGithubRequest_('GET', base + '/git/ref/heads/' + encodeURIComponent(branch));
   if (ref.status === 404 || ref.status === 409) {
-    const commits = makeGithubRequest('GET', base + '/commits?per_page=1');
+    const commits = makeGithubRequest_('GET', base + '/commits?per_page=1');
     if (commits.status === 409 || (commits.status === 200 && Array.isArray(commits.body) && !commits.body.length)) {
       return {branch, head:null, tree:null, entries:{}};
     }
@@ -125,7 +125,7 @@ function installGithubTemplate_(slug, options) {
     if (!snapshot.head) {
       const readme = files.find(file=>file.path === 'README.md');
       checkTime();
-      const initialized = makeGithubRequest('PUT','/repos/' + slug + '/contents/README.md', {
+      const initialized = makeGithubRequest_('PUT','/repos/' + slug + '/contents/README.md', {
         message:'Initialize Capstone template v4',content:githubTemplatePayload_(readme),branch:snapshot.branch,
         committer:{name:'System',email:'system@capstone.local'}
       });
@@ -159,7 +159,7 @@ function installGithubTemplate_(slug, options) {
       author:{name:'System',email:'system@capstone.local'},committer:{name:'System',email:'system@capstone.local'}
     });
     checkTime();
-    const update = makeGithubRequest('PATCH',base + '/git/refs/heads/' + encodeURIComponent(snapshot.branch),{sha:commit.sha,force:false});
+    const update = makeGithubRequest_('PATCH',base + '/git/refs/heads/' + encodeURIComponent(snapshot.branch),{sha:commit.sha,force:false});
     if ([409,422].includes(update.status)) continue;
     if (update.status !== 200) throw new Error('Template branch update failed (HTTP ' + update.status + ').');
     snapshot = githubTemplateSnapshot_(slug);

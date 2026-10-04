@@ -19,13 +19,13 @@ Legitimate lifecycle events, including start, formation, title and report, remai
 
 1. An authorized Coordinator/PD opens System Status → Assessment readiness.
 2. If the registry is missing, **Create assessment definitions tab** calls
-   `createAssessmentDefinitions()`. Authorization and a script lock precede writes.
+   `createAssessmentDefinitions_()`. Authorization and a script lock precede writes.
    It validates and writes only the existing parser's ten-column header row.
 3. Readiness refreshes to **Assessment definitions required**. The direct sheet
    link opens the new tab. The Coordinator enters the institution's actual
    assessment definitions and referenced rubrics, then selects **Recheck**.
 4. Valid configuration enables the separate **Create missing assessment storage**
-   action. `prepareReviewAssessmentStorage()` revalidates under a lock and
+   action. `prepareReviewAssessmentStorage_()` revalidates under a lock and
    provisions all supported configured assessments, including Guide.
 5. Missing journals are created, genuinely empty journals receive headers, and
    compatible existing journals remain unchanged. Reviewers/Guides enter marks

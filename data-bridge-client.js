@@ -86,6 +86,11 @@ function getMigratedViewsClientScript_() {
 const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => typeof InternalAssessmentPublishing === 'undefined' ? null : InternalAssessmentPublishing);
 const CoordinatorView = (${coordinatorViewBrowser_.toString()})(DataBridge, () => DashboardUI);
+const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI);
+const SharedTimelineView = (${sharedTimelineViewBrowser_.toString()})(() => DashboardUI);
+const SharedRubricsView = (${sharedRubricsViewBrowser_.toString()})(() => DashboardUI);
+const SystemStatusActions = (${systemStatusActionsBrowser_.toString()})(DataBridge, () => DashboardUI);
+const StudentGithub = (${studentGithubBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentResults = (${studentResultsViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentWeekly = (${studentWeeklyViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI);

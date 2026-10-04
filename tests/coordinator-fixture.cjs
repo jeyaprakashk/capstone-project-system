@@ -5,7 +5,7 @@ const { weeklyFixture } = require('./weekly-progress-fixture.cjs');
 
 function coordinatorFixture({ reviewsConfigured = true, progressFails = false } = {}) {
   const f = weeklyFixture(), c = f.c;
-  for (const file of ['milestone-config.js', 'assessment-registry.js', 'rubric-config.js', 'deadline-events.js', 'lucide-icons.js', 'icon-renderer.js', 'dashboard-client-scripts.js',
+  for (const file of ['milestone-config.js', 'assessment-registry.js', 'rubric-config.js', 'deadline-events.js', 'lucide-icons.js', 'icon-renderer.js', 'assessment-history-view.js','dashboard-client-scripts.js',
     'coordinator-dashboard.js', 'api-envelope.js', 'coordinator-api.js', 'common-styles.js']) vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
   const day = Math.floor(Date.parse('2026-01-10') / 86400000);
   const reviews = [{ key: 'review1', label: 'Review 1' }, { key: 'review2', label: 'Review 2' }];
@@ -23,7 +23,7 @@ function coordinatorFixture({ reviewsConfigured = true, progressFails = false } 
   ];
   f.status.rows.splice(1, f.status.rows.length, ...teams.map(t => f.ts.map(h => ({ ...base, ...t })[h] ?? '')));
   f.roster.rows.splice(1, f.roster.rows.length, ...teams.map(t => f.tr.map(h => ({ ...base, ...t })[h] ?? '')));
-  c.getRepoUrlMap = () => ({ t1: 'https://github.com/org/t1', t2: 'https://github.com/org/t2', t4: 'https://github.com/org/t4' });
+  c.getRepoUrlMap_ = () => ({ t1: 'https://github.com/org/t1', t2: 'https://github.com/org/t2', t4: 'https://github.com/org/t4' });
   c.getAllReviewCompletionStatus_ = () => {
     if (progressFails) throw new Error('marks unavailable');
     return { t1: { review1: { completed: true }, review2: { completed: false } }, t2: { review1: { completed: false }, review2: { completed: false } }, t3: { review1: { completed: false, available: false }, review2: { available: false } }, t4: { review1: { completed: true }, review2: { completed: true } } };

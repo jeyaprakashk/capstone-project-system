@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),crypto=re
 const {publishingFixture}=require('./internal-publishing-fixture.cjs');
 const id=()=>crypto.randomUUID(),plain=x=>JSON.parse(JSON.stringify(x));
 
-function reopen(f,key='review1',student){const t=f.report().teams[0];return f.c.reopenInternalAssessment({assessmentId:key,team:'g18',student,revision:student?t.students.find(s=>s.register===student).revision:t.revision,requestId:id(),reason:'Private correction reason'});}
+function reopen(f,key='review1',student){const t=f.report().teams[0];return f.c.reopenInternalAssessment_({assessmentId:key,team:'g18',student,revision:student?t.students.find(s=>s.register===student).revision:t.revision,requestId:id(),reason:'Private correction reason'});}
 
 test('publication is a minimal frozen release with a verified exact academic source, not duplicate evidence',()=>{
  const f=publishingFixture(),input=f.input();input.students[0].scores.I.remark='Released feedback';f.submit(input);
@@ -35,7 +35,7 @@ test('source, snapshot, duplicate publication and unsupported version corruption
 test('Review correction preserves released data through draft and resubmission; republication is isolated',()=>{
  const f=publishingFixture();f.submit();f.publish();f.actor('one@x');const before=plain(f.c.loadPublishedReviewEvaluation_('review1'));
  reopen(f);f.actor('one@x');let visible=f.c.loadPublishedReviewEvaluation_('review1');assert.equal(visible.total,80);assert(visible.underCorrection);assert(!JSON.stringify(visible).includes('Private correction'));
- f.actor('reviewer@x');let input=f.input();input.students[0].scores.I.marks=33;f.c.saveReviewEvaluationDraft({...input,assessmentId:'review1'});
+ f.actor('reviewer@x');let input=f.input();input.students[0].scores.I.marks=33;f.c.saveReviewEvaluationDraft_({...input,assessmentId:'review1'});
  f.actor('one@x');assert.equal(f.c.loadPublishedReviewEvaluation_('review1').total,80);
  f.actor('reviewer@x');input=f.input();input.students[0].scores.I.marks=33;f.submit(input);
  f.actor('one@x');visible=f.c.loadPublishedReviewEvaluation_('review1');assert.deepEqual(plain(visible.scores),before.scores);assert(visible.underCorrection);
@@ -44,14 +44,14 @@ test('Review correction preserves released data through draft and resubmission; 
 });
 
 test('Guide correction retains old publication through changed draft and resubmission',()=>{
- const f=publishingFixture('guide_eval');f.guideSubmit('s1');f.report();f.c.publishInternalAssessment({assessmentId:'guide_eval',team:'g18',student:'s1',revision:1,requestId:id()});
- reopen(f,'guide_eval','s1');f.actor('guide@x');let d=f.c.loadGuideEvaluation('g18','s1');
- f.c.saveGuideEvaluationDraft({team:'g18',student:'s1',revision:d.revision,token:d.token,requestId:id(),scores:{I:{level:3,marks:33,remark:''}}});
- f.actor('one@x');assert.equal(f.c.loadPublishedGuideEvaluation().total,32);assert(f.c.loadPublishedGuideEvaluation().underCorrection);
- f.actor('guide@x');d=f.c.loadGuideEvaluation('g18','s1');f.c.submitGuideEvaluation({team:'g18',student:'s1',revision:d.revision,token:d.token,requestId:id(),scores:{I:{level:3,marks:33,remark:''}}});
- f.actor('one@x');assert.equal(f.c.loadPublishedGuideEvaluation().total,32);
- const t=f.report().teams[0];f.c.publishInternalAssessment({assessmentId:'guide_eval',team:'g18',student:'s1',revision:t.students[0].revision,requestId:id()});
- f.actor('one@x');assert.equal(f.c.loadPublishedGuideEvaluation().total,33);assert.equal(f.c.loadPublishedGuideEvaluation().underCorrection,false);
+ const f=publishingFixture('guide_eval');f.guideSubmit('s1');f.report();f.c.publishInternalAssessment_({assessmentId:'guide_eval',team:'g18',student:'s1',revision:1,requestId:id()});
+ reopen(f,'guide_eval','s1');f.actor('guide@x');let d=f.c.loadGuideEvaluation_('g18','s1');
+ f.c.saveGuideEvaluationDraft_({team:'g18',student:'s1',revision:d.revision,token:d.token,requestId:id(),scores:{I:{level:3,marks:33,remark:''}}});
+ f.actor('one@x');assert.equal(f.c.loadPublishedGuideEvaluation_().total,32);assert(f.c.loadPublishedGuideEvaluation_().underCorrection);
+ f.actor('guide@x');d=f.c.loadGuideEvaluation_('g18','s1');f.c.submitGuideEvaluation_({team:'g18',student:'s1',revision:d.revision,token:d.token,requestId:id(),scores:{I:{level:3,marks:33,remark:''}}});
+ f.actor('one@x');assert.equal(f.c.loadPublishedGuideEvaluation_().total,32);
+ const t=f.report().teams[0];f.c.publishInternalAssessment_({assessmentId:'guide_eval',team:'g18',student:'s1',revision:t.students[0].revision,requestId:id()});
+ f.actor('one@x');assert.equal(f.c.loadPublishedGuideEvaluation_().total,33);assert.equal(f.c.loadPublishedGuideEvaluation_().underCorrection,false);
 });
 
 test('pending and policy-zero snapshots exclude inactive evidence and keep null distinct from zero',()=>{
@@ -64,19 +64,19 @@ test('publication membership guard permits metadata but rejects changes and ambi
  for(const key of ['review1','guide_eval']){
   const f=publishingFixture(key);if(key==='review1')f.submit();else f.guideSubmit('s1');
   f.students[0].name='Corrected';f.students[0].email='corrected@x';let report=f.report();assert.equal(report.teams[0].students[0].publicationPermission,'ALLOWED');
-  f.c.publishInternalAssessment({assessmentId:key,team:'g18',...(key==='guide_eval'?{student:'s1'}:{}),revision:1,requestId:id()});
+  f.c.publishInternalAssessment_({assessmentId:key,team:'g18',...(key==='guide_eval'?{student:'s1'}:{}),revision:1,requestId:id()});
   f.actor('one@x');assert.throws(()=>f.c.loadPublishedAssessment_(key),/assignment/);f.actor('corrected@x');assert.equal(f.c.loadPublishedAssessment_(key).identity.name,'Corrected');
   f.students[1].email='corrected@x';assert.throws(()=>f.c.loadPublishedAssessment_(key),/ambiguous/);
  }
  const f=publishingFixture();f.submit();f.students.pop();assert.equal(f.report().teams[0].canPublishTeam,false);assert.equal(f.report().teams[0].canReopen,false);
- assert.throws(()=>f.c.publishInternalAssessment({assessmentId:'review1',team:'g18',revision:1,requestId:id()}),/membership/);
+ assert.throws(()=>f.c.publishInternalAssessment_({assessmentId:'review1',team:'g18',revision:1,requestId:id()}),/membership/);
 });
 
 test('draft sources are never publishable; confirmed requests remain discoverable after later commands',()=>{
- const f=publishingFixture();f.c.saveReviewEvaluationDraft({...f.input(),assessmentId:'review1'});f.report();assert.throws(()=>f.c.publishInternalAssessment({assessmentId:'review1',team:'g18',revision:1,requestId:id()}),/not available/);
- f.submit();const request={assessmentId:'review1',team:'g18',revision:2,requestId:id()};f.report();f.c.publishInternalAssessment(request);reopen(f);
+ const f=publishingFixture();f.c.saveReviewEvaluationDraft_({...f.input(),assessmentId:'review1'});f.report();assert.throws(()=>f.c.publishInternalAssessment_({assessmentId:'review1',team:'g18',revision:1,requestId:id()}),/not available/);
+ f.submit();const request={assessmentId:'review1',team:'g18',revision:2,requestId:id()};f.report();f.c.publishInternalAssessment_(request);reopen(f);
  const report=f.report();assert(report.teams[0].operations.some(op=>op.requestId===request.requestId));
- const length=f.tables.Review1Evaluations.length;assert.equal(f.c.publishInternalAssessment(request).revision,3);assert.equal(f.tables.Review1Evaluations.length,length);
+ const length=f.tables.Review1Evaluations.length;assert.equal(f.c.publishInternalAssessment_(request).revision,3);assert.equal(f.tables.Review1Evaluations.length,length);
 });
 
 test('correction before initial publication stays private and oversized releases append nothing',()=>{
@@ -85,7 +85,7 @@ test('correction before initial publication stays private and oversized releases
  // Large released feedback would exceed the existing single-cell journal limit.
  for(let i=1;i<=3;i++){const data=JSON.parse(other.tables.Review1Evaluations[i][8]);data.scores.I.remark='x'.repeat(20000);other.tables.Review1Evaluations[i][8]=JSON.stringify(data);}
  other.report();const before=JSON.stringify(other.tables);
- assert.throws(()=>other.c.publishInternalAssessment({assessmentId:'review1',team:'g18',revision:1,requestId:id()}),/too large/);
+ assert.throws(()=>other.c.publishInternalAssessment_({assessmentId:'review1',team:'g18',revision:1,requestId:id()}),/too large/);
  assert.equal(JSON.stringify(other.tables),before);
 });
 

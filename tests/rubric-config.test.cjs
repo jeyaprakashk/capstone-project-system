@@ -6,7 +6,7 @@ const path=require('node:path');
 function fixture(shared=new Map()) {
  let rows=null, reads=0;
  const sheet={getDataRange:()=>({getValues:()=>{reads++;return rows;}})};
- const c=vm.createContext({SHEET_ID:'test',getSheet:()=>rows?sheet:null,
+ const c=vm.createContext({SHEET_ID:'test',getSheet_:()=>rows?sheet:null,
   CacheService:{getScriptCache:()=>({get:key=>shared.get(key)||null,put:(key,value)=>shared.set(key,value)})}});
 require('./milestone-fixture.cjs').install(c);
  vm.runInContext(fs.readFileSync(path.join(__dirname,'..','rubric-config.js'),'utf8'),c);
@@ -18,9 +18,9 @@ require('./milestone-fixture.cjs').install(c);
  }
  return {c,shared,populate,get rows(){return rows;},metrics:()=>({reads})};
 }
-test('loader returns immutable review criteria from the sheet',()=>{
+test('parsing returns immutable review criteria from the sheet',()=>{
  const f=fixture();f.populate();
- const rubric=f.c.getRubricStructure_();
+ const rubric=f.c.parseRubricRows_(f.rows,f.c.definitions);
  for(const key of ['review1','review2']) {
   assert.equal(rubric[key].length,7);
   assert.equal(rubric[key].reduce((sum,p)=>sum+p.maxMarks,0),100);
@@ -60,17 +60,17 @@ test('shared endpoint authorizes every dashboard role before reading definitions
  const f=fixture();f.populate();let email='user@example.com', roles=[];
  f.c.Session={getActiveUser:()=>({getEmail:()=>email})};f.c.withDashboardRead_=fn=>fn();
  f.c.getDashboardRoleViews_=()=>roles;
- for(const role of ['student','guide','reviewer','coord']) {roles=[{key:role}];assert.equal(f.c.loadSharedRubrics().assessments.length,2);}
- roles=[];assert.throws(()=>f.c.loadSharedRubrics(),/Dashboard access/);
- email='';roles=[{key:'student'}];assert.throws(()=>f.c.loadSharedRubrics(),/Dashboard access/);
+ for(const role of ['student','guide','reviewer','coord']) {roles=[{key:role}];assert.equal(f.c.loadSharedRubrics_().assessments.length,2);}
+ roles=[];assert.throws(()=>f.c.loadSharedRubrics_(),/Dashboard access/);
+ email='';roles=[{key:'student'}];assert.throws(()=>f.c.loadSharedRubrics_(),/Dashboard access/);
  assert.equal(f.metrics().reads,4);
 });
 
 test('registry-defined review IDs control requirements',()=>{
  const f=fixture();f.populate();f.c.setReviews(3);
- assert.throws(()=>f.c.getRubricStructure_(),/review3/);
+ assert.throws(()=>f.c.parseRubricRows_(f.rows,f.c.definitions),/review3/);
  f.rows.push(...f.rows.filter(row=>row[0]==='review2').map(row=>['review3',...row.slice(1)]));
- assert.equal(Object.keys(f.c.getRubricStructure_()).length,3);
+ assert.equal(Object.keys(f.c.parseRubricRows_(f.rows,f.c.definitions)).length,3);
 });
 test('preflight uses Milestones headers, arbitrary IDs, and live rubric data',()=>{
  const f=fixture();f.populate();
@@ -85,18 +85,10 @@ test('preflight uses Milestones headers, arbitrary IDs, and live rubric data',()
 test('configuration status endpoint rejects unauthorized callers before reading sheets',()=>{
  const f=fixture();
  f.c.Session={getActiveUser:()=>({getEmail:()=> 'outsider@example.com'})};
- f.c.getCoordinatorEmail=()=> 'coordinator@example.com';f.c.getConfig=()=> 'pd@example.com';
- f.c.emailsMatch=(a,b)=>a===b;
- assert.throws(()=>f.c.getCoordinatorReviewConfiguration(),/Coordinator access/);
+ f.c.getCoordinatorEmail_=()=> 'coordinator@example.com';f.c.getConfig_=()=> 'pd@example.com';
+ f.c.emailsMatch_=(a,b)=>a===b;
+ assert.throws(()=>f.c.getCoordinatorReviewConfiguration_(),/Coordinator access/);
  assert.equal(f.metrics().reads,0);
-});
-test('rubrics reuse only within execution and read live data in new requests',()=>{
- const f=fixture();f.populate();f.c.getRubricStructure_();f.c.getRubricStructure_();assert.equal(f.metrics().reads,1);
- assert.equal(f.shared.size,0);
- const next=fixture(f.shared);next.populate();next.rows[1][3]='Updated criterion';
- assert.equal(next.c.getRubricStructure_().review1[0].name,'Updated criterion');
- assert.equal(next.metrics().reads,1);
- assert.throws(()=>fixture(f.shared).c.getRubricStructure_(),/not found/);
 });
 
 test('header mapping and explicit ordering support row and column rearrangement',()=>{
@@ -104,7 +96,7 @@ test('header mapping and explicit ordering support row and column rearrangement'
  assert.equal(f.c.parseRubricRows_(rows).review1[0].pi,'PI1');
 });
 test('invalid or missing definitions fail clearly',()=>{
- const f=fixture();assert.throws(()=>f.c.getRubricStructure_(),/not found/);f.populate();
+ const f=fixture();f.populate();
  for(const [column,value] of [[0,'review3'],[1,0],[2,'wrong'],[3,''],[4,'wrong'],[5,-1],[6,'Other']]){
   const rows=f.rows.map(row=>[...row]);rows[1][column]=value;assert.throws(()=>f.c.parseRubricRows_(rows),/row 2/);
  }
@@ -119,23 +111,23 @@ test('rubric labels are normalized while criterion wording is preserved',()=>{
  assert.equal(pi.pi,'PI1');assert.equal(pi.co,'CO1');assert.equal(pi.type,'Team');assert.equal(pi.name,'My Custom TITLE');
 });
 
-test('read-only status requires rubric coverage for every graded assessment',()=>{
- const f=fixture();assert.equal(f.c.getRubricsStatus_().configured,false);f.populate();
- assert.equal(f.c.getRubricsStatus_().configured,true);
+test('readiness requires rubric coverage for every graded assessment',()=>{
+ const f=fixture();f.populate();
+ const readiness=()=>f.c.getAssessmentRubricReadiness_(f.rows,f.c.definitions);
+ assert.deepEqual(Object.values(readiness().reports).map(r=>r.state),['READY','READY']);
  f.c.definitions.push({key:'future_demo',type:'REVIEW',label:'Future demo',gradedBy:'Review Committee'});
- assert.match(f.c.getRubricsStatus_().detail,/Missing rubrics: Future demo/);
+ assert.equal(readiness().reports.future_demo.state,'MISSING');
  f.rows.push(['future_demo',1,'PI1','Example future criterion','CO1',100,'Individual']);
- assert.equal(f.c.getRubricsStatus_().configured,true);
- f.rows.at(-1)[5]=-1;assert.equal(f.c.getRubricsStatus_().configured,false);
- f.rows.splice(1);assert.match(f.c.getRubricsStatus_().detail,/no criteria/);
+ assert.equal(readiness().reports.future_demo.state,'READY');
+ f.rows.at(-1)[5]=-1;assert.equal(readiness().reports.future_demo.state,'INVALID');
+ assert.equal(f.c.getAssessmentRubricReadiness_(null,f.c.definitions).reports.review1.state,'MISSING');
 });
-test('status ignores ungraded milestones and rejects missing guide descriptors',()=>{
- const f=fixture();f.populate();f.c.getMilestones_=()=>[{key:'formation',gradedBy:'Not Applicable'}];
- assert.equal(f.c.getRubricsStatus_().configured,true);
+test('readiness rejects missing guide descriptors',()=>{
+ const f=fixture();f.populate();
+ const readiness=()=>f.c.getAssessmentRubricReadiness_(f.rows,f.c.definitions);
  f.c.definitions.push({key:'guide_eval',type:'GUIDE_EVALUATION',label:'Guide Eval',gradedBy:'Project Guide'});
  f.rows.push(['guide_eval',1,'PI1','Example criterion','CO1',100,'Individual']);
- assert.match(f.c.getRubricsStatus_().detail,/Level 0–5/);
+ assert.match(readiness().reports.guide_eval.error,/Level 0/);
  f.rows[0].push(...Array.from({length:6},(_,i)=>'Level '+i));f.rows.at(-1).push(...Array(6).fill('Example descriptor'));
- assert.equal(f.c.getRubricsStatus_().configured,true);
- f.c.definitions=[];assert.equal(f.c.getRubricsStatus_().configured,false);
+ assert.equal(readiness().reports.guide_eval.state,'READY');
 });

@@ -1,8 +1,0 @@
-✖ bulk readiness batches 62 teams and preserves live access decisions
-✖ failing tests:
-✖ final valid member enables new creation; failed sheet write recovers existing repo on retry
-✖ read-only invitations are upgraded without replacing invitations; failed grants remain locked
-✖ ready teams retain title Form submission without weekly Form ingestion
-✖ repair reuses existing contents, preserves stronger access and accepts pending write invitations
-✖ strict intake emails the team for each prerequisite failure without modifying records
-✖ strict intake unlocks after acceptance; outsiders cannot email the team

@@ -4,7 +4,7 @@
  * team tracker (search, filters, sorting, pagination). The overview renders first; then one read per
  * Review, the Guide Evaluation, health and weekly activity run in parallel, each settling (or failing,
  * with its own Retry) on its own.
- * It never calls google.script.run; the team drawer stays in DashboardUI.
+ * It never calls google.script.run; the team drawer is rendered by TeamDrawerView.
  */
 function coordinatorViewBrowser_(bridge, getUi) {
   'use strict';
@@ -13,6 +13,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
   const persistent = {sort:{column:null, direction:'ascending', type:'text'}, size:10};
   const state = {};
   let generation = 0, pending = null, host = null;
+  const delegated = new WeakSet();
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const icon = (name, label) => getUi().renderIcon(name, label);
   const skeleton = label => getUi().renderSkeleton('inline', label);
@@ -30,6 +31,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
   const STAT_TEXT = {complete:'text-success', danger:'text-danger', warning:'text-warning', neutral:'text-primary'};
   const STAT_TINT = {complete:'bg-success-tint', danger:'bg-danger-tint', warning:'bg-warning-tint', neutral:'bg-canvas'};
   const SORT_TYPE = {pair:'pair', text:'text'};
+  const PROGRESS = 'block h-2 w-full appearance-none overflow-hidden rounded border-0 bg-tint [&::-webkit-progress-bar]:bg-tint [&::-webkit-progress-value]:rounded [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary';
 
   const reviewStatus = key => state.reviews[key] ? 'ready' : state.reviewErrors[key] ? 'failed' : 'loading';
   const guideStatus = () => state.guide ? 'ready' : state.guideError ? 'failed' : 'loading';
@@ -70,7 +72,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
       '<div class="stat-pct rounded-md px-1.5 text-sm empty:hidden ' + STAT_TEXT[c.tone] + ' ' + STAT_TINT[c.tone] + '"' + (c.ids ? ' id="coordinatorActiveTeamsPct"' : '') + '>' + c.note + '</div></div><div class="mt-2 text-xs text-muted">' + c.detail + '</div></div>';
   }
   function progressBar(value, total, left, right) {
-    return '<div class="h-2 overflow-hidden rounded bg-tint" aria-hidden="true"><span class="block h-full rounded bg-primary" style="width:' + pct(value, total) + '%"></span></div>' +
+    return '<progress class="' + PROGRESS + '" value="' + pct(value, total) + '" max="100" aria-hidden="true"></progress>' +
       '<div class="flex justify-between"><span>' + left + '</span><span>' + right + '</span></div>';
   }
   function statCards() {
@@ -290,7 +292,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
     host.innerHTML = headerMarkup() + '<div id="coordinatorAsyncRoot" class="mt-4 flex flex-col gap-4"><div id="coordinatorOverviewStatus" role="status"></div>' +
       (overview.reviewConfigurationError ? '<p role="status" class="text-sm text-warning">Review configuration unavailable. Check System Status.</p>' : '') +
       '<div id="coordinatorStats"></div><div id="coordinatorProgressStatus" role="status"></div><div id="coordinatorTracker">' + trackerMarkup() + '</div></div>' + drawerMarkup();
-    host.onclick = onClick; host.oninput = onInput; host.onchange = onChange;
+    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('input', onInput); host.addEventListener('change', onChange); }
     renderStats(); updateTracker();
     const gen = generation;
     if (wasPending) {

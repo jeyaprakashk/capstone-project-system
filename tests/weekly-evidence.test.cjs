@@ -28,7 +28,7 @@ test('a late report does not include late-period commits or inherit their attrib
  f.commit('2026-01-05T18:00:00Z');
  f.commit('2026-01-05T18:00:00.001Z',{authorId:'invalid'});
  f.commit('2026-01-08T10:00:00Z');
- f.time('2026-01-08T12:00:00Z');f.c.submitWeeklyProgress(f.input());
+ f.time('2026-01-08T12:00:00Z');f.c.submitWeeklyProgress_(f.input());
  const result=f.read();assert.equal(result.log.timeliness,'LATE');assert.equal(result.state,'available');assert.equal(result.count,1);
  assert.equal(result.commits[0].timestamp,'2026-01-05T18:00:00.000Z');
 });
@@ -55,11 +55,11 @@ test('shared reader returns effective log and safe commit details; scopes reads 
  const f=fixture();
  const row=f.commit('2026-01-02T00:00:00Z',{message:'<img src=x onerror=bad()>',sha:'A'.repeat(40)});
  f.commit('2026-01-02T00:00:00Z',{sha:row.sha});
- f.c.submitWeeklyProgress(f.input());f.c.submitWeeklyProgress(f.input({workCompleted:'Revised work'}));
+ f.c.submitWeeklyProgress_(f.input());f.c.submitWeeklyProgress_(f.input({workCompleted:'Revised work'}));
  const result=f.read();assert.equal(result.log.workCompleted,'Revised work');assert.equal(result.count,1);
  assert.deepEqual(JSON.parse(JSON.stringify(result.commits[0])),{timestamp:'2026-01-02T00:00:00.000Z',message:row.message,sha:'a'.repeat(40),shortSha:'aaaaaaa',url:f.setup.repoUrl+'/commit/'+'a'.repeat(40)});
  const read=f.c.readCollectedCommits_;let calls=0;f.c.readCollectedCommits_=team=>{assert.equal(team,'T1');calls++;return read(team);};
- f.c.loadStudentWeeklyProgress();assert.equal(calls,1);
+ f.c.loadStudentWeeklyProgress_();assert.equal(calls,1);
  assert.equal(f.entries().length,2);assert(!Object.hasOwn(f.entries()[0],'commits'));
 });
 
@@ -73,5 +73,5 @@ test('no commits, unavailable collection, failed reads and unmapped states remai
 
 test('invalid matched SHA produces unavailable dashboard evidence instead of a false zero',()=>{
  const f=fixture();f.commit('2026-01-02T00:00:00Z',{sha:'javascript:bad'});
- const result=f.c.loadStudentWeeklyProgress().evidence[0];assert.equal(result.state,'unavailable');assert.equal(result.count,null);
+ const result=f.c.loadStudentWeeklyProgress_().evidence[0];assert.equal(result.state,'unavailable');assert.equal(result.count,null);
 });

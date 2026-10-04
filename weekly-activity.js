@@ -1,6 +1,6 @@
 /** Independent scoped readers; shared aggregation. No persistent activity cache or locks. */
 function readActivityRows_(sheetName, column, value) {
-  const sheet = getSheet(sheetName);
+  const sheet = getSheet_(sheetName);
   const last = sheet.getLastRow();
   if (last < 2) return [];
   if (column === null) return readSheetRows_(sheet, 2, last - 1);
@@ -46,23 +46,15 @@ function activityResponse_(context, teams) {
 }
 
 function activityIsCoordinator_(email) {
-  return emailsMatch(email, getCoordinatorEmail()) || emailsMatch(email, getConfig('CELL_PD_EMAIL'));
+  return emailsMatch_(email, getCoordinatorEmail_()) || emailsMatch_(email, getConfig_('CELL_PD_EMAIL'));
 }
 
-function authorizeActivityTeam_(email, row, columns, studentEmail) {
-  if (!email || !row) throw new Error('Activity access denied.');
-  if (activityIsCoordinator_(email) || emailsMatch(row[columns.GUIDE_EMAIL], email) ||
-      getCommitteeNumbersForReviewer(email).some(number => textEquals_(number, row[columns.COMMITTEE_NUMBER]))) return;
-  const member = [1,2,3,4].some(number => emailsMatch(row[columns['S' + number + '_EMAIL']], email));
-  if (!member || (studentEmail && !emailsMatch(email, studentEmail))) throw new Error('Activity access denied.');
-}
-
-function loadAllTeamsWeeklyActivity() {
+function loadAllTeamsWeeklyActivity_() {
   return withDashboardRead_(() => {
     const email = Session.getActiveUser().getEmail();
     if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
-    const columns = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    const ids = getSheetRows(SHEET_NAMES.TEAM_STATUS).map(row => row[columns.TEAM_ID]).filter(Boolean);
+    const columns = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+    const ids = getSheetRows_(SHEET_NAMES.TEAM_STATUS).map(row => row[columns.TEAM_ID]).filter(Boolean);
     const context = weeklyActivityContext_();
     const active = context.state === 'active';
     const teams = aggregateWeeklyActivity_(ids,
@@ -73,53 +65,11 @@ function loadAllTeamsWeeklyActivity() {
   });
 }
 
-function loadTeamWeeklyActivity(teamId) {
-  return withDashboardRead_(() => {
-    const columns = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    const rows = readActivityRows_(SHEET_NAMES.TEAM_STATUS, columns.TEAM_ID + 1, teamId);
-    if (rows.length !== 1) throw new Error('Team not found or duplicated.');
-    authorizeActivityTeam_(Session.getActiveUser().getEmail(), rows[0], columns);
-    const context = weeklyActivityContext_();
-    return activityResponse_(context, getTeamWeeklyActivity_(teamId, context));
-  });
-}
-
 function getTeamWeeklyActivity_(teamId, context, logs) {
   const active = context.state === 'active';
   return aggregateWeeklyActivity_([teamId],
     active ? (logs || readLogEntries_(teamId)) : [],
     active ? readCollectedCommits_(teamId) : [], context);
-}
-
-function loadStudentWeeklyActivity(studentEmail) {
-  return withDashboardRead_(() => {
-    const email = Session.getActiveUser().getEmail();
-    studentEmail = normalizeEmail(studentEmail || email);
-    if (!email || !studentEmail) throw new Error('Activity access denied.');
-    const columns = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    const matches = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => [1,2,3,4].some(number => emailsMatch(row[columns['S' + number + '_EMAIL']], studentEmail)));
-    if (matches.length !== 1) throw new Error('Student team not found or ambiguous.');
-    const row = matches[0], teamId = row[columns.TEAM_ID];
-    authorizeActivityTeam_(email, row, columns, studentEmail);
-    const context = weeklyActivityContext_();
-    let identity = {state:'unavailable'}, logs = [], commits = [];
-    const slot = [1,2,3,4].find(n=>emailsMatch(row[columns['S'+n+'_EMAIL']],studentEmail));
-    const regNo = row[columns['S'+slot+'_REGNO']];
-    if (context.state === 'active') {
-      logs = readLogEntries_(teamId,regNo);
-      try {
-        const sheet = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS), accountColumns = githubAccountColumns_(sheet,true);
-        identity = githubStudentIdentity_({email:studentEmail,teamId},readSheetRows_(sheet,2),accountColumns);
-        if (identity.state === 'available') {
-          if (readCommitCollectionStatus_(teamId) !== 'ok') identity = {state:'unavailable'};
-          else commits = readCollectedCommits_(teamId);
-        }
-      } catch(error) { identity = {state:'unavailable',reason:error.message}; }
-    }
-    const teams = aggregateWeeklyActivity_([teamId],logs,commits,context,{githubId:identity.githubId,unavailable:identity.state!=='available',regNo});
-    return {...activityResponse_(context,teams),studentEmail,
-      commitAttribution:teams[normalizeText_(teamId)].commits === null ? 'unavailable' : 'mapped'};
-  });
 }
 
 /** Collection health only, never a cache of commits or combined weekly data. */
@@ -167,15 +117,15 @@ function readWeeklyProgressEvidence_(student, weekId, source) {
 
 /** Stored, previously verified identities only. Live profile checks belong to setup. */
 function weeklyStoredGithubMapping_(teamId) {
-  const sheet = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS), columns = githubAccountColumns_(sheet);
+  const sheet = getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS), columns = githubAccountColumns_(sheet);
   const rows = readSheetRows_(sheet,2), students = weeklyStudents_();
   const members = students.filter(student=>textEquals_(student.teamId,teamId)).map(student=>{
     const identity = githubStudentIdentity_(student,rows,columns,students);
-    const submission = rows.filter(row=>emailsMatch(row[1],student.email) && textEquals_(row[2],teamId)).slice(-1)[0];
+    const submission = rows.filter(row=>emailsMatch_(row[1],student.email) && textEquals_(row[2],teamId)).slice(-1)[0];
     return {email:student.email,label:student.regNo,username:String(submission && submission[3] || '').trim(),
       githubId:githubId_(submission && submission[columns.ID]),status:identity.state === 'available' ? 'valid' : 'unavailable'};
   });
-  return {members,repoUrl:getRepoUrlForTeam(teamId)};
+  return {members,repoUrl:getRepoUrlForTeam_(teamId)};
 }
 
 function weeklyEvidenceSource_(student, options) {
@@ -183,7 +133,7 @@ function weeklyEvidenceSource_(student, options) {
   const source = {logs:options.logs || readLogEntries_(student.teamId,student.regNo),state:'unmapped',commits:[]};
   try {
     const setup = options.setup || weeklyStoredGithubMapping_(student.teamId);
-    const members = setup.members || [], mine = members.filter(m=>emailsMatch(m.email,student.email) && textEquals_(m.label,student.regNo));
+    const members = setup.members || [], mine = members.filter(m=>emailsMatch_(m.email,student.email) && textEquals_(m.label,student.regNo));
     if (mine.length !== 1 || mine[0].status !== 'valid' || !String(mine[0].username || '').trim() || !githubId_(mine[0].githubId) ||
         members.filter(m=>githubAuthorMatches_(mine[0].githubId,m.githubId)).length !== 1) {
       source.state='unavailable'; source.message='Your GitHub username mapping is unavailable or unverified. Complete GitHub setup, then refresh.'; return source;

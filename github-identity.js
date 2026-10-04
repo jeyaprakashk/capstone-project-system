@@ -26,7 +26,7 @@ function githubAccountColumns_(sheet) {
 }
 
 function githubCaptureReady_() {
-  try { githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_ACCOUNTS)); return true; }
+  try { githubAccountColumns_(getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS)); return true; }
   catch (error) { return false; }
 }
 
@@ -55,7 +55,7 @@ function resolveGithubAccountId_(id, request, cache) {
   if (!id) throw new Error('GitHub setup unavailable: a valid GitHub ID is missing.');
   cache = cache || new Map();
   if (!cache.has(id)) {
-    try { cache.set(id, githubAccountResponse_((request || makeGithubRequest)('GET','/user/' + id), id)); }
+    try { cache.set(id, githubAccountResponse_((request || makeGithubRequest_)('GET','/user/' + id), id)); }
     catch (error) { cache.set(id, error); }
   }
   const result = cache.get(id);
@@ -86,9 +86,9 @@ function writeGithubAccount_(sheet, rowNumber, columns, account) {
 function refreshGithubAccountMetadata_(submission, account) {
   if (!submission || !account.githubId) return;
   githubIdentityLock_(()=>{
-    const sheet = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS), columns = githubAccountColumns_(sheet);
+    const sheet = getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS), columns = githubAccountColumns_(sheet);
     readSheetRows_(sheet,2).forEach((row,index)=>{
-      if (emailsMatch(row[1],submission[1]) && textEquals_(row[2],submission[2]) && githubId_(row[columns.ID]) === account.githubId) {
+      if (emailsMatch_(row[1],submission[1]) && textEquals_(row[2],submission[2]) && githubId_(row[columns.ID]) === account.githubId) {
         if (row[3] !== account.username) sheet.getRange(index+2,4).setValue(githubLiteral_(account.username));
         if (row[columns.NAME] !== account.displayName) sheet.getRange(index+2,columns.NAME+1).setValue(githubLiteral_(account.displayName));
         if (row[columns.URL] !== account.profileUrl) sheet.getRange(index+2,columns.URL+1).setValue(account.profileUrl);
@@ -100,15 +100,15 @@ function refreshGithubAccountMetadata_(submission, account) {
 /** Academic identity is still roster-owned. All registrations participate in conflict checks. */
 function githubStudentIdentity_(student, rows, columns, students) {
   students = students || weeklyStudents_();
-  const academic = students.filter(s=>emailsMatch(s.email,student.email) && textEquals_(s.teamId,student.teamId));
+  const academic = students.filter(s=>emailsMatch_(s.email,student.email) && textEquals_(s.teamId,student.teamId));
   if (academic.length !== 1) return {state:'unavailable',reason:'Student membership is ambiguous.'};
-  const mine = rows.filter(r=>emailsMatch(r[1],student.email) && textEquals_(r[2],student.teamId));
+  const mine = rows.filter(r=>emailsMatch_(r[1],student.email) && textEquals_(r[2],student.teamId));
   const ids = [...new Set(mine.map(r=>githubId_(r[columns.ID])).filter(Boolean))];
   if (ids.length !== 1 || mine.some(r=>r[columns.ID] !== '' && r[columns.ID] != null && !githubId_(r[columns.ID]))) return {state:'unavailable',reason:'GitHub setup unavailable: GitHub identity is missing or conflicting.'};
   const id = ids[0];
   const conflict = rows.some(r=>{
     if (githubId_(r[columns.ID]) !== id) return false;
-    const owners = students.filter(s=>emailsMatch(s.email,r[1]) && textEquals_(s.teamId,r[2]));
+    const owners = students.filter(s=>emailsMatch_(s.email,r[1]) && textEquals_(s.teamId,r[2]));
     return owners.length !== 1 || !textEquals_(owners[0].regNo,academic[0].regNo);
   });
   if (conflict) return {state:'unavailable',reason:'GitHub ID is assigned to conflicting students. Contact the coordinator.'};
@@ -120,9 +120,3 @@ function githubAuthorMatches_(studentId, authorId) {
   return !!id && id === githubId_(authorId);
 }
 
-function githubCommitAttribution_(studentId, commit) {
-  if (!githubId_(studentId)) return 'unavailable';
-  if (commit.authorResolution === 'unavailable') return 'unavailable';
-  if (!githubId_(commit.authorId)) return commit.authorResolution === 'unlinked' ? 'unlinked' : 'unavailable';
-  return githubAuthorMatches_(studentId,commit.authorId) ? 'attributed' : 'other';
-}

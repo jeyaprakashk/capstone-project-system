@@ -40,14 +40,14 @@ function parseAssessmentDefinitions_(rows,timezone) {
   return definitions.sort((a,b)=>a.sequence-b.sequence||a.key.localeCompare(b.key));
 }
 function getAssessmentDefinitions_() {
-  const sheet=getSheet('AssessmentDefinitions');
+  const sheet=getSheet_('AssessmentDefinitions');
   if(!sheet)return [];
-  return parseAssessmentDefinitions_(sheet.getDataRange().getValues(),getSpreadsheet().getSpreadsheetTimeZone());
+  return parseAssessmentDefinitions_(sheet.getDataRange().getValues(),getSpreadsheet_().getSpreadsheetTimeZone());
 }
 /** Required consumers distinguish unfinished setup from a configured registry. */
 function requireAssessmentDefinitions_() {
   const definitions=getAssessmentDefinitions_();
-  if(!definitions.length&&!getSheet('AssessmentDefinitions'))throw new Error('AssessmentDefinitions is missing. Ask the Coordinator to create the assessment definitions tab in System Status.');
+  if(!definitions.length&&!getSheet_('AssessmentDefinitions'))throw new Error('AssessmentDefinitions is missing. Ask the Coordinator to create the assessment definitions tab in System Status.');
   if(!definitions.length)throw new Error('AssessmentDefinitions contains no graded assessments. Configure assessment definitions using the System Status definitions link.');
   return definitions;
 }
@@ -56,9 +56,8 @@ function assessmentDefinition_(id) {
   if(!definition)throw new Error('Unknown assessment. Configure '+id+' in AssessmentDefinitions.');
   return definition;
 }
-function isReviewAssessment_(key) {return getAssessmentDefinitions_().some(d=>d.key===key && d.type==='REVIEW');}
 function assessmentRubric_(definition) {
-  const sheet=getSheet('Rubrics');if(!sheet)throw new Error('Rubrics tab is required.');
+  const sheet=getSheet_('Rubrics');if(!sheet)throw new Error('Rubrics tab is required.');
   const rows=sheet.getDataRange().getValues(),col=(rows[0]||[]).map(normalizeText_).indexOf('assessment id');
   if(col<0)throw new Error('Rubrics requires Assessment ID column.');
   const key=definition.key;
@@ -80,7 +79,7 @@ function assessmentPrerequisiteBlock_(definition,team,loaded) {
  * never by Review number. Reads do not create, rename, clear or migrate sheets. */
 function assessmentJournal_(definition) {
   if(definition.type==='SEE')throw new Error('SEE is evaluated outside this app and has no assessment journal.');
-  const configured=getSheet(definition.journal);
+  const configured=getSheet_(definition.journal);
   const inspect=(sheet,name)=>{
     if(!sheet)return {sheet:null,name,state:'MISSING'};
     const rows=sheet.getDataRange().getValues();
@@ -95,7 +94,7 @@ function assessmentJournal_(definition) {
   };
   const direct=inspect(configured,definition.journal);
   if(direct.hasRecords||direct.state==='READY'&&definition.journalConfigured!==false)return direct;
-  const candidates=getSpreadsheet().getSheets().filter(sheet=>sheet!==configured).flatMap(sheet=>{
+  const candidates=getSpreadsheet_().getSheets().filter(sheet=>sheet!==configured).flatMap(sheet=>{
     const rows=sheet.getDataRange().getValues();
     if(REVIEW_JOURNAL_HEADERS_.some((h,i)=>(rows[0]||[])[i]!==h))return [];
     if(!rows.slice(1).some(r=>normalizeText_(r[0])===definition.key))return [];
@@ -117,19 +116,11 @@ function provisionAssessmentJournals_(definitions) {
   const plans=definitions.filter(d=>d.type!=='SEE').map(d=>({definition:d,...assessmentJournal_(d)}));
   const results=plans.map(plan=>{
     const created=plan.state==='MISSING',initialized=plan.state==='EMPTY';
-    const sheet=created?getSpreadsheet().insertSheet(plan.name):plan.sheet;
+    const sheet=created?getSpreadsheet_().insertSheet(plan.name):plan.sheet;
     if(initialized&&sheet.getLastRow()>0)throw new Error('Journal '+plan.name+' changed during setup. Retry; existing data was left unchanged.');
     if(created||initialized)sheet.getRange(1,1,1,REVIEW_JOURNAL_HEADERS_.length).setValues([REVIEW_JOURNAL_HEADERS_]);
     return {assessment:plan.definition.key,label:plan.definition.label,journal:plan.name,created,initialized,state:'READY'};
   });
   SpreadsheetApp.flush();
   return results;
-}
-/** Explicit coordinator setup. Never overwrites existing assessment data. */
-function provisionAssessmentJournals() {
-  guideActor_(true);
-  const lock=LockService.getScriptLock();if(!lock.tryLock(5000))throw new Error('Another setup is running.');
-  try {
-    return provisionAssessmentJournals_(requireAssessmentDefinitions_());
-  }finally{lock.releaseLock();}
 }

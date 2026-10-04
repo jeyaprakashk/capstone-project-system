@@ -9,15 +9,11 @@
 const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
 
 let configExecutionValues_ = null;
-/** Reviews are registry instances, ordered by configured sequence. */
-function getInternalReviewsCount_() {
-  return getInternalReviews_().length;
-}
 function getInternalReviews_() {
   return Object.freeze(getAssessmentDefinitions_().filter(d=>d.type==='REVIEW'));
 }
 
-function getConfig(key) {
+function getConfig_(key) {
   const targetKey = normalizeText_(key);
   if (configExecutionValues_) return requireConfigValue_(targetKey);
   const sheetId =
@@ -30,7 +26,7 @@ function getConfig(key) {
     );
   }
 
-  const configSheet = getSheet('Config');
+  const configSheet = getSheet_('Config');
 
   if (!configSheet) {
     throw new Error('Config sheet not found.');
@@ -71,13 +67,13 @@ function requireConfigValue_(key) {
  * @param {string} key
  * @param {*} value
  */
-function setConfig(key, value) {
+function setConfig_(key, value) {
   const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
   if (!sheetId) {
     throw new Error('SHEET_ID is not configured in Script Properties.');
   }
 
-  const configSheet = getSheet('Config');
+  const configSheet = getSheet_('Config');
   if (!configSheet) {
     throw new Error('Config sheet not found.');
   }
@@ -110,11 +106,11 @@ function setConfig(key, value) {
 // ===================================================================
 // Reuse the Spreadsheet object only during the current Apps Script execution.
 // This is NOT persistent data caching: every new web request opens the live
-// spreadsheet again, but repeated getSheet() calls in the same request no
+// spreadsheet again, but repeated getSheet_() calls in the same request no
 // longer repeat SpreadsheetApp.openById().
 let _spreadsheetExecutionHandle = null;
 
-function getSpreadsheet() {
+function getSpreadsheet_() {
   if (!_spreadsheetExecutionHandle) {
     _spreadsheetExecutionHandle = SpreadsheetApp.openById(SHEET_ID);
   }
@@ -133,9 +129,9 @@ function getNamedSheet_(spreadsheet, name) {
   return matches[0] || null;
 }
 
-function getSheet(sheetName) {
+function getSheet_(sheetName) {
   const key = normalizeText_(sheetName);
-  if (!sheetExecutionHandles_[key]) sheetExecutionHandles_[key] = getNamedSheet_(getSpreadsheet(), sheetName);
+  if (!sheetExecutionHandles_[key]) sheetExecutionHandles_[key] = getNamedSheet_(getSpreadsheet_(), sheetName);
   return sheetExecutionHandles_[key];
 }
 
@@ -148,12 +144,12 @@ function withDashboardRead_(read) {
   finally { dashboardReadSnapshot_ = null; dashboardHeaderSnapshot_ = null; }
 }
 
-function getSheetRows(sheetName) {
+function getSheetRows_(sheetName) {
   const key = normalizeText_(sheetName);
   if (dashboardReadSnapshot_ && Object.prototype.hasOwnProperty.call(dashboardReadSnapshot_, key)) {
     return dashboardReadSnapshot_[key];
   }
-  const values = getSheet(sheetName).getDataRange().getValues();
+  const values = getSheet_(sheetName).getDataRange().getValues();
   const rows = values.slice(1);
   if (dashboardHeaderSnapshot_) dashboardHeaderSnapshot_[key] = values[0] || [];
   if (dashboardReadSnapshot_) dashboardReadSnapshot_[key] = rows;
@@ -170,13 +166,13 @@ function readMatchedRows_(sheet, matches) {
   return rows.map(row => values[row - first]);
 }
 
-function setStatusFields(sheet, row, fields, columnMap) {
+function setStatusFields_(sheet, row, fields, columnMap) {
   Object.entries(fields).forEach(([field, value]) => {
     sheet.getRange(row, columnMap[field] + 1).setValue(value);
   });
 }
 
-function findTeamStatusRow(statusSheet, teamId, columnMap) {
+function findTeamStatusRow_(statusSheet, teamId, columnMap) {
   const ids = readSheetRows_(statusSheet, 2);
   for (let i = 0; i < ids.length; i++) {
     if (textEquals_(ids[i][columnMap.TEAM_ID], teamId)) return i + 2;
@@ -187,7 +183,7 @@ function findTeamStatusRow(statusSheet, teamId, columnMap) {
 // ===================================================================
 // COLUMN MAPPING — header-based, case-insensitive
 // ===================================================================
-function buildColumnMap(sheet, fieldNameMap, headers) {
+function buildColumnMap_(sheet, fieldNameMap, headers) {
   const headerRow = headers || (readSheetRows_(sheet, 1, 1)[0] || []);
   const normalize = s => String(s).trim().toLowerCase();
   const headerIndex = {};
@@ -210,11 +206,11 @@ function buildColumnMap(sheet, fieldNameMap, headers) {
 // Cached column maps per execution
 let _columnMapCache = {};
 
-function getColumnMap(sheetName, fieldMap) {
+function getColumnMap_(sheetName, fieldMap) {
   const cacheKey = sheetName + JSON.stringify(fieldMap);
   if (!_columnMapCache[cacheKey]) {
-    if (dashboardReadSnapshot_) getSheetRows(sheetName);
-    _columnMapCache[cacheKey] = buildColumnMap(getSheet(sheetName), fieldMap, dashboardHeaderSnapshot_ && dashboardHeaderSnapshot_[normalizeText_(sheetName)]);
+    if (dashboardReadSnapshot_) getSheetRows_(sheetName);
+    _columnMapCache[cacheKey] = buildColumnMap_(getSheet_(sheetName), fieldMap, dashboardHeaderSnapshot_ && dashboardHeaderSnapshot_[normalizeText_(sheetName)]);
   }
   return _columnMapCache[cacheKey];
 }
@@ -237,18 +233,31 @@ function textEquals_(left, right) {
   return normalizeText_(left) === normalizeText_(right);
 }
 
-function normalizeEmail(e) {
+/**
+ * First statement of every public entry point that triggers or the editor run (and that is therefore callable
+ * by name through google.script.run). It allows a trigger, an editor run or a coordinator, and rejects any
+ * other signed-in user: the web app executes as its deployer, so the effective user is never the caller.
+ */
+function requireTriggerOrOperator_() {
+  const active = normalizeEmail_(Session.getActiveUser().getEmail());
+  if (!active) return;
+  const effective = Session.getEffectiveUser ? normalizeEmail_(Session.getEffectiveUser().getEmail()) : active;
+  if (active === effective || activityIsCoordinator_(active)) return;
+  throw new Error('Coordinator access is required.');
+}
+
+function normalizeEmail_(e) {
   return normalizeText_(e);
 }
 
-function emailsMatch(a, b) {
-  return normalizeEmail(a) === normalizeEmail(b);
+function emailsMatch_(a, b) {
+  return normalizeEmail_(a) === normalizeEmail_(b);
 }
 
 // ===================================================================
 // HTML & STRING UTILITIES
 // ===================================================================
-function escapeHtml(s) {
+function escapeHtml_(s) {
   return String(s || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -256,28 +265,15 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-function driveFileUrl(value) {
+function driveFileUrl_(value) {
   if (!value) return '';
   return value.startsWith('http') ? value : `https://drive.google.com/file/d/${value}/view`;
-}
-
-function isValidUrl(str) {
-  try { new URL(str); return true; } catch (_) { return false; }
-}
-
-function urlResolves(url) {
-  try {
-    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
-    return resp.getResponseCode() < 400;
-  } catch (e) {
-    return false;
-  }
 }
 
 // ===================================================================
 // TEXT SIMILARITY — trigram Jaccard
 // ===================================================================
-function similarity(a, b) {
+function similarity_(a, b) {
   if (!a || !b) return 0;
 
   // Normalize both strings
@@ -325,7 +321,7 @@ function similarity(a, b) {
 // ===================================================================
 // DATA GROUPING & AGGREGATION
 // ===================================================================
-function groupBy(arr, keyFn) {
+function groupBy_(arr, keyFn) {
   return arr.reduce((acc, item) => {
     const key = normalizeText_(keyFn(item));
     (acc[key] = acc[key] || []).push(item);
@@ -333,7 +329,7 @@ function groupBy(arr, keyFn) {
   }, Object.create(null));
 }
 
-function buildTeamMembersField(rowData, columnMap) {
+function buildTeamMembersField_(rowData, columnMap) {
   return [
     rowData[columnMap.S1_REGNO],
     rowData[columnMap.S2_REGNO],
@@ -354,7 +350,7 @@ function getOptionalHeaderIndex_(sheet, headerName) {
   return headers.findIndex(h => String(h || '').trim().toLowerCase() === target);
 }
 
-function getRepoUrlMap(timings) {
+function getRepoUrlMap_(timings) {
   const measure = (phase, read) => {
     if (!timings) return read();
     const started = Date.now();
@@ -364,8 +360,8 @@ function getRepoUrlMap(timings) {
   };
   return measure('repository_detail_total', () => {
   // TeamStatus is the only repository registry.
-  const statusSheet = getSheet(SHEET_NAMES.TEAM_STATUS);
-  const snapshotRows = dashboardReadSnapshot_ ? getSheetRows(SHEET_NAMES.TEAM_STATUS) : null;
+  const statusSheet = getSheet_(SHEET_NAMES.TEAM_STATUS);
+  const snapshotRows = dashboardReadSnapshot_ ? getSheetRows_(SHEET_NAMES.TEAM_STATUS) : null;
   const headers = snapshotRows ? dashboardHeaderSnapshot_[normalizeText_(SHEET_NAMES.TEAM_STATUS)] : null;
   const repoCol = headers ? headers.findIndex(h => normalizeText_(h) === 'repo url') : getOptionalHeaderIndex_(statusSheet, 'Repo URL');
   const teamCol = headers ? headers.findIndex(h => normalizeText_(h) === 'team id') : getOptionalHeaderIndex_(statusSheet, 'Team ID');
@@ -384,11 +380,11 @@ function getRepoUrlMap(timings) {
   });
 }
 
-function getRepoUrlForTeam(teamId) {
+function getRepoUrlForTeam_(teamId) {
   const wanted = String(teamId || '').trim();
   if (!wanted) return '';
 
-  const statusSheet = getSheet(SHEET_NAMES.TEAM_STATUS);
+  const statusSheet = getSheet_(SHEET_NAMES.TEAM_STATUS);
   const repoCol = getOptionalHeaderIndex_(statusSheet, 'Repo URL');
   const teamCol = getOptionalHeaderIndex_(statusSheet, 'Team ID');
   if (repoCol >= 0 && teamCol >= 0 && statusSheet.getLastRow() >= 2) {
@@ -404,7 +400,7 @@ function getRepoUrlForTeam(teamId) {
 }
 
 function updateTeamStatusRepoUrl_(teamId, repoUrl) {
-  const sheet = getSheet(SHEET_NAMES.TEAM_STATUS);
+  const sheet = getSheet_(SHEET_NAMES.TEAM_STATUS);
   let repoCol = getOptionalHeaderIndex_(sheet, 'Repo URL');
   if (repoCol < 0) {
     repoCol = sheet.getLastColumn();
@@ -424,22 +420,22 @@ function updateTeamStatusRepoUrl_(teamId, repoUrl) {
 let _rcColumnsCache = null;
 let _committeeRowsCache = null;
 
-function getReviewCommitteeColumns() {
+function getReviewCommitteeColumns_() {
   if (_rcColumnsCache) return _rcColumnsCache;
-  _rcColumnsCache = getColumnMap(SHEET_NAMES.REVIEW_COMMITTEE, FIELD_DEFINITIONS.REVIEW_COMMITTEE);
+  _rcColumnsCache = getColumnMap_(SHEET_NAMES.REVIEW_COMMITTEE, FIELD_DEFINITIONS.REVIEW_COMMITTEE);
   return _rcColumnsCache;
 }
 
-function getAllCommitteeRows() {
+function getAllCommitteeRows_() {
   if (_committeeRowsCache) return _committeeRowsCache;
-  _committeeRowsCache = getSheetRows(SHEET_NAMES.REVIEW_COMMITTEE);
+  _committeeRowsCache = getSheetRows_(SHEET_NAMES.REVIEW_COMMITTEE);
   return _committeeRowsCache;
 }
 
-function getCommitteeInfo(committeeNumber) {
+function getCommitteeInfo_(committeeNumber) {
   if (!committeeNumber) return null;
-  const RC = getReviewCommitteeColumns();
-  const row = getAllCommitteeRows().find(r => textEquals_(r[RC.COMMITTEE_NUMBER], committeeNumber));
+  const RC = getReviewCommitteeColumns_();
+  const row = getAllCommitteeRows_().find(r => textEquals_(r[RC.COMMITTEE_NUMBER], committeeNumber));
   if (!row) return null;
   return {
     reviewer1Name: row[RC.REVIEWER1_NAME],
@@ -453,59 +449,48 @@ function getCommitteeInfo(committeeNumber) {
   };
 }
 
-function getCommitteeNumbersForReviewer(email) {
-  const RC = getReviewCommitteeColumns();
-  return getAllCommitteeRows()
+function getCommitteeNumbersForReviewer_(email) {
+  const RC = getReviewCommitteeColumns_();
+  return getAllCommitteeRows_()
     .filter(r => [
       r[RC.REVIEWER1_EMAIL],
       r[RC.REVIEWER2_EMAIL],
       r[RC.REVIEWER3_EMAIL],
       r[RC.REVIEWER4_EMAIL]
-    ].some(e => emailsMatch(e, email)))
+    ].some(e => emailsMatch_(e, email)))
     .map(r => r[RC.COMMITTEE_NUMBER]);
 }
 
 // ===================================================================
 // STUDENT ROSTER LOOKUP
 // ===================================================================
-function getStudentTeamId(email) {
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS);
-
-  const match = rows.find(r =>
-    [r[TS.S1_EMAIL], r[TS.S2_EMAIL], r[TS.S3_EMAIL], r[TS.S4_EMAIL]]
-      .some(e => emailsMatch(e, email))
-  );
-  return match ? match[TS.TEAM_ID] : null;
-}
-
 // ===================================================================
 // FORM LINKS — pre-filled with Team ID
 // ===================================================================
-function buildTeamIntakeLink(teamId) {
-  const base = getConfig('TEAM_INTAKE_FORM_URL_BASE');
-  const entry = getConfig('TEAM_INTAKE_TEAMID_ENTRY');
+function buildTeamIntakeLink_(teamId) {
+  const base = getConfig_('TEAM_INTAKE_FORM_URL_BASE');
+  const entry = getConfig_('TEAM_INTAKE_TEAMID_ENTRY');
   return `${base}?usp=pp_url&${entry}=${encodeURIComponent(teamId)}`;
 }
 
-function getDashboardUrl() {
-  return getConfig('GUIDE_DASHBOARD_URL');
+function getDashboardUrl_() {
+  return getConfig_('GUIDE_DASHBOARD_URL');
 }
 
-function getHubRegistrySheet() {
-  const HUB_SHEET_ID = getConfig('HUB_SHEET_ID');
+function getHubRegistrySheet_() {
+  const HUB_SHEET_ID = getConfig_('HUB_SHEET_ID');
   return getNamedSheet_(SpreadsheetApp.openById(HUB_SHEET_ID), SHEET_NAMES.MASTER_REGISTRY);
 }
 
 // ===================================================================
 // CONSTANTS (cached)
 // ===================================================================
-function getCoordinatorEmail() {
-  return getConfig('COORDINATOR_EMAIL');
+function getCoordinatorEmail_() {
+  return getConfig_('COORDINATOR_EMAIL');
 }
 
-function getAcademicYear() {
-  return getConfig('ACADEMIC_YEAR');
+function getAcademicYear_() {
+  return getConfig_('ACADEMIC_YEAR');
 }
 // Project dates are civil-day numbers in the spreadsheet timezone, not elapsed
 // 24-hour periods. This avoids locale ambiguity and daylight-saving boundaries.
@@ -540,7 +525,7 @@ function projectDay_(value, timezone, key) {
 
 function getProjectSchedule_() {
   if (projectScheduleExecution_) return projectScheduleExecution_;
-  const timezone = getSpreadsheet().getSpreadsheetTimeZone();
+  const timezone = getSpreadsheet_().getSpreadsheetTimeZone();
   const milestones = getMilestones_();
   const assessments=getAssessmentDefinitions_();
   composeProjectTimeline_(milestones,assessments);
@@ -573,29 +558,6 @@ function getProjectClock_(schedule, now) {
     completedWeeks:today > schedule.end ? Math.ceil((schedule.end - schedule.week1 + 1) / 7) : Math.max(0, Math.floor((today - schedule.week1) / 7)) };
 }
 
-function activityProjectDay_(value, schedule) {
-  if (value === '' || value === null || value === undefined) return null;
-  try {
-    if (value instanceof Date || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(value)) || /^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
-      return projectDay_(value, schedule.timezone);
-    }
-    // Only unambiguous timestamp strings are accepted; Sheets normally returns Date cells.
-    if (!/^\d{4}-\d{2}-\d{2}T/.test(String(value))) return null;
-    return projectDay_(new Date(value), schedule.timezone);
-  } catch (err) { return null; }
-}
-
-function isFutureProjectTimestamp_(value, now) {
-  const timestamp = value instanceof Date ? value : /^\d{4}-\d{2}-\d{2}T/.test(String(value)) ? new Date(value) : null;
-  return timestamp !== null && timestamp.getTime() > now.getTime();
-}
-
-function isCurrentProjectWeek_(value, schedule, clock) {
-  const day = activityProjectDay_(value, schedule);
-  return clock.active && day !== null && day >= clock.start && day <= Math.min(clock.today, clock.end)
-    && !isFutureProjectTimestamp_(value, clock.now);
-}
-
 function getLogWeekSummary_(records, eligibleFrom, regNo, now) {
   now = now || new Date();
   const windows = eligibleWeeklyWindows_(eligibleFrom,getWeeklySubmissionWindows_());
@@ -604,7 +566,7 @@ function getLogWeekSummary_(records, eligibleFrom, regNo, now) {
   const submitted = new Set(effective.filter(r=>r.entryStatus !== 'MISSED').map(r=>r.weekId));
   const missing = expected.filter(w=>now.getTime() > w.late_until && !submitted.has(w.weekId));
   const current = expected.find(w=>now.getTime() <= w.deadline_at);
-  const timezone = getSpreadsheet().getSpreadsheetTimeZone();
+  const timezone = getSpreadsheet_().getSpreadsheetTimeZone();
   return {expectedWeeks:expected.length, missing:missing.length,
     firstMissingDue:missing.length ? projectDay_(new Date(missing[0].deadline_at),timezone) : null,
     currentLogged:!!current && submitted.has(current.weekId), active:!!current, week:current ? current.weekId : null,
@@ -628,33 +590,3 @@ function getTeamLogWeekSummary_(row, columns, logs, schedule, clock) {
     loggedStudents:active.filter(s=>s.currentLogged).length,totalStudents:registers.length,
     active:active.length > 0,week:current ? current.week : null,due:current ? current.due : null};
 }
-
-/** Shared tab header: title, successful-read timestamp, refresh action and divider. */
-function buildTabHeader_(title, key, updated) {
-  return `<div><div><h2>${escapeHtml(title)}</h2><p id="${key}Updated">${escapeHtml(updated)}</p></div><button type="button" class="tab-refresh-btn border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" data-refresh-button id="${key}Refresh" aria-label="${escapeHtml('Refresh ' + title)}" data-shell-refresh="${escapeHtml(key)}">${renderLucideIcon_('refresh-cw')}Refresh</button></div><p id="${key}RefreshStatus" class="tab-refresh-status empty:hidden" data-refresh-status role="status" aria-live="polite"></p>`;
-}
-
-/** Shared headers for refreshable, non-student dashboard containers. */
-function dashboardUpdatedLabel_() {
-  return 'Last updated: ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) + ' IST';
-}
-
-function buildDashboardContainerHeader_(title, key) {
-  return buildTabHeader_(title, key, key === 'coord' || key === 'systemStatus' ? 'Waiting for data…' : dashboardUpdatedLabel_());
-}
-
-/** Presentation only: preserves the Review drawer history labels and note filtering. */
-function renderAssessmentHistory_(decisions) {
-    const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    if(!decisions || !decisions.length)return '';
-    const actions={exception:'Absence details updated',targetSubmit:'Assessment completed',targetDraft:'Assessment draft saved',MAKEUP_ALTERNATIVE_ASSESSMENT:'Assessment authorized',DEFERRED_ASSESSMENT:'Assessment deferred',TEAM_MARK_APPLICABLE:'Team mark approved',TEAM_MARK_NOT_APPLICABLE:'Team mark not applicable',OTHER:'Academic decision recorded'};
-    const statuses={COMPLETED:'Completed',MAKEUP_PENDING:'Awaiting makeup',COMPLETED_AFTER_MAKEUP:'Completed after makeup',ABSENT_UNAPPROVED:'Unapproved absence',ACADEMIC_DECISION_PENDING:'Awaiting academic decision',NON_PARTICIPATION:'Non-participation',INCOMPLETE:'Incomplete'};
-    const automaticReasons=['Prolonged absence source facts updated.','Review-day absence recorded as unapproved.'];
-    return '<details><summary>Assessment history <span>'+decisions.length+'</span></summary><ol>'+decisions.slice().reverse().map(d=>{
-      const date=new Date(d.at),valid=Number.isFinite(date.getTime());
-      const when=valid?date.toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-      const reason=String(d.reason||'');
-      const note=reason && !automaticReasons.includes(reason) && !reason.startsWith('Absence details recorded: ')?'<p>'+escape(reason)+'</p>':'';
-      return '<li><div><strong>'+escape(actions[d.decision]||'Assessment updated')+'</strong>'+(when?'<time datetime="'+escape(date.toISOString())+'">'+escape(when)+'</time>':'')+'</div><div>'+escape(statuses[d.previousStatus]||'Not assessed')+' <span>changed to</span> '+escape(statuses[d.resultingStatus]||'Updated')+'</div>'+note+(d.reviewer?'<small>'+escape(d.reviewer)+'</small>':'')+'</li>';
-    }).join('')+'</ol></details>';
-  }

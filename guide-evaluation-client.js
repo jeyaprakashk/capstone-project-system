@@ -70,7 +70,7 @@ function guideEvaluationBrowser_(bridge) {
   async function save(submit) {
     if(busy)return;
     if(submit && !await DashboardUI.ask('Submit this student’s evaluation? Scores will lock until the coordinator reopens it.'))return;
-    const method=submit?'submitGuideEvaluation':'saveGuideEvaluationDraft';
+    const method=submit?'submitGuideEvaluation_':'saveGuideEvaluationDraft_';
     const scores={};el('guideEvaluationEditor').querySelectorAll('fieldset').forEach(field=>{
       const level=field.querySelector('[data-level]').value;
       scores[field.dataset.pi]={level:level===''?null:Number(level),marks:field.querySelector('[data-marks]').value,remark:field.querySelector('[data-remark]').value};
@@ -86,4 +86,4 @@ function guideEvaluationBrowser_(bridge) {
   window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
   return {open};
 }
-function getGuideEvaluationClientScript() { return 'const GuideEvaluation = ('+guideEvaluationBrowser_.toString()+')(DataBridge);'; }
+function getGuideEvaluationClientScript_() { return 'const GuideEvaluation = ('+guideEvaluationBrowser_.toString()+')(DataBridge);'; }

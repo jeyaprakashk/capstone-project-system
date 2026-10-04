@@ -19,12 +19,12 @@ function getTeamsGithubSetup_(rows, columns, repoUrlMap, usernameRows) {
       } catch (err) { /* Keep failed checks unavailable; never retry the whole batch serially. */ }
     }
   }
-  const accountColumns = githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_ACCOUNTS));
+  const accountColumns = githubAccountColumns_(getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS));
   const latest = new Map();
-  usernameRows.forEach(row => latest.set(normalizeText_(row[2]) + ':' + normalizeEmail(row[1]), row));
+  usernameRows.forEach(row => latest.set(normalizeText_(row[2]) + ':' + normalizeEmail_(row[1]), row));
   const names = [];
   rows.forEach(row => [1,2,3,4].forEach(n => {
-    const saved = latest.get(normalizeText_(row[columns.TEAM_ID]) + ':' + normalizeEmail(row[columns['S' + n + '_EMAIL']]));
+    const saved = latest.get(normalizeText_(row[columns.TEAM_ID]) + ':' + normalizeEmail_(row[columns['S' + n + '_EMAIL']]));
     const name = String(saved && saved[3] || '').trim();
     const id = githubId_(saved && saved[accountColumns.ID]);
     if (id) names.push('/user/' + id);
@@ -51,21 +51,21 @@ function getTeamsGithubSetup_(rows, columns, repoUrlMap, usernameRows) {
 /** Shared, live team readiness. Read paths never create repositories or invitations. */
 function getTeamGithubSetup_(teamId, options) {
   options = options || {};
-  const request = options.request || makeGithubRequest;
-  const columns = options.columns || getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const row = options.row || getSheetRows(SHEET_NAMES.TEAM_STATUS).find(row => textEquals_(row[columns.TEAM_ID], teamId));
+  const request = options.request || makeGithubRequest_;
+  const columns = options.columns || getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const row = options.row || getSheetRows_(SHEET_NAMES.TEAM_STATUS).find(row => textEquals_(row[columns.TEAM_ID], teamId));
   if (!row) throw new Error('Team not found: ' + teamId);
-  const repoUrl = options.repoUrl !== undefined ? options.repoUrl : getRepoUrlForTeam(teamId);
-  const accountColumns = githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_ACCOUNTS));
+  const repoUrl = options.repoUrl !== undefined ? options.repoUrl : getRepoUrlForTeam_(teamId);
+  const accountColumns = githubAccountColumns_(getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS));
   const latest = new Map();
-  (options.usernameRows || getSheetRows(SHEET_NAMES.GITHUB_ACCOUNTS)).forEach(item => {
-    if (textEquals_(item[2], teamId)) latest.set(normalizeEmail(item[1]), item);
+  (options.usernameRows || getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS)).forEach(item => {
+    if (textEquals_(item[2], teamId)) latest.set(normalizeEmail_(item[1]), item);
   });
   const validationCache = options.validationCache || new Map();
-  const identityRows = options.usernameRows || getSheetRows(SHEET_NAMES.GITHUB_ACCOUNTS);
+  const identityRows = options.usernameRows || getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS);
   const members = [1, 2, 3, 4].filter(n => String(row[columns['S' + n + '_EMAIL']] || '').trim()).map(n => {
     const email = String(row[columns['S' + n + '_EMAIL']]).trim();
-    const submission = latest.get(normalizeEmail(email));
+    const submission = latest.get(normalizeEmail_(email));
     const username = String(submission && submission[3] || '').trim();
     const member = { email, label: String(row[columns['S' + n + '_REGNO']] || row[columns['S' + n + '_NAME']] || email), username,
       status: 'missing', submittedAt: null, access: 'unchecked' };
@@ -90,7 +90,7 @@ function getTeamGithubSetup_(teamId, options) {
         member.displayName = check.displayName || '';
         member.profileUrl = check.profileUrl || '';
         if (check.githubId) {
-          const metadataKey = 'metadata:' + normalizeText_(teamId) + ':' + normalizeEmail(email) + ':' + check.githubId;
+          const metadataKey = 'metadata:' + normalizeText_(teamId) + ':' + normalizeEmail_(email) + ':' + check.githubId;
           if (!validationCache.has(metadataKey)) {
             refreshGithubAccountMetadata_(submission,check);
             validationCache.set(metadataKey,true);
@@ -158,8 +158,8 @@ function ensureGithubPermission_(slug, username, required, invitations, expected
   if (invitation && githubPermissionSufficient_({ permission: invitation.permissions }, required)) return;
   const permissions = required === 'push' ? 'write' : required === 'pull' ? 'read' : required;
   const response = invitation
-    ? makeGithubRequest('PATCH', '/repos/' + slug + '/invitations/' + invitation.id, { permissions })
-    : addCollaborator(slug, username, required);
+    ? makeGithubRequest_('PATCH', '/repos/' + slug + '/invitations/' + invitation.id, { permissions })
+    : addCollaborator_(slug, username, required);
   if (expectedId && response.body && response.body.invitee && !githubAuthorMatches_(expectedId,response.body.invitee.id)) throw new Error('Invitation account ID conflict.');
   if (!(invitation ? response.status === 200 : [201, 204].includes(response.status))) throw new Error('Could not grant access to ' + username + '. Retry GitHub setup.');
 }
@@ -167,7 +167,7 @@ function ensureGithubPermission_(slug, username, required, invitations, expected
 function getGithubInvitations_(slug, request) {
   const invitations = [];
   for (let page = 1; ; page++) {
-    const response = (request || makeGithubRequest)('GET', '/repos/' + slug + '/invitations?per_page=100&page=' + page);
+    const response = (request || makeGithubRequest_)('GET', '/repos/' + slug + '/invitations?per_page=100&page=' + page);
     if (response.status !== 200 || !Array.isArray(response.body)) throw new Error('Repository invitations could not be verified. Retry GitHub setup.');
     invitations.push(...response.body);
     if (response.body.length < 100) return invitations;
@@ -187,20 +187,20 @@ function githubSetupMessage_(setup) {
 
 /** All mutation callers hold the script lock. No writes occur before all usernames validate. */
 function repairTeamGithubSetup_(teamId) {
-  const columns = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const row = getSheetRows(SHEET_NAMES.TEAM_STATUS).find(row => textEquals_(row[columns.TEAM_ID], teamId));
+  const columns = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const row = getSheetRows_(SHEET_NAMES.TEAM_STATUS).find(row => textEquals_(row[columns.TEAM_ID], teamId));
   const setup = getTeamGithubSetup_(teamId, { row, columns, inspectAccess: false });
   if (!setup.usernamesComplete) return setup;
   const name = getTeamRepoName_(teamId, row[columns.SEMESTER]);
-  const expectedSlug = String(getConfig('GITHUB_ORG_NAME')).trim() + '/' + name;
+  const expectedSlug = String(getConfig_('GITHUB_ORG_NAME')).trim() + '/' + name;
   const slug = setup.repoUrl ? getGithubRepoSlug_(setup.repoUrl) : expectedSlug;
   if (!slug) throw new Error('The saved repository URL is invalid. Contact your coordinator.');
-  let repo = makeGithubRequest('GET', '/repos/' + slug);
+  let repo = makeGithubRequest_('GET', '/repos/' + slug);
   const created = repo.status === 404;
   if (created) {
     if (!textEquals_(slug, expectedSlug)) throw new Error('Saved repository was not found. Contact your coordinator before creating a replacement.');
     PropertiesService.getScriptProperties().setProperty(githubTemplatePendingKey_(slug), JSON.stringify({version:4}));
-    repo = createTeamRepo(name, teamId);
+    repo = createTeamRepo_(name, teamId);
   }
   if (repo.status !== (created ? 201 : 200) || !repo.body || !repo.body.html_url) throw new Error('Repository lookup or creation failed: ' + repo.status);
   // Record the URL before access repair; readiness is always checked separately.
@@ -240,7 +240,7 @@ function githubAcceptedAccessMessage_(setup) {
 
 function requireTeamGithubReady_(teamId, email, options) {
   const setup = getTeamGithubSetup_(teamId);
-  if (!setup.members.some(member => emailsMatch(member.email, email))) throw new Error('You are not a current member of this team.');
+  if (!setup.members.some(member => emailsMatch_(member.email, email))) throw new Error('You are not a current member of this team.');
   const message = options && options.requireAcceptedInvitations
     ? githubAcceptedAccessMessage_(setup) : setup.ready ? '' : setup.message;
   if (message) {
@@ -254,10 +254,10 @@ function requireTeamGithubReady_(teamId, email, options) {
 
 function notifyGithubIntakeRejection_(teamId, submitterEmail, error) {
   const recipients = error.githubSetup
-    ? [...new Set(error.githubSetup.members.map(member => normalizeEmail(member.email)).filter(Boolean))]
+    ? [...new Set(error.githubSetup.members.map(member => normalizeEmail_(member.email)).filter(Boolean))]
     : [submitterEmail];
   MailApp.sendEmail(recipients.join(','), `Title submission not applied — Team ${teamId}`,
-    error.message + '\n\nThe raw response was retained, but no title or approval records were changed. After resolving the issue, submit the title again.\n\nDashboard: ' + getDashboardUrl());
+    error.message + '\n\nThe raw response was retained, but no title or approval records were changed. After resolving the issue, submit the title again.\n\nDashboard: ' + getDashboardUrl_());
 }
 
 function githubPermissionIdentityMatches_(body, expectedId) {

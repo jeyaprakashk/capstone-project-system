@@ -8,6 +8,7 @@
  */
 function studentViewBrowser_(bridge, getUi) {
   'use strict';
+  const delegated = new WeakSet();
   const state = {dto:null, host:null};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
@@ -104,8 +105,7 @@ function studentViewBrowser_(bridge, getUi) {
     const ui = getUi();
     host.innerHTML = '<div><h2 class="text-xl font-semibold text-ink">Team <span class="text-primary">' + escape(dto.teamId) + '</span></h2>' + rosterMarkup(dto.roster) + '<div class="mt-4">' + setupMarkup(dto) + '</div>' +
       (dto.titleApproved ? weeklyMarkup(ui) : '') + sideMarkup(dto, ui) + '</div>';
-    host.onclick = onClick;
-    host.onsubmit = onSubmit;
+    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); }
   }
 
   function onClick(event) {

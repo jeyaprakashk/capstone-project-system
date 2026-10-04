@@ -24,7 +24,7 @@ The alternate client, level-based mutation path, committee-file provisioner, see
 ## Modified files and functions
 
 - `common-constants.js`: `FIELD_DEFINITIONS.REVIEW_COMMITTEE` now contains assignment fields only.
-- `common-helpers.js`: simplified `buildColumnMap()` to ordinary header matching; `getCommitteeInfo()` returns reviewer information only. Existing assignment helpers remain unchanged.
+- `common-helpers.js`: simplified `buildColumnMap_()` to ordinary header matching; `getCommitteeInfo_()` returns reviewer information only. Existing assignment helpers remain unchanged.
 - `coordinator-dashboard.js`: `buildCommitteeData_()` returns number, members and teams; `buildCommitteeDirectory_()` renders only assignment information. `buildReviewConfigurationCard_()` includes server-reported states for each configured Review and a definitions link. Setup markup and styles use current terminology.
 - `review-configuration.js`: `checkReviewConfiguration_()` uses the existing journal resolver and configuration/rubric validators to report per-assessment READY, MISSING, EMPTY or ERROR states. A journal conflict is retained against its assessment instead of discarding all assessment results. The server returns aggregate validity, readiness, presentation state and summary. Structural configuration errors still block setup.
 - `dashboard-client-scripts.js`: `initializeAssessmentStorage()` retains the existing authorized setup RPC. `recheckReviewConfiguration()` displays server results without recalculating readiness rules, preserves the last successful assessment list on failed refresh, settles the shared loading lifecycle and disables setup until a successful validation permits it.
@@ -36,17 +36,17 @@ The alternate client, level-based mutation path, committee-file provisioner, see
 ## Final Coordinator workflow
 
 1. System Status loads committee membership and team assignments without an external storage identifier.
-2. Assessment readiness calls `getCoordinatorReviewConfiguration()`.
+2. Assessment readiness calls `getCoordinatorReviewConfiguration_()`.
 3. Definitions, assessment rubric criteria, dates, prerequisite configuration and journal compatibility are validated by server code.
 4. Each configured Review shows its returned storage state. Missing or genuinely empty storage permits initialization; conflicts and invalid configuration block it.
-5. Create missing assessment storage invokes `prepareReviewAssessmentStorage()`, which authorizes the Coordinator/PD, obtains a lock, revalidates and preflights configured Review journals.
+5. Create missing assessment storage invokes `prepareReviewAssessmentStorage_()`, which authorizes the Coordinator/PD, obtains a lock, revalidates and preflights configured Review journals.
 6. Missing tabs are created, empty tabs receive the header, and valid populated journals are preserved. Results and readiness are refreshed.
 
 Storage READY does not authorize a particular team to enter marks. Existing reviewer assignment, title, opening, prerequisite and lifecycle checks continue to determine team entry availability. The directory does not calculate or display journal readiness.
 
 ## Final Reviewer and journal workflows
 
-`configured REVIEW → reviewer assignment → Reviewer dashboard → Enter marks / View marks → ReviewEvaluations.open(team, assessmentId, button) → loadReviewEvaluation → rubric + roster + current evaluation → saveReviewEvaluationDraft / submitReviewEvaluation → append revision`
+`configured REVIEW → reviewer assignment → Reviewer dashboard → Enter marks / View marks → ReviewEvaluations.open(team, assessmentId, button) → loadReviewEvaluation_ → rubric + roster + current evaluation → saveReviewEvaluationDraft_ / submitReviewEvaluation_ → append revision`
 
 Instances use the configured Journal binding or `Assessment_<assessmentId>` in the main spreadsheet. The resolver, initialization behavior and nine-column schema remain unchanged:
 

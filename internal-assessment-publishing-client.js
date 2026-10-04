@@ -24,7 +24,7 @@ function internalAssessmentPublishingBrowser_(bridge) {
       const finish=(callback,value)=>{if(settled)return;settled=true;clearTimeout(timer);callback(value);};
       const timer=setTimeout(()=>finish(reject,{message:'No response received. The operation may have completed.',uncertain:true}),45000);
       try {
-        const call=method==='loadInternalAssessmentPublishing'?bridge.read('publishing:'+args[0],'API_publishing_get',[args[0]],{timeoutMs:120000}):bridge.write('API_publishing_run',[method,args[0]]);
+        const call=method==='loadInternalAssessmentPublishing_'?bridge.read('publishing:'+args[0],'API_publishing_get',[args[0]],{timeoutMs:120000}):bridge.write('API_publishing_run',[method,args[0]]);
         call.then(value=>finish(resolve,value),error=>finish(reject,error));
       }
       catch(error){finish(reject,error);}
@@ -98,6 +98,11 @@ function internalAssessmentPublishingBrowser_(bridge) {
       else if(button.hasAttribute('data-retry-operation'))retry(key,Number(button.dataset.retryOperation));
       else if(button.hasAttribute('data-retry-refresh'))refresh(key);
     });
+    const filter=event=>{
+      if(!event.target.matches || !event.target.matches('[data-search],[data-filter]'))return;
+      const s=state(section.dataset.publishing);if(s.report)applyFilter(section,s);
+    };
+    section.addEventListener('input',filter);section.addEventListener('change',filter);
   }
   function root(key){return document.querySelector('[data-publishing="'+key+'"]');}
   function disable(section,value){section.querySelectorAll('button,input,select').forEach(node=>node.disabled=value);}
@@ -106,13 +111,15 @@ function internalAssessmentPublishingBrowser_(bridge) {
     const host=section.querySelector('[data-publishing-content]');host.innerHTML=markup(s.report,s);
     host.querySelectorAll('[data-publishing-table-wrap]').forEach((wrapper,index)=>{wrapper.tabIndex=0;wrapper.setAttribute('role','region');wrapper.setAttribute('aria-label',index?'Student publication details, scroll horizontally':'Team publication table, scroll horizontally');});
     const hint=document.createElement('p');hint.className='publishing-scroll-hint m-0 hidden text-xs text-muted max-[640px]:block';hint.textContent='Scroll horizontally to see publication status and actions.';host.querySelector('[data-publishing-table-wrap]').before(hint);
-    const apply=()=>{
-      s.query=host.querySelector('[data-search]').value;s.filter=host.querySelector('[data-filter]').value;const query=s.query.trim().toLowerCase();let count=0;
-      host.querySelectorAll('[data-team]').forEach(node=>{const team=s.report.teams[Number(node.dataset.team)],status=effectiveState(team,s),match=s.filter==='all' || s.filter===status || s.filter==='exceptions' && ['PARTIAL_OR_EXCEPTION','PARTIALLY_PUBLISHED'].includes(status);
-        node.hidden=!match || ![team.displayTeam,...team.students.flatMap(student=>[student.name,student.register])].some(value=>String(value).toLowerCase().includes(query));if(!node.hidden)count++;
-      });host.querySelector('[data-count]').textContent=count+' of '+s.report.teams.length+' teams';host.querySelector('[data-empty]').hidden=count!==0;
-    };
-    host.querySelector('[data-search]').addEventListener('input',apply);host.querySelector('[data-filter]').addEventListener('change',apply);apply();
+    applyFilter(section,s);
+  }
+  /** Search and status filter over the rendered rows; driven by the section's delegated input/change listener. */
+  function applyFilter(section,s) {
+    const host=section.querySelector('[data-publishing-content]');
+    s.query=host.querySelector('[data-search]').value;s.filter=host.querySelector('[data-filter]').value;const query=s.query.trim().toLowerCase();let count=0;
+    host.querySelectorAll('[data-team]').forEach(node=>{const team=s.report.teams[Number(node.dataset.team)],status=effectiveState(team,s),match=s.filter==='all' || s.filter===status || s.filter==='exceptions' && ['PARTIAL_OR_EXCEPTION','PARTIALLY_PUBLISHED'].includes(status);
+      node.hidden=!match || ![team.displayTeam,...team.students.flatMap(student=>[student.name,student.register])].some(value=>String(value).toLowerCase().includes(query));if(!node.hidden)count++;
+    });host.querySelector('[data-count]').textContent=count+' of '+s.report.teams.length+' teams';host.querySelector('[data-empty]').hidden=count!==0;
   }
   function reconcile(s) {
     s.report.teams.forEach(team=>{
@@ -126,7 +133,7 @@ function internalAssessmentPublishingBrowser_(bridge) {
     s.busy=true;const generation=++s.generation,host=section.querySelector('[data-publishing-content]'),hadContent=!!host.querySelector('[data-search]');disable(section,true);
     const finish=DashboardUI.beginContentLoading(host,'Reading publication status');
     try {
-      const report=await rpc('loadInternalAssessmentPublishing',[key]);finish();
+      const report=await rpc('loadInternalAssessmentPublishing_',[key]);finish();
       if(!section.isConnected || generation!==s.generation)return;
       if(!report.ready)throw new Error(report.error||'Assessment configuration is unavailable.');
       s.report=report;reconcile(s);render(section,s);notice(section,'');

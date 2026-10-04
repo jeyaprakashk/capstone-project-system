@@ -6,13 +6,13 @@ function fixture(){
  const tables={};
  function sheet(name,data){tables[name]=data;return {getDataRange:()=>({getValues:()=>data.map(r=>r.slice())}),getLastRow:()=>data.length,getLastColumn:()=>Math.max(0,...data.map(row=>row.length)),getMaxRows:()=>1000,insertRowsAfter(){},getMaxColumns:()=>30,insertColumnsAfter(){},getRange:(r,col,n,w)=>({getValues:()=>data.slice(r-1,r-1+n).map(row=>row.slice(col-1,col-1+w)),setValues:values=>{values.forEach((row,i)=>{data[r-1+i]||=[];row.forEach((v,j)=>data[r-1+i][col-1+j]=v);});}})};}
  const sheets={};let c;
- const context={Date,console,Session:{getActiveUser:()=>({getEmail:()=>actor})},activityIsCoordinator_:email=>email==='coord@x',normalizeText_:v=>String(v??'').trim().toLowerCase(),normalizeEmail:v=>String(v??'').trim().toLowerCase(),emailsMatch:(a,b)=>String(a).toLowerCase()===String(b).toLowerCase(),textEquals_:(a,b)=>String(a).toLowerCase()===String(b).toLowerCase(),
-  SHEET_NAMES:{TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},getColumnMap:()=>({TEAM_ID:0,GUIDE_EMAIL:1}),getSheetRows:()=>[['T1',assigned]],getStudentsFromTeamStatusRow_:()=>students,
-  getSheet:name=>sheets[name]||null,getNamedSheet_:(ss,name)=>sheets[name]||null,getSpreadsheet:()=>({getSpreadsheetTimeZone:()=> 'UTC',insertSheet:name=>(sheets[name]=sheet(name,[]))}),
+ const context={Date,console,Session:{getActiveUser:()=>({getEmail:()=>actor})},activityIsCoordinator_:email=>email==='coord@x',normalizeText_:v=>String(v??'').trim().toLowerCase(),normalizeEmail_:v=>String(v??'').trim().toLowerCase(),emailsMatch_:(a,b)=>String(a).toLowerCase()===String(b).toLowerCase(),textEquals_:(a,b)=>String(a).toLowerCase()===String(b).toLowerCase(),
+  SHEET_NAMES:{TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},getColumnMap_:()=>({TEAM_ID:0,GUIDE_EMAIL:1}),getSheetRows_:()=>[['T1',assigned]],getStudentsFromTeamStatusRow_:()=>students,
+  getSheet_:name=>sheets[name]||null,getNamedSheet_:(ss,name)=>sheets[name]||null,getSpreadsheet_:()=>({getSpreadsheetTimeZone:()=> 'UTC',insertSheet:name=>(sheets[name]=sheet(name,[]))}),
   getInternalReviews_:()=>[{key:'review1'}],
   projectDay_:v=>{const d=new Date(v);if(!Number.isFinite(d.getTime()))throw Error('Invalid deadline');return Math.floor(d.getTime()/86400000);},
   Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,text)=>crypto.createHash('sha256').update(text).digest(),base64EncodeWebSafe:buffer=>buffer.toString('base64url')},
-  LockService:{getScriptLock:()=>({tryLock:()=>{if(!lockAllowed)return false;locked=true;return true;},releaseLock:()=>{locked=false;}})},SpreadsheetApp:{flush(){}},escapeHtml:v=>String(v)
+  LockService:{getScriptLock:()=>({tryLock:()=>{if(!lockAllowed)return false;locked=true;return true;},releaseLock:()=>{locked=false;}})},SpreadsheetApp:{flush(){}},escapeHtml_:v=>String(v)
  };
  c=createSheetReadContext(context);for(const file of ['rubric-config.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','review-evaluation.js','guide-evaluation.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
  sheets.AssessmentDefinitions=sheet('AssessmentDefinitions',[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),['guide_eval','GUIDE_EVALUATION','Guide Evaluation',1,20,'2019-12-20','2020-01-01','','guide-bands-v3-target-level-2','GuideEvaluations']]);
@@ -21,7 +21,7 @@ function fixture(){
  const rubric=[['Assessment ID','Order','PI','Criterion','CO','Max Marks','Type',...Array.from({length:6},(_,i)=>'Level '+i)],...[15,30,20,15,20].map((max,i)=>['Example criterion '+(i+1),['CO5','CO3','CO5','CO4','CO6'][i],max,Array.from({length:6},(_,level)=>'Example descriptor '+level)]).map(([name,co,max,levels],i)=>['guide_eval',i+1,'PI'+(i+1),name,co,max,'Individual',...levels])];
  sheets.Rubrics=sheet('Rubrics',rubric);sheets.GuideEvaluations=sheet('GuideEvaluations',[...[]]);
  tables.GuideEvaluations.push(...[JSON.parse(vm.runInContext('JSON.stringify(GUIDE_EVAL_HEADERS_)',c))]);
- const load=()=>c.loadGuideEvaluation('T1','S1');
+ const load=()=>c.loadGuideEvaluation_('T1','S1');
  const input=(d=load(),scores)=>({team:'T1',student:'S1',revision:d.revision,token:d.token,requestId:crypto.randomUUID().replace(/-/g,''),scores:scores||Object.fromEntries(d.config.criteria.map(x=>[x.pi,{level:3,marks:x.maxMarks*.8,remark:''}]))});
  return {c,tables,students,load,input,actor:v=>actor=v,assign:v=>assigned=v,lock:v=>lockAllowed=v,locked:()=>locked};
 }
@@ -42,28 +42,28 @@ test('Level 2 is the target: feedback is mandatory only below Level 2',()=>{
 });
 
 test('draft submit publish reopen preserve history and privacy',()=>{
- const f=fixture();let d=f.load();const draft=f.input(d);assert.equal(f.c.saveGuideEvaluationDraft(draft).status,'Draft');d=f.load();const submit=f.input(d);const result=f.c.submitGuideEvaluation(submit);assert.equal(result.total,80);assert.equal(result.weighted,16);assert(f.load().evaluation.late);
- assert.throws(()=>f.c.saveGuideEvaluationDraft(f.input()),/locked/);f.actor('s1@x');assert.equal(f.c.loadPublishedGuideEvaluation(),null);
- f.actor('coord@x');let op={team:'T1',student:'S1',revision:2,requestId:'publish_request_123'};f.c.publishGuideEvaluation(op);f.actor('s1@x');assert.equal(f.c.loadPublishedGuideEvaluation().weighted,16);f.actor('s2@x');assert.equal(f.c.loadPublishedGuideEvaluation(),null);
- f.actor('coord@x');assert.throws(()=>f.c.reopenGuideEvaluation({...op,revision:3,requestId:'reopen_request_123'}),/reason/);f.c.reopenGuideEvaluation({...op,revision:3,requestId:'reopen_request_123',reason:'Correction'});f.actor('s1@x');assert.equal(f.c.loadPublishedGuideEvaluation().underCorrection,true);assert.equal(f.tables.GuideEvaluations.length,5);assert(!f.locked());
+ const f=fixture();let d=f.load();const draft=f.input(d);assert.equal(f.c.saveGuideEvaluationDraft_(draft).status,'Draft');d=f.load();const submit=f.input(d);const result=f.c.submitGuideEvaluation_(submit);assert.equal(result.total,80);assert.equal(result.weighted,16);assert(f.load().evaluation.late);
+ assert.throws(()=>f.c.saveGuideEvaluationDraft_(f.input()),/locked/);f.actor('s1@x');assert.equal(f.c.loadPublishedGuideEvaluation_(),null);
+ f.actor('coord@x');let op={team:'T1',student:'S1',revision:2,requestId:'publish_request_123'};f.c.publishInternalAssessment_({...op,assessmentId:'guide_eval'});f.actor('s1@x');assert.equal(f.c.loadPublishedGuideEvaluation_().weighted,16);f.actor('s2@x');assert.equal(f.c.loadPublishedGuideEvaluation_(),null);
+ f.actor('coord@x');assert.throws(()=>f.c.reopenGuideEvaluation_({...op,revision:3,requestId:'reopen_request_123'}),/reason/);f.c.reopenGuideEvaluation_({...op,revision:3,requestId:'reopen_request_123',reason:'Correction'});f.actor('s1@x');assert.equal(f.c.loadPublishedGuideEvaluation_().underCorrection,true);assert.equal(f.tables.GuideEvaluations.length,5);assert(!f.locked());
 });
 test('duplicate retries are idempotent, stale writes and request reuse rejected',()=>{
- const f=fixture(),input=f.input();f.c.saveGuideEvaluationDraft(input);f.c.saveGuideEvaluationDraft(input);assert.equal(f.tables.GuideEvaluations.length,2);
- assert.throws(()=>f.c.submitGuideEvaluation(input),/different data/);assert.throws(()=>f.c.saveGuideEvaluationDraft({...input,requestId:'another_request_123'}),/changed/);
- f.lock(false);assert.throws(()=>f.c.saveGuideEvaluationDraft(f.input()),/saving/);
+ const f=fixture(),input=f.input();f.c.saveGuideEvaluationDraft_(input);f.c.saveGuideEvaluationDraft_(input);assert.equal(f.tables.GuideEvaluations.length,2);
+ assert.throws(()=>f.c.submitGuideEvaluation_(input),/different data/);assert.throws(()=>f.c.saveGuideEvaluationDraft_({...input,requestId:'another_request_123'}),/changed/);
+ f.lock(false);assert.throws(()=>f.c.saveGuideEvaluationDraft_(f.input()),/saving/);
 });
 test('assignment, rubric and roster changes reject stale saves',()=>{
- const f=fixture(),input=f.input();f.assign('other@x');assert.throws(()=>f.c.saveGuideEvaluationDraft(input),/assigned guide/);f.assign('guide@x');f.students.push({regNo:'S3',email:'s3@x'});assert.throws(()=>f.c.saveGuideEvaluationDraft(input),/Roster or rubric/);f.students.pop();f.tables.Rubrics[1][7]='Changed descriptor';assert.throws(()=>f.c.saveGuideEvaluationDraft(input),/Roster or rubric/);assert.equal(f.tables.GuideEvaluations.length,1);
+ const f=fixture(),input=f.input();f.assign('other@x');assert.throws(()=>f.c.saveGuideEvaluationDraft_(input),/assigned guide/);f.assign('guide@x');f.students.push({regNo:'S3',email:'s3@x'});assert.throws(()=>f.c.saveGuideEvaluationDraft_(input),/Roster or rubric/);f.students.pop();f.tables.Rubrics[1][7]='Changed descriptor';assert.throws(()=>f.c.saveGuideEvaluationDraft_(input),/Roster or rubric/);assert.equal(f.tables.GuideEvaluations.length,1);
 });
 test('coordinator-only actions cannot be called by guides or students',()=>{
- const f=fixture();for(const method of ['publishGuideEvaluation','reopenGuideEvaluation','loadCoordinatorGuideEvaluations'])assert.throws(()=>f.c[method](f.input()),/Coordinator/);f.actor('s1@x');assert.throws(()=>f.load(),/assigned guide/);
+ const f=fixture();for(const method of ['reopenGuideEvaluation_','loadCoordinatorGuideEvaluations_'])assert.throws(()=>f.c[method](f.input()),/Coordinator/);assert.throws(()=>f.c.publishInternalAssessment_({...f.input(),assessmentId:'guide_eval'}),/Coordinator/);f.actor('s1@x');assert.throws(()=>f.load(),/assigned guide/);
 });
 test('manual storage preserves existing rubric and records, and requires valid configuration',()=>{
  const f=fixture();f.actor('coord@x');const original=JSON.stringify(f.tables.Rubrics);assert.equal(f.c.setupGuideEvaluation,undefined);f.c.guideRecords_();f.c.guideRecords_();assert.equal(JSON.stringify(f.tables.Rubrics),original);assert.equal(f.tables.GuideEvaluations.length,1);
- f.tables.AssessmentDefinitions[1][6]='';assert.equal(f.c.loadCoordinatorGuideEvaluations().ready,false);f.tables.AssessmentDefinitions[1][6]='2020-01-01';f.tables.Rubrics[1][7]='';assert.equal(f.c.loadCoordinatorGuideEvaluations().ready,false);
+ f.tables.AssessmentDefinitions[1][6]='';assert.equal(f.c.loadCoordinatorGuideEvaluations_().ready,false);f.tables.AssessmentDefinitions[1][6]='2020-01-01';f.tables.Rubrics[1][7]='';assert.equal(f.c.loadCoordinatorGuideEvaluations_().ready,false);
 });
 test('guide completion requires every current student to submit',()=>{
- const f=fixture();f.c.submitGuideEvaluation(f.input());f.actor('coord@x');assert.equal(f.c.guideCompletion_().completed,0);f.students.pop();assert.equal(f.c.guideCompletion_().completed,1);
+ const f=fixture();f.c.submitGuideEvaluation_(f.input());f.actor('coord@x');assert.equal(f.c.guideCompletion_().completed,0);f.students.pop();assert.equal(f.c.guideCompletion_().completed,1);
 });
 test('rubric parser accepts multiple explicitly registered milestone groups',()=>{
  const f=fixture();const h=f.tables.Rubrics[0];const rows=[h,['review1',1,'PI1','Review criterion','CO1',100,'Team'],...f.tables.Rubrics.slice(1)];assert.equal(f.c.parseRubricRows_(rows,[{key:'review1'},{key:'guide_eval'}]).review1.length,1);
@@ -76,10 +76,10 @@ test('marks use exact criterion band boundaries and server-side totals',()=>{
  assert.throws(()=>score('11.24'),/outside/);assert.throws(()=>score('12.75'),/outside/);
 });
 test('publication permits assignment metadata corrections and reopening keeps Guide rubric behavior',()=>{
- const f=fixture();f.c.submitGuideEvaluation(f.input());f.actor('coord@x');f.assign('new@x');
- assert.equal(f.c.publishGuideEvaluation({team:'T1',student:'S1',revision:1,requestId:'publish_changed_123'}).status,'Published');
+ const f=fixture();f.c.submitGuideEvaluation_(f.input());f.actor('coord@x');f.assign('new@x');
+ assert.equal(f.c.publishInternalAssessment_({...{team:'T1',student:'S1',revision:1,requestId:'publish_changed_123'},assessmentId:'guide_eval'}).status,'Published');
  f.tables.Rubrics[1][7]='New level zero descriptor';
- f.c.reopenGuideEvaluation({team:'T1',student:'S1',revision:2,requestId:'reopen_changed_123',reason:'Guide reassigned'});
+ f.c.reopenGuideEvaluation_({team:'T1',student:'S1',revision:2,requestId:'reopen_changed_123',reason:'Guide reassigned'});
  f.actor('new@x');const d=f.load();assert.equal(d.evaluation.config.criteria[0].descriptors[0],'New level zero descriptor');assert.equal(Object.keys(d.evaluation.scores).length,0);
 });
 test('validation never seeds missing rubric rows',()=>{
@@ -90,13 +90,13 @@ test('validation never seeds missing rubric rows',()=>{
 });
 
 test('browser module serializes as valid standalone script',()=>{
- const c=createSheetReadContext({});vm.runInContext(fs.readFileSync('guide-evaluation-client.js','utf8'),c);new vm.Script(c.getGuideEvaluationClientScript());
+ const c=createSheetReadContext({});vm.runInContext(fs.readFileSync('guide-evaluation-client.js','utf8'),c);new vm.Script(c.getGuideEvaluationClientScript_());
 });
 
 test('guide weight and criterion maxima come from sheets and changes reject stale edits',()=>{
  const f=fixture(),input=f.input();f.tables.AssessmentDefinitions[1][4]=30;
- assert.throws(()=>f.c.saveGuideEvaluationDraft(input),/Roster or rubric/);
+ assert.throws(()=>f.c.saveGuideEvaluationDraft_(input),/Roster or rubric/);
  f.tables.Rubrics.splice(2);f.tables.Rubrics[1][5]=50;
  const d=f.load();assert.equal(d.config.maximum,50);assert.equal(d.config.weight,.3);
- const result=f.c.submitGuideEvaluation(f.input(d));assert.equal(result.total,40);assert.equal(result.weighted,24);
+ const result=f.c.submitGuideEvaluation_(f.input(d));assert.equal(result.total,40);assert.equal(result.weighted,24);
 });

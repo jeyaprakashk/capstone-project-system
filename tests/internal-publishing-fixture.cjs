@@ -7,14 +7,14 @@ function publishingFixture(key='review1') {
   const criteria=[{pi:'T',name:'Team',maxMarks:60,type:'Team',descriptors:Array(6).fill('Descriptor')},{pi:'I',name:'Individual',maxMarks:40,type:'Individual',descriptors:Array(6).fill('Descriptor')}];
   const normalize=value=>String(value??'').trim().toLowerCase(),sheets={},tables={};
   const c=vm.createContext({Date,console,Set,Map,
-    Session:{getActiveUser:()=>({getEmail:()=>actor})},activityIsCoordinator_:email=>email==='coord@x',normalizeText_:normalize,normalizeReviewKey_:normalize,normalizeEmail:normalize,
-    textEquals_:(a,b)=>normalize(a)===normalize(b),emailsMatch:(a,b)=>normalize(a)===normalize(b),
-    SHEET_NAMES:{TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},getColumnMap:()=>cols,getSheetRows:()=>rows,getStudentsFromTeamStatusRow_:()=>students,
-    getCommitteeNumbersForReviewer:()=>['C1'],getCommitteeInfo:()=>({}),getReviewDefinitions_:()=>['review1','review2'].map(key=>({key,label:key,day:20000,weight:25,rubric:criteria})),
-    getSpreadsheet:()=>({getSpreadsheetTimeZone:()=> 'UTC',getSheets:()=>Object.values(sheets)}),getSheet:name=>sheets[name]||null,projectDay_:()=>20000,
+    Session:{getActiveUser:()=>({getEmail:()=>actor})},activityIsCoordinator_:email=>email==='coord@x',normalizeText_:normalize,normalizeReviewKey_:normalize,normalizeEmail_:normalize,
+    textEquals_:(a,b)=>normalize(a)===normalize(b),emailsMatch_:(a,b)=>normalize(a)===normalize(b),
+    SHEET_NAMES:{TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},getColumnMap_:()=>cols,getSheetRows_:()=>rows,getStudentsFromTeamStatusRow_:()=>students,
+    getCommitteeNumbersForReviewer_:()=>['C1'],getCommitteeInfo_:()=>({}),getReviewDefinitions_:()=>['review1','review2'].map(key=>({key,label:key,day:20000,weight:25,rubric:criteria})),
+    getSpreadsheet_:()=>({getSpreadsheetTimeZone:()=> 'UTC',getSheets:()=>Object.values(sheets)}),getSheet_:name=>sheets[name]||null,projectDay_:()=>20000,
     Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,text)=>crypto.createHash('sha256').update(text).digest(),base64EncodeWebSafe:value=>value.toString('base64url')},
     LockService:{getScriptLock:()=>({tryLock:()=>{if(locked)return false;locked=true;return true;},releaseLock:()=>locked=false})},SpreadsheetApp:{flush(){}},
-    summarizeReviewCompletion_:registers=>({totalStudents:registers.size,markedStudents:0}),escapeHtml:normalize,getSkeletonMarkup_:()=>'<div>Skeleton</div>'
+    summarizeReviewCompletion_:registers=>({totalStudents:registers.size,markedStudents:0}),escapeHtml_:normalize,getSkeletonMarkup_:()=>'<div>Skeleton</div>'
   });
   for(const file of ['lucide-icons.js','icon-renderer.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','review-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
   c.getMilestones_=()=>[];
@@ -29,9 +29,9 @@ function publishingFixture(key='review1') {
   }
   const input=()=>{const loaded=c.getReviewEvaluation_('G18',key);return {team:'G18',revision:loaded.revision,token:loaded.token,requestId:crypto.randomUUID(),teamScores:{T:{level:3,marks:48,remark:''}},students:students.map(s=>({register:normalize(s.regNo),absence:{type:'NORMAL'},scores:{I:{level:3,marks:32,remark:''}}}))};};
   const submit=value=>{actor='reviewer@x';return c.reviewWrite_('submit',value||input(),key);};
-  const report=()=>{actor='coord@x';return c.loadInternalAssessmentPublishing(key);};
+  const report=()=>{actor='coord@x';return c.loadInternalAssessmentPublishing_(key);};
   const publish=student=>{actor='coord@x';const latest=c.reviewLatest_(c.reviewRecords_(key).records,'G18');return c.reviewWrite_('publish',{team:'G18',revision:latest.revision,requestId:crypto.randomUUID(),...(student?{student}:{})},key);};
-  const guideSubmit=register=>{actor='guide@x';const d=c.loadGuideEvaluation('G18',register);return c.submitGuideEvaluation({team:'G18',student:register,revision:d.revision,token:d.token,requestId:crypto.randomUUID(),scores:{I:{level:3,marks:32,remark:''}}});};
+  const guideSubmit=register=>{actor='guide@x';const d=c.loadGuideEvaluation_('G18',register);return c.submitGuideEvaluation_({team:'G18',student:register,revision:d.revision,token:d.token,requestId:crypto.randomUUID(),scores:{I:{level:3,marks:32,remark:''}}});};
   return {c,key,rows,row,students,tables,input,submit,publish,report,guideSubmit,actor:value=>actor=value};
 }
 module.exports={publishingFixture};

@@ -1,7 +1,7 @@
 // Helpers for asserting against the compiled Tailwind stylesheet.
 const fs = require('node:fs');
 const css = fs.readFileSync('tailwind-styles.html', 'utf8');
-const escapeSelector = name => '.' + name.replace(/([:\/.\[\]%#&(),=])/g, '\\$1');
+const escapeSelector = name => '.' + name.replace(/([:\/.\[\]%#&(),=@])/g, '\\$1');
 // Hook classes carry no styles: scripts and tests find elements through them.
 const HOOK = /^(review-|publishing-|lucide|app-skeleton|timeline-|rubric-|committee-|setup-|student-|expandable-text|role-|dashboard-|team-drawer|tab-refresh|stat-|coordinator-|tracker-|shared-)/;
 const compiled = name => HOOK.test(name) || css.includes(escapeSelector(name));

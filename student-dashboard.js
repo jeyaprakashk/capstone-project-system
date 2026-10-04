@@ -18,29 +18,29 @@ function studentPerfLog_(label, startMs) {
   return now;
 }
 
-function getStudentDashboardData(email, teamId, teamStatusRow) {
+function getStudentDashboardData_(email, teamId, teamStatusRow) {
   const perfStart = Date.now();
   let perfLap = perfStart;
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
 
   // Reuse the TeamStatus row already read during authorization when available.
   // This is request-local data only; nothing is persisted between requests.
   let r = teamStatusRow;
   if (!r) {
-    const statusSheet = getSheet(SHEET_NAMES.TEAM_STATUS);
-    const statusRow = findTeamStatusRow(statusSheet, teamId, TS);
+    const statusSheet = getSheet_(SHEET_NAMES.TEAM_STATUS);
+    const statusRow = findTeamStatusRow_(statusSheet, teamId, TS);
     if (statusRow < 2) throw new Error('Student team was not found.');
     r = readSheetRows_(statusSheet, statusRow, 1)[0];
   }
 
   perfLap = studentPerfLog_('TeamStatus row + column map', perfLap);
 
-  const titleStatus = getTeamStatus(r);
+  const titleStatus = getTeamStatus_(r);
   const note = textEquals_(r[TS.REVIEWER_DECISION], 'Revise') ? r[TS.REVIEWER_NOTES]
     : textEquals_(r[TS.GUIDE_DECISION], 'Rejected') ? r[TS.GUIDE_NOTES]
     : '';
 
-  const statusSheetForRepo = getSheet(SHEET_NAMES.TEAM_STATUS);
+  const statusSheetForRepo = getSheet_(SHEET_NAMES.TEAM_STATUS);
   const repoCol = getOptionalHeaderIndex_(statusSheetForRepo, 'Repo URL');
   const repoUrl = repoCol >= 0 ? String(r[repoCol] || '').trim() : '';
   perfLap = studentPerfLog_('Repository URL lookup', perfLap);
@@ -58,7 +58,7 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
   const schedule = getProjectSchedule_();
   const clock = getProjectClock_(schedule);
 
-  studentPerfLog_('getStudentDashboardData TOTAL', perfStart);
+  studentPerfLog_('getStudentDashboardData_ TOTAL', perfStart);
 
   return {
     teamId, title: r[TS.TITLE], problem: r[TS.PROBLEM],
@@ -68,7 +68,7 @@ function getStudentDashboardData(email, teamId, teamStatusRow) {
   };
 }
 
-function initialsOf(name) {
+function initialsOf_(name) {
   const parts = String(name || '?').trim().split(/\s+/);
   return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '?';
 }

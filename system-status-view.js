@@ -7,6 +7,7 @@
  */
 function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
   'use strict';
+  const delegated = new WeakSet();
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const icon = (name, label, extra) => getUi().renderIcon(name, label, extra);
   const skeleton = (variant, label) => getUi().renderSkeleton(variant, label);
@@ -58,7 +59,7 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
       '<ul id="reviewConfigurationIssues" hidden class="mt-2 list-disc pl-5 text-sm text-danger"></ul>' +
       '<div class="mt-2"><button class="' + BUTTON + '" type="button" id="createAssessmentDefinitionsButton" hidden disabled data-action="bootstrap-definitions">Create assessment definitions tab</button></div>' +
       note('First create the definitions schema, then use Assessment definitions to enter the academic configuration. Setup never supplies assessment instances or policy choices.') +
-      '<ul id="reviewAssessmentReadiness" aria-label="Readiness by assessment" class="m-0 mt-2 grid list-none gap-2 p-0"></ul>' +
+      '<ul id="reviewAssessmentReadiness" aria-label="Readiness by assessment" class="m-0 mt-2 grid list-none grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2 p-0"></ul>' +
       note('Storage readiness is separate from team entry availability, which also checks reviewer assignment, opening dates and prerequisites.') +
       '<div id="assessmentStorageSetup" class="mt-3"><div>' + note('Prepare configured assessment journals. Existing assessment data stays unchanged.') +
       '<div class="mt-2"><button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="' + PRIMARY + '" data-action="storage-init">Create missing assessment storage</button></div></div>' +
@@ -80,14 +81,39 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
         '<div class="mt-2"><ul class="m-0 list-none p-0 text-sm">' + members + '</ul><div class="mt-2 text-sm"><span class="font-semibold text-ink-2">Assigned teams</span><div class="mt-1 flex flex-wrap gap-1">' +
         (committee.teams.length ? committee.teams.map(team => '<span class="rounded-md bg-tint px-2 py-0.5 text-xs font-semibold text-primary">' + escape(team) + '</span>').join('') : 'No teams assigned') + '</div></div></div></details>';
     }).join('');
-    return '<div id="committeeReadinessGrid" class="grid gap-2">' + items + '</div>';
+    return '<div id="committeeReadinessGrid" class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2">' + items + '</div>';
+  }
+
+  const READINESS = {READY:'Ready', MISSING:'Missing', INVALID:'Invalid', EMPTY:'Needs initialization', ERROR:'Error', NOT_REQUIRED:'Not required'};
+  const LINE = 'block text-xs text-ink-2';
+  /** Replaces a list's items with plain messages (escaped) and hides the list when there are none. */
+  function renderIssues(list, messages) {
+    list.hidden = !messages.length;
+    list.innerHTML = messages.map(message => '<li>' + escape(message) + '</li>').join('');
+  }
+  /** One item per configured assessment: its rubric and storage readiness, journal and any errors. */
+  function renderReadiness(list, storage) {
+    list.innerHTML = storage.map(entry => {
+      const rubric = entry.rubric || {state:'MISSING'};
+      const tone = entry.ready ? 'border-edge bg-paper' : 'border-warning/40 bg-warning-tint';
+      return '<li data-assessment="' + escape(entry.assessment) + '" data-state="' + escape(entry.state) + '" class="flex flex-col gap-0.5 rounded-tile border px-3 py-2 ' + tone + '">' +
+        '<strong class="text-sm text-ink">' + escape(entry.label + ' \u00b7 ' + (entry.ready ? 'Ready' : 'Needs attention')) + '</strong>' +
+        '<small class="' + LINE + '">' + escape('Rubric: ' + READINESS[rubric.state] + (rubric.state === 'READY' ? ' \u00b7 ' + rubric.criterionCount + ' ' + (rubric.criterionCount === 1 ? 'criterion' : 'criteria') + ' \u00b7 ' + rubric.maximumMarks + ' marks' : '')) + '</small>' +
+        '<small class="' + LINE + '">' + escape('Storage: ' + READINESS[entry.state] + (entry.state === 'NOT_REQUIRED' ? ' \u00b7 Evaluated outside this app' : '')) + '</small>' +
+        (entry.state !== 'NOT_REQUIRED' ? '<small class="' + LINE + '">' + escape('Journal: ' + entry.journal) + '</small>' : '') +
+        (rubric.error ? '<small class="block text-xs text-danger">' + escape(rubric.error) + '</small>' : '') +
+        (entry.error ? '<small class="block text-xs text-danger">' + escape(entry.error) + '</small>' : '') + '</li>';
+    }).join('');
+  }
+  /** The outcome of preparing each assessment journal. */
+  function renderJournalResults(list, journals) {
+    list.innerHTML = journals.map(journal => '<li>' + escape(journal.label + ': ' + journal.journal + ' \u2014 ' + (journal.created ? 'created' : journal.initialized ? 'initialized' : 'existing storage retained') + '.') + '</li>').join('');
   }
 
   function render(target, dto) {
     const items = dto.publishing.configured ? dto.publishing.items.map(publishingCard).join('') : '<p role="status" class="text-sm text-warning">Assessment configuration needs attention. Use Assessment readiness below.</p>';
     target.innerHTML = '<div data-status-cards class="flex flex-col gap-4"><div data-status-primary class="grid gap-4 lg:grid-cols-2">' + githubCard(dto.github) + invitationsCard() + '</div>' + items + committeeCard() + reviewCard() + '</div>';
-    target.onclick = onClick;
-    target.onchange = onChange;
+    if (!delegated.has(target)) { delegated.add(target); target.addEventListener('click', onClick); target.addEventListener('change', onChange); }
   }
 
   function onChange(event) {
@@ -110,5 +136,5 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
 
   function load() { return bridge.read('system-status', 'API_coordinator_getSystemStatus', [], {timeoutMs:120000}); }
 
-  return {load, render, committeeDirectory, publishingCard};
+  return {load, render, committeeDirectory, publishingCard, renderIssues, renderReadiness, renderJournalResults};
 }

@@ -4,15 +4,11 @@
  * and renders them in reviewer-view.js; this file builds no markup.
  */
 
-function isReviewerForAnyTeam(email) {
-  return getReviewerDashboardData(email).total > 0;
-}
+function getReviewerDashboardData_(email) {
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const rows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r => r[TS.TEAM_ID]);
 
-function getReviewerDashboardData(email) {
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(r => r[TS.TEAM_ID]);
-
-  const myCommitteeNumbers = new Set(getCommitteeNumbersForReviewer(email).map(normalizeText_));
+  const myCommitteeNumbers = new Set(getCommitteeNumbersForReviewer_(email).map(normalizeText_));
   const myRows = rows.filter(r => myCommitteeNumbers.has(normalizeText_(r[TS.COMMITTEE_NUMBER])));
 
   const pending = myRows.filter(r => textEquals_(r[TS.GUIDE_DECISION], 'Approved') && !textEquals_(r[TS.REVIEWER_DECISION], 'Approved'));
@@ -22,7 +18,7 @@ function getReviewerDashboardData(email) {
   return { pending, approved, notYetGuideApproved, assigned: myRows, total: myRows.length };
 }
 
-function submitReviewerDecision(teamId, decision, notes) {
+function submitReviewerDecision_(teamId, decision, notes) {
   const lock=LockService.getScriptLock();
   if (!lock.tryLock(1000)) throw new Error('Another decision is being saved. Try again.');
   try {
@@ -31,6 +27,6 @@ function submitReviewerDecision(teamId, decision, notes) {
     if (decision==='Revise' && !String(notes || '').trim()) throw new Error('Notes are required when requesting revision.');
     if (textEquals_(context.row[context.TS.REVIEWER_DECISION],'Approved')) return {ok:true,message:'Title already approved.'};
     if (!context.title.trim() || !textEquals_(context.row[context.TS.GUIDE_DECISION],'Approved')) throw new Error('The title must be submitted and approved by the guide first.');
-    return applyReviewerDecision(teamId,decision,notes,Session.getActiveUser().getEmail());
+    return applyReviewerDecision_(teamId,decision,notes,Session.getActiveUser().getEmail());
   } finally { lock.releaseLock(); }
 }

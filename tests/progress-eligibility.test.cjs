@@ -6,10 +6,10 @@ const {weeklyFixture}=require('./weekly-progress-fixture.cjs');
 function fixture(){
  const f=weeklyFixture();f.setEligibility('');f.user('coord@example.com');
  f.set('Guide Email','guide@example.com');f.set('Semester','ODD');f.set('Title Approved By','reviewer@example.com');
- f.c.getAcademicYear=()=> '2026-27';
+ f.c.getAcademicYear_=()=> '2026-27';
  const registry=f.sheet('MasterRegistry',[['Year','Semester','Team','Guide','Title','Repo','Members','Approved','Reviewer'],
   ['2026-27','ODD','T1','guide@example.com','Project','','',new Date('2026-01-01T00:00:00Z'),'reviewer@example.com']]);
- f.c.getHubRegistrySheet=()=>registry;
+ f.c.getHubRegistrySheet_=()=>registry;
  const calls=[];let response;
  const commit=(id,at,sha='a'.repeat(40))=>({sha,author:{id:Number(id),login:id==='101'?'alice':'bob',type:'User'},commit:{message:'Implemented sensor acquisition',committer:{date:at}}});
  const normal=path=>{
@@ -142,44 +142,20 @@ test('missing and mismatched authoritative title dates do not become observation
  }
 });
 
-test('migration is isolated, idempotent, preserves history and never copies old team eligibility',()=>{
- const f=fixture();f.time('2026-01-09');f.ts.push('Progress Eligible From Week ID');f.status.rows[1].push('W1');
- const before=JSON.stringify(f.status.rows),logs=JSON.stringify(f.sheets.get('LogEntries').rows);
- const preview=f.c.previewProgressEligibilityMigration();assert.equal(preview.cutoverWeek,'W2');assert.equal(f.record().enforcedFrom,'');
- f.c.initializeProgressEligibilityMigration();f.time('2026-01-10');f.c.initializeProgressEligibilityMigration();
- assert.equal(f.record().eligibleFrom,'');assert.equal(f.record().enforcedFrom,'W2');
- f.sheets.get('GitHubAccounts').rows.slice(1).forEach(row=>row[0]=new Date('2026-01-01'));f.c.executeProgressEligibilityMigration();
- assert.equal(f.record().eligibleFrom,'W1');assert.equal(f.record().enforcedFrom,'W2');assert.equal(JSON.stringify(f.status.rows),before);assert.equal(JSON.stringify(f.sheets.get('LogEntries').rows),logs);
-});
-
-test('cutover excludes earlier obligations while permitting voluntary submissions with original timing',()=>{
- const f=fixture();f.time('2026-01-09');f.c.initializeProgressEligibilityMigration();
- f.sheets.get('GitHubAccounts').rows.slice(1).forEach(row=>row[0]=new Date('2026-01-01'));f.c.executeProgressEligibilityMigration();
- f.user('one@example.com');const data=f.c.loadStudentWeeklyProgress();assert.equal(data.summary.expectedWeeks,1);assert.equal(data.weeks[0].obligatory,false);
- assert.equal(f.c.submitWeeklyProgress(f.input()).timeliness,'LATE');
- f.time('2026-01-15');f.c.processWeeklySubmissionSchedule();assert.equal(f.entries().filter(r=>r.entryStatus==='MISSED').length,0);assert.equal(f.c.loadStudentWeeklyProgress().summary.missing,0);
- f.time('2026-01-22');f.c.processWeeklySubmissionSchedule();assert.equal(f.entries().filter(r=>r.entryStatus==='MISSED').length,2);assert(f.entries().filter(r=>r.entryStatus==='MISSED').every(r=>r.weekId==='W2'));
-});
-
 test('earlier individual weeks produce no reminders, and summaries ignore ineligible teammates',()=>{
  const f=fixture();f.setEligibility('W2','001');f.setEligibility('','002');f.time('2026-01-04T18:00:00Z');f.c.processWeeklySubmissionSchedule();assert.equal(f.mails.length,0);
- f.time('2026-01-09');f.user('one@example.com');f.c.submitWeeklyProgress(f.input({weekId:'W2'}));
+ f.time('2026-01-09');f.user('one@example.com');f.c.submitWeeklyProgress_(f.input({weekId:'W2'}));
  const team=f.c.weeklyTeam_('T1');const summary=f.c.getTeamLogWeekSummary_(team.row,team.columns,f.entries(),null,{now:new Date('2026-01-09')});
  assert.equal(summary.expectedWeeks,1);assert.equal(summary.currentLogged,true);assert.equal(summary.loggedStudents,1);assert.equal(summary.missing,0);
 });
 
-test('storage setup validates without rewriting and trigger setup is coordinator-only and idempotent',()=>{
+test('storage setup validates without rewriting and is coordinator-only',()=>{
  const f=fixture();const old=JSON.stringify(f.pe.rows);f.c.setupProgressEligibilityStorage();assert.equal(JSON.stringify(f.pe.rows),old);
- for(const name of ['processWeeklySubmissionSchedule','fetchAllCommits','processWeeklyProgressAI'])f.triggers.push({getHandlerFunction:()=>name});
- f.c.setupProgressEligibilityTrigger();f.c.setupProgressEligibilityTrigger();assert.equal(f.triggers.length,4);
- const trigger=f.triggers.at(-1);assert.equal(trigger.hour,2);assert.equal(trigger.days,1);assert.equal(trigger.timezone,'Asia/Kolkata');
- f.properties.set('PROGRESS_ELIGIBILITY_TRIGGER_OWNER','other@example.com');assert.throws(()=>f.c.setupProgressEligibilityTrigger(),/another/);
  f.user('one@example.com');assert.throws(()=>f.c.setupProgressEligibilityStorage(),/Coordinator/);
 });
 
 test('duplicates, identity changes and no future cutover fail without fabricated boundaries',()=>{
  const f=fixture();f.pe.rows.push(f.pe.rows[1].slice());assert.throws(()=>f.run(),/duplicate/);
- const g=fixture();g.time('2026-03-01');assert.throws(()=>g.c.initializeProgressEligibilityMigration(),/No cutover/);assert.equal(g.properties.has('PROGRESS_ELIGIBILITY_MIGRATION'),false);
  const h=fixture();h.pe.rows[1][Object.keys(h.fields).indexOf('githubId')]='999';h.run();assert.equal(h.record().eligibleFrom,'');assert.match(h.record().error,/identity changed/);
 });
 
@@ -188,40 +164,19 @@ test('production has no team eligibility fallback, mutation hooks or migration d
   const text=fs.readFileSync(file,'utf8');assert.doesNotMatch(text,/WEEKLY_ELIGIBILITY_HEADER_|ensureWeeklyProgressEligibility_|recordWeeklyEligibilityIfConfigured_|team\.eligibleFrom|PROGRESS_ELIGIBILITY_MIGRATION/);
  }
  const f=weeklyFixture();f.c.getTeamGithubSetup_=()=>{throw Error('Team gate forbidden');};f.c.requireTeamGithubReady_=f.c.getTeamGithubSetup_;
- f.c.reconcileProgressEligibility=()=>{throw Error('Reconciliation forbidden');};f.c.loadStudentWeeklyProgress();f.c.submitWeeklyProgress(f.input());f.c.processWeeklySubmissionSchedule();
+ f.c.reconcileProgressEligibility=()=>{throw Error('Reconciliation forbidden');};f.c.loadStudentWeeklyProgress_();f.c.submitWeeklyProgress_(f.input());f.c.processWeeklySubmissionSchedule();
 });
 
 test('storage errors and missing individual rows never fall back to a legacy team value',()=>{
  const f=weeklyFixture();f.ts.push('Progress Eligible From Week ID');f.status.rows[1].push('W1');f.pe.rows.splice(1);
- assert.equal(f.c.loadStudentWeeklyProgress().eligibleFrom,'');assert.throws(()=>f.c.submitWeeklyProgress(f.input()),/eligible/);
- const g=weeklyFixture();g.sheets.delete('ProgressEligibility');assert.throws(()=>g.c.loadStudentWeeklyProgress(),/Initialize ProgressEligibility/);
+ assert.equal(f.c.loadStudentWeeklyProgress_().eligibleFrom,'');assert.throws(()=>f.c.submitWeeklyProgress_(f.input()),/eligible/);
+ const g=weeklyFixture();g.sheets.delete('ProgressEligibility');assert.throws(()=>g.c.loadStudentWeeklyProgress_(),/Initialize ProgressEligibility/);
  assert.throws(()=>g.c.processWeeklySubmissionSchedule(),/Initialize ProgressEligibility/);
-});
-
-test('existing historical MISSED entries are preserved and excluded before the enforcement floor',()=>{
- const f=fixture();f.time('2026-01-09');f.c.initializeProgressEligibilityMigration();
- f.c.appendWeeklyEntry_({id:'historical-missed',regNo:'001',teamId:'T1',weekId:'W1',entryStatus:'MISSED',timeliness:'MISSED',recordedAt:new Date('2026-01-08')});
- const before=JSON.stringify(f.sheets.get('LogEntries').rows);f.c.executeProgressEligibilityMigration();f.user('one@example.com');
- assert.equal(f.c.loadStudentWeeklyProgress().summary.missing,0);assert.equal(JSON.stringify(f.sheets.get('LogEntries').rows),before);
-});
-
-test('unresolved migration rows have no expected, missed or reminder obligations',()=>{
- const f=fixture();f.time('2026-01-09');f.c.initializeProgressEligibilityMigration();f.time('2026-01-22');
- f.user('one@example.com');const data=f.c.loadStudentWeeklyProgress();assert.equal(data.summary.expectedWeeks,0);assert.equal(data.summary.missing,0);assert.equal(data.actions.length,0);
- f.c.processWeeklySubmissionSchedule();assert.equal(f.entries().length,0);assert.equal(f.mails.length,0);
-});
-
-test('migration resumes interrupted writes using its original cohort and cutover',()=>{
- const f=fixture();f.time('2026-01-09');const write=f.c.writeProgressEligibility_;let fail=true;
- f.c.writeProgressEligibility_=r=>{if(r.regNo==='002'&&fail)throw Error('storage error');return write(r);};
- assert.throws(()=>f.c.initializeProgressEligibilityMigration(),/storage error/);assert.equal(f.record().enforcedFrom,'W2');
- f.time('2026-01-11');fail=false;f.c.initializeProgressEligibilityMigration();
- assert.equal(f.record('002').enforcedFrom,'W2');assert.equal(f.c.previewProgressEligibilityMigration().cutover,'2026-01-09T00:00:00.000Z');
 });
 
 test('student web callers cannot use coordinator effective identity for setup or reconciliation',()=>{
  const f=fixture();f.c.Session.getEffectiveUser=()=>({getEmail:()=> 'coord@example.com'});f.user('one@example.com');
- for(const action of [()=>f.run(),()=>f.c.setupProgressEligibilityStorage(),()=>f.c.setupProgressEligibilityTrigger(),()=>f.c.initializeProgressEligibilityMigration()])assert.throws(action,/Coordinator/);
+ for(const action of [()=>f.run(),()=>f.c.setupProgressEligibilityStorage()])assert.throws(action,/Coordinator/);
 });
 
 test('concurrent fixed rows are not overwritten and one failed write does not prevent other students',()=>{
@@ -236,90 +191,6 @@ test('active read access counts as collaboration but none or wrong numeric ident
  const g=fixture();g.respond(p=>p.includes('/permission')?{status:200,body:{permission:'admin',user:{id:999}}}:g.normal(p));g.run();assert.equal(g.record().eligibleFrom,'');assert.equal(g.record().firstDetected,'');
 });
 
-test('migration chooses the earliest of registration, commit and first detection then the later title date',()=>{
- const f=fixture();f.time('2026-01-10');const windows=f.c.getWeeklySubmissionWindows_();
- for(const [registration,commit,detection,source] of [
-  ['2025-12-01','2026-01-02','2026-01-03','MIGRATION_REGISTRATION'],
-  ['2026-01-03','2025-12-01','2026-01-02','FIRST_COMMIT'],
-  ['2026-01-03','2026-01-02','2025-12-01','FIRST_DETECTED']]){
-  const record={firstCommit:commit,firstDetected:detection,titleDate:'2026-01-01',titleStatus:'APPROVED'};
-  const result=f.c.calculateProgressEligibilityMigration_(record,{date:registration},windows,'W2',new Date('2026-01-10'));
-  assert.equal(result.source,source);assert.equal(result.effectiveDate.toISOString(),'2025-12-01T00:00:00.000Z');
-  assert.equal(result.fixingDate.toISOString(),'2026-01-01T00:00:00.000Z');assert.equal(result.eligibleFrom,'W1');assert.equal(result.enforcedFrom,'W2');
- }
- const later=f.c.calculateProgressEligibilityMigration_({firstCommit:'2026-01-09',titleDate:'2026-01-01',titleStatus:'APPROVED'},null,windows,'W1',new Date('2026-01-10'));
- assert.equal(later.enforcedFrom,'W2');
-});
-
-test('migration registration accepts only valid matching historical submission records',()=>{
- const f=fixture(),student=f.c.weeklyStudents_()[0],sheet=f.sheets.get('GitHubAccounts'),cols=f.c.githubAccountColumns_(sheet);
- const base=sheet.rows[1].slice();base[0]=new Date('2025-12-20');
- const wrongId=base.slice();wrongId[0]=new Date('2025-01-01');wrongId[4]='999';
- const wrongTeam=base.slice();wrongTeam[2]='other';const wrongEmail=base.slice();wrongEmail[1]='other@example.com';
- const future=base.slice();future[0]=new Date('2030-01-01');const invalid=base.slice();invalid[0]='invalid';
- const earlier=base.slice();earlier[0]=new Date('2025-12-01');
- const r=f.c.progressMigrationRegistration_(student,'101',[base,wrongId,wrongTeam,wrongEmail,future,invalid,earlier],cols,new Date('2026-01-02'));
- assert.equal(r.date.toISOString(),'2025-12-01T00:00:00.000Z');assert.equal(r.row,8);
- assert.equal(f.c.progressMigrationRegistration_(student,'101',[wrongId,wrongTeam,wrongEmail,future,invalid],cols,new Date('2026-01-02')),null);
-});
-
-test('migration evidence preview is read-only and registration alone may qualify existing students',()=>{
- const f=fixture();f.time('2026-01-09');f.sheets.get('GitHubAccounts').rows.slice(1).forEach(row=>row[0]=new Date('2026-01-01'));
- f.respond(p=>p.includes('/permission')?{status:404,body:{}}:f.normal(p));
- const before=JSON.stringify(f.pe.rows),props=JSON.stringify([...f.properties]);
- const preview=f.c.previewProgressEligibilityMigrationEvidence();assert.equal(preview.unresolved,0);
- assert.equal(preview.results[0].record.source,'MIGRATION_REGISTRATION');assert.equal(preview.results[0].record.eligibleFrom,'W1');
- assert.equal(JSON.stringify(f.pe.rows),before);assert.equal(JSON.stringify([...f.properties]),props);
- f.c.initializeProgressEligibilityMigration();const result=f.c.executeProgressEligibilityMigration();assert.equal(result.complete,true);assert.equal(result.fixed,2);
- assert.equal(f.record().source,'MIGRATION_REGISTRATION');const calls=f.calls.length;const fixed=JSON.stringify(f.pe.rows);
- f.c.executeProgressEligibilityMigration();f.run();assert.equal(f.calls.length,calls);assert.equal(JSON.stringify(f.pe.rows),fixed);
-});
-
-test('migration failures and missing title defer fixing without losing immutable detection',()=>{
- const f=fixture();f.sheets.get('GitHubAccounts').rows[1][0]=new Date('2026-01-01');f.c.initializeProgressEligibilityMigration();
- f.respond(p=>p.includes('/commits')?{status:503,body:{}}:f.normal(p));
- assert.equal(f.c.executeProgressEligibilityMigration().complete,false);assert.equal(f.record().eligibleFrom,'');assert(f.record().firstDetected);
- const detected=f.record().firstDetected.toISOString();f.respond(f.normal);f.registry.rows.splice(1);f.time('2026-01-03');
- f.c.executeProgressEligibilityMigration();assert.equal(f.record().status,'WAITING_TITLE');assert.equal(f.record().firstDetected.toISOString(),detected);
-});
-
-test('migration snapshot excludes later arrivals and historical registration references cannot affect steady state',()=>{
- const f=fixture();f.c.initializeProgressEligibilityMigration();const plan=f.c.readProgressEligibilityMigration_();assert.equal(plan.students.length,2);
- const student={regNo:'003',teamId:'T1',email:'three@example.com'};
- const roster=f.c.weeklyStudents_;f.c.weeklyStudents_=()=>[...roster(),student];
- assert.equal(f.c.previewProgressEligibilityMigrationEvidence().results.length,2);
- const result=f.c.progressSelectEvidenceDate_({firstDetected:'2026-01-02',effectiveDate:'2025-01-01',source:'MIGRATION_REGISTRATION',evidence:JSON.stringify({migrationRegistration:{date:'2025-01-01'}})});
- assert.equal(result.source,'FIRST_DETECTED');assert.equal(result.effectiveDate.toISOString(),'2026-01-02T00:00:00.000Z');
-});
-
-test('temporary cleanup moves unresolved cohort exceptions to steady state',()=>{
- const f=fixture();f.c.initializeProgressEligibilityMigration();
- f.user('one@example.com');
- assert.throws(()=>f.c.cleanupProgressEligibilityMigrationProperties(),/Coordinator access is required/);
- f.user('coord@example.com');f.setEligibility('W1','001');
- f.properties.set('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS','["002","other"]');
- const result=f.c.cleanupProgressEligibilityMigrationProperties();
- assert.equal(result.students,2);assert.equal(result.movedToSteadyState,1);assert.equal(result.chunksDeleted,1);
- assert.equal(f.properties.has('PROGRESS_ELIGIBILITY_MIGRATION'),false);
- assert.equal(f.properties.has('PROGRESS_ELIGIBILITY_MIGRATION_COHORT_0'),false);
- assert.equal(f.properties.get('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS'),'["other"]');
- assert.equal(f.record('001').eligibleFrom,'W1');assert.equal(f.record('002').enforcedFrom,'');
- assert.equal(f.run().fixed,1);assert.equal(f.record('002').eligibleFrom,'W1');
-});
-
-test('temporary cleanup replaces migration-only dates with steady-state evidence',()=>{
- const f=fixture();f.c.initializeProgressEligibilityMigration();
- const columns=f.pe.rows[0], row=f.pe.rows[1];
- row[columns.indexOf('Collaborator Date Source')]='MIGRATION_REGISTRATION';
- row[columns.indexOf('Effective Collaborator Date')]=new Date('2025-12-20');
- row[columns.indexOf('Collaborator First Detected At')]=new Date('2026-01-01');
- f.c.cleanupProgressEligibilityMigrationProperties();
- assert.equal(f.record('001').enforcedFrom,'');
- assert.equal(f.record('001').source,'FIRST_DETECTED');
- assert.equal(f.record('001').effectiveDate.toISOString(),'2026-01-01T00:00:00.000Z');
- assert.equal(f.record('002').effectiveDate,'');
-});
-
 test('production contains no audit policy, migration calculation or registration timestamp source',()=>{
  const text=fs.readFileSync('progress-eligibility.js','utf8');
  assert.doesNotMatch(text,/audit-log|AUDIT_LOG|AUDIT_MODE|progressAuditEvidence_|migrationRegistration|MIGRATION_|cutover|accountRows\[[^\]]+\]\[0\]/);
@@ -332,47 +203,6 @@ test('later commits do not displace an earlier positive detection when title is 
  f.set('Reviewer Decision','Approved');f.run();assert.equal(f.record().source,'FIRST_DETECTED');
  assert.equal(f.record().effectiveDate.toISOString(),detected);assert.equal(f.record().firstCommit.toISOString(),'2026-01-08T00:00:00.000Z');
  assert.equal(f.record().eligibleFrom,'W1');
-});
-
-test('migration execution revalidates changed identities and resumes failed student writes',()=>{
- const f=fixture();f.time('2026-01-09');f.c.initializeProgressEligibilityMigration();
- const write=f.c.writeProgressEligibility_;let fail=true;
- f.c.writeProgressEligibility_=record=>{if(record.regNo==='002'&&fail)throw Error('write failed');return write(record);};
- assert.throws(()=>f.c.executeProgressEligibilityMigration(),/write failed/);const first=JSON.stringify(f.pe.rows[1]);
- fail=false;assert.equal(f.c.executeProgressEligibilityMigration().complete,true);assert.equal(JSON.stringify(f.pe.rows[1]),first);
- const g=fixture();g.c.initializeProgressEligibilityMigration();const preview=g.c.previewProgressEligibilityMigrationEvidence;
- g.c.previewProgressEligibilityMigrationEvidence=()=>{const result=preview();g.sheets.get('GitHubAccounts').rows[1][4]='999';return result;};
- assert.throws(()=>g.c.executeProgressEligibilityMigration(),/identity changed/);assert.equal(g.record().eligibleFrom,'');
-});
-
-test('migration batches cap unresolved work and resume unchecked students before prior exceptions',()=>{
- const f=fixture(),base=f.c.weeklyStudents_();
- f.c.weeklyStudents_=()=>[...base,...Array.from({length:23},(_,i)=>({regNo:'extra'+i,teamId:'T1',email:'extra'+i+'@example.com'}))];
- f.c.initializeProgressEligibilityMigration();
- const preview=f.c.previewProgressEligibilityMigrationEvidence();assert.equal(preview.deferred,5);
- const first=f.c.executeProgressEligibilityMigration();assert.equal(first.deferred,5);
- assert.equal(f.c.readProgressEligibility_().filter(r=>r.checkedAt).length,20);
- f.time('2026-01-03');f.c.executeProgressEligibilityMigration();
- assert.equal(f.c.readProgressEligibility_().filter(r=>r.checkedAt).length,25);
-});
-
-test('held migration exceptions remain untouched by daily reconciliation and resolve manually with original benefit',()=>{
- const f=fixture();f.time('2026-01-09');f.c.initializeProgressEligibilityMigration();
- f.sheets.get('GitHubAccounts').rows.slice(1).forEach(row=>row[0]=new Date('2026-01-01'));
- f.set('Reviewer Decision','');f.c.executeProgressEligibilityMigration();
- const plan=f.properties.get('PROGRESS_ELIGIBILITY_MIGRATION');
- assert.equal(f.c.holdProgressEligibilityMigrationExceptions().held,2);
- const before=JSON.stringify(f.pe.rows),calls=f.calls.length;
- f.set('Reviewer Decision','Approved');const daily=f.run();
- assert.equal(daily.held,2);assert.equal(daily.checked,0);assert.equal(f.calls.length,calls);assert.equal(JSON.stringify(f.pe.rows),before);
- assert.equal(f.c.executeProgressEligibilityMigration().complete,true);
- assert.equal(f.record().eligibleFrom,'W1');assert.equal(f.record().enforcedFrom,'W2');assert.equal(f.record().source,'MIGRATION_REGISTRATION');
- assert.equal(f.properties.get('PROGRESS_ELIGIBILITY_MIGRATION'),plan);assert.equal(f.run().held,0);
-});
-
-test('persisted enforcement floors protect unresolved students even before explicit holds are installed',()=>{
- const f=fixture();f.time('2026-01-09');f.c.initializeProgressEligibilityMigration();
- const before=JSON.stringify(f.pe.rows);assert.equal(f.run().held,2);assert.equal(f.calls.length,0);assert.equal(JSON.stringify(f.pe.rows),before);
 });
 
 test('holds preserve unrelated students and fail closed on malformed configuration',()=>{

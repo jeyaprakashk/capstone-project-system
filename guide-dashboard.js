@@ -5,20 +5,20 @@
  * and renders them in guide-view.js; this file builds no markup.
  */
 
-function getGuideDashboardData(email) {
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS);
-  const myRows = rows.filter(r => emailsMatch(r[TS.GUIDE_EMAIL], email));
-  const repoUrlMap = getRepoUrlMap();
+function getGuideDashboardData_(email) {
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const rows = getSheetRows_(SHEET_NAMES.TEAM_STATUS);
+  const myRows = rows.filter(r => emailsMatch_(r[TS.GUIDE_EMAIL], email));
+  const repoUrlMap = getRepoUrlMap_();
   const schedule = getProjectSchedule_(), clock = getProjectClock_(schedule);
-  const logsByTeam = groupBy(readLogEntries_(), row => row.teamId);
+  const logsByTeam = groupBy_(readLogEntries_(), row => row.teamId);
 
   const STATUS_PRIORITY = {
     NEEDS_REVIEW: 0, NOT_SUBMITTED: 1, REJECTED_BY_GUIDE: 2,
     REVISE_AWAITING_STUDENT: 3, AWAITING_REVIEWER: 4, APPROVED: 5
   };
 
-  const teams = myRows.map(r => ({ row: r, status: getTeamStatus(r), repoUrl: repoUrlMap[normalizeText_(r[TS.TEAM_ID])] || '', logWeeks:getTeamLogWeekSummary_(r, TS, logsByTeam[normalizeText_(r[TS.TEAM_ID])] || [], schedule, clock) }))
+  const teams = myRows.map(r => ({ row: r, status: getTeamStatus_(r), repoUrl: repoUrlMap[normalizeText_(r[TS.TEAM_ID])] || '', logWeeks:getTeamLogWeekSummary_(r, TS, logsByTeam[normalizeText_(r[TS.TEAM_ID])] || [], schedule, clock) }))
     .sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
 
   const counts = { NOT_SUBMITTED: 0, NEEDS_REVIEW: 0, REVISE_AWAITING_STUDENT: 0, AWAITING_REVIEWER: 0, APPROVED: 0, REJECTED_BY_GUIDE: 0 };
@@ -29,7 +29,7 @@ function getGuideDashboardData(email) {
 
 function guideRecordDate_(value) {
   const date=value ? new Date(value) : null;
-  return date && Number.isFinite(date.getTime()) ? date.toLocaleString('en-GB',{timeZone:getSpreadsheet().getSpreadsheetTimeZone(),day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+  return date && Number.isFinite(date.getTime()) ? date.toLocaleString('en-GB',{timeZone:getSpreadsheet_().getSpreadsheetTimeZone(),day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
 }
 
 function readGuideRecordContext_(rows, TS) {
@@ -38,16 +38,16 @@ function readGuideRecordContext_(rows, TS) {
   // The registry writer appends year, semester, team, guide, title, repo,
   // members, approval date and approving reviewer, in that order.
   try {
-    readSheetRows_(getHubRegistrySheet(),2).forEach(record=>{
+    readSheetRows_(getHubRegistrySheet_(),2).forEach(record=>{
       const key=normalizeText_(record[2]),row=owned.get(key);
-      if(!row || !textEquals_(record[0],getAcademicYear()) || !textEquals_(record[1],row[TS.SEMESTER]) ||
-        !emailsMatch(record[3],row[TS.GUIDE_EMAIL]) || String(record[4])!==String(row[TS.TITLE]) ||
-        !emailsMatch(record[8],row[TS.TITLE_APPROVED_BY]))return;
+      if(!row || !textEquals_(record[0],getAcademicYear_()) || !textEquals_(record[1],row[TS.SEMESTER]) ||
+        !emailsMatch_(record[3],row[TS.GUIDE_EMAIL]) || String(record[4])!==String(row[TS.TITLE]) ||
+        !emailsMatch_(record[8],row[TS.TITLE_APPROVED_BY]))return;
       const date=guideRecordDate_(record[7]);if(date){approvals[key]=date;approvalTimes[key]=new Date(record[7]).getTime();}
     });
   } catch(error) { /* Approval stays authoritative even when its date cannot be read. */ }
   try {
-    const sheet=getSheet(SHEET_NAMES.TEAM_INTAKE_RAW);
+    const sheet=getSheet_(SHEET_NAMES.TEAM_INTAKE_RAW);
     if(!sheet)throw new Error('Intake history unavailable');
     const headers=(readSheetRows_(sheet,1,1)[0] || []).map(normalizeText_);
     const column=name=>headers.indexOf(normalizeText_(name));
@@ -64,8 +64,8 @@ function readGuideRecordContext_(rows, TS) {
   return {approvals,approvalTimes,documentSubmissions};
 }
 
-function getTeamStatus(r) {
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+function getTeamStatus_(r) {
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   if (!r[TS.TITLE]) return 'NOT_SUBMITTED';
   if (textEquals_(r[TS.REVIEWER_DECISION], 'Approved')) return 'APPROVED';
   if (textEquals_(r[TS.REVIEWER_DECISION], 'Revise')) return 'REVISE_AWAITING_STUDENT';
@@ -74,7 +74,7 @@ function getTeamStatus(r) {
   return 'NEEDS_REVIEW';
 }
 
-function submitGuideDecision(teamId, decision, notes, editedTitle) {
+function submitGuideDecision_(teamId, decision, notes, editedTitle) {
   const email = Session.getActiveUser().getEmail();
-  return applyGuideDecision(teamId, decision, notes, email, editedTitle);
+  return applyGuideDecision_(teamId, decision, notes, email, editedTitle);
 }

@@ -12,7 +12,7 @@ function fixture() {
   for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-provisioning.js','weekly-activity.js'])vm.runInContext(fs.readFileSync(file,'utf8'),f.c);
   f.c.Logger={log(){}};
   f.config.CELL_PD_EMAIL='pd@example.com';
-  f.c.getCommitteeNumbersForReviewer=()=>[];
+  f.c.getCommitteeNumbersForReviewer_=()=>[];
   f.c.getProjectSchedule_=()=>({});
   f.c.getProjectClock_=()=>({now:new f.c.Date()});
   f.c.CacheService={getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v),remove:k=>cache.delete(k)})};
@@ -20,7 +20,7 @@ function fixture() {
     path.includes('/invitations?')?{status:200,body:[]}:
     path.includes('/permission')?{status:200,body:{permission:'write',user:{id:path.includes('/second/')?102:101}}}:
     {status:200,body:{html_url:'https://github.com/org/team'}};
-  f.c.makeGithubRequest=(...args)=>{calls.push(args);return response(...args);};
+  f.c.makeGithubRequest_=(...args)=>{calls.push(args);return response(...args);};
   const accounts=f.sheet('GitHubAccounts',[accountHeaders.concat('GitHub ID','GitHub Display Name','GitHub Profile URL')]),commits=f.sheet('Commits',[commitHeaders.concat('GitHub Author ID')]);
   f.user('one@example.com');
   const add=(id='101',email='one@example.com',login='old')=>accounts.rows.push(['2026-01-01T00:00:00Z',email,'T1',login,id,'Old Name','https://github.com/'+login]);
@@ -36,52 +36,52 @@ test('IDs accept only positive decimal text or safe positive integers; blank IDs
 });
 
 test('profile preview canonicalizes metadata without saving; explicit confirmation saves and does not provision',()=>{
-  const f=fixture();const preview=f.c.previewStudentGithubAccount('https://github.com/TypedName/');
+  const f=fixture();const preview=f.c.previewStudentGithubAccount_('https://github.com/TypedName/');
   assert.equal(f.accounts.rows.length,1);assert.equal(preview.account.username,'canonical');assert.equal(preview.account.githubId,'101');
   assert.match(f.calls[0][1],/users\/TypedName$/);
-  const result=f.c.confirmStudentGithubAccount(preview.token);
+  const result=f.c.confirmStudentGithubAccount_(preview.token);
   assert(result.ok);assert.deepEqual(f.accounts.rows[1].slice(3),['canonical','101','Student','https://github.com/canonical']);
-  assert.equal(f.calls.length,1);assert.throws(()=>f.c.confirmStudentGithubAccount(preview.token),/expired/);
+  assert.equal(f.calls.length,1);assert.throws(()=>f.c.confirmStudentGithubAccount_(preview.token),/expired/);
 });
 
 test('null display names stay blank; invalid and non-profile inputs never call GitHub',()=>{
   const f=fixture();
-  for(const link of ['canonical','http://github.com/user','https://evil.example/u','https://github.com/u/r','https://github.com/settings','https://github.com/u?tab=repositories','https://github.com/u#x','https://user@github.com/u','https://github.com/u/issues'])assert.throws(()=>f.c.previewStudentGithubAccount(link),/profile/);
+  for(const link of ['canonical','http://github.com/user','https://evil.example/u','https://github.com/u/r','https://github.com/settings','https://github.com/u?tab=repositories','https://github.com/u#x','https://user@github.com/u','https://github.com/u/issues'])assert.throws(()=>f.c.previewStudentGithubAccount_(link),/profile/);
   assert.equal(f.calls.length,0);f.response(()=>account(101,'canonical',null));
-  f.c.confirmStudentGithubAccount(f.c.previewStudentGithubAccount('https://github.com/canonical').token);
+  f.c.confirmStudentGithubAccount_(f.c.previewStudentGithubAccount_('https://github.com/canonical').token);
   assert.equal(f.accounts.rows[1][5],'');
 });
 
 test('nonexistent, bot, organization, malformed and unavailable accounts never register',()=>{
   for(const response of [{status:404},{status:503},account(0),account(101,'canonical'),account(101,'canonical')]) {
     const f=fixture();if(response.body&&response.body.id===101)response.body.type='Organization';
-    f.response(()=>response);assert.throws(()=>f.c.previewStudentGithubAccount('https://github.com/canonical'));
+    f.response(()=>response);assert.throws(()=>f.c.previewStudentGithubAccount_('https://github.com/canonical'));
     assert.equal(f.accounts.rows.length,1);
   }
-  const f=fixture();const bot=account();bot.body.type='Bot';f.response(()=>bot);assert.throws(()=>f.c.previewStudentGithubAccount('https://github.com/canonical'),/personal/);
+  const f=fixture();const bot=account();bot.body.type='Bot';f.response(()=>bot);assert.throws(()=>f.c.previewStudentGithubAccount_('https://github.com/canonical'),/personal/);
 });
 
 test('confirmation tokens are student-bound, expire, and cannot bypass protected IDs or duplicate checks',()=>{
-  const f=fixture(),p=f.c.previewStudentGithubAccount('https://github.com/canonical');
-  f.user('two@example.com');assert.throws(()=>f.c.confirmStudentGithubAccount(p.token),/another student/);
+  const f=fixture(),p=f.c.previewStudentGithubAccount_('https://github.com/canonical');
+  f.user('two@example.com');assert.throws(()=>f.c.confirmStudentGithubAccount_(p.token),/another student/);
   f.user('one@example.com');const cached=JSON.parse(f.cache.get('github-confirm:'+p.token));cached.expires=0;f.cache.set('github-confirm:'+p.token,JSON.stringify(cached));
-  assert.throws(()=>f.c.confirmStudentGithubAccount(p.token),/expired/);
-  const q=f.c.previewStudentGithubAccount('https://github.com/canonical');f.add('999');
-  assert.throws(()=>f.c.confirmStudentGithubAccount(q.token),/cannot be replaced/);assert.equal(f.accounts.rows[1][4],'999');
-  f.accounts.rows.splice(1);f.add('101','two@example.com');assert.throws(()=>f.c.confirmStudentGithubAccount(q.token),/another student/);
+  assert.throws(()=>f.c.confirmStudentGithubAccount_(p.token),/expired/);
+  const q=f.c.previewStudentGithubAccount_('https://github.com/canonical');f.add('999');
+  assert.throws(()=>f.c.confirmStudentGithubAccount_(q.token),/cannot be replaced/);assert.equal(f.accounts.rows[1][4],'999');
+  f.accounts.rows.splice(1);f.add('101','two@example.com');assert.throws(()=>f.c.confirmStudentGithubAccount_(q.token),/another student/);
 });
 
 test('a competing save is rechecked; same-account confirmation preserves the timestamp; outages never erase IDs',()=>{
-  const f=fixture(),p=f.c.previewStudentGithubAccount('https://github.com/canonical'),q=f.c.previewStudentGithubAccount('https://github.com/canonical');
-  f.c.confirmStudentGithubAccount(p.token);const timestamp=f.accounts.rows[1][0];f.c.confirmStudentGithubAccount(q.token);
+  const f=fixture(),p=f.c.previewStudentGithubAccount_('https://github.com/canonical'),q=f.c.previewStudentGithubAccount_('https://github.com/canonical');
+  f.c.confirmStudentGithubAccount_(p.token);const timestamp=f.accounts.rows[1][0];f.c.confirmStudentGithubAccount_(q.token);
   assert.equal(f.accounts.rows.length,2);assert.equal(f.accounts.rows[1][0],timestamp);
-  f.response(()=>({status:503}));assert.throws(()=>f.c.previewStudentGithubAccount('https://github.com/other'));
+  f.response(()=>({status:503}));assert.throws(()=>f.c.previewStudentGithubAccount_('https://github.com/other'));
   assert.equal(f.accounts.rows[1][4],'101');
 });
 
 test('durable ID resolution refreshes metadata without changing ID or timestamp, and caches per request',()=>{
   const f=fixture();f.add();const original=f.accounts.rows[1][0];const cache=new Map();
-  const resolved=f.c.resolveGithubAccountId_('101',f.c.makeGithubRequest,cache);f.c.resolveGithubAccountId_('101',f.c.makeGithubRequest,cache);
+  const resolved=f.c.resolveGithubAccountId_('101',f.c.makeGithubRequest_,cache);f.c.resolveGithubAccountId_('101',f.c.makeGithubRequest_,cache);
   f.c.refreshGithubAccountMetadata_(f.accounts.rows[1],resolved);
   assert.equal(f.calls.length,1);assert.equal(f.calls[0][1],'/user/101');assert.equal(f.accounts.rows[1][0],original);
   assert.deepEqual(f.accounts.rows[1].slice(3),['canonical','101','Student','https://github.com/canonical']);
@@ -114,19 +114,16 @@ test('ID evidence ignores names and system labels: only a positive match counts'
   assert.equal(f.c.readWeeklyProgressEvidence_(student,'W1').count,2);
   f.accounts.rows[1][3]='renamed';f.commits.rows[1][3]='old-reassigned';
   assert.equal(f.c.readWeeklyProgressEvidence_(student,'W1').count,2);
-  assert.equal(f.c.loadStudentWeeklyActivity().teams.t1.commits,2);
-  f.commit(6,'invalid');assert.equal(f.c.readWeeklyProgressEvidence_(student,'W1').count,null);assert.equal(f.c.loadStudentWeeklyActivity().teams.t1.commits,null);
+  f.commit(6,'invalid');assert.equal(f.c.readWeeklyProgressEvidence_(student,'W1').count,null);
 });
 
 test('unregistered activity and evidence remain null until normal confirmed registration',()=>{
   const f=fixture();f.time('2026-01-02T12:00:00Z');f.collectionStatus('ok');f.commit(1,'101');f.commit(2,'999');
   const student=f.c.weeklyStudents_().find(s=>s.email==='one@example.com');
-  assert.equal(f.c.loadStudentWeeklyActivity().teams.t1.commits,null);
   assert.equal(f.c.readWeeklyProgressEvidence_(student,'W1').count,null);
   assert.equal(f.c.readWeeklyProgressEvidence_(student,'W1').state,'unavailable');
-  f.c.confirmStudentGithubAccount(f.c.previewStudentGithubAccount('https://github.com/canonical').token);
+  f.c.confirmStudentGithubAccount_(f.c.previewStudentGithubAccount_('https://github.com/canonical').token);
   f.response((method,path)=>{if(path.startsWith('/users/'))throw Error('Legacy lookup forbidden');return account(101,'renamed');});
-  assert.equal(f.c.loadStudentWeeklyActivity().teams.t1.commits,1);
   const evidence=f.c.readWeeklyProgressEvidence_(student,'W1');assert.equal(evidence.state,'available');assert.equal(evidence.count,1);
 });
 

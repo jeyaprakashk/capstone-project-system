@@ -1,21 +1,21 @@
 /** Coordinator-only recovery. Reads current membership on every batch; never provisions repos. */
-function resendExpiredStudentInvitations(cursor) {
+function resendExpiredStudentInvitations_(cursor) {
   const email = Session.getActiveUser().getEmail();
   if (!email || !getDashboardRoleViews_(email).some(view => view.key === 'coord')) throw new Error('Coordinator access is required.');
   if (cursor != null && typeof cursor !== 'string') throw new Error('Invalid continuation cursor.');
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    const columns = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    const teams = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[columns.TEAM_ID]);
+    const columns = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+    const teams = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row => row[columns.TEAM_ID]);
     const keys = [...new Set(teams.map(row => normalizeText_(row[columns.TEAM_ID])))].sort();
     const batch = keys.filter(key => !cursor || key > cursor).slice(0, 5);
-    const accounts = getSheetRows(SHEET_NAMES.GITHUB_ACCOUNTS);
-    const accountColumns = githubAccountColumns_(getSheet(SHEET_NAMES.GITHUB_ACCOUNTS));
-    const students = weeklyStudents_(), repos = getRepoUrlMap(), cache = new Map(), results = [];
+    const accounts = getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS);
+    const accountColumns = githubAccountColumns_(getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS));
+    const students = weeklyStudents_(), repos = getRepoUrlMap_(), cache = new Map(), results = [];
     let nextCursor = cursor || '', stopped = false;
     const request = (method, path, payload) => {
-      const response = makeGithubRequest(method, path, payload);
+      const response = makeGithubRequest_(method, path, payload);
       // Stop on all forbidden responses as well: permission failures must not trigger a bulk retry storm.
       if (response.status === 429 || response.status === 403) {
         const error = new Error('GitHub paused this run (HTTP ' + response.status + '). Check token permissions or rate limits before retrying.');

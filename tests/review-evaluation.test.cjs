@@ -20,10 +20,10 @@ function fixture() {
   }
   const normalize=v=>String(v??'').trim().toLowerCase();
   const c=vm.createContext({console,Date,Set,Map,Session:{getActiveUser:()=>({getEmail:()=>actor})},activityIsCoordinator_:v=>v==='coord@x',
-    normalizeText_:normalize,normalizeReviewKey_:normalize,normalizeEmail:normalize,textEquals_:(a,b)=>normalize(a)===normalize(b),emailsMatch:(a,b)=>normalize(a)===normalize(b),
-    SHEET_NAMES:{TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},getColumnMap:()=>TS,getSheetRows:()=>[row],getStudentsFromTeamStatusRow_:()=>students,
-    getCommitteeNumbersForReviewer:email=>['reviewer@x','second@x'].includes(email)?['C1']:[],getCommitteeInfo:()=>({reviewer1Name:'Reviewer'}),getReviewDefinitions_:()=>reviews,
-    getSheet:name=>sheets[name]||null,getSpreadsheet:()=>({getSpreadsheetTimeZone:()=> 'Asia/Kolkata',getSheets:()=>Object.values(sheets),insertSheet:name=>sheet(name,[])}),
+    normalizeText_:normalize,normalizeReviewKey_:normalize,normalizeEmail_:normalize,textEquals_:(a,b)=>normalize(a)===normalize(b),emailsMatch_:(a,b)=>normalize(a)===normalize(b),
+    SHEET_NAMES:{TEAM_STATUS:'teams'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},getColumnMap_:()=>TS,getSheetRows_:()=>[row],getStudentsFromTeamStatusRow_:()=>students,
+    getCommitteeNumbersForReviewer_:email=>['reviewer@x','second@x'].includes(email)?['C1']:[],getCommitteeInfo_:()=>({reviewer1Name:'Reviewer'}),getReviewDefinitions_:()=>reviews,
+    getSheet_:name=>sheets[name]||null,getSpreadsheet_:()=>({getSpreadsheetTimeZone:()=> 'Asia/Kolkata',getSheets:()=>Object.values(sheets),insertSheet:name=>sheet(name,[])}),
     projectDay_:(date,timezone)=>{assert.equal(timezone,'Asia/Kolkata');return today;},
     Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,text)=>crypto.createHash('sha256').update(text).digest(),base64EncodeWebSafe:buffer=>buffer.toString('base64url')},
     LockService:{getScriptLock:()=>({tryLock:()=>{if(!allowLock)return false;locked=true;return true;},releaseLock:()=>locked=false})},SpreadsheetApp:{flush(){}},
@@ -33,7 +33,7 @@ function fixture() {
   sheet('Review2Evaluations',[Array.from(vm.runInContext('REVIEW_JOURNAL_HEADERS_',c))]);
   c.getAssessmentDefinitions_=()=>reviews.map((r,i)=>({...r,type:'REVIEW',sequence:i+1,opens:r.opens??r.day-7,academicPolicyVersion:r.academicPolicyVersion||'review-attendance-v1',journal:r.journal||'Review'+(i+1)+'Evaluations',prerequisites:r.prerequisites??(i?[{assessmentId:reviews[i-1].key,condition:'RECORDED'}]:[])}));
   c.assessmentRubric_=d=>reviews.find(r=>r.key===d.key).rubric;
-  const load=()=>c.loadReviewEvaluation('T1','review1');
+  const load=()=>c.loadReviewEvaluation_('T1','review1');
   const input=(d=load())=>({team:'T1',revision:d.revision,token:d.token,requestId:crypto.randomUUID(),teamScores:{T:{level:3,marks:48,remark:''}},
     students:students.map((s,i)=>({register:normalize(s.regNo),absence:{type:'NORMAL'},scores:{I:{level:3,marks:i?31:32,remark:''}}}))});
   const staffInput=(revision,reason)=>({team:'T1',revision,requestId:crypto.randomUUID(),reason});
@@ -44,20 +44,20 @@ function fixture() {
 test('Review 1 accepts Level 2 without feedback for both team and individual criteria',()=>{
  const f=fixture(),input=f.input();input.teamScores.T={level:2,marks:36,remark:''};
  input.students.forEach(s=>s.scores.I={level:2,marks:24,remark:''});
- assert.equal(f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}).status,'Submitted');
+ assert.equal(f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}).status,'Submitted');
 });
 
 test('Level 2 feedback is optional and blank feedback does not block frontend submission',async ()=>{
  const f=browserFixture();f.api.open('T1',f.trigger);f.requests[0].success(f.data);
  for(const field of f.fields()) {field.controls['[data-level]'].value='2';field.controls['[data-marks]'].value=field.dataset.owner==='team'?'36':'24';}
  f.events.input();assert(f.fields().every(field=>field.querySelector('[data-feedback-required]').hidden));
- await f.click('data-submit');assert.equal(f.requests[1].name,'submitReviewEvaluation');
+ await f.click('data-submit');assert.equal(f.requests[1].name,'submitReviewEvaluation_');
 });
 
 test('one range write stores separate student rows with replicated team scores',()=>{
   const f=fixture(),sheet=f.sheets.Review1Evaluations,range=sheet.getRange,writes=[];
   sheet.getRange=(...args)=>{writes.push(args);return range(...args);};
-  const input=f.input();f.c.saveReviewEvaluationDraft({...(input),assessmentId:'review1'});
+  const input=f.input();f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'});
   assert.deepEqual(writes,[[2,1,2,9]]);
   const rows=f.tables.Review1Evaluations;
   assert.deepEqual(rows[0],['Assessment','Team','Student','Revision','Action','Actor','At','Request ID','Payload']);
@@ -69,11 +69,11 @@ test('one range write stores separate student rows with replicated team scores',
   assert.equal(rows[1][3],rows[2][3]);assert.equal(rows[1][6],rows[2][6]);assert.equal(rows[1][7],rows[2][7]);
   const loaded=f.load();assert.equal(loaded.evaluation.teamScores.T.marks,48);
   assert.deepEqual(Array.from(loaded.evaluation.students,s=>s.scores.I.marks),[32,31]);
-  f.c.saveReviewEvaluationDraft({...(input),assessmentId:'review1'});assert.equal(writes.length,1);
+  f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'});assert.equal(writes.length,1);
 });
 test('incomplete, duplicate and inconsistent student revisions are rejected',()=>{
   for(const kind of ['missing','duplicate','team score','status']) {
-    const f=fixture();f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});const rows=f.tables.Review1Evaluations;
+    const f=fixture();f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});const rows=f.tables.Review1Evaluations;
     if(kind==='missing') rows.pop();
     else if(kind==='duplicate') rows.push([...rows[1]]);
     else {const value=JSON.parse(rows[2][8]);if(kind==='team score')value.scores.T.marks=49;else value.status='Published';rows[2][8]=JSON.stringify(value);}
@@ -83,28 +83,28 @@ test('incomplete, duplicate and inconsistent student revisions are rejected',()=
 test('seven calendar day opening is inclusive and is enforced on reads and writes',()=>{
   const f=fixture(),input=f.input();f.today(19999);
   assert.equal(f.progress().readable,false);assert.match(f.progress().reason,/Opens/);
-  assert.throws(f.load,/Opens/);assert.throws(()=>f.c.saveReviewEvaluationDraft({...(input),assessmentId:'review1'}),/Opens/);assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/Opens/);
-  f.today(20000);assert.equal(f.load().availability.editable,true);f.c.saveReviewEvaluationDraft({...(input),assessmentId:'review1'});
-  f.today(20007);f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});assert.equal(f.load().evaluation.late,false);
+  assert.throws(f.load,/Opens/);assert.throws(()=>f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'}),/Opens/);assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/Opens/);
+  f.today(20000);assert.equal(f.load().availability.editable,true);f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'});
+  f.today(20007);f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});assert.equal(f.load().evaluation.late,false);
 });
 test('late team submissions are allowed and recorded',()=>{
-  const f=fixture();f.today(20008);f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});assert.equal(f.load().evaluation.late,true);
+  const f=fixture();f.today(20008);f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});assert.equal(f.load().evaluation.late,true);
 });
 test('due pill distinguishes upcoming, due today and overdue drafts',()=>{
   const f=fixture();assert.equal(f.load().availability.timing.label,'Upcoming');
   f.today(20007);assert.equal(f.load().availability.timing.tone,'warning');assert.equal(f.load().availability.timing.label,'Due today');
   f.today(20008);assert.equal(f.load().availability.timing.tone,'danger');assert.equal(f.load().availability.timing.label,'Overdue');
-  assert.equal(f.c.saveReviewEvaluationDraft({...(f.input()),assessmentId:'review1'}).timing.label,'Overdue');
+  assert.equal(f.c.saveReviewEvaluationDraft_({...(f.input()),assessmentId:'review1'}).timing.label,'Overdue');
 });
 test('submission timing stays fixed after the deadline, publication and date configuration changes',()=>{
   for(const [date,label,tone] of [[20006,'Submitted early','success'],[20007,'Submitted on time','success'],[20008,'Submitted late','danger']]){
-    const f=fixture();f.today(date);const input=f.input(),saved=f.c.submitReviewEvaluation({...(input),assessmentId:'review1'});
+    const f=fixture();f.today(date);const input=f.input(),saved=f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'});
     assert.equal(saved.timing.label,label);assert.equal(saved.timing.tone,tone);assert.equal(saved.submittedDay,date);
     f.today(20050);assert.equal(f.load().availability.timing.label,label);
-    assert.equal(f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}).timing.label,label);
+    assert.equal(f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}).timing.label,label);
     f.reviews[0].day=20080;assert.equal(f.load().availability.timing.label,label);
-    f.actor('coord@x');f.c.publishInternalAssessment({...f.staffInput(1),assessmentId:'review1'});f.actor('reviewer@x');assert.equal(f.load().availability.timing.label,label);f.actor('coord@x');
-    f.reviews[0].day=20007;f.c.reopenReviewEvaluation({...(f.staffInput(2,'Correction')),assessmentId:'review1'});f.actor('reviewer@x');
+    f.actor('coord@x');f.c.publishInternalAssessment_({...f.staffInput(1),assessmentId:'review1'});f.actor('reviewer@x');assert.equal(f.load().availability.timing.label,label);f.actor('coord@x');
+    f.reviews[0].day=20007;f.c.reopenReviewEvaluation_({...(f.staffInput(2,'Correction')),assessmentId:'review1'});f.actor('reviewer@x');
     assert.equal(f.load().availability.timing.label,'Overdue');
   }
 });
@@ -115,28 +115,28 @@ test('existing submission timestamps are used when submission day is absent',()=
   assert.equal(f.c.reviewTiming_(config,{status:'Submitted',config}).tone,'neutral');
 });
 test('assigned committee authorization and replaceable title eligibility apply on every write',()=>{
-  const f=fixture(),input=f.input();f.actor('outsider@x');assert.throws(f.load,/assigned reviewer/);assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/assigned reviewer/);
-  f.actor('reviewer@x');f.row[3]='Revise';assert.throws(f.load,/Approve/);assert.throws(()=>f.c.saveReviewEvaluationDraft({...(input),assessmentId:'review1'}),/Approve/);
+  const f=fixture(),input=f.input();f.actor('outsider@x');assert.throws(f.load,/assigned reviewer/);assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/assigned reviewer/);
+  f.actor('reviewer@x');f.row[3]='Revise';assert.throws(f.load,/Approve/);assert.throws(()=>f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'}),/Approve/);
   f.row[3]='Approved';f.row[2]='';assert.throws(f.load,/Approve/);assert.equal(f.tables.Review1Evaluations.length,1);
 });
 test('mixed scores share team criteria and compute individual totals and weights',()=>{
-  const f=fixture();f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});const d=f.load();
+  const f=fixture();f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});const d=f.load();
   assert.equal(d.status,'Submitted');assert.equal(d.availability.editable,false);assert.equal(d.evaluation.teamScores.T.marks,48);
   assert.deepEqual(Array.from(d.evaluation.students,s=>s.total),[80,79]);assert.deepEqual(Array.from(d.evaluation.students,s=>s.weighted),[16,15.8]);
   assert.equal(f.progress().completed,true);assert.equal(f.progress().markedStudents,2);
 });
 test('incomplete drafts persist but cannot complete or submit a team',()=>{
   const f=fixture(),input=f.input();input.teamScores={};input.students.forEach(s=>s.scores={});
-  f.c.saveReviewEvaluationDraft({...(input),assessmentId:'review1'});assert.equal(f.load().status,'Draft');assert.equal(f.progress().completed,false);
-  input.revision=1;input.requestId=crypto.randomUUID();assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/required/);
+  f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'});assert.equal(f.load().status,'Draft');assert.equal(f.progress().completed,false);
+  input.revision=1;input.requestId=crypto.randomUUID();assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/required/);
   assert.equal(f.tables.Review1Evaluations.length,3);
 });
 test('zero marks require feedback at submission and unknown or duplicated student criteria cannot bypass validation',()=>{
-  const f=fixture(),input=f.input();input.teamScores.T={level:0,marks:0,remark:''};assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/remark/);
+  const f=fixture(),input=f.input();input.teamScores.T={level:0,marks:0,remark:''};assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/remark/);
   input.teamScores.T.remark='Needs work';input.students.forEach(s=>s.scores.I={level:0,marks:0,remark:'Needs work'});
-  f.c.submitReviewEvaluation({...(input),assessmentId:'review1'});assert.equal(f.load().evaluation.students[0].total,0);
-  const other=fixture(),bad=other.input();bad.students[1].register=bad.students[0].register;assert.throws(()=>other.c.submitReviewEvaluation({...(bad),assessmentId:'review1'}),/every registered/);
-  const mixed=other.input();mixed.students[0].scores.T={level:5,marks:60,remark:''};assert.throws(()=>other.c.submitReviewEvaluation({...(mixed),assessmentId:'review1'}),/Invalid criterion/);
+  f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'});assert.equal(f.load().evaluation.students[0].total,0);
+  const other=fixture(),bad=other.input();bad.students[1].register=bad.students[0].register;assert.throws(()=>other.c.submitReviewEvaluation_({...(bad),assessmentId:'review1'}),/every registered/);
+  const mixed=other.input();mixed.students[0].scores.T={level:5,marks:60,remark:''};assert.throws(()=>other.c.submitReviewEvaluation_({...(mixed),assessmentId:'review1'}),/Invalid criterion/);
 });
 test('exact mark bands, precision and zero validate through both scopes',()=>{
   const f=fixture(),config={academicPolicyVersion:'review-attendance-v1',criteria:[{pi:'T',maxMarks:100,type:'Team'},{pi:'I',maxMarks:100,type:'Individual'}],weight:.2};
@@ -146,63 +146,59 @@ test('exact mark bands, precision and zero validate through both scopes',()=>{
     input.teamScores.T.marks=high;
     if(level<5)assert.throws(()=>f.c.reviewScore_(config,{students:[{register:'s'}]},input,true),/outside/);
   }
-  for(const marks of [-1,48.001,true,'NaN',Infinity]){const input=f.input();input.teamScores.T.marks=marks;assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/decimals|outside/);}
+  for(const marks of [-1,48.001,true,'NaN',Infinity]){const input=f.input();input.teamScores.T.marks=marks;assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/decimals|outside/);}
 });
 test('Review 1 accepts half marks and rejects other decimals in both scoring scopes',()=>{
   const f=fixture(),input=f.input();input.teamScores.T.marks=48.5;input.students[0].scores.I.marks=31.5;
-  f.c.saveReviewEvaluationDraft({...(input),assessmentId:'review1'});assert.equal(f.load().evaluation.students[0].total,80);
+  f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'});assert.equal(f.load().evaluation.students[0].total,80);
   for(const scope of ['team','individual']){
     const invalid=f.input();if(scope==='team')invalid.teamScores.T.marks=48.25;else invalid.students[0].scores.I.marks=31.75;
-    assert.throws(()=>f.c.saveReviewEvaluationDraft({...(invalid),assessmentId:'review1'}),/whole or half/);
-    assert.throws(()=>f.c.submitReviewEvaluation({...(invalid),assessmentId:'review1'}),/whole or half/);
+    assert.throws(()=>f.c.saveReviewEvaluationDraft_({...(invalid),assessmentId:'review1'}),/whole or half/);
+    assert.throws(()=>f.c.submitReviewEvaluation_({...(invalid),assessmentId:'review1'}),/whole or half/);
   }
 });
 test('shared drafts reject concurrent stale revisions and retries are idempotent',()=>{
-  const f=fixture(),input=f.input();f.c.saveReviewEvaluationDraft({...(input),assessmentId:'review1'});f.c.saveReviewEvaluationDraft({...(input),assessmentId:'review1'});assert.equal(f.tables.Review1Evaluations.length,3);
-  assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/different data/);
-  f.actor('second@x');assert.throws(()=>f.c.saveReviewEvaluationDraft({...({...input,requestId:crypto.randomUUID()}),assessmentId:'review1'}),/changed/);
-  f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});assert.equal(f.load().status,'Submitted');
-  assert.throws(()=>f.c.saveReviewEvaluationDraft({...(f.input()),assessmentId:'review1'}),/locked/);assert.equal(f.locked(),false);
+  const f=fixture(),input=f.input();f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'});f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'});assert.equal(f.tables.Review1Evaluations.length,3);
+  assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/different data/);
+  f.actor('second@x');assert.throws(()=>f.c.saveReviewEvaluationDraft_({...({...input,requestId:crypto.randomUUID()}),assessmentId:'review1'}),/changed/);
+  f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});assert.equal(f.load().status,'Submitted');
+  assert.throws(()=>f.c.saveReviewEvaluationDraft_({...(f.input()),assessmentId:'review1'}),/locked/);assert.equal(f.locked(),false);
 });
 test('changed roster, rubric and opening date invalidate previously opened drafts',()=>{
-  const f=fixture(),input=f.input();f.students.push({regNo:'S3',name:'Three',email:'three@x'});assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/Roster or rubric/);f.students.pop();
-  f.reviews[0].rubric[0].maxMarks=70;assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/Roster or rubric/);f.reviews[0].rubric[0].maxMarks=60;
-  f.reviews[0].day++;assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/Opens/);assert.equal(f.tables.Review1Evaluations.length,1);
+  const f=fixture(),input=f.input();f.students.push({regNo:'S3',name:'Three',email:'three@x'});assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/Roster or rubric/);f.students.pop();
+  f.reviews[0].rubric[0].maxMarks=70;assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/Roster or rubric/);f.reviews[0].rubric[0].maxMarks=60;
+  f.reviews[0].day++;assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/Opens/);assert.equal(f.tables.Review1Evaluations.length,1);
 });
 test('publication is coordinator-only and exposes only the signed-in student scores',()=>{
-  const f=fixture();f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});const op=f.staffInput(1);
-  for(const method of ['publishInternalAssessment','reopenReviewEvaluation'])assert.throws(()=>f.c[method]({...op,assessmentId:'review1'}),/Coordinator/);
-  assert.throws(()=>f.c.loadCoordinatorReviewEvaluations_('review1'),/Coordinator/);
-  f.actor('one@x');assert.equal(f.c.loadPublishedReviewEvaluation('review1'),null);assert.throws(f.load,/assigned reviewer/);
-  f.actor('coord@x');f.c.publishInternalAssessment({...(op),assessmentId:'review1'});f.c.publishInternalAssessment({...(op),assessmentId:'review1'});
-  f.actor('one@x');let published=f.c.loadPublishedReviewEvaluation('review1');assert.equal(published.total,80);assert.equal(published.students,undefined);assert.equal(published.scores.T.marks,48);
-  f.actor('two@x');assert.equal(f.c.loadPublishedReviewEvaluation('review1').total,79);
-  f.actor('outsider@x');assert.throws(()=>f.c.loadPublishedReviewEvaluation('review1'),/assignment/);
+  const f=fixture();f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});const op=f.staffInput(1);
+  for(const method of ['publishInternalAssessment_','reopenReviewEvaluation_'])assert.throws(()=>f.c[method]({...op,assessmentId:'review1'}),/Coordinator/);
+  f.actor('one@x');assert.equal(f.c.loadPublishedReviewEvaluation_('review1'),null);assert.throws(f.load,/assigned reviewer/);
+  f.actor('coord@x');f.c.publishInternalAssessment_({...(op),assessmentId:'review1'});f.c.publishInternalAssessment_({...(op),assessmentId:'review1'});
+  f.actor('one@x');let published=f.c.loadPublishedReviewEvaluation_('review1');assert.equal(published.total,80);assert.equal(published.students,undefined);assert.equal(published.scores.T.marks,48);
+  f.actor('two@x');assert.equal(f.c.loadPublishedReviewEvaluation_('review1').total,79);
+  f.actor('outsider@x');assert.throws(()=>f.c.loadPublishedReviewEvaluation_('review1'),/assignment/);
   assert.equal(f.tables.Review1Evaluations.length,4);
 });
 test('publication uses submitted rubric snapshot and rejects changed roster',()=>{
-  const f=fixture();f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});f.actor('coord@x');f.students[0].regNo='replacement';
-  assert.throws(()=>f.c.publishInternalAssessment({...(f.staffInput(1)),assessmentId:'review1'}),/Roster membership/);f.students[0].regNo='S1';
-  f.reviews[0].rubric[0].maxMarks=90;f.c.publishInternalAssessment({...(f.staffInput(1)),assessmentId:'review1'});f.actor('reviewer@x');assert.equal(f.load().config.criteria[0].maxMarks,60);
+  const f=fixture();f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});f.actor('coord@x');f.students[0].regNo='replacement';
+  assert.throws(()=>f.c.publishInternalAssessment_({...(f.staffInput(1)),assessmentId:'review1'}),/Roster membership/);f.students[0].regNo='S1';
+  f.reviews[0].rubric[0].maxMarks=90;f.c.publishInternalAssessment_({...(f.staffInput(1)),assessmentId:'review1'});f.actor('reviewer@x');assert.equal(f.load().config.criteria[0].maxMarks,60);
 });
 test('submitted evaluations stay readable when the opening date or eligibility changes',()=>{
-  const f=fixture();f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});f.today(19990);f.row[3]='Revise';assert.equal(f.load().availability.readable,true);assert.equal(f.load().availability.editable,false);
+  const f=fixture();f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});f.today(19990);f.row[3]='Revise';assert.equal(f.load().availability.readable,true);assert.equal(f.load().availability.editable,false);
 });
 test('legacy save endpoint cannot overwrite Review 1 and legacy levels never complete history',()=>{
   const f=fixture();assert.equal(f.c.saveReviewerEvaluation,undefined);assert.equal(f.progress().completed,false);
-  assert.equal(f.c.loadReviewEvaluation('T1','review1').status,'Not started');
+  assert.equal(f.c.loadReviewEvaluation_('T1','review1').status,'Not started');
 });
 test('manually created storage headers are validated without overwriting',()=>{
   const f=fixture();f.actor('coord@x');assert.equal(f.c.setupReview1Evaluation,undefined);f.c.reviewRecords_('review1');assert.equal(f.tables.Review1Evaluations.length,1);
   f.tables.Review1Evaluations[0][0]='Wrong';assert.throws(()=>f.c.reviewRecords_('review1'),/Incompatible journal/);assert.equal(f.tables.Review1Evaluations[0][0],'Wrong');
 });
 test('missing storage, oversized payload and unavailable lock fail without revision writes',()=>{
-  const f=fixture(),input=f.input();f.lock(false);assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/saving/);f.lock(true);
-  delete f.sheets.Review1Evaluations;assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/Error in Initialization/);
-  const big=fixture();big.reviews[0].rubric[0].descriptors=Array(6).fill('x'.repeat(10000));assert.throws(()=>big.c.submitReviewEvaluation({...(big.input()),assessmentId:'review1'}),/too large/);assert.equal(big.tables.Review1Evaluations.length,1);
-});
-test('coordinator report lists team statuses and totals without requiring reviewer assignment',()=>{
-  const f=fixture();f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});f.actor('coord@x');const report=f.c.loadCoordinatorReviewEvaluations_('review1');assert.equal(report.ready,true);assert.equal(report.teams[0].status,'Submitted');assert.equal(report.teams[0].students.length,2);
+  const f=fixture(),input=f.input();f.lock(false);assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/saving/);f.lock(true);
+  delete f.sheets.Review1Evaluations;assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/Error in Initialization/);
+  const big=fixture();big.reviews[0].rubric[0].descriptors=Array(6).fill('x'.repeat(10000));assert.throws(()=>big.c.submitReviewEvaluation_({...(big.input()),assessmentId:'review1'}),/too large/);assert.equal(big.tables.Review1Evaluations.length,1);
 });
 test('browser source is serializable and uses shared drawer layout',()=>{
   const c=vm.createContext({});vm.runInContext(fs.readFileSync('review-academic-policy.js','utf8'),c);vm.runInContext(fs.readFileSync('review-evaluation-client.js','utf8'),c);
@@ -213,10 +209,10 @@ test('Review 2 checks history on load and save, and reopening removes completion
   const f=fixture();
   f.reviews[0].prerequisites=[];f.reviews[1].prerequisites=[{assessmentId:'review1',condition:'RECORDED'}];
   f.today(20030);
-  assert.throws(()=>f.c.loadReviewEvaluation('T1','review2'),/Submit Review 1/);
-  f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});assert.equal(f.c.loadReviewEvaluation('T1','review2').config.key,'review2');
-  f.actor('coord@x');f.c.reopenReviewEvaluation({...(f.staffInput(1,'Correction')),assessmentId:'review1'});f.actor('reviewer@x');
-  assert.throws(()=>f.c.saveReviewEvaluationDraft({...({...f.staffInput(0),token:'stale'}),assessmentId:'review2'}),/Submit Review 1/);
+  assert.throws(()=>f.c.loadReviewEvaluation_('T1','review2'),/Submit Review 1/);
+  f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});assert.equal(f.c.loadReviewEvaluation_('T1','review2').config.key,'review2');
+  f.actor('coord@x');f.c.reopenReviewEvaluation_({...(f.staffInput(1,'Correction')),assessmentId:'review1'});f.actor('reviewer@x');
+  assert.throws(()=>f.c.saveReviewEvaluationDraft_({...({...f.staffInput(0),token:'stale'}),assessmentId:'review2'}),/Submit Review 1/);
   assert.equal(f.c.saveReviewerEvaluation,undefined);
 });
 test('spreadsheet timezone midnight drives the exact seven-day boundary',()=>{
@@ -234,7 +230,7 @@ test('reviewer dashboard shows opening reason and read-only action after submiss
   vm.runInContext(fs.readFileSync('reviewer-api.js','utf8'),f.c);
   const render=()=>f.c.reviewerReviewCellDto_(f.row,f.TS,f.reviews[0],{reviews:[f.reviews[0]],teams:{t1:{review1:f.progress()}}});
   f.today(19999);assert.equal(render().enabled,false);assert.match(render().note,/Opens/);
-  f.today(20000);assert.equal(render().enabled,true);f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});assert.equal(render().actionLabel,'View marks');
+  f.today(20000);assert.equal(render().enabled,true);f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});assert.equal(render().actionLabel,'View marks');
 });
 
 function browserFixture(extended=false,key='review1') {
@@ -292,13 +288,13 @@ function browserFixture(extended=false,key='review1') {
   function runner(success,failure){return new Proxy({},{get:(_,name)=>name==='withSuccessHandler'?fn=>runner(fn,failure):name==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({name,args,success,failure})});}
   const c=vm.createContext({ReviewerView:{refresh:()=>Promise.resolve(true)},console,confirm:()=>discard,prompt:()=>extended?'Reviewed assessment':null,window:{crypto,addEventListener(){}},document:{createElement:()=>drawer,body:{appendChild(){},classList:{add(){},remove(){}}},getElementById:()=>null},DashboardUI:{ask:async ()=>discard,requestText:async ()=>extended?'Reviewed assessment':null,notify:async ()=>{},guideRun:()=>runner(),renderSkeleton:()=>'<p>Loading</p>',...(extended?{beginContentLoading(){loading.begun++;let settled=false;return()=>{if(!settled)loading.settled++;settled=true;};}}:{})}});
   vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
-  for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js'])vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):fs.readFileSync(file,'utf8'),c);
+  for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;
   c.DashboardUI.renderIcon=c.renderLucideIcon_;
   c.DashboardUI.renderExpandableText=c.renderExpandableText_;
-  vm.runInContext(fs.readFileSync('review-academic-policy.js','utf8'),c);vm.runInContext(fs.readFileSync('review-evaluation-client.js','utf8'),c);const LEGACY={draft:'saveReviewEvaluationDraft',submit:'submitReviewEvaluation',absence:'recordReviewAbsence',makeupDraft:'saveReviewMakeupDraft',makeupSubmit:'submitReviewMakeup'};
+  vm.runInContext(fs.readFileSync('review-academic-policy.js','utf8'),c);vm.runInContext(fs.readFileSync('review-evaluation-client.js','utf8'),c);const LEGACY={draft:'saveReviewEvaluationDraft_',submit:'submitReviewEvaluation_',absence:'recordReviewAbsence_',makeupDraft:'saveReviewMakeupDraft_',makeupSubmit:'submitReviewMakeup_'};
   const settle=(name,args)=>{const p=new Sync();requests.push({name,args,success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;};
-  const bridge={read:(readKey,method,args)=>settle('loadReviewEvaluation',args),write:(method,args)=>settle(LEGACY[args[0]],[args[1]])};
+  const bridge={read:(readKey,method,args)=>settle('loadReviewEvaluation_',args),write:(method,args)=>settle(LEGACY[args[0]],[args[1]])};
   const api=c.reviewEvaluationBrowser_(key,bridge);
   const click=attr=>events.click({target:buttons.find(b=>b.hasAttribute(attr))});
   const data=JSON.parse(JSON.stringify(fixture().load()));
@@ -309,7 +305,7 @@ function browserFixture(extended=false,key='review1') {
 function absenceFixture(key='review1') {
   const f=fixture();
   if(key==='review_extra'){f.reviews[1].key=key;f.reviews[1].label='Additional Review';}
-  if(key!=='review1'){f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});f.today(20030);}
+  if(key!=='review1'){f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});f.today(20030);}
   const load=()=>f.c.getReviewEvaluation_('T1',key);
   const input=(data=load())=>f.input(data);
   const submit=value=>f.c.reviewWrite_('submit',value,key);
@@ -333,36 +329,36 @@ for(const key of ['review1','review2'])for(const [name,facts,team,individual] of
 });
 for(const approved of [true,false])for(const verifiedContribution of [true,false])test('attended Long Absent requires Individual scores '+[approved,verifiedContribution],()=>{
  const f=fixture(),input=f.input();input.students[0].absence={type:'PROLONGED',approved,verifiedContribution,attended:true};input.students[0].scores={};
- assert.throws(()=>f.c.submitReviewEvaluation({...(input),assessmentId:'review1'}),/required/);assert.equal(f.tables.Review1Evaluations.length,1);
+ assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/required/);assert.equal(f.tables.Review1Evaluations.length,1);
 });
 test('makeup is isolated, idempotent and survives copy-and-correct applicability transitions',()=>{
- const f=fixture(),input=f.input();input.students[0].absence={type:'PROLONGED',approved:true,verifiedContribution:false,attended:false};input.students[0].scores={};f.c.submitReviewEvaluation({...(input),assessmentId:'review1'});
+ const f=fixture(),input=f.input();input.students[0].absence={type:'PROLONGED',approved:true,verifiedContribution:false,attended:false};input.students[0].scores={};f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'});
  let d=f.load();const teammate=JSON.stringify(d.evaluation.students[1]),team=JSON.stringify(d.evaluation.teamScores);
  const command={assessmentId:'review1',team:'T1',student:'s1',revision:d.revision,token:d.token,requestId:crypto.randomUUID(),scores:{I:{level:3,marks:32,remark:''}}};
- assert.throws(()=>f.c.submitReviewMakeup({...command,teamScores:{}}),/only/);
- f.c.saveReviewMakeupDraft(command);assert.equal(f.load().evaluation.students[0].total,null);
- d=f.load();const submit={...command,revision:d.revision,requestId:crypto.randomUUID()};f.c.submitReviewMakeup(submit);const rows=f.tables.Review1Evaluations.length;f.c.submitReviewMakeup(submit);assert.equal(f.tables.Review1Evaluations.length,rows);
+ assert.throws(()=>f.c.submitReviewMakeup_({...command,teamScores:{}}),/only/);
+ f.c.saveReviewMakeupDraft_(command);assert.equal(f.load().evaluation.students[0].total,null);
+ d=f.load();const submit={...command,revision:d.revision,requestId:crypto.randomUUID()};f.c.submitReviewMakeup_(submit);const rows=f.tables.Review1Evaluations.length;f.c.submitReviewMakeup_(submit);assert.equal(f.tables.Review1Evaluations.length,rows);
  d=f.load();assert.equal(d.evaluation.students[0].total,32);assert.equal(d.evaluation.students[0].assessment.teamMark,0);assert.equal(JSON.stringify(d.evaluation.students[1]),teammate);assert.equal(JSON.stringify(d.evaluation.teamScores),team);
  const before=JSON.stringify(f.tables.Review1Evaluations),event=d.evaluation.students[0].assessment.makeup.eventId;
- f.actor('coord@x');f.c.reopenReviewEvaluation({...(f.staffInput(d.revision,'Correct facts')),assessmentId:'review1'});f.actor('reviewer@x');
+ f.actor('coord@x');f.c.reopenReviewEvaluation_({...(f.staffInput(d.revision,'Correct facts')),assessmentId:'review1'});f.actor('reviewer@x');
  assert.equal(JSON.stringify(f.tables.Review1Evaluations.slice(0,rows)),before);
  function correction(facts,scores={}){const data=f.load(),v=f.input(data);v.students=data.evaluation.students.map(s=>({register:s.register,absence:s.assessment.facts,scores:s.scores}));v.students[0].absence=facts;v.students[0].scores=scores;return v;}
- let v=correction({type:'PROLONGED',approved:true,verifiedContribution:false,attended:true});f.c.saveReviewEvaluationDraft({...(v),assessmentId:'review1'});assert.equal(f.load().evaluation.students[0].total,null);assert.throws(()=>f.c.submitReviewEvaluation({...(correction(v.students[0].absence)),assessmentId:'review1'}),/required/);
- v=correction({type:'PROLONGED',approved:false,verifiedContribution:false,attended:false});f.c.saveReviewEvaluationDraft({...(v),assessmentId:'review1'});assert.equal(f.load().evaluation.students[0].total,0);
- v=correction({type:'PROLONGED',approved:true,verifiedContribution:false,attended:false});f.c.submitReviewEvaluation({...(v),assessmentId:'review1'});d=f.load();assert.equal(d.evaluation.students[0].total,32);assert.equal(d.evaluation.students[0].assessment.makeup.eventId,event);assert.equal(d.evaluation.students[0].assessment.events.length,1);
+ let v=correction({type:'PROLONGED',approved:true,verifiedContribution:false,attended:true});f.c.saveReviewEvaluationDraft_({...(v),assessmentId:'review1'});assert.equal(f.load().evaluation.students[0].total,null);assert.throws(()=>f.c.submitReviewEvaluation_({...(correction(v.students[0].absence)),assessmentId:'review1'}),/required/);
+ v=correction({type:'PROLONGED',approved:false,verifiedContribution:false,attended:false});f.c.saveReviewEvaluationDraft_({...(v),assessmentId:'review1'});assert.equal(f.load().evaluation.students[0].total,0);
+ v=correction({type:'PROLONGED',approved:true,verifiedContribution:false,attended:false});f.c.submitReviewEvaluation_({...(v),assessmentId:'review1'});d=f.load();assert.equal(d.evaluation.students[0].total,32);assert.equal(d.evaluation.students[0].assessment.makeup.eventId,event);assert.equal(d.evaluation.students[0].assessment.events.length,1);
 });
 test('reopening compares four dimensions and accepts display-only identity corrections',()=>{
  for(const [dimension,change] of [['rubric',f=>f.reviews[0].rubric[0].name='Changed'],['configuration',f=>f.reviews[0].weight=21],['roster',f=>f.students[0].regNo='replacement'],['policy',f=>f.reviews[0].academicPolicyVersion='future']]){
-  const f=fixture();f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});const before=JSON.stringify(f.tables);change(f);f.actor('coord@x');assert.throws(()=>f.c.reopenReviewEvaluation({...(f.staffInput(1,'Correction')),assessmentId:'review1'}),e=>e.code==='REOPEN_INCOMPATIBLE'&&e.changes.some(c=>c.dimension===dimension));assert.equal(JSON.stringify(f.tables),before);
+  const f=fixture();f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});const before=JSON.stringify(f.tables);change(f);f.actor('coord@x');assert.throws(()=>f.c.reopenReviewEvaluation_({...(f.staffInput(1,'Correction')),assessmentId:'review1'}),e=>e.code==='REOPEN_INCOMPATIBLE'&&e.changes.some(c=>c.dimension===dimension));assert.equal(JSON.stringify(f.tables),before);
  }
- const f=fixture();f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});const before=JSON.stringify(f.tables.Review1Evaluations);f.students[0].name='Corrected';f.students[0].email='corrected@x';f.students[0].regNo=' S1 ';f.students.reverse();f.actor('coord@x');f.c.reopenReviewEvaluation({...(f.staffInput(1,'Identity display correction')),assessmentId:'review1'});f.actor('reviewer@x');const d=f.load();assert.equal(d.evaluation.students[0].scores.I.marks,32);assert.equal(d.evaluation.copiedFromRevision,1);assert.equal(JSON.stringify(f.tables.Review1Evaluations.slice(0,3)),before);
+ const f=fixture();f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});const before=JSON.stringify(f.tables.Review1Evaluations);f.students[0].name='Corrected';f.students[0].email='corrected@x';f.students[0].regNo=' S1 ';f.students.reverse();f.actor('coord@x');f.c.reopenReviewEvaluation_({...(f.staffInput(1,'Identity display correction')),assessmentId:'review1'});f.actor('reviewer@x');const d=f.load();assert.equal(d.evaluation.students[0].scores.I.marks,32);assert.equal(d.evaluation.copiedFromRevision,1);assert.equal(JSON.stringify(f.tables.Review1Evaluations.slice(0,3)),before);
 });
 test('copy-and-correct rederives contribution and keeps previous finalized outcome frozen',()=>{
- const f=fixture(),v=f.input();v.students[0].absence={type:'PROLONGED',approved:true,verifiedContribution:true,attended:true};f.c.submitReviewEvaluation({...(v),assessmentId:'review1'});const old=JSON.stringify(f.tables.Review1Evaluations);f.actor('coord@x');f.c.reopenReviewEvaluation({...(f.staffInput(1,'Contribution correction')),assessmentId:'review1'});f.actor('reviewer@x');const next=f.input();next.students[0].absence={...v.students[0].absence,verifiedContribution:false};f.c.submitReviewEvaluation({...(next),assessmentId:'review1'});assert.equal(f.load().evaluation.students[0].total,32);assert.equal(JSON.stringify(f.tables.Review1Evaluations.slice(0,3)),old);
+ const f=fixture(),v=f.input();v.students[0].absence={type:'PROLONGED',approved:true,verifiedContribution:true,attended:true};f.c.submitReviewEvaluation_({...(v),assessmentId:'review1'});const old=JSON.stringify(f.tables.Review1Evaluations);f.actor('coord@x');f.c.reopenReviewEvaluation_({...(f.staffInput(1,'Contribution correction')),assessmentId:'review1'});f.actor('reviewer@x');const next=f.input();next.students[0].absence={...v.students[0].absence,verifiedContribution:false};f.c.submitReviewEvaluation_({...(next),assessmentId:'review1'});assert.equal(f.load().evaluation.students[0].total,32);assert.equal(JSON.stringify(f.tables.Review1Evaluations.slice(0,3)),old);
  const snapshot=f.load().evaluation.students[0];f.c.reviewPolicyCalculate_=()=>{throw Error('must not recalculate finalized results');};assert.equal(f.load().evaluation.students[0].total,snapshot.total);
 });
 test('recorded pending Review permits configured successor; configured opening is authoritative',()=>{
- const f=fixture(),v=f.input();v.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true};v.students[0].scores={};f.c.submitReviewEvaluation({...(v),assessmentId:'review1'});f.reviews[1].opens=20000;assert.equal(f.c.loadReviewEvaluation('T1','review2').availability.editable,true);f.reviews[1].opens=20001;assert.throws(()=>f.c.loadReviewEvaluation('T1','review2'),/Opens/);
+ const f=fixture(),v=f.input();v.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true};v.students[0].scores={};f.c.submitReviewEvaluation_({...(v),assessmentId:'review1'});f.reviews[1].opens=20000;assert.equal(f.c.loadReviewEvaluation_('T1','review2').availability.editable,true);f.reviews[1].opens=20001;assert.throws(()=>f.c.loadReviewEvaluation_('T1','review2'),/Opens/);
 });
 const absence=(type,approved,verifiedContribution,attended)=>({type,approved,verifiedContribution,attended,reason:'Reviewer verified guide confirmation and review attendance',...(type==='PROLONGED'?{absenceReason:approved?'MEDICAL':null,supportingEvidence:[],contributionEvidence:verifiedContribution?['GUIDE_CONFIRMATION']:[],otherContributionEvidenceText:null}:{})});
 
@@ -564,15 +560,15 @@ for(const key of ['review1','review2']) {
 
 
 test('Review 2 uses independent rubric, maximum, descriptors, date, weight and history; legacy Review 1 bytes stay untouched',()=>{
-  const f=fixture();f.c.submitReviewEvaluation({...(f.input()),assessmentId:'review1'});f.actor('coord@x');f.c.publishInternalAssessment({...(f.staffInput(1)),assessmentId:'review1'});f.actor('reviewer@x');
+  const f=fixture();f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});f.actor('coord@x');f.c.publishInternalAssessment_({...(f.staffInput(1)),assessmentId:'review1'});f.actor('reviewer@x');
   const before=JSON.stringify(f.tables.Review1Evaluations);
   f.reviews[1].rubric=[{pi:'R2T',type:'Team',name:'Implementation',maxMarks:80,co:'CO3',descriptors:Array(6).fill('Review 2 implementation')},{pi:'R2I',type:'Individual',name:'Defence',maxMarks:20,co:'CO4',descriptors:Array(6).fill('Review 2 defence')}];
-  f.today(20022);assert.throws(()=>f.c.loadReviewEvaluation('T1','review2'),/Opens/);f.today(20023);
-  const d=f.c.loadReviewEvaluation('T1','review2');assert.equal(d.config.weight,.3);assert.equal(d.config.criteria[0].pi,'R2T');assert.equal(d.config.criteria[0].descriptors[0],'Review 2 implementation');
+  f.today(20022);assert.throws(()=>f.c.loadReviewEvaluation_('T1','review2'),/Opens/);f.today(20023);
+  const d=f.c.loadReviewEvaluation_('T1','review2');assert.equal(d.config.weight,.3);assert.equal(d.config.criteria[0].pi,'R2T');assert.equal(d.config.criteria[0].descriptors[0],'Review 2 implementation');
   const input={...f.staffInput(0),token:d.token,teamScores:{R2T:{level:3,marks:64,remark:''}},students:f.students.map(s=>({register:s.regNo.toLowerCase(),absence:{type:'NORMAL'},scores:{R2I:{level:3,marks:16,remark:''}}}))};
-  f.c.submitReviewEvaluation({...(input),assessmentId:'review2'});assert.equal(f.c.loadReviewEvaluation('T1','review2').evaluation.students[0].weighted,24);
-  f.actor('coord@x');f.c.publishInternalAssessment({...(f.staffInput(1)),assessmentId:'review2'});f.actor('one@x');
-  assert.equal(f.c.loadPublishedReviewEvaluation('review2').total,80);assert.equal(f.c.loadPublishedReviewEvaluation('review1').weighted,16);
+  f.c.submitReviewEvaluation_({...(input),assessmentId:'review2'});assert.equal(f.c.loadReviewEvaluation_('T1','review2').evaluation.students[0].weighted,24);
+  f.actor('coord@x');f.c.publishInternalAssessment_({...(f.staffInput(1)),assessmentId:'review2'});f.actor('one@x');
+  assert.equal(f.c.loadPublishedReviewEvaluation_('review2').total,80);assert.equal(f.c.loadPublishedReviewEvaluation_('review1').weighted,16);
   assert.equal(JSON.stringify(f.tables.Review1Evaluations),before);
   assert.equal(f.tables.Review2Evaluations.length,4);
 });
@@ -623,22 +619,22 @@ for(const key of ['review1','review2']) {
 
 
 for(const key of ['review2','review3','design_gate'])test(key+' browser passes its instance ID directly to generic RPCs',()=>{
-  const f=browserFixture(true,key);f.api.open('T1',f.trigger);assert.equal(f.requests[0].name,'loadReviewEvaluation');
+  const f=browserFixture(true,key);f.api.open('T1',f.trigger);assert.equal(f.requests[0].name,'loadReviewEvaluation_');
   assert.deepEqual(Array.from(f.requests[0].args),['T1',key]);
   f.data.config.key=key;f.data.config.label='Configured Review';f.requests[0].success(f.data);
   assert.match(f.drawer.innerHTML,/Configured Review<\/span>/);
-  f.click('data-draft');assert.equal(f.requests[1].name,'saveReviewEvaluationDraft');assert.equal(f.requests[1].args[0].assessmentId,key);
+  f.click('data-draft');assert.equal(f.requests[1].name,'saveReviewEvaluationDraft_');assert.equal(f.requests[1].args[0].assessmentId,key);
 });
 
 test('shared engine requires an explicit assessment instead of silently selecting Review 1',()=>{
   const f=fixture();assert.throws(()=>f.c.reviewConfiguration_(),/Unknown assessment/);
-  assert.throws(()=>f.c.loadReviewEvaluation('T1'),/Unknown assessment/);
+  assert.throws(()=>f.c.loadReviewEvaluation_('T1'),/Unknown assessment/);
 });
 
 test('pending effective criterion marks remain null in published APIs, including policy zeros',()=>{
   for(const approved of [true,false]){
     const f=absenceFixture(),input=f.input();input.students[0].absence=absence('REVIEW_DAY_ABSENCE',approved);input.students[0].scores={};f.submit(input);f.publish();f.actor('one@x');
-    const result=f.c.loadPublishedReviewEvaluation('review1');assert.equal(result.scores.I.marks,approved?null:0);assert.equal(result.scores.T.marks,48);
+    const result=f.c.loadPublishedReviewEvaluation_('review1');assert.equal(result.scores.I.marks,approved?null:0);assert.equal(result.scores.T.marks,48);
   }
 });
 
@@ -729,7 +725,7 @@ test('drawer validates bands, requires complete submissions and locks after subm
   const f=browserFixture();f.api.open('T1',f.trigger);f.requests[0].success(f.data);await f.click('data-submit');assert.equal(f.requests.length,1);
   for(const field of f.fields()){field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value=field.dataset.owner==='team'?'48':'32';}
   f.fields()[0].controls['[data-marks]'].value='51';f.events.input();await f.click('data-submit');assert.equal(f.requests.length,1);
-  f.fields()[0].controls['[data-marks]'].value='48';f.events.input();await f.click('data-submit');assert.equal(f.requests[1].name,'submitReviewEvaluation');
+  f.fields()[0].controls['[data-marks]'].value='48';f.events.input();await f.click('data-submit');assert.equal(f.requests[1].name,'submitReviewEvaluation_');
   f.requests[1].success({revision:1,status:'Submitted'});assert(f.fields().every(field=>Object.values(field.controls).every(c=>c.disabled)));assert.doesNotMatch(f.drawer.innerHTML,/data-submit/);
 });
 test('drawer warns before discarding unsaved edits and restores focus on close',async ()=>{
@@ -930,7 +926,7 @@ test('deselecting the last required feedback prevents submission until feedback 
   const f=feedbackFixture();f.pick(1);f.field.controls['[data-marks]'].value='30';
   for(const field of f.fields().slice(1)){field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='32';}
   f.toggle(1);f.toggle(1);await f.click('data-submit');assert.equal(f.requests.length,1);
-  f.toggle(1);await f.click('data-submit');assert.equal(f.requests[1].name,'submitReviewEvaluation');
+  f.toggle(1);await f.click('data-submit');assert.equal(f.requests[1].name,'submitReviewEvaluation_');
 });
 
 
@@ -946,7 +942,7 @@ test('approval hides only when irrelevant and returns when attendance or contrib
 
 test('review submission accepts irrelevant blank approval and retains individual marks',()=>{
  const f=fixture(),input=f.input();input.students[0].absence={type:'PROLONGED',verifiedContribution:false,attended:true,approved:null};
- f.c.submitReviewEvaluation({...input,assessmentId:'review1'});
+ f.c.submitReviewEvaluation_({...input,assessmentId:'review1'});
  const student=f.load().evaluation.students[0];assert.equal(student.assessment.teamMark,0);assert.equal(student.assessment.individualMark,32);assert.equal(student.assessment.completed,true);
 });
 
@@ -960,7 +956,7 @@ for(const key of ['review1','review2'])test(key+' approved absence evidence surv
 });
 test('other absence evidence needs a description on submission',()=>{
  const f=fixture(),input=f.input();input.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['OTHER'],otherEvidenceText:'  '};input.students[0].scores={};
- assert.throws(()=>f.c.submitReviewEvaluation({...input,assessmentId:'review1'}),/Describe the other supporting absence evidence/);assert.equal(f.load().revision,0);
+ assert.throws(()=>f.c.submitReviewEvaluation_({...input,assessmentId:'review1'}),/Describe the other supporting absence evidence/);assert.equal(f.load().revision,0);
 });
 test('absence evidence appears for approved absences and hides when irrelevant',()=>{
  const f=browserFixture(true);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
@@ -985,7 +981,7 @@ function submittedAbsence(key='review1',facts={type:'REVIEW_DAY_ABSENCE',approve
 for(const key of ['review1','review2','review_extra']) {
   test(key+' absence correction appends an isolated audited revision and supports exact retry',()=>{
     const f=submittedAbsence(key),before=f.load().evaluation,request=correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false});
-    const result=f.c.recordReviewAbsence(request),after=f.load().evaluation;
+    const result=f.c.recordReviewAbsence_(request),after=f.load().evaluation;
     assert.equal(result.revision,before.revision+1);assert.equal(result.status,'Submitted');
     assert.equal(after.students[0].total,48);assert.equal(after.students[0].needsPublication,true);
     for(const field of ['teamScores','submittedAt','submittedDay','late','config','roster'])assert.equal(JSON.stringify(after[field]),JSON.stringify(before[field]));
@@ -995,20 +991,20 @@ for(const key of ['review1','review2','review_extra']) {
     assert.equal(event.action,'absenceCorrection');assert.equal(event.actor,'reviewer@x');assert.equal(event.requestId,request.requestId);assert(event.at);
     assert.equal(event.before.facts.approved,true);assert.equal(event.after.facts.approved,false);
     assert.equal(event.before.outcome.total,null);assert.equal(event.after.outcome.total,48);assert.equal(event.reason,undefined);
-    assert.equal(f.c.recordReviewAbsence(request).revision,after.revision);assert.equal(f.load().revision,after.revision);
-    assert.throws(()=>f.c.recordReviewAbsence({...request,absence:{type:'REVIEW_DAY_ABSENCE',approved:true}}),/different data/);
+    assert.equal(f.c.recordReviewAbsence_(request).revision,after.revision);assert.equal(f.load().revision,after.revision);
+    assert.throws(()=>f.c.recordReviewAbsence_({...request,absence:{type:'REVIEW_DAY_ABSENCE',approved:true}}),/different data/);
   });
   test(key+' absence correction keeps published results frozen until republication',()=>{
     const f=submittedAbsence(key,{type:'REVIEW_DAY_ABSENCE',approved:false});f.publish();
-    f.actor('one@x');const released=f.c.loadPublishedReviewEvaluation(key);f.actor('reviewer@x');
+    f.actor('one@x');const released=f.c.loadPublishedReviewEvaluation_(key);f.actor('reviewer@x');
     const before=f.load().evaluation;
-    f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true}));
+    f.c.recordReviewAbsence_(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true}));
     assert.equal(JSON.stringify(f.load().evaluation.students[1]),JSON.stringify(before.students[1]));
-    f.actor('one@x');const waiting=f.c.loadPublishedReviewEvaluation(key);
+    f.actor('one@x');const waiting=f.c.loadPublishedReviewEvaluation_(key);
     assert.equal(waiting.total,released.total);assert.equal(waiting.publication.sourceRevision,released.publication.sourceRevision);assert.equal(waiting.updatePending,true);
-    f.actor('two@x');assert.equal(f.c.loadPublishedReviewEvaluation(key).updatePending,false);f.actor('reviewer@x');
+    f.actor('two@x');assert.equal(f.c.loadPublishedReviewEvaluation_(key).updatePending,false);f.actor('reviewer@x');
     const sourceRevision=f.load().revision;f.publish('s1');f.actor('one@x');
-    const updated=f.c.loadPublishedReviewEvaluation(key);assert.equal(updated.total,null);assert.equal(updated.publication.sourceRevision,sourceRevision);assert.equal(updated.updatePending,false);
+    const updated=f.c.loadPublishedReviewEvaluation_(key);assert.equal(updated.total,null);assert.equal(updated.publication.sourceRevision,sourceRevision);assert.equal(updated.updatePending,false);
   });
   test(key+' absence correction UI saves, retries, cancels and preserves refresh failures',async()=>{
     const server=submittedAbsence(key),b=browserFixture(true,key);b.api.open('T1',b.trigger);b.requests[0].success(JSON.parse(JSON.stringify(server.load())));
@@ -1018,11 +1014,11 @@ for(const key of ['review1','review2','review_extra']) {
     assert(b.fields().every(field=>field.controls['[data-marks]'].disabled));
     host.controls.approved.value='no';b.events.input();assert.equal(b.drawer.querySelector('[data-summary-unsaved]').hidden,false);
     assert.match(b.drawer.querySelector('[data-summary-values="0"]').innerHTML,/48/);
-    await b.click('data-record-absence');const first=b.requests[1];assert.equal(first.name,'recordReviewAbsence');assert.equal(first.args[0].assessmentId,key);assert.equal(first.args[0].reason,undefined);
+    await b.click('data-record-absence');const first=b.requests[1];assert.equal(first.name,'recordReviewAbsence_');assert.equal(first.args[0].assessmentId,key);assert.equal(first.args[0].reason,undefined);
     await b.click('data-record-absence');assert.equal(b.requests.length,2);
     first.failure({message:'Offline'});assert.equal(host.controls.approved.value,'no');assert.equal(host.controls.approved.disabled,false);
     await b.click('data-record-absence');assert.equal(b.requests[2].args[0].requestId,first.args[0].requestId);
-    b.requests[2].success(server.c.recordReviewAbsence(first.args[0]));assert.match(b.drawer.innerHTML,/Edit absence details/);
+    b.requests[2].success(server.c.recordReviewAbsence_(first.args[0]));assert.match(b.drawer.innerHTML,/Edit absence details/);
     assert.equal(b.absenceNodes().get('0').controls.approved.disabled,true);
     await b.click('data-edit-absence');host=b.absenceNodes().get('0');host.controls.approved.value='yes';b.events.input();
     b.discard(false);await b.click('data-cancel-absence');assert.equal(host.controls.approved.value,'yes');await b.click('data-close');assert.equal(b.drawer.open,true);
@@ -1033,21 +1029,21 @@ for(const key of ['review1','review2','review_extra']) {
 }
 test('absence correction enforces authorization, eligibility, concurrency and payload boundaries',()=>{
   const f=submittedAbsence(),request=correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false}),revision=f.load().revision;
-  for(const actor of ['coord@x','guide@x','outsider@x']){f.actor(actor);assert.throws(()=>f.c.recordReviewAbsence(request),/assigned reviewer/);}
+  for(const actor of ['coord@x','guide@x','outsider@x']){f.actor(actor);assert.throws(()=>f.c.recordReviewAbsence_(request),/assigned reviewer/);}
   f.actor('reviewer@x');
-  for(const extra of [{student:'s2'},{student:'missing'},{revision:0},{token:'stale'},{scores:{}},{teamScores:{}},{makeup:{}},{decision:'OTHER'},{absence:{type:'UNSELECTED'}},{absence:{type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['OTHER'],otherEvidenceText:''}}])assert.throws(()=>f.c.recordReviewAbsence({...request,...extra}));
-  f.lock(false);assert.throws(()=>f.c.recordReviewAbsence(request),/saving/);f.lock(true);
-  f.reviews[0].weight++;assert.throws(()=>f.c.recordReviewAbsence(request),/CONFIGURATION_CHANGED/);f.reviews[0].weight--;
-  f.students.push({regNo:'s3',name:'Three',email:'three@x'});assert.throws(()=>f.c.recordReviewAbsence(request),/ROSTER_CHANGED/);f.students.pop();
+  for(const extra of [{student:'s2'},{student:'missing'},{revision:0},{token:'stale'},{scores:{}},{teamScores:{}},{makeup:{}},{decision:'OTHER'},{absence:{type:'UNSELECTED'}},{absence:{type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['OTHER'],otherEvidenceText:''}}])assert.throws(()=>f.c.recordReviewAbsence_({...request,...extra}));
+  f.lock(false);assert.throws(()=>f.c.recordReviewAbsence_(request),/saving/);f.lock(true);
+  f.reviews[0].weight++;assert.throws(()=>f.c.recordReviewAbsence_(request),/CONFIGURATION_CHANGED/);f.reviews[0].weight--;
+  f.students.push({regNo:'s3',name:'Three',email:'three@x'});assert.throws(()=>f.c.recordReviewAbsence_(request),/ROSTER_CHANGED/);f.students.pop();
   assert.equal(f.load().revision,revision);assert.equal(f.locked(),false);
-  const draft=absenceFixture();assert.throws(()=>draft.c.recordReviewAbsence(correctionInput(draft,{type:'REVIEW_DAY_ABSENCE',approved:true})),/Submit the evaluation/);
+  const draft=absenceFixture();assert.throws(()=>draft.c.recordReviewAbsence_(correctionInput(draft,{type:'REVIEW_DAY_ABSENCE',approved:true})),/Submit the evaluation/);
 });
 for(const key of ['review1','review2','review_extra'])test(key+' corrected approved absence shows submitted makeup criteria after reload',async()=>{
   const server=submittedAbsence(key,{type:'REVIEW_DAY_ABSENCE',approved:false});
   const before=server.load().evaluation;
-  server.c.recordReviewAbsence(correctionInput(server,{type:'REVIEW_DAY_ABSENCE',approved:true}));
+  server.c.recordReviewAbsence_(correctionInput(server,{type:'REVIEW_DAY_ABSENCE',approved:true}));
   const scores={I:{level:3,marks:32,remark:'Makeup viva completed'}};
-  server.c.submitReviewMakeup({...correctionInput(server,{}),absence:undefined,scores});
+  server.c.submitReviewMakeup_({...correctionInput(server,{}),absence:undefined,scores});
   const b=browserFixture(true,key);b.api.open('T1',b.trigger);
   b.requests[0].success(JSON.parse(JSON.stringify(server.load())));
   const check=()=>{
@@ -1064,7 +1060,7 @@ for(const key of ['review1','review2','review_extra'])test(key+' corrected appro
   assert.equal(JSON.stringify(server.student().scores),JSON.stringify(before.students[0].scores));
   assert.equal(JSON.stringify(server.load().evaluation.teamScores),JSON.stringify(before.teamScores));
   assert.equal(JSON.stringify(server.load().evaluation.students[1]),JSON.stringify(before.students[1]));
-  server.c.recordReviewAbsence(correctionInput(server,{type:'REVIEW_DAY_ABSENCE',approved:false}));
+  server.c.recordReviewAbsence_(correctionInput(server,{type:'REVIEW_DAY_ABSENCE',approved:false}));
   await b.click('data-reload');b.requests.at(-1).success(JSON.parse(JSON.stringify(server.load())));
   assert.equal(b.fields().find(f=>f.dataset.owner==='0').hidden,true);
   assert.equal(server.student().assessment.individualMark,0);
@@ -1072,24 +1068,24 @@ for(const key of ['review1','review2','review_extra'])test(key+' corrected appro
 
 test('absence corrections preserve makeup drafts and completed provenance as applicability changes',()=>{
   const f=submittedAbsence(),scores={I:{level:3,marks:32,remark:''}};
-  f.c.saveReviewMakeupDraft({...correctionInput(f,{}),absence:undefined,scores});
+  f.c.saveReviewMakeupDraft_({...correctionInput(f,{}),absence:undefined,scores});
   const draft=JSON.stringify(f.student().assessment.makeupDraft);
-  f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false}));assert.equal(JSON.stringify(f.student().assessment.makeupDraft),draft);
-  f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true}));
-  f.c.submitReviewMakeup({...correctionInput(f,{}),absence:undefined,scores});
+  f.c.recordReviewAbsence_(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false}));assert.equal(JSON.stringify(f.student().assessment.makeupDraft),draft);
+  f.c.recordReviewAbsence_(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true}));
+  f.c.submitReviewMakeup_({...correctionInput(f,{}),absence:undefined,scores});
   const makeup=JSON.stringify(f.student().assessment.makeup),events=JSON.stringify(f.student().assessment.events);
-  f.c.recordReviewAbsence(correctionInput(f,{type:'PROLONGED',approved:true,verifiedContribution:false,attended:false}));assert.equal(f.student().total,32);
-  f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false}));assert.equal(f.student().total,48);
-  f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['OTHER'],otherEvidenceText:'Permission checked'}));assert.equal(f.student().total,80);
+  f.c.recordReviewAbsence_(correctionInput(f,{type:'PROLONGED',approved:true,verifiedContribution:false,attended:false}));assert.equal(f.student().total,32);
+  f.c.recordReviewAbsence_(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false}));assert.equal(f.student().total,48);
+  f.c.recordReviewAbsence_(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['OTHER'],otherEvidenceText:'Permission checked'}));assert.equal(f.student().total,80);
   assert.equal(JSON.stringify(f.student().assessment.makeup),makeup);assert.equal(JSON.stringify(f.student().assessment.events.slice(0,JSON.parse(events).length)),events);
-  assert.throws(()=>f.c.recordReviewAbsence(correctionInput(f,{type:'NORMAL'})),/coordinator to reopen/);
-  assert.throws(()=>f.c.recordReviewAbsence(correctionInput(f,{type:'PROLONGED',approved:true,verifiedContribution:true,attended:true})),/coordinator to reopen/);
+  assert.throws(()=>f.c.recordReviewAbsence_(correctionInput(f,{type:'NORMAL'})),/coordinator to reopen/);
+  assert.throws(()=>f.c.recordReviewAbsence_(correctionInput(f,{type:'PROLONGED',approved:true,verifiedContribution:true,attended:true})),/coordinator to reopen/);
 });
 test('attended absence can become normal using existing normal scores; evidence-only edits retain outcomes',()=>{
   const f=submittedAbsence('review1',{type:'PROLONGED',approved:true,verifiedContribution:true,attended:true}),before=f.student();
-  f.c.recordReviewAbsence(correctionInput(f,{...before.assessment.facts,supportingEvidence:['MEDICAL_DOCUMENT']}));assert.equal(f.student().total,before.total);
-  f.c.recordReviewAbsence(correctionInput(f,{type:'NORMAL'}));assert.equal(f.student().total,80);assert.equal(JSON.stringify(f.student().scores),JSON.stringify(before.scores));
-  assert.throws(()=>f.c.recordReviewAbsence(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true})),/existing absences/);
+  f.c.recordReviewAbsence_(correctionInput(f,{...before.assessment.facts,supportingEvidence:['MEDICAL_DOCUMENT']}));assert.equal(f.student().total,before.total);
+  f.c.recordReviewAbsence_(correctionInput(f,{type:'NORMAL'}));assert.equal(f.student().total,80);assert.equal(JSON.stringify(f.student().scores),JSON.stringify(before.scores));
+  assert.throws(()=>f.c.recordReviewAbsence_(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true})),/existing absences/);
 });
 
 

@@ -63,9 +63,20 @@ function dtoFacts(dto) {
 }
 
 const normalize = facts => JSON.parse(JSON.stringify(facts));
+const call = (g, name, ...args) => JSON.parse(g.c[name](...args)).data;
+/** The overview with the progress sections merged in, as the view presents the completed dashboard. */
+function progressFromSections(g) {
+  const overview = call(g, 'API_coordinator_getOverview'), guide = call(g, 'API_coordinator_getGuideProgress'), health = call(g, 'API_coordinator_getHealth');
+  const reviews = Object.fromEntries(overview.reviewColumns.map(c => [c.key, call(g, 'API_coordinator_getReviewProgress', c.key)]));
+  return { ...overview, loading: false, partial: health.partial,
+    stats: { ...overview.stats, needsAttention: health.needsAttention, guideEvaluation: { available: guide.available, completed: guide.completed },
+      reviews: overview.stats.reviews.map(r => ({ ...r, completed: reviews[r.key].completed, unavailable: reviews[r.key].unavailable, known: true })) },
+    teams: overview.teams.map(t => ({ ...t, health: health.teams[t.teamId].health, pendingDeadlines: health.teams[t.teamId].pendingDeadlines, guideEvaluation: guide.teams[t.teamId],
+      reviews: Object.fromEntries(Object.keys(reviews).map(key => [key, reviews[key].teams[t.teamId]])) })),
+    deadlinePills: health.deadlinePills };
+}
 function stage(g, name) {
-  const loading = name === 'overview';
-  return { dto: JSON.parse(g.c[loading ? 'API_coordinator_getOverview' : 'API_coordinator_getProgress']()).data };
+  return { dto: name === 'overview' ? call(g, 'API_coordinator_getOverview') : progressFromSections(g) };
 }
 
 test('coordinator DTO carries the same facts the server-rendered stats and tracker showed', () => {
@@ -78,48 +89,29 @@ test('coordinator DTO carries the same facts the server-rendered stats and track
 
 module.exports = { dtoFacts, stage, normalize };
 
-test('the overview reads no marks or logs; progress reports unavailable reviews as partial', () => {
+test('the overview reads no marks or logs; the progress reads report unavailable reviews as partial', () => {
   const g = coordinatorFixture();
   let marks = 0, logs = 0;
   const original = g.c.getAllReviewCompletionStatus_, readLogs = g.c.readLogEntries_;
-  g.c.getAllReviewCompletionStatus_ = () => { marks++; return original(); };
+  g.c.getAllReviewCompletionStatus_ = (...args) => { marks++; return original(...args); };
   g.c.readLogEntries_ = () => { logs++; return readLogs(); };
-  const overview = JSON.parse(g.c.API_coordinator_getOverview()).data;
+  const overview = call(g, 'API_coordinator_getOverview');
   assert.equal(overview.loading, true);
   assert.equal(marks + logs, 0);
   assert(overview.teams.every(t => t.health === 'loading' && Object.values(t.reviews).every(v => v === 'Loading…')));
-  const progress = JSON.parse(g.c.API_coordinator_getProgress()).data;
-  assert.equal(progress.loading, false);
+  const progress = progressFromSections(g);
   assert.equal(progress.partial, true);
-  assert.equal(marks, 1);
+  assert.equal(marks, 3, 'one read per Review plus health, nothing more');
 });
 
-test('progress survives unavailable marks and the DTO contains no markup', () => {
+test('unavailable marks fail the Review read alone; health still answers and no DTO contains markup', () => {
   const g = coordinatorFixture({ progressFails: true });
-  const frame = JSON.parse(g.c.API_coordinator_getProgress());
-  assert.equal(frame.ok, true);
-  assert(frame.data.teams.every(t => Object.values(t.reviews).every(v => v === 'Unavailable')));
-  assert.doesNotMatch(JSON.stringify(frame.data), /<(div|td|tr|span|button)\b|class=|onclick=/);
-});
-
-test('the split progress endpoints together carry what getProgress carries', () => {
-  const g = coordinatorFixture(), call = (name, ...args) => JSON.parse(g.c[name](...args)).data;
-  const progress = call('API_coordinator_getProgress'), guide = call('API_coordinator_getGuideProgress'), health = call('API_coordinator_getHealth');
-  const reviews = Object.fromEntries(progress.reviewColumns.map(c => [c.key, call('API_coordinator_getReviewProgress', c.key)]));
-  for (const review of progress.stats.reviews) {
-    const part = reviews[review.key];
-    assert.deepEqual({ completed: part.completed, unavailable: part.unavailable, label: part.label }, { completed: review.completed, unavailable: review.unavailable, label: review.label });
-  }
-  assert.deepEqual({ available: guide.available, completed: guide.completed }, progress.stats.guideEvaluation);
-  assert.equal(health.needsAttention, progress.stats.needsAttention);
-  assert.equal(health.partial, progress.partial);
-  assert.deepEqual(health.deadlinePills, progress.deadlinePills);
-  for (const team of progress.teams) {
-    assert.equal(guide.teams[team.teamId], team.guideEvaluation, team.teamId);
-    assert.deepEqual(health.teams[team.teamId], { health: team.health, pendingDeadlines: team.pendingDeadlines }, team.teamId);
-    for (const key of Object.keys(team.reviews)) assert.equal(reviews[key].teams[team.teamId], team.reviews[key], team.teamId + ' ' + key);
-  }
-  assert.doesNotMatch(JSON.stringify([guide, health, reviews]), /<(div|td|tr|span|button)|class=|onclick=/);
+  const review = JSON.parse(g.c.API_coordinator_getReviewProgress('review1'));
+  assert.equal(review.ok, false);
+  assert.equal(review.error.message, 'marks unavailable');
+  const health = JSON.parse(g.c.API_coordinator_getHealth());
+  assert.equal(health.ok, true);
+  assert.doesNotMatch(JSON.stringify([review, health, call(g, 'API_coordinator_getGuideProgress')]), /<(div|td|tr|span|button)|class=|onclick=/);
 });
 
 test('the split endpoints check access, reject unknown reviews and fail independently', () => {
@@ -135,7 +127,7 @@ test('the split endpoints check access, reject unknown reviews and fail independ
 
 test('the activity endpoint returns the existing weekly activity and checks access', () => {
   const g = coordinatorFixture();
-  g.c.loadAllTeamsWeeklyActivity = () => ({ state: 'active', teams: {}, totalTeams: 5, activeTeams: 2, checkedAt: '2026-01-10T00:00:00.000Z' });
+  g.c.loadAllTeamsWeeklyActivity_ = () => ({ state: 'active', teams: {}, totalTeams: 5, activeTeams: 2, checkedAt: '2026-01-10T00:00:00.000Z' });
   assert.deepEqual(JSON.parse(g.c.API_coordinator_getActivity()).data.activeTeams, 2);
   g.f.user('guide@example.com');
   assert.equal(JSON.parse(g.c.API_coordinator_getActivity()).error.code, 'UNAUTHORIZED');
@@ -143,7 +135,7 @@ test('the activity endpoint returns the existing weekly activity and checks acce
 
 test('weekly setup endpoints check access, keep the existing rules and reject unknown requests', () => {
   const g = coordinatorFixture(), calls = [];
-  g.c.getWeeklyProgressPhase2Readiness = () => ({ storageReady: false, triggerReady: null, canSetupStorage: true, canSetupTriggers: false, issues: ['Missing sheet'] });
+  g.c.getWeeklyProgressPhase2Readiness_ = () => ({ storageReady: false, triggerReady: null, canSetupStorage: true, canSetupTriggers: false, issues: ['Missing sheet'] });
   g.c.setupWeeklyProgressPhase2Storage = () => { calls.push('storage'); return { ok: true }; };
   g.c.setupWeeklyProgressPhase2Triggers = () => { throw new Error('GEMINI_API_KEY not found.'); };
   assert.equal(JSON.parse(g.c.API_coordinator_getWeeklySetup()).data.issues[0], 'Missing sheet');
@@ -158,17 +150,17 @@ test('weekly setup endpoints check access, keep the existing rules and reject un
 
 test('System Status card endpoints delegate to the existing functions and keep their messages', () => {
   const g = coordinatorFixture(), seen = [];
-  const map = { API_coordinator_getCommitteeConfiguration: 'getCoordinatorCommitteeConfiguration', API_coordinator_getReviewConfiguration: 'getCoordinatorReviewConfiguration', API_coordinator_createDefinitions: 'createAssessmentDefinitions', API_coordinator_prepareStorage: 'prepareReviewAssessmentStorage', API_coordinator_syncGithub: 'syncCoordinatorGithubAccess' };
+  const map = { API_coordinator_getCommitteeConfiguration: 'getCoordinatorCommitteeConfiguration_', API_coordinator_getReviewConfiguration: 'getCoordinatorReviewConfiguration_', API_coordinator_createDefinitions: 'createAssessmentDefinitions_', API_coordinator_prepareStorage: 'prepareReviewAssessmentStorage_', API_coordinator_syncGithub: 'syncCoordinatorGithubAccess_' };
   for (const [endpoint, legacy] of Object.entries(map)) {
     g.c[legacy] = () => { seen.push(legacy); return { from: legacy }; };
     assert.deepEqual(JSON.parse(g.c[endpoint]()).data, { from: legacy });
   }
-  g.c.resendExpiredStudentInvitations = cursor => ({ cursor });
+  g.c.resendExpiredStudentInvitations_ = cursor => ({ cursor });
   assert.deepEqual(JSON.parse(g.c.API_coordinator_resendInvitations('t4')).data, { cursor: 't4' });
   assert.deepEqual(JSON.parse(g.c.API_coordinator_resendInvitations()).data, { cursor: '' });
-  g.c.createAssessmentDefinitions = () => { throw new Error('Coordinator access is required.'); };
+  g.c.createAssessmentDefinitions_ = () => { throw new Error('Coordinator access is required.'); };
   assert.deepEqual(JSON.parse(g.c.API_coordinator_createDefinitions()).error, { code: 'REJECTED', message: 'Coordinator access is required.' });
   assert.equal(seen.length, 5);
   const fs = require('node:fs'), src = fs.readFileSync('dashboard-client-scripts.js', 'utf8');
-  for (const name of Object.values(map).concat('resendExpiredStudentInvitations')) assert.equal(src.includes('.' + name + '('), false, name + ' must go through the bridge');
+  for (const name of Object.values(map).concat('resendExpiredStudentInvitations_')) assert.equal(src.includes('.' + name + '('), false, name + ' must go through the bridge');
 });

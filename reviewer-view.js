@@ -6,6 +6,7 @@
  */
 function reviewerViewBrowser_(bridge, getUi) {
   'use strict';
+  const delegated = new WeakSet();
   const PAGE_SIZES = [10, 25, 50, 'all'];
   const state = {dto:null, host:null, query:'', page:1, size:10, busyTeam:null};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -131,9 +132,7 @@ function reviewerViewBrowser_(bridge, getUi) {
       '<table class="min-w-full divide-y divide-edge bg-paper text-left"><thead class="bg-canvas text-xs font-semibold uppercase tracking-wider text-muted"><tr>' +
       '<th scope="col" class="px-4 py-3">Team</th><th scope="col" class="px-4 py-3">Guide</th><th scope="col" class="px-4 py-3">Register Numbers</th><th scope="col" class="px-4 py-3">Project Title</th><th scope="col" class="px-4 py-3">Committee</th><th scope="col" class="px-4 py-3">Title Approval</th>' + head +
       '</tr></thead><tbody data-reviewer-body>' + part.rows + '</tbody></table></div><div data-reviewer-pagination>' + part.pagination + '</div></section>';
-    host.onclick = onClick;
-    host.oninput = onInput;
-    host.onchange = onChange;
+    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('input', onInput); host.addEventListener('change', onChange); }
   }
 
   function onInput(event) {

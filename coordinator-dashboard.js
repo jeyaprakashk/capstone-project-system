@@ -21,16 +21,12 @@ function coordinatorRead_(operation, read) {
   }
 }
 
-function getCoordinatorDashboardData() {
-  return coordinatorRead_('core', getCoordinatorDashboardData_);
-}
-
 function getCoordinatorRepositoryStatus_(repoUrl) {
   const ready = !!String(repoUrl || '').trim();
   return {repositoryOnly:true, ready, message:ready ? 'Repository URL recorded' : 'Repository URL missing'};
 }
 
-function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
+function getCoordinatorDashboardData_(deferAssessments, timings) {
   const measure = (phase, read) => {
     if (!timings) return read();
     const started = Date.now();
@@ -41,22 +37,20 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
   const dataStarted = Date.now();
   const reviewTimings = timings ? [] : undefined;
   const repositoryTimings = timings ? [] : undefined;
-  const TS = measure('status_columns', () => getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS));
-  const TR = measure('roster_columns', () => getColumnMap(SHEET_NAMES.TEAM_ROSTER, FIELD_DEFINITIONS.TEAM_ROSTER));
-  const RC = skipAccess ? {} : measure('committee_columns', () => getColumnMap(SHEET_NAMES.REVIEW_COMMITTEE, FIELD_DEFINITIONS.REVIEW_COMMITTEE));
+  const TS = measure('status_columns', () => getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS));
+  const TR = measure('roster_columns', () => getColumnMap_(SHEET_NAMES.TEAM_ROSTER, FIELD_DEFINITIONS.TEAM_ROSTER));
 
-  const statusRows = measure('status_rows', () => getSheetRows(SHEET_NAMES.TEAM_STATUS)).filter(r => r[TS.TEAM_ID]);
-  const rosterRows = measure('roster_rows', () => getSheetRows(SHEET_NAMES.TEAM_ROSTER));
-  const committeeRows = skipAccess ? [] : measure('committee_rows', () => getSheetRows(SHEET_NAMES.REVIEW_COMMITTEE));
-  const repoUrlMap = measure('repository_map', () => getRepoUrlMap(repositoryTimings));
+  const statusRows = measure('status_rows', () => getSheetRows_(SHEET_NAMES.TEAM_STATUS)).filter(r => r[TS.TEAM_ID]);
+  const rosterRows = measure('roster_rows', () => getSheetRows_(SHEET_NAMES.TEAM_ROSTER));
+  const repoUrlMap = measure('repository_map', () => getRepoUrlMap_(repositoryTimings));
   const githubByTeam = Object.fromEntries(statusRows.map(row => {
     const id = normalizeText_(row[TS.TEAM_ID]);
     return [id, getCoordinatorRepositoryStatus_(repoUrlMap[id])];
   }));
   const logRows = deferAssessments ? [] : measure('historical_logs', () => readLogEntries_());
 
-  const rosterByTeamId = groupBy(rosterRows, r => r[TR.TEAM_ID]);
-  const logsByTeam = groupBy(logRows, r => r.teamId);
+  const rosterByTeamId = groupBy_(rosterRows, r => r[TR.TEAM_ID]);
+  const logsByTeam = groupBy_(logRows, r => r.teamId);
 
   // Stats
   const total = statusRows.length;
@@ -66,7 +60,6 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
   let schedule = null;
   try { schedule = measure('schedule', () => getProjectSchedule_()); } catch (err) { /* Configuration card provides recovery. */ }
   const clock = schedule ? getProjectClock_(schedule) : null;
-  const activeThisWeek = null; // Filled by the independent activity request.
 
   const guideEvaluation = deferAssessments ? {available:false,completed:0,teams:{}} : measure('guide_evaluation', () => guideCompletion_());
   // Review completion
@@ -87,34 +80,6 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
   const needsAttention = Object.values(healthByTeam).filter(h => h.health === 'attention').length;
 
 
-  const stages = {
-    setup:{completed:Object.values(githubByTeam).filter(setup => setup.ready).length,total}, titleApproval:{completed:titleApproved,total},
-    ...reviewStats, guideEval:{completed:0,total}
-  };
-  const assessmentProgress = {
-    ...Object.fromEntries(reviews.map(review => [review.key, {
-      completed:reviewStats[review.key].completed, pending:total - reviewStats[review.key].completed - reviewStats[review.key].unavailable, unavailable:reviewStats[review.key].unavailable
-    }])),
-    guideEval:{completed:0,pending:total}
-  };
-
-  // Needs attention teams
-  const needsAttentionTeams = statusRows
-    .map(r => ({
-      row: r,
-      status: getTeamStatus(r),
-      health: healthByTeam[normalizeText_(r[TS.TEAM_ID])].health,
-      severity: healthByTeam[normalizeText_(r[TS.TEAM_ID])].severity,
-      issue: healthByTeam[normalizeText_(r[TS.TEAM_ID])].issue,
-      daysOverdue: healthByTeam[normalizeText_(r[TS.TEAM_ID])].daysOverdue,
-      repoUrl: repoUrlMap[normalizeText_(r[TS.TEAM_ID])]
-    }))
-    .filter(t => t.health === 'attention')
-    .sort((a, b) => {
-      const severityOrder = { high: 0, medium: 1, low: 2 };
-      return severityOrder[a.severity] - severityOrder[b.severity];
-    });
-
   // Team tracker data
   const teamTrackerData = statusRows.map(r => {
     const teamId = normalizeText_(r[TS.TEAM_ID]);
@@ -122,7 +87,6 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
       reviewCompletion[teamId] || {};
     const rosterRow = rosterByTeamId[normalizeText_(r[TS.TEAM_ID])] ? rosterByTeamId[normalizeText_(r[TS.TEAM_ID])][0] : null;
     const guide = rosterRow ? rosterRow[TR.GUIDE_NAME] : '—';
-    const committee = r[TS.COMMITTEE_NUMBER];
     const deadlineEvents = deferAssessments ? [] : getTeamDeadlineEvents_(r, TS, repoUrlMap[teamId], logsByTeam[teamId] || [], teamReview, schedule, clock, logSummaryByTeam[teamId], githubByTeam[teamId]);
 
     return {
@@ -131,43 +95,23 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
       emailRecipients:[...new Set(['GUIDE_EMAIL','S1_EMAIL','S2_EMAIL','S3_EMAIL','S4_EMAIL'].map(key => String((rosterRow && rosterRow[TR[key]]) || r[TS[key]] || '').trim().toLowerCase()).filter(email => /^[^\s@,;:?&#]+@[^\s@,;:?&#]+\.[^\s@,;:?&#]+$/.test(email)))],
       title: r[TS.TITLE],
       registerNumbers: [1,2,3,4].map(number => String(r[TS['S' + number + '_REGNO']] || '').trim()).filter(Boolean),
-      titleStatus: getTeamStatus(r),
+      titleStatus: getTeamStatus_(r),
       repoStatus: githubByTeam[teamId].ready ? 'ready' : 'pending',
       githubMessage: githubByTeam[teamId].message,
       githubTiming: '',
       repoUrl: repoUrlMap[normalizeText_(r[TS.TEAM_ID])],
       deadlineEvents,
       pendingDeadlines:deadlineEvents.filter(event => !event.complete && clock && clock.today >= event.due - DEADLINE_PILL_LEAD_DAYS_).map(event => event.key),
-      weeklyActivity: null,
       guideEvaluation:deferAssessments ? 'Loading…' : !guideEvaluation.available ? 'Unavailable' : guideEvaluation.teams[teamId] ? 'Completed' : 'Pending',
       reviews:Object.fromEntries(reviews.map(review => [review.key, deferAssessments ? 'Loading…' : !teamReview[review.key] || teamReview[review.key].available === false ? 'Unavailable' : teamReview[review.key].completed ? 'Completed' : 'Pending'])),
-      outcome: healthByTeam[normalizeText_(r[TS.TEAM_ID])].health,
       health: healthByTeam[normalizeText_(r[TS.TEAM_ID])].health,
-      committee,
-      row: r
     };
   });
 
-  // GitHub coordinator access info
-  const coordUsername = String(
-    skipAccess ? '' : getConfig('COLLABORATOR_GITHUB_USERNAME')
-  ).trim();
-
-  const reposWithAccess = Number(
-    skipAccess ? 0 : getConfig('COLLABORATOR_REPOS_ACCESS')
-  ) || 0;
-
-  const totalRepos = reposReady;
-
   const result = {
-    stats: { loading:!!deferAssessments, total, titleApproved, reposReady, activeThisWeek, reviews:reviewStats, needsAttention, guideEvaluation },
-    stages,
-    assessmentProgress,
-    needsAttentionTeams,
+    stats: { loading:!!deferAssessments, total, titleApproved, reposReady, reviews:reviewStats, needsAttention, guideEvaluation },
     teamTrackerData,
-    deadlinePills:buildDeadlinePills_(teamTrackerData.map(team => team.deadlineEvents), clock ? clock.today : null),
-    committees:buildCommitteeData_(committeeRows, statusRows, RC, TS),
-    githubAccess: { coordUsername, reposWithAccess, totalRepos }
+    deadlinePills:buildDeadlinePills_(teamTrackerData.map(team => team.deadlineEvents), clock ? clock.today : null)
   };
   if (timings) {
     const measuredMs = timings.reduce((sum, item) => sum + item.durationMs, 0);
@@ -176,11 +120,8 @@ function getCoordinatorDashboardData_(deferAssessments, skipAccess, timings) {
   }
   return result;
 }
-function getCoordinatorTeamDetails(teamId) {
-  return coordinatorRead_('team-details', () => getCoordinatorTeamDetails_(teamId));
-}
 
-function loadCoordinatorDrawerSection(teamId, section) {
+function loadCoordinatorDrawerSection_(teamId, section) {
   return coordinatorRead_('drawer-' + section, () => {
     if (!['basic','progress','activity'].includes(section)) throw new Error('Unknown drawer section.');
     return getCoordinatorTeamDetails_(teamId, section);
@@ -191,18 +132,18 @@ function getCoordinatorTeamDetails_(teamId, section) {
   teamId = String(teamId || '').trim();
   if (!teamId) throw new Error('Team ID is required.');
 
-  const TS = getColumnMap(
+  const TS = getColumnMap_(
     SHEET_NAMES.TEAM_STATUS,
     FIELD_DEFINITIONS.TEAM_STATUS
   );
 
-  const TR = section === 'progress' || section === 'activity' ? {} : getColumnMap(
+  const TR = section === 'progress' || section === 'activity' ? {} : getColumnMap_(
     SHEET_NAMES.TEAM_ROSTER,
     FIELD_DEFINITIONS.TEAM_ROSTER
   );
 
-  const statusRows = getSheetRows(SHEET_NAMES.TEAM_STATUS);
-  const rosterRows = section === 'progress' || section === 'activity' ? [] : getSheetRows(SHEET_NAMES.TEAM_ROSTER);
+  const statusRows = getSheetRows_(SHEET_NAMES.TEAM_STATUS);
+  const rosterRows = section === 'progress' || section === 'activity' ? [] : getSheetRows_(SHEET_NAMES.TEAM_ROSTER);
 
   const statusRow = statusRows.find(function(r) {
     return textEquals_(r[TS.TEAM_ID], teamId);
@@ -222,10 +163,10 @@ function getCoordinatorTeamDetails_(teamId, section) {
     const reviews = getTeamReviewCompletionStatus_(teamId) || {};
     const context = weeklyActivityContext_();
     const logs = readLogEntries_(teamId);
-    const progressRepoUrl = getRepoUrlForTeam(teamId);
+    const progressRepoUrl = getRepoUrlForTeam_(teamId);
     const progressSetup = getCoordinatorRepositoryStatus_(progressRepoUrl);
     return {
-      titleStatus:getTeamStatus(statusRow), guideDecision:String(statusRow[TS.GUIDE_DECISION] || ''),
+      titleStatus:getTeamStatus_(statusRow), guideDecision:String(statusRow[TS.GUIDE_DECISION] || ''),
       reviewerDecision:String(statusRow[TS.REVIEWER_DECISION] || ''),
       repoStatus:progressSetup.message,
       health:assessProjectTeam_(statusRow, TS, progressRepoUrl, logs, reviews, context.schedule, context.clock, null, progressSetup).health,
@@ -237,7 +178,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
     return textEquals_(r[TR.TEAM_ID], teamId);
   });
 
-  const repoUrl = getRepoUrlForTeam(teamId);
+  const repoUrl = getRepoUrlForTeam_(teamId);
   const githubSetup = getCoordinatorRepositoryStatus_(repoUrl);
 
   // -----------------------------
@@ -278,7 +219,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
     statusRow[TS.COMMITTEE_NUMBER] ||
     (rosterRow ? rosterRow[TR.COMMITTEE_NUMBER] : '');
 
-  const committeeInfo = getCommitteeInfo(committeeNumber);
+  const committeeInfo = getCommitteeInfo_(committeeNumber);
 
   const reviewers = [];
 
@@ -335,7 +276,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
     committeeNumber: String(committeeNumber || '').trim(),
     reviewers: reviewers,
 
-    titleStatus: getTeamStatus(statusRow),
+    titleStatus: getTeamStatus_(statusRow),
     guideDecision: String(statusRow[TS.GUIDE_DECISION] || '').trim(),
     reviewerDecision: String(statusRow[TS.REVIEWER_DECISION] || '').trim(),
 
@@ -387,19 +328,19 @@ function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock
 // ===================================================================
 
 
-function getCoordinatorCommitteeConfiguration() {
+function getCoordinatorCommitteeConfiguration_() {
   const email=Session.getActiveUser().getEmail();
-  if(!email||(!emailsMatch(email,getCoordinatorEmail())&&!emailsMatch(email,getConfig('CELL_PD_EMAIL'))))throw new Error('Coordinator access is required.');
+  if(!email||(!emailsMatch_(email,getCoordinatorEmail_())&&!emailsMatch_(email,getConfig_('CELL_PD_EMAIL'))))throw new Error('Coordinator access is required.');
   return withDashboardRead_(()=>{
     const issues=[],links={},checkedAt=new Date().toISOString();let committees=[];
     try {
-      const committeeSheet=getSheet(SHEET_NAMES.REVIEW_COMMITTEE),teamSheet=getSheet(SHEET_NAMES.TEAM_STATUS);
+      const committeeSheet=getSheet_(SHEET_NAMES.REVIEW_COMMITTEE),teamSheet=getSheet_(SHEET_NAMES.TEAM_STATUS);
       for(const [key,sheet] of [['committees',committeeSheet],['assignments',teamSheet]])if(sheet)links[key]='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit#gid='+sheet.getSheetId();
       if(!committeeSheet)return {valid:false,state:'definitions-missing',summary:'Review committee configuration required',issues:[{message:'The ReviewCommittee tab is missing.'}],committees,links,checkedAt};
-      const RC=getColumnMap(SHEET_NAMES.REVIEW_COMMITTEE,FIELD_DEFINITIONS.REVIEW_COMMITTEE);
-      const rows=getSheetRows(SHEET_NAMES.REVIEW_COMMITTEE);
-      const TS=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
-      const teams=getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row=>row[TS.TEAM_ID]);
+      const RC=getColumnMap_(SHEET_NAMES.REVIEW_COMMITTEE,FIELD_DEFINITIONS.REVIEW_COMMITTEE);
+      const rows=getSheetRows_(SHEET_NAMES.REVIEW_COMMITTEE);
+      const TS=getColumnMap_(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
+      const teams=getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row=>row[TS.TEAM_ID]);
       committees=buildCommitteeData_(rows,teams,RC,TS);
       if(!committees.length)issues.push({message:'No review committees configured. Add committee numbers and reviewer email addresses in ReviewCommittee.'});
       committees.filter(c=>!c.members.some(m=>m.email.trim())).forEach(c=>issues.push({message:'Committee '+c.number+' has no reviewer email addresses.'}));

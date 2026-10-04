@@ -15,12 +15,12 @@ function fixture(count=1) {
     Session:{getActiveUser:()=>({getEmail:()=> 'coord@x'})},getDashboardRoleViews_:()=>authorized?[{key:'coord'}]:[],
     LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){released++;}})},
     SHEET_NAMES:{TEAM_STATUS:'teams',GITHUB_ACCOUNTS:'accounts'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},
-    getColumnMap:()=>({TEAM_ID:0,S1_EMAIL:1,S2_EMAIL:2}),getSheetRows:name=>name==='teams'?teams:accounts,
-    getSheet:()=>({}),readSheetRows_:()=>[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL']],
-    weeklyStudents_:()=>students,normalizeText_:norm,emailsMatch:(a,b)=>norm(a)===norm(b),textEquals_:(a,b)=>norm(a)===norm(b),
-    getRepoUrlMap:()=>Object.fromEntries(teams.map(t=>[norm(t[0]),'https://github.com/org/'+t[0]])),
+    getColumnMap_:()=>({TEAM_ID:0,S1_EMAIL:1,S2_EMAIL:2}),getSheetRows_:name=>name==='teams'?teams:accounts,
+    getSheet_:()=>({}),readSheetRows_:()=>[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL']],
+    weeklyStudents_:()=>students,normalizeText_:norm,emailsMatch_:(a,b)=>norm(a)===norm(b),textEquals_:(a,b)=>norm(a)===norm(b),
+    getRepoUrlMap_:()=>Object.fromEntries(teams.map(t=>[norm(t[0]),'https://github.com/org/'+t[0]])),
     getGithubRepoSlug_:url=>url.replace('https://github.com/',''),
-    makeGithubRequest(method,path,payload) {
+    makeGithubRequest_(method,path,payload) {
       calls.push({method,path,payload}); const override=hook?.(method,path,payload);if(override)return override;
       if(path.startsWith('/user/')) { const id=Number(path.split('/').pop());return {status:200,body:{id,login:'user'+id,type:'User',html_url:'https://github.com/user'+id}}; }
       if(path.includes('/invitations?'))return {status:200,body:invites.slice()};
@@ -34,7 +34,7 @@ function fixture(count=1) {
     }
   });
   for(const file of ['github-identity.js','team-github-setup.js','github-invitation-resend.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
-  return {c,teams,accounts,students,invites,calls,active,run:cursor=>c.resendExpiredStudentInvitations(cursor),setHook:value=>hook=value,deny:()=>authorized=false,released:()=>released};
+  return {c,teams,accounts,students,invites,calls,active,run:cursor=>c.resendExpiredStudentInvitations_(cursor),setHook:value=>hook=value,deny:()=>authorized=false,released:()=>released};
 }
 test('replaces expired invitations, resolves renamed users by ID, preserves registrations and is repeatable',()=>{
   const f=fixture();f.invites.push({id:7,invitee:{id:1},permissions:'write',expired:true});f.active.add(2);
@@ -87,14 +87,13 @@ function browser() {
   const viewContext=vm.createContext({});vm.runInContext(fs.readFileSync('system-status-view.js','utf8'),viewContext);
   const {document}=parseHTML('<html><body><div id="status"></div></body></html>');
   viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null).render(document.getElementById('status'),{github:{coordUsername:'',reposWithAccess:0,totalRepos:0},publishing:{configured:false,items:[]}});
-  const requests=[];const c=vm.createContext({document,Map,escapeClientHtml:x=>String(x).replaceAll('<','&lt;'),DataBridge:{write:(method,args)=>{const p=new Sync(),r={method,cursor:args[0],success:v=>p.resolve(v),failure:e=>p.reject(e)};requests.push(r);return p;}}});
-  const source=fs.readFileSync('dashboard-client-scripts.js','utf8');
-  c.byId=id=>document.getElementById(id);c.renderLucideIcon_=()=>'';
+  const requests=[];const c=vm.createContext({document,Map});
   // linkedom lacks the browser select.value setter used by the shared helper.
   Object.defineProperty(document.getElementById('studentInvitationsPageSize'),'value',{value:'10',writable:true});
-  vm.runInContext(source.slice(source.indexOf('  function renderTeamPagination('),source.indexOf('  function escapeDrawerHtml(')),c);
-  vm.runInContext(source.slice(source.indexOf('  let studentInvitationResendBusy'),source.indexOf('  function refreshGithubStatus(')),c);
-  return {document,requests,run:()=>c.runStudentInvitationResend(),resize:value=>c.changeTeamPageSize('invitations',value),host:document.getElementById('studentInvitationResend')};
+  vm.runInContext(fs.readFileSync('system-status-actions.js','utf8'),c);
+  const bridge={write:(method,args)=>{const p=new Sync(),r={method,cursor:args[0],success:v=>p.resolve(v),failure:e=>p.reject(e)};requests.push(r);return p;}};
+  const actions=c.systemStatusActionsBrowser_(bridge,()=>({beginContentLoading:()=>()=>{},notify:()=>{},renderIcon:()=>''}));
+  return {document,requests,run:()=>actions.runStudentInvitationResend(),resize:value=>actions.changeTeamPageSize('invitations',value),host:document.getElementById('studentInvitationResend')};
 }
 test('browser blocks duplicate clicks, accumulates batches, preserves results on failure and retries cursor',()=>{
   const f=browser();f.run();f.run();assert.equal(f.requests.length,1);

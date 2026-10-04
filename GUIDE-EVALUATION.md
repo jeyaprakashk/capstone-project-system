@@ -81,10 +81,10 @@ this log. Normal sheet ownership/sharing must keep it inaccessible to students.
 The existing Apps Script deployment identity writes it on authenticated users'
 behalf; every public endpoint verifies the actual signed-in user.
 
-Read APIs: `loadGuideEvaluation(team, student)`,
-`loadCoordinatorGuideEvaluations()`, `loadPublishedGuideEvaluation()`.
-Write APIs: `saveGuideEvaluationDraft(input)`, `submitGuideEvaluation(input)`,
-`publishGuideEvaluation(input)`, `reopenGuideEvaluation(input)`.
+Read APIs: `loadGuideEvaluation_(team, student)`,
+`loadCoordinatorGuideEvaluations_()`, `loadPublishedGuideEvaluation_()`.
+Write APIs: `saveGuideEvaluationDraft_(input)`, `submitGuideEvaluation_(input)`,
+`publishGuideEvaluation(input)`, `reopenGuideEvaluation_(input)`.
 All write inputs include team, student, expected revision, and request ID.
 Guide writes additionally include the load token and scores; reopen includes a
 reason. Setup is coordinator-only. Stale revisions, stale rubric/roster tokens,

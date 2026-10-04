@@ -12,8 +12,8 @@ function getTeamReviewCompletionStatus_(teamId) {
 function collectReviewCompletion_(requestedTeamId,timings,onlyKey) {
   const started=Date.now();let success=false;
   try {
-    const TS=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
-    const rows=getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row=>normalizeReviewKey_(row[TS.TEAM_ID])&&(!requestedTeamId||normalizeReviewKey_(row[TS.TEAM_ID])===requestedTeamId));
+    const TS=getColumnMap_(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
+    const rows=getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row=>normalizeReviewKey_(row[TS.TEAM_ID])&&(!requestedTeamId||normalizeReviewKey_(row[TS.TEAM_ID])===requestedTeamId));
     const progress=getReviewerReviewProgress_(rows,onlyKey);
     if(progress.error)throw new Error(progress.error);
     const result=Object.create(null);

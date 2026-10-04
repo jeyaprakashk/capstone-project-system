@@ -8,7 +8,7 @@ const { loadSources } = require('./invariants/golden.cjs');
 const DTO = { github: { coordUsername: 'coord-gh', reposWithAccess: 7, totalRepos: 9 }, publishing: { configured: true, items: [{ key: 'review1', title: 'Review 1' }, { key: 'guide_eval', title: 'Guide Evaluation' }] } };
 
 function setup(dto = DTO) {
-  const { document } = parseHTML('<html><body><div id="systemStatusContent"></div></body></html>');
+  const { document, window } = parseHTML('<html><body><div id="systemStatusContent"></div></body></html>');
   const calls = [];
   const c = loadSources(['data-bridge-client.js', 'system-status-view.js'], { document, Promise, JSON, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
@@ -22,7 +22,7 @@ function setup(dto = DTO) {
   const view = c.__make(bridge, () => ui, () => publishing);
   const host = document.getElementById('systemStatusContent');
   view.render(host, dto);
-  return { view, host, calls, click: el => host.onclick({ target: el }) };
+  return { view, host, calls, window, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })) };
 }
 const norm = n => n.textContent.replace(/\s+/g, ' ').trim();
 
@@ -65,7 +65,7 @@ test('buttons hand off to the dashboard modules without inline handlers', () => 
   assert.deepEqual(JSON.parse(JSON.stringify(f.calls)), [['sync'], ['resend'], ['committee'], ['review'], ['bootstrap'], ['storage'], ['toggle', 'review1'], ['refresh', 'guide_eval']]);
   f.click(pick('storage-init').cloneNode(true)); // a detached clone is not a registered action target
   const select = f.host.querySelector('#studentInvitationsPageSize');
-  f.host.onchange({ target: { getAttribute: () => 'resend-size', value: '25' } });
+  Object.defineProperty(select, 'value', { value: '25', configurable: true }); select.dispatchEvent(new f.window.Event('change', { bubbles: true }));
   assert.deepEqual(f.calls.at(-1), ['size', 'invitations', '25']);
   assert.deepEqual(Array.from(f.host.querySelectorAll('*')).flatMap(n => Array.from(n.attributes).map(a => a.name)).filter(name => /^on/i.test(name)), []);
   assert(select);

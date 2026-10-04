@@ -50,7 +50,7 @@ function guideGithubDto_(github, roster, repoUrl, data) {
   return {
     tone,
     members:roster.filter(student => String(student.email || '').trim()).map(student => {
-      const member = github.members.find(item => emailsMatch(item.email, student.email));
+      const member = github.members.find(item => emailsMatch_(item.email, student.email));
       const missing = !member || !member.githubId;
       const joined = !missing && member.status === 'valid' && member.access === 'active';
       return {name:String(student.name || ''), regno:String(student.regno || ''), state:missing ? 'missing' : joined ? 'joined' : 'pending', timing:guideGithubTimingDto_(member, data.schedule, data.clock)};
@@ -100,15 +100,15 @@ function guideEvaluationDto_(schedule, clock) {
   return {enabled:opens !== null && clock.today >= opens, notice:opens === null ? 'Guide Evaluation is not configured in AssessmentDefinitions.' : 'Available from ' + formatProjectDay_(opens) + '.'};
 }
 
-/** Pure DTO builder over getGuideDashboardData(). */
+/** Pure DTO builder over getGuideDashboardData_(). */
 function buildGuideDto_(data) {
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const teams = data.teams;
   let githubByTeam = null;
   if (teams.length) {
     try {
       const repoUrls = Object.fromEntries(teams.map(t => [normalizeText_(t.row[TS.TEAM_ID]), t.repoUrl || '']));
-      githubByTeam = getTeamsGithubSetup_(teams.map(t => t.row), TS, repoUrls, getSheetRows(SHEET_NAMES.GITHUB_ACCOUNTS));
+      githubByTeam = getTeamsGithubSetup_(teams.map(t => t.row), TS, repoUrls, getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS));
     } catch (error) { /* A failed status read must not block title review or imply missing accounts. */ }
   }
   return {
@@ -122,40 +122,40 @@ function buildGuideDto_(data) {
 function guideAccessOrThrow_() {
   const email = Session.getActiveUser().getEmail();
   if (!email) throw apiFail_('UNAUTHENTICATED', 'Could not identify your account.');
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  if (!getSheetRows(SHEET_NAMES.TEAM_STATUS).some(r => r[TS.TEAM_ID] && emailsMatch(r[TS.GUIDE_EMAIL], email))) throw apiFail_('UNAUTHORIZED', 'You do not have Guide access.');
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  if (!getSheetRows_(SHEET_NAMES.TEAM_STATUS).some(r => r[TS.TEAM_ID] && emailsMatch_(r[TS.GUIDE_EMAIL], email))) throw apiFail_('UNAUTHORIZED', 'You do not have Guide access.');
   return email;
 }
 
 function API_guide_getDashboard() {
-  return apiHandle_(() => withDashboardRead_(() => buildGuideDto_(getGuideDashboardData(guideAccessOrThrow_()))));
+  return apiHandle_(() => withDashboardRead_(() => buildGuideDto_(getGuideDashboardData_(guideAccessOrThrow_()))));
 }
 
 function API_guide_submitDecision(teamId, decision, notes, editedTitle) {
   return apiHandle_(() => {
     guideAccessOrThrow_();
-    return apiWorkflowResult_(submitGuideDecision(String(teamId || ''), String(decision || ''), String(notes || ''), String(editedTitle || '')), 'Decision saved.');
+    return apiWorkflowResult_(submitGuideDecision_(String(teamId || ''), String(decision || ''), String(notes || ''), String(editedTitle || '')), 'Decision saved.');
   });
 }
 
 /** Weekly progress for the guide's teams; the browser module renders and saves through the bridge. */
 function API_guide_getWeekly() {
-  return apiHandle_(() => { guideAccessOrThrow_(); return loadGuideWeeklyProgress(); });
+  return apiHandle_(() => { guideAccessOrThrow_(); return loadGuideWeeklyProgress_(); });
 }
 
 function API_guide_signWeekly(entryId, status) {
-  return apiHandle_(() => { guideAccessOrThrow_(); const result = submitWeeklyGuideSignoff(String(entryId || ''), String(status || '')); if (result && result.ok === false) throw apiFail_('REJECTED', result.message || 'The confirmation was not accepted.'); return result; });
+  return apiHandle_(() => { guideAccessOrThrow_(); const result = submitWeeklyGuideSignoff_(String(entryId || ''), String(status || '')); if (result && result.ok === false) throw apiFail_('REJECTED', result.message || 'The confirmation was not accepted.'); return result; });
 }
 
 /** Guide Evaluation: existing rules and messages; the browser module renders and saves through the bridge. */
 function API_guide_getEvaluation(teamId, register) {
-  return apiHandle_(() => { guideAccessOrThrow_(); return loadGuideEvaluation(String(teamId || ''), String(register || '')); });
+  return apiHandle_(() => { guideAccessOrThrow_(); return loadGuideEvaluation_(String(teamId || ''), String(register || '')); });
 }
 
 function API_guide_saveEvaluationDraft(input) {
-  return apiHandle_(() => { guideAccessOrThrow_(); return saveGuideEvaluationDraft(input); });
+  return apiHandle_(() => { guideAccessOrThrow_(); return saveGuideEvaluationDraft_(input); });
 }
 
 function API_guide_submitEvaluation(input) {
-  return apiHandle_(() => { guideAccessOrThrow_(); return submitGuideEvaluation(input); });
+  return apiHandle_(() => { guideAccessOrThrow_(); return submitGuideEvaluation_(input); });
 }

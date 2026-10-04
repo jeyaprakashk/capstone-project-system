@@ -4,16 +4,16 @@ function fixture(rows) {
  let reads=0;
  const c=vm.createContext({Date,PropertiesService:{getScriptProperties:()=>({getProperty:()=> 'test'})}});
  for(const file of ['common-helpers.js','milestone-config.js','rubric-config.js','assessment-registry.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
- c.getConfig=()=>{throw Error('No Config fallback');};
- c.getSpreadsheet=()=>({getSpreadsheetTimeZone:()=> 'UTC'});
- c.getSheet=name=>name==='Milestones'&&rows?{getDataRange:()=>({getValues:()=>{reads++;return rows;}})}:null;
+ c.getConfig_=()=>{throw Error('No Config fallback');};
+ c.getSpreadsheet_=()=>({getSpreadsheetTimeZone:()=> 'UTC'});
+ c.getSheet_=name=>name==='Milestones'&&rows?{getDataRange:()=>({getValues:()=>{reads++;return rows;}})}:null;
  return {c,reads:()=>reads};
 }
 test('Milestones has no assessment storage mapping or review discovery fallback',()=>{
  const {c}=fixture([header,['review1','Old review','2026-10-12','Review Committee',25]]);
  assert.equal(c.committeeReviewTabName_,undefined);
  assert.equal(vm.runInContext('typeof EVALUATION_SHEET_NAMES_',c),'undefined');
- assert.equal(c.getInternalReviewsCount_(),0);
+ assert.equal(c.getInternalReviews_().length,0);
  assert.throws(()=>c.getMilestones_(),/AssessmentDefinitions/);
 });
 test('non-assessment events retain labels, dates and chronological order, read once',()=>{

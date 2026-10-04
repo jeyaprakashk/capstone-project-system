@@ -2,7 +2,7 @@
 function reviewEvaluationBrowser_(reviewKey, bridge) {
   let reviewLabel=reviewKey;
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const SAVE_KINDS={saveReviewEvaluationDraft:'draft',submitReviewEvaluation:'submit',recordReviewAbsence:'absence',saveReviewMakeupDraft:'makeupDraft',submitReviewMakeup:'makeupSubmit'};
+  const SAVE_KINDS={saveReviewEvaluationDraft_:'draft',submitReviewEvaluation_:'submit',recordReviewAbsence_:'absence',saveReviewMakeupDraft_:'makeupDraft',submitReviewMakeup_:'makeupSubmit'};
   const SMALL='border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const BUTTON='border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const PRIMARY='border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
@@ -249,6 +249,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     });
     drawer.addEventListener('invalid',event=>revealCriterion(event.target),true);
     drawer.addEventListener('cancel',event=>{event.preventDefault();return close();});
+    drawer.addEventListener('submit',event=>event.preventDefault());
     drawer.addEventListener('click',async event=>{
       const candidate=event.target.closest && event.target.closest('[data-attendance-picker]');
       const picker=candidate && candidate.hasAttribute && candidate.hasAttribute('data-attendance-picker')?candidate:null;
@@ -470,7 +471,6 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     }).join('');
     drawer.innerHTML=shell(d.details.team,(old.reason?'<p>Reopened: '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div data-review-actions class="mt-2 flex flex-wrap items-center gap-2">'+(d.availability.editable?'<button class="'+BUTTON+'" type="button" data-draft>Save Draft</button><button class="'+PRIMARY+'" type="button" data-submit>Submit Evaluation</button>':'')+'<button class="'+SMALL+'" type="button" data-reload>Reload</button><button class="'+SMALL+'" type="button" data-close>Close</button></div>');
     if(targeted)drawer.querySelector('[data-review-actions]').innerHTML='<button class="'+BUTTON+'" type="button" data-target-draft>Save Makeup Draft</button><button class="'+PRIMARY+'" type="button" data-target-submit>Submit Makeup</button><button class="'+SMALL+'" type="button" data-reload>Cancel / Reload</button><button class="'+SMALL+'" type="button" data-close>Close</button>';
-    drawer.querySelector('form').addEventListener('submit',event=>event.preventDefault());
     drawer.querySelectorAll('[data-absence] input,[data-absence] select,[data-absence] textarea').forEach(el=>el.disabled=!!targeted);
     syncStudentSelection();syncCriteriaTabs();updateRanges();drawer.querySelector('[data-close]').focus();
   }
@@ -672,7 +672,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       const old=savedStudent(correctionIndex),preview=reviewPolicyCalculate_(model.config,model.evaluation.teamScores,{...old,assessment:{...old.assessment,facts:absence}});
       if(absence.attended && preview.assessment.individualState!=='RESOLVED')throw new Error('Normal individual marks are missing. Ask the coordinator to reopen the evaluation to enter those marks.');
     } catch(error) {message(error.message);return;}
-    sendAcademic('recordReviewAbsence',{assessmentId:reviewKey,team:model.roster.team,student:model.roster.students[correctionIndex].register,revision:model.revision,token:model.token,absence});
+    sendAcademic('recordReviewAbsence_',{assessmentId:reviewKey,team:model.roster.team,student:model.roster.students[correctionIndex].register,revision:model.revision,token:model.token,absence});
   }
   async function saveTarget(submit) {
     if(busy || reading || !targeted)return;
@@ -685,7 +685,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       const c=model.config.criteria[Number(field.dataset.index)],level=field.querySelector('[data-level]').value,marks=field.querySelector('[data-marks]').value;
       input[c.type==='Team'?'teamScores':'scores'][c.pi]={level:level===''?null:Number(level),marks:marks===''?null:marks,remark:field.querySelector('[data-remark]').value};
     });
-    sendAcademic(submit?'submitReviewMakeup':'saveReviewMakeupDraft',input);
+    sendAcademic(submit?'submitReviewMakeup_':'saveReviewMakeupDraft_',input);
   }
   function sendAcademic(method,input) {
     const signature=JSON.stringify({method,input});if(!pending || pending.signature!==signature)pending={signature,id:requestId()};
@@ -730,7 +730,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if(invalid){revealCriterion(invalid);invalid.reportValidity();return;}
     if(!form.reportValidity())return;
     if(submit && !await DashboardUI.ask('Submit '+reviewLabel+' for the entire team? Normal scores will lock; documented pending cases can be assessed separately.'))return;
-    const method=submit?'submitReviewEvaluation':'saveReviewEvaluationDraft', signature=JSON.stringify({method,payload});
+    const method=submit?'submitReviewEvaluation_':'saveReviewEvaluationDraft_', signature=JSON.stringify({method,payload});
     if(!pending || pending.signature!==signature)pending={signature,id:requestId()};
     payload.requestId=pending.id;setBusy(true);message('Saving '+reviewLabel+'…');
     bridge.write('API_review_save',[SAVE_KINDS[method],{...payload,assessmentId:reviewKey}]).then(result=>{

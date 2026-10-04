@@ -7,8 +7,8 @@ function fixture() {
   const {document}=parseHTML('<html><body><section id="guideWeeklyProgress"><p id="guide-weeklyUpdated"></p><button>Refresh</button><p data-guide-weekly-status></p><div data-guide-weekly-read>Initial skeleton</div></section></body></html>');
   const requests=[],timers=new Map();let starts=0,finishes=0,timerId=0;
   const {Sync}=require('./sync-promise.cjs');
-  const bridge={read:(key,method,args)=>{const p=new Sync();requests.push({method:method==='API_guide_getEvaluation'?'loadGuideEvaluation':'loadGuideWeeklyProgress',args:args||[],success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;},
-    write:(method,args)=>{const p=new Sync();requests.push({method:'submitWeeklyGuideSignoff',args,success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;}};
+  const bridge={read:(key,method,args)=>{const p=new Sync();requests.push({method:method==='API_guide_getEvaluation'?'loadGuideEvaluation_':'loadGuideWeeklyProgress_',args:args||[],success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;},
+    write:(method,args)=>{const p=new Sync();requests.push({method:'submitWeeklyGuideSignoff_',args,success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;}};
   const c=vm.createContext({document,Date,setTimeout:(fn,delay)=>{assert.equal(delay,5000);timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),DashboardUI:{renderSkeleton:()=>'<span>Skeleton</span>',beginContentLoading:(target,label,options)=>{
     starts++;assert.equal(options.compact,true);target.setAttribute('aria-busy','true');let done=false;
     return()=>{if(!done){done=true;finishes++;target.removeAttribute('aria-busy');}};
@@ -80,15 +80,15 @@ test('sticky decision bars reserve their measured height only on tall cards',()=
   let headerBottom=650;
   card.querySelector('[data-weekly-student-header]').getBoundingClientRect=()=>({bottom:headerBottom});
   card.getBoundingClientRect=()=>({bottom:900});
-  measure();assert.equal(card.style.getPropertyValue('--guide-action-reserve'),'70px');
+  measure();assert.equal(card.dataset.actionReserve,'70');
   assert.equal(card.dataset.stickyDecision,'false');
   headerBottom=600;measure();assert.equal(card.dataset.stickyDecision,'false');
   headerBottom=300;measure();assert.equal(card.dataset.stickyDecision,'false');
   headerBottom=240;measure();assert.equal(card.dataset.stickyDecision,'true');
   headerBottom=100;measure();assert.equal(card.dataset.stickyDecision,'true');
   headerBottom=650;measure();assert.equal(card.dataset.stickyDecision,'false');
-  barHeight=110;measure();assert.equal(card.style.getPropertyValue('--guide-action-reserve'),'110px');
-  contentHeight=300;measure();assert.equal(card.style.getPropertyValue('--guide-action-reserve'),'0px');
+  barHeight=110;measure();assert.equal(card.dataset.actionReserve,'110');
+  contentHeight=300;measure();assert.equal(card.dataset.actionReserve,'0');
 });
 
 test('AI quality handles blank scores and explains the actual rating calculation',()=>{
@@ -117,7 +117,7 @@ test('initial read failure retries and detached responses do not update the scre
 
 test('guide sign-off blocks duplicates, retains choice on failure and displays successful confirmation',()=>{
   const f=fixture();f.api.load();f.reply();let button=f.host.querySelector('[data-sign="NOT_DISCUSSED"]');
-  button.click();button.click();assert.equal(f.requests.length,1);f.flush();assert.equal(f.requests.length,2);assert.equal(f.requests[1].method,'submitWeeklyGuideSignoff');
+  button.click();button.click();assert.equal(f.requests.length,1);f.flush();assert.equal(f.requests.length,2);assert.equal(f.requests[1].method,'submitWeeklyGuideSignoff_');
   assert.deepEqual(Array.from(f.requests[1].args),['e2','NOT_DISCUSSED']);
   f.requests[1].failure(Error('stale entry'));assert.equal(f.host.busy,false);assert.match(f.host.textContent,/stale entry/);
   button.click();f.flush();f.requests[2].success({status:'NOT_DISCUSSED',message:'Saved; revisions frozen.'});
@@ -171,9 +171,9 @@ test('guide approval context matches the current title, reviewer and year and re
   const norm=value=>String(value || '').trim().toLowerCase();
   const records=[['2026-27','Odd','G33','guide@test','Approved title','','','2026-09-29T12:00:00Z','reviewer@test'],
     ['2025-26','Odd','G33','guide@test','Old title','','','2026-09-30T12:00:00Z','reviewer@test']];
-  const c=vm.createContext({normalizeText_:norm,textEquals_:(a,b)=>norm(a)===norm(b),emailsMatch:(a,b)=>norm(a)===norm(b),getAcademicYear:()=> '2026-27',
-    getSpreadsheet:()=>({getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),getHubRegistrySheet:()=> 'registry',getSheet:()=> 'intake',SHEET_NAMES:{TEAM_INTAKE_RAW:'intake'},
-    readSheetRows_:(sheet,start)=>sheet==='registry'?records:start===1?[['Timestamp','Team ID','Work Breakdown Document']]:[['2026-09-28T12:00:00Z','G33','file']],escapeHtml:value=>String(value)});
+  const c=vm.createContext({normalizeText_:norm,textEquals_:(a,b)=>norm(a)===norm(b),emailsMatch_:(a,b)=>norm(a)===norm(b),getAcademicYear_:()=> '2026-27',
+    getSpreadsheet_:()=>({getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),getHubRegistrySheet_:()=> 'registry',getSheet_:()=> 'intake',SHEET_NAMES:{TEAM_INTAKE_RAW:'intake'},
+    readSheetRows_:(sheet,start)=>sheet==='registry'?records:start===1?[['Timestamp','Team ID','Work Breakdown Document']]:[['2026-09-28T12:00:00Z','G33','file']],escapeHtml_:value=>String(value)});
   vm.runInContext(fs.readFileSync('guide-dashboard.js','utf8'),c);
   const context=c.readGuideRecordContext_([row],TS);
   assert.match(context.approvals.g33,/29 Sept 2026/);assert.match(context.documentSubmissions.g33,/28 Sept 2026/);
@@ -306,7 +306,7 @@ test('tab switches and failed refresh preserve full logs; successful refresh rep
   f.api.selectView('title');f.api.selectView('weekly');assert.equal(f.requests.length,2);
   f.api.load();f.reply();
   assert.notEqual(f.host.querySelector('[data-weekly-evidence]'),detail);
-  assert.equal(f.requests.at(-1).method,'loadGuideWeeklyProgress');assert.equal(f.requests.length,3);
+  assert.equal(f.requests.at(-1).method,'loadGuideWeeklyProgress_');assert.equal(f.requests.length,3);
 });
 
 
@@ -356,7 +356,7 @@ test('team attention combines only guide actions, updates after decisions and di
   assert.equal(pill('A').textContent,'Title review · 1');assert.equal(tabBadge('weekly').hidden,true);
   root.querySelector('[data-guide-tab="evaluation"]').disabled=false;
   f.api.load();f.reply();
-  const reads=f.requests.filter(r=>r.method==='loadGuideEvaluation');assert.equal(reads.length,2);
+  const reads=f.requests.filter(r=>r.method==='loadGuideEvaluation_');assert.equal(reads.length,2);
   assert.match(pill('A').textContent,/Skeleton/);assert.match(pill('B').textContent,/Skeleton/);
   reads[0].success({statuses:[{status:'Draft'}]});assert.equal(pill('A').textContent,'Title review · 1');
   reads[1].failure('offline');assert.equal(pill('B').hidden,true);assert.match(root.querySelector('[data-guide-select="B"]').getAttribute('aria-description'),/could not be checked/);

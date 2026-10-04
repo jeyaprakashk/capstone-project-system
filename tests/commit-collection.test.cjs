@@ -64,7 +64,7 @@ test('second collector exits immediately while first lease remains active across
 
 test('busy acquisition lock skips without waiting, releasing another lock, or accessing collection data',()=>{
  const f=fixture(),lock=f.c.LockService.getScriptLock();lock.waitLock();
- f.c.getSheetRows=()=>{throw Error('Must skip before collection');};
+ f.c.getSheetRows_=()=>{throw Error('Must skip before collection');};
  assert.equal(f.c.fetchAllCommits().length,0);
  assert.equal(f.locked(),true);assert.equal(f.calls.length,0);
  assert.equal(f.properties.has('COMMITS_COLLECTION_LEASE'),false);
@@ -86,7 +86,7 @@ test('collection lease clears after handled API failure and uncaught setup, audi
  for(const failure of ['api','setup','audit','status']) {
   const f=fixture();
   if(failure==='api')f.response(()=>({status:500,body:{message:'failed'}}));
-  if(failure==='setup')f.c.getRepoUrlMap=()=>{throw Error('setup failed');};
+  if(failure==='setup')f.c.getRepoUrlMap_=()=>{throw Error('setup failed');};
   if(failure==='audit')f.c.auditCommitHistory=()=>{throw Error('audit failed');};
   if(failure==='status')f.c.writeCommitCollectionStatus_=()=>{throw Error('status failed');};
   if(failure==='api')assert.equal(f.c.fetchAllCommits()[0].code,'GITHUB_API_ERROR');

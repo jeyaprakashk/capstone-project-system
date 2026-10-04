@@ -94,8 +94,8 @@ by the local implementation or its tests.
 ## Existing Phase 1
 
 Weekly entry is an HTML form in the existing Apps Script Student Dashboard.
-`google.script.run` calls `loadStudentWeeklyProgress()` and
-`submitWeeklyProgress(input)`. There is no weekly Google Form, Form response
+`google.script.run` calls `loadStudentWeeklyProgress_()` and
+`submitWeeklyProgress_(input)`. There is no weekly Google Form, Form response
 handler, separate app, or fallback to RawLog.
 
 ## Configuration and cutover
@@ -151,12 +151,10 @@ weekly processing. The following describes storage and the existing hourly sched
    LogEntries and ProgressEligibility storage. Existing
    incompatible storage fails instead of being overwritten.
 2. The hourly `processWeeklySubmissionSchedule()` consumes persisted individual
-   eligibility only; it never establishes or reconciles eligibility. The isolated
-   migration reconstructs historical eligibility and applies its cutover floor.
-   Complete and verify migration before activating daily reconciliation.
-3. Run `setupWeeklySubmissionTriggers()` to install one hourly schedule handler
-   and remove current-owner installations of `onFormSubmit`,
-   `sendWeeklyLogReminders`, and `sendWeeklyAnalysisDigest`.
+   eligibility only; it never establishes or reconciles eligibility.
+3. One hourly schedule trigger runs `processWeeklySubmissionSchedule`. The retired
+   `onFormSubmit`, `sendWeeklyLogReminders` and `sendWeeklyAnalysisDigest`
+   installations were removed.
 4. Inventory installed triggers under every account that previously installed
    weekly triggers: Apps Script trigger enumeration only exposes the caller's
    installations. Remove retired weekly installations owned by other accounts.
@@ -259,8 +257,6 @@ Successful sends are recorded in `WeeklyReminders` (`Reg No`, `Week ID`, `Sent A
 `setupWeeklySubmissionStorage()` creates the tab and transfers existing
 `weekly-reminder:<encoded-reg-no>:<week-id>` Script Properties before removing
 them. Run setup before the scheduler uses this version.
-`cleanupWeeklyReminderScriptProperties()` is a repeatable coordinator editor
-function for any remaining legacy receipts; it returns migrated and deleted counts.
 Failed sends can retry;
 recorded successful sends are suppressed. No report-only or flag logic gates
 reminders. Apps Script scheduling is approximate. Delivery and the sheet receipt

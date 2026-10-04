@@ -24,7 +24,7 @@ function guideFixture({ github = 'default' } = {}) {
     { 'Team ID': 'T6', Title: 'Revise me', 'Guide Decision': 'Approved', 'Reviewer Decision': 'Revise', 'Reviewer Notes': 'Narrow it', 'Student 1 Name': 'Eight', 'Student 1 Register No': '008', 'Student 1 Email': 'eight@example.com' }
   ];
   f.status.rows.splice(1, f.status.rows.length, ...teams.map(t => ts.map(h => ({ ...base, ...t })[h] ?? '')));
-  c.getRepoUrlMap = () => ({ t1: 'https://github.com/org/team1', t2: 'https://github.com/org/team2' });
+  c.getRepoUrlMap_ = () => ({ t1: 'https://github.com/org/team1', t2: 'https://github.com/org/team2' });
   const members = {
     t1: { members: [{ email: 'one@example.com', githubId: '1', status: 'valid', access: 'active', submittedAt: Date.parse('2026-01-07T10:00:00Z') }, { email: 'two@example.com', githubId: '2', status: 'valid', access: 'active', submittedAt: Date.parse('2026-01-09T10:00:00Z') }] },
     t2: { members: [{ email: 'three@example.com', githubId: '3', status: 'valid', access: 'invited', submittedAt: Date.parse('2026-01-07T10:00:00Z') }] },
@@ -32,7 +32,7 @@ function guideFixture({ github = 'default' } = {}) {
     t5: { members: [{ email: 'seven@example.com', githubId: '7', status: 'valid', access: 'unavailable' }] }
   };
   c.getTeamsGithubSetup_ = () => { if (github === 'throw') throw new Error('GitHub down'); return members; };
-  c.getHubRegistrySheet = () => ({}); // approval date unavailable unless a test supplies a registry
+  c.getHubRegistrySheet_ = () => ({}); // approval date unavailable unless a test supplies a registry
   return { f, c, ts, state, members, header, user: 'guide@example.com', day };
 }
 module.exports = { guideFixture };

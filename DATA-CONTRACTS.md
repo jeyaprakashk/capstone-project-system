@@ -27,32 +27,32 @@ One section per migrated endpoint, added with the dashboard that needs it:
 
 | Endpoint | Role | Request | `data` shape | Replaces |
 | --- | --- | --- | --- | --- |
-| `API_coordinator_getOverview()` / `API_coordinator_getProgress()` | Coordinator | none | `CoordinatorDashboard` (below); overview has `loading:true` | `buildCoordinatorContent`, `loadCoordinatorSection` (removed) |
-| `API_coordinator_getReviewProgress(key)` | Coordinator | `key` is a configured Review key | `{key, label, total, completed, unavailable, teams:{<teamId>:'Completed'\|'Pending'\|'Unavailable'}}`; rejected for an unknown key | the Review part of `getProgress` |
-| `API_coordinator_getGuideProgress()` | Coordinator | none | `{available, completed, teams:{<teamId>:'Completed'\|'Pending'\|'Unavailable'}}` | the Guide Evaluation part of `getProgress` |
-| `API_coordinator_getHealth()` | Coordinator | none | `{needsAttention, partial, teams:{<teamId>:{health, pendingDeadlines}}, deadlinePills}` | the health and deadline part of `getProgress` |
-| `API_coordinator_getActivity()` | Coordinator | none | `{state (`active`, `between` weeks, `not-started`, `ended`, `unavailable`), week, checkedAt, teams:{<teamId lower-case>:{logs,commits}}, totalTeams, activeTeams}` | `loadAllTeamsWeeklyActivity` (wrapped) |
+| `API_coordinator_getOverview()` | Coordinator | none | `CoordinatorDashboard` (below) with `loading:true`; assessment values are not read yet | `buildCoordinatorContent`, `loadCoordinatorSection` (removed) |
+| `API_coordinator_getReviewProgress(key)` | Coordinator | `key` is a configured Review key | `{key, label, total, completed, unavailable, teams:{<teamId>:'Completed'\|'Pending'\|'Unavailable'}}`; rejected for an unknown key | the Review completion read |
+| `API_coordinator_getGuideProgress()` | Coordinator | none | `{available, completed, teams:{<teamId>:'Completed'\|'Pending'\|'Unavailable'}}` | the Guide Evaluation completion read |
+| `API_coordinator_getHealth()` | Coordinator | none | `{needsAttention, partial, teams:{<teamId>:{health, pendingDeadlines}}, deadlinePills}` | the health and deadline read |
+| `API_coordinator_getActivity()` | Coordinator | none | `{state (`active`, `between` weeks, `not-started`, `ended`, `unavailable`), week, checkedAt, teams:{<teamId lower-case>:{logs,commits}}, totalTeams, activeTeams}` | `loadAllTeamsWeeklyActivity_` (wrapped) |
 | `API_coordinator_getSystemStatus()` | Coordinator | none | `SystemStatus` (below) | `loadCoordinatorSystemStatus` (removed) |
-| `API_student_getWeekly()` / `API_student_submitWeekly(input)` | Student | input: `{requestId, weekId, workCompleted, guideDiscussion, blockers, nextAction}` | the existing weekly-progress object (`ready, weeks, actions, history, evidence, allWeeks, timezone, checkedAt …`) / `{ok, entryId, weekId, entryStatus, timeliness, firstSubmittedAt, message}` | `loadStudentWeeklyProgress` / `submitWeeklyProgress` called directly |
-| `API_guide_getWeekly()` / `API_guide_signWeekly(entryId, status)` | Guide | `status` is `DISCUSSED` or `NOT_DISCUSSED` | `{checkedAt, timezone, weeks, entries, requiredByWeek …}` / `{ok, entryId, status, message}` | `loadGuideWeeklyProgress` / `submitWeeklyGuideSignoff` called directly |
-| `API_guide_getEvaluation(teamId, register)` | Guide | register optional | the existing `loadGuideEvaluation` object (`roster, student, statuses, config, evaluation, repository, revision, token, overdue`) | `loadGuideEvaluation` called directly |
-| `API_guide_saveEvaluationDraft(input)` / `API_guide_submitEvaluation(input)` | Guide | `{team, student, revision, token, scores, requestId}`; the request ID makes a retry safe | `{status, …}` as before | `saveGuideEvaluationDraft` / `submitGuideEvaluation` called directly |
-| `API_student_getReviewResult(key)` / `API_student_getGuideResult()` | Student | assessment key | the published result (`config, identity, total, weighted, scores, assessment, underCorrection`) or `null` when nothing is published | `loadPublishedReviewEvaluation` / `loadPublishedGuideEvaluation` called directly |
+| `API_student_getWeekly()` / `API_student_submitWeekly(input)` | Student | input: `{requestId, weekId, workCompleted, guideDiscussion, blockers, nextAction}` | the existing weekly-progress object (`ready, weeks, actions, history, evidence, allWeeks, timezone, checkedAt …`) / `{ok, entryId, weekId, entryStatus, timeliness, firstSubmittedAt, message}` | `loadStudentWeeklyProgress_` / `submitWeeklyProgress_` called directly |
+| `API_guide_getWeekly()` / `API_guide_signWeekly(entryId, status)` | Guide | `status` is `DISCUSSED` or `NOT_DISCUSSED` | `{checkedAt, timezone, weeks, entries, requiredByWeek …}` / `{ok, entryId, status, message}` | `loadGuideWeeklyProgress_` / `submitWeeklyGuideSignoff_` called directly |
+| `API_guide_getEvaluation(teamId, register)` | Guide | register optional | the existing `loadGuideEvaluation_` object (`roster, student, statuses, config, evaluation, repository, revision, token, overdue`) | `loadGuideEvaluation_` called directly |
+| `API_guide_saveEvaluationDraft(input)` / `API_guide_submitEvaluation(input)` | Guide | `{team, student, revision, token, scores, requestId}`; the request ID makes a retry safe | `{status, …}` as before | `saveGuideEvaluationDraft_` / `submitGuideEvaluation_` called directly |
+| `API_student_getReviewResult(key)` / `API_student_getGuideResult()` | Student | assessment key | the published result (`config, identity, total, weighted, scores, assessment, underCorrection`) or `null` when nothing is published | `loadPublishedReviewEvaluation_` / `loadPublishedGuideEvaluation_` called directly |
 | `API_student_getDashboard()` | Student | none | `StudentDashboard` (below) | `buildStudentContent` (removed) |
 | `API_guide_getDashboard()` | Guide | none | `GuideDashboard` (below) | `buildDashboardContent` (removed) |
 | `API_guide_submitDecision(teamId, decision, notes, editedTitle)` | Guide | `decision` is `Approved` or `Rejected`; notes required for `Rejected` | `{message}` | `decide` in the old client |
 | `API_reviewer_getDashboard()` | Reviewer | none | `ReviewerDashboard` (below) | `buildReviewerContent` (removed) |
 | `API_reviewer_submitDecision(teamId, decision, notes)` | Reviewer | `decision` is `Approved` or `Revise`; notes required for `Revise` | `{message}` | `reviewerDecide` in the old client |
-| `API_review_getEvaluation(teamId, assessmentId)` | Reviewer | assessment key such as `review1` | the existing `loadReviewEvaluation` object (details, roster, config, evaluation, statuses, revision, token) | `loadReviewEvaluation` called directly |
-| `API_review_save(kind, input)` | Reviewer | `kind` is `draft`, `submit`, `absence`, `makeupDraft` or `makeupSubmit`; `input` is the existing request object | the existing result of `saveReviewEvaluationDraft`, `submitReviewEvaluation`, `recordReviewAbsence`, `saveReviewMakeupDraft` or `submitReviewMakeup`; `{ok:false}` results become `REJECTED` | those functions called directly |
-| `API_coordinator_getWeeklySetup()` / `API_coordinator_setupWeekly(kind)` | Coordinator | `kind` is `storage` or `triggers` | the existing readiness report (`storageReady, triggerReady, canSetupStorage, canSetupTriggers, issues`) / the existing setup result | `getWeeklyProgressPhase2Readiness` / `setupWeeklyProgressPhase2Storage` / `setupWeeklyProgressPhase2Triggers` called directly |
-| `API_coordinator_getCommitteeConfiguration()` / `API_coordinator_getReviewConfiguration()` | Coordinator | none | the existing readiness reports (`valid, state, summary, issues, links, checkedAt`, plus `committees` or `storage`) | `getCoordinatorCommitteeConfiguration` / `getCoordinatorReviewConfiguration` called directly |
-| `API_coordinator_createDefinitions()` / `API_coordinator_prepareStorage()` | Coordinator | none | `{created}` / `{journals:[{label,journal,created,initialized}]}` | `createAssessmentDefinitions` / `prepareReviewAssessmentStorage` called directly |
-| `API_coordinator_syncGithub()` / `API_coordinator_resendInvitations(cursor)` | Coordinator | `cursor` is `''` for the first batch, then the returned `nextCursor` | the existing sync summary / `{results, nextCursor, stopped}` | `syncCoordinatorGithubAccess` / `resendExpiredStudentInvitations` called directly |
-| `API_publishing_get(assessmentId)` / `API_publishing_run(method, input)` | Coordinator | `method` is `publishInternalAssessment` or `reopenInternalAssessment`; `input` carries `requestId`, so a retry is safe | the existing publication report (`ready, config, teams, error`) / the existing publish or reopen result | `loadInternalAssessmentPublishing` / `publishInternalAssessment` / `reopenInternalAssessment` called directly |
-| `API_student_previewGithub(profileUrl)` / `API_student_confirmGithub(token)` / `API_student_completeGithubSetup()` | Student | profile URL; the signed `token` returned by the preview | `{token, account:{githubId, username, displayName, profileUrl, avatarUrl}}` / `{ok, message}` / `{message}` | `previewStudentGithubAccount` / `confirmStudentGithubAccount` / `completeStudentGithubSetup` called directly |
-| `API_shared_getTimeline()` / `API_shared_getRubrics()` | Any dashboard role | none | the existing project timeline (`schedule, milestones …`) / shared rubrics (`assessments …`) | `loadSharedProjectTimeline` / `loadSharedRubrics` called directly |
-| `API_coordinator_getTeamDrawer(teamId, section)` | Coordinator | `section` is `basic`, `progress` or `activity` | the existing team detail for that section (the drawer markup is built in the browser) | `loadCoordinatorDrawerSection` called directly |
+| `API_review_getEvaluation(teamId, assessmentId)` | Reviewer | assessment key such as `review1` | the existing `loadReviewEvaluation_` object (details, roster, config, evaluation, statuses, revision, token) | `loadReviewEvaluation_` called directly |
+| `API_review_save(kind, input)` | Reviewer | `kind` is `draft`, `submit`, `absence`, `makeupDraft` or `makeupSubmit`; `input` is the existing request object | the existing result of `saveReviewEvaluationDraft_`, `submitReviewEvaluation_`, `recordReviewAbsence_`, `saveReviewMakeupDraft_` or `submitReviewMakeup_`; `{ok:false}` results become `REJECTED` | those functions called directly |
+| `API_coordinator_getWeeklySetup()` / `API_coordinator_setupWeekly(kind)` | Coordinator | `kind` is `storage` or `triggers` | the existing readiness report (`storageReady, triggerReady, canSetupStorage, canSetupTriggers, issues`) / the existing setup result | `getWeeklyProgressPhase2Readiness_` / `setupWeeklyProgressPhase2Storage` / `setupWeeklyProgressPhase2Triggers` called directly |
+| `API_coordinator_getCommitteeConfiguration()` / `API_coordinator_getReviewConfiguration()` | Coordinator | none | the existing readiness reports (`valid, state, summary, issues, links, checkedAt`, plus `committees` or `storage`) | `getCoordinatorCommitteeConfiguration_` / `getCoordinatorReviewConfiguration_` called directly |
+| `API_coordinator_createDefinitions()` / `API_coordinator_prepareStorage()` | Coordinator | none | `{created}` / `{journals:[{label,journal,created,initialized}]}` | `createAssessmentDefinitions_` / `prepareReviewAssessmentStorage_` called directly |
+| `API_coordinator_syncGithub()` / `API_coordinator_resendInvitations(cursor)` | Coordinator | `cursor` is `''` for the first batch, then the returned `nextCursor` | the existing sync summary / `{results, nextCursor, stopped}` | `syncCoordinatorGithubAccess_` / `resendExpiredStudentInvitations_` called directly |
+| `API_publishing_get(assessmentId)` / `API_publishing_run(method, input)` | Coordinator | `method` is `publishInternalAssessment_` or `reopenInternalAssessment_`; `input` carries `requestId`, so a retry is safe | the existing publication report (`ready, config, teams, error`) / the existing publish or reopen result | `loadInternalAssessmentPublishing_` / `publishInternalAssessment_` / `reopenInternalAssessment_` called directly |
+| `API_student_previewGithub(profileUrl)` / `API_student_confirmGithub(token)` / `API_student_completeGithubSetup()` | Student | profile URL; the signed `token` returned by the preview | `{token, account:{githubId, username, displayName, profileUrl, avatarUrl}}` / `{ok, message}` / `{message}` | `previewStudentGithubAccount_` / `confirmStudentGithubAccount_` / `completeStudentGithubSetup_` called directly |
+| `API_shared_getTimeline()` / `API_shared_getRubrics()` | Any dashboard role | none | the existing project timeline (`schedule, milestones …`) / shared rubrics (`assessments …`) | `loadSharedProjectTimeline_` / `loadSharedRubrics_` called directly |
+| `API_coordinator_getTeamDrawer(teamId, section)` | Coordinator | `section` is `basic`, `progress` or `activity` | the existing team detail for that section, rendered by `TeamDrawerView` (`team-drawer-view.js`) | `loadCoordinatorDrawerSection_` called directly |
 
 For each endpoint record: required role, request fields and validation, the exact
 `data` fields and types, and which server HTML builder it replaces. Each endpoint has
@@ -90,9 +90,8 @@ Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invaria
 
 The overview renders first. Then one `getReviewProgress` per `reviewColumns` entry, `getGuideProgress`, `getHealth` and weekly
 activity run in parallel and settle independently: each fills only its own card and tracker column, and a failure or
-timeout is isolated to that section, with its own message and Retry. `getProgress` still returns everything in one call
-and is kept until the split reads are verified in production; the view no longer calls it. Percentages, tones and badge labels are derived in the view.
-The team drawer is still driven by DashboardUI. Contract tests: `tests/coordinator-migration.test.cjs`
+timeout is isolated to that section, with its own message and Retry. Percentages, tones and badge labels are derived in the view.
+The team drawer is rendered by `TeamDrawerView` (three sections read independently; each fails and retries on its own); DashboardUI only opens, closes and focuses it. Contract tests: `tests/coordinator-migration.test.cjs`
 (snapshot `tests/invariants/snapshots/coordinator-legacy-facts.json`, captured from the removed HTML for the overview,
 progress and no-reviews cases).
 
@@ -104,9 +103,9 @@ progress and no-reviews cases).
 ```
 
 This is only the frame: GitHub access, the invitation-resend card, one collapsed publishing card per assessment, and the
-committee and assessment-readiness cards. Each card's own checks (`getCoordinatorCommitteeConfiguration`,
-`getCoordinatorReviewConfiguration`, publishing reads, weekly setup, invitation resend, GitHub sync) are separate calls made
-by their dashboard modules against hooks the view renders. `getCoordinatorCommitteeConfiguration` returns structured
+committee and assessment-readiness cards. Each card's own checks (`getCoordinatorCommitteeConfiguration_`,
+`getCoordinatorReviewConfiguration_`, publishing reads, weekly setup, invitation resend, GitHub sync) are separate calls made
+by their dashboard modules against hooks the view renders. `getCoordinatorCommitteeConfiguration_` returns structured
 `committees:[{number, members:[{name,email}], teams:[string]}]`; the view builds the directory (no server HTML).
 Contract tests: `tests/system-status-view.test.cjs` and the System Status cases in `tests/project-schedule.test.cjs`.
 

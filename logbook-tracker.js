@@ -9,7 +9,7 @@ function commitApiError_(slug, response) {
     detail = code === 'RATE_LIMITED' ? 'GitHub rate limit reached; retry after the limit resets.' : 'Check the existing token repository selection, Contents read access, and organization SSO/IP restrictions.';
   } else if (response.status === 404) {
     // A commits 404 is not evidence that a private repository was deleted.
-    const repo = makeGithubRequest('GET', '/repos/' + slug);
+    const repo = makeGithubRequest_('GET', '/repos/' + slug);
     if (repo.status === 200) {
       code = 'COMMIT_ACCESS_OR_RESOURCE_UNAVAILABLE';
       detail = 'Repository metadata is accessible: the repository exists. Check Contents read access and its default branch; the commit endpoint returned 404.';
@@ -18,7 +18,7 @@ function commitApiError_(slug, response) {
     } else if (repo.status === 403 || repo.status === 429) {
       return commitApiError_(slug,repo);
     } else if (repo.status === 404) {
-      const identity = makeGithubRequest('GET','/user');
+      const identity = makeGithubRequest_('GET','/user');
       if (identity.status === 401) {
         code = 'AUTHENTICATION_FAILED'; detail = 'Credential probe rejected GITHUB_ADMIN_TOKEN (HTTP 401).';
       } else {
@@ -36,13 +36,13 @@ function commitApiError_(slug, response) {
   return error;
 }
 
-function fetchCommitsForTeam(repoOwner, repoName, hours) {
+function fetchCommitsForTeam_(repoOwner, repoName, hours) {
   hours = hours || 2;
   const sinceDate = new Date(Date.now() - hours * 60 * 60 * 1000);
   const slug = encodeURIComponent(repoOwner) + '/' + encodeURIComponent(repoName);
   const commits = [];
   for (let page = 1; ; page++) {
-    const response = makeGithubRequest('GET', '/repos/' + slug + '/commits?since=' + encodeURIComponent(sinceDate.toISOString()) + '&per_page=100&page=' + page);
+    const response = makeGithubRequest_('GET', '/repos/' + slug + '/commits?since=' + encodeURIComponent(sinceDate.toISOString()) + '&per_page=100&page=' + page);
     if (response.status === 409 && response.body && /repository is empty/i.test(response.body.message || '')) return [];
     if (response.status !== 200) throw commitApiError_(slug,response);
     if (!Array.isArray(response.body)) throw new Error('Invalid commit response for ' + slug + ': expected an array.');
@@ -71,7 +71,7 @@ function commitIdentity_(sha) {
 }
 
 function readCollectedCommits_(teamId) {
-  const sheet = getSheet(SHEET_NAMES.COMMITS), columns = commitColumns_(sheet);
+  const sheet = getSheet_(SHEET_NAMES.COMMITS), columns = commitColumns_(sheet);
   const rows = teamId ? readActivityRows_(SHEET_NAMES.COMMITS,columns.TEAM_ID+1,teamId) : readSheetRows_(sheet,2);
   return rows.filter(row=>row[columns.TEAM_ID]).map(row=>{
     const rawAuthorId = row[columns.AUTHOR_ID], authorId = githubId_(rawAuthorId);
@@ -119,7 +119,8 @@ function appendCollectedCommits_(sheet, teamId, commits, repoUrl) {
 
 /** Read-only SHA audit: historical rows are never modified or deleted. */
 function auditCommitHistory() {
-  const sheet = getSheet(SHEET_NAMES.COMMITS), columns = commitColumns_(sheet);
+  requireTriggerOrOperator_();
+  const sheet = getSheet_(SHEET_NAMES.COMMITS), columns = commitColumns_(sheet);
   const confirmed = new Map(), unidentifiedRows = [], teams = new Set();
   let rowCount = 0;
   readSheetRows_(sheet,2).forEach((row,index) => {
@@ -141,9 +142,9 @@ function auditCommitHistory() {
 /** Call under the script lock when creating or writing collection status. */
 function commitCollectionStatusSheet_(create) {
   const name = SHEET_NAMES.COMMIT_COLLECTION_STATUS;
-  let sheet = getSheet(name);
+  let sheet = getSheet_(name);
   const headers = Object.values(FIELD_DEFINITIONS.COMMIT_COLLECTION_STATUS);
-  if (!sheet && create) sheet = getSpreadsheet().insertSheet(name);
+  if (!sheet && create) sheet = getSpreadsheet_().insertSheet(name);
   if (!sheet) return null;
   if (!sheet.getLastRow() && create) sheet.getRange(1,1,1,headers.length).setValues([headers]);
   const actual = readSheetRows_(sheet,1,1)[0] || [];
@@ -156,7 +157,7 @@ function commitCollectionStatusSheet_(create) {
 function readCommitCollectionStatus_(teamId) {
   const sheet = commitCollectionStatusSheet_(false);
   if (!sheet) return '';
-  const matches = getSheetRows(SHEET_NAMES.COMMIT_COLLECTION_STATUS).filter(row=>textEquals_(row[0],teamId));
+  const matches = getSheetRows_(SHEET_NAMES.COMMIT_COLLECTION_STATUS).filter(row=>textEquals_(row[0],teamId));
   return matches.length === 1 ? String(matches[0][1]) : '';
 }
 
@@ -181,6 +182,7 @@ function writeCommitCollectionStatus_(teamId, status) {
 }
 
 function fetchAllCommits() {
+  requireTriggerOrOperator_();
   const leaseKey = 'COMMITS_COLLECTION_LEASE';
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(0)) {
@@ -208,10 +210,10 @@ function fetchAllCommits() {
 }
 
 function collectAllCommits_() {
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const statusRows = getSheetRows(SHEET_NAMES.TEAM_STATUS);
-  const commitSheet = getSheet(SHEET_NAMES.COMMITS);
-  const repoMap = getRepoUrlMap();
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const statusRows = getSheetRows_(SHEET_NAMES.TEAM_STATUS);
+  const commitSheet = getSheet_(SHEET_NAMES.COMMITS);
+  const repoMap = getRepoUrlMap_();
   const processed = [];
   statusRows.forEach(row => {
     const teamId = row[TS.TEAM_ID], repoUrl = repoMap[normalizeText_(teamId)];
@@ -219,7 +221,7 @@ function collectAllCommits_() {
     try {
       const repo = parseGithubRepoUrl_(repoUrl);
       if (!repo) throw new Error('Invalid recorded GitHub repository URL for ' + teamId + '; URL was not changed.');
-      const commits = fetchCommitsForTeam(repo.owner,repo.repo,2);
+      const commits = fetchCommitsForTeam_(repo.owner,repo.repo,2);
       processed.push({teamId,...appendCollectedCommits_(commitSheet,teamId,commits,repoUrl)});
       writeCommitCollectionStatus_(teamId, 'ok');
     } catch (error) {
@@ -235,13 +237,13 @@ function collectAllCommits_() {
 
 // Phase 1 weekly progress. No form ingestion, assessments or notification side effects on save.
 function getWeeklySubmissionWindows_() {
-  const sheet = getSheet(SHEET_NAMES.WEEKLY_WINDOWS);
+  const sheet = getSheet_(SHEET_NAMES.WEEKLY_WINDOWS);
   if (!sheet) throw new Error('Configure the WeeklyWindows sheet before using weekly progress.');
   const headers = readSheetRows_(sheet,1,1)[0] || [];
   Object.values(FIELD_DEFINITIONS.WEEKLY_WINDOWS).forEach(header => {
     if (headers.filter(h=>textEquals_(h,header)).length !== 1) throw new Error('WeeklyWindows requires exactly one ' + header + ' column.');
   });
-  const columns = buildColumnMap(sheet,FIELD_DEFINITIONS.WEEKLY_WINDOWS,headers);
+  const columns = buildColumnMap_(sheet,FIELD_DEFINITIONS.WEEKLY_WINDOWS,headers);
   const values = readSheetRows_(sheet,2).filter(row=>row.some(value=>value !== '' && value != null));
   if (!values.length) throw new Error('At least one weekly window is required in WeeklyWindows.');
   const ids = new Set();
@@ -270,8 +272,8 @@ function weeklyLock_(run) {
 }
 
 function weeklyTeam_(teamId) {
-  const sheet = getSheet(SHEET_NAMES.TEAM_STATUS);
-  const columns = buildColumnMap(sheet, FIELD_DEFINITIONS.TEAM_STATUS);
+  const sheet = getSheet_(SHEET_NAMES.TEAM_STATUS);
+  const columns = buildColumnMap_(sheet, FIELD_DEFINITIONS.TEAM_STATUS);
   const matches = readSheetRows_(sheet, 2).map((row,index) => ({row,rowNumber:index+2}))
     .filter(item => textEquals_(item.row[columns.TEAM_ID], teamId));
   if (matches.length !== 1) throw new Error('Team is missing or ambiguous.');
@@ -281,7 +283,7 @@ function weeklyTeam_(teamId) {
 /** Validated current roster; no duplicated identity registry. */
 function weeklyStudents_() {
   const collect = (name, definitions) => {
-    const sheet = getSheet(name), columns = buildColumnMap(sheet, definitions);
+    const sheet = getSheet_(name), columns = buildColumnMap_(sheet, definitions);
     const rows = readSheetRows_(sheet, 2), students = [], teams = new Set();
     rows.forEach(row => {
       const teamId = String(row[columns.TEAM_ID] || '').trim();
@@ -289,7 +291,7 @@ function weeklyStudents_() {
       if (teams.has(normalizeText_(teamId))) throw new Error('Duplicate team in ' + name);
       teams.add(normalizeText_(teamId));
       [1,2,3,4].forEach(n => {
-        const email = normalizeEmail(row[columns['S'+n+'_EMAIL']]);
+        const email = normalizeEmail_(row[columns['S'+n+'_EMAIL']]);
         const regNo = String(row[columns['S'+n+'_REGNO']] || '').trim();
         if (!email && !regNo && !row[columns['S'+n+'_NAME']]) return;
         if (!email || !regNo) throw new Error('Student email or Reg No is missing in ' + name);
@@ -306,7 +308,7 @@ function weeklyStudents_() {
 }
 
 function authorizeWeeklyStudent_() {
-  const email = normalizeEmail(Session.getActiveUser().getEmail());
+  const email = normalizeEmail_(Session.getActiveUser().getEmail());
   if (!email) throw new Error('Sign in with your institutional account.');
   const student = weeklyStudents_().find(item => item.email === email);
   if (!student) throw new Error('Student membership was not found.');
@@ -343,11 +345,11 @@ function weeklyLogColumns_(sheet) {
   Object.values(FIELD_DEFINITIONS.LOG_ENTRIES).forEach(header => {
     if (headers.filter(h=>textEquals_(h,header)).length !== 1) throw new Error('LogEntries requires exactly one ' + header + ' column.');
   });
-  return buildColumnMap(sheet,FIELD_DEFINITIONS.LOG_ENTRIES,headers);
+  return buildColumnMap_(sheet,FIELD_DEFINITIONS.LOG_ENTRIES,headers);
 }
 
 function readLogEntries_(teamId, regNo) {
-  const sheet = getSheet(SHEET_NAMES.LOG_ENTRIES);
+  const sheet = getSheet_(SHEET_NAMES.LOG_ENTRIES);
   if (!sheet) throw new Error('Initialize LogEntries first.');
   const columns = weeklyLogColumns_(sheet);
   const source = regNo ? readActivityRows_(SHEET_NAMES.LOG_ENTRIES,columns.regNo+1,regNo) : teamId ? readActivityRows_(SHEET_NAMES.LOG_ENTRIES,columns.teamId+1,teamId) : readSheetRows_(sheet,2);
@@ -365,7 +367,7 @@ function getEffectiveLogEntries_(records) {
 }
 
 function appendWeeklyEntry_(record) {
-  const sheet = getSheet(SHEET_NAMES.LOG_ENTRIES), columns = weeklyLogColumns_(sheet);
+  const sheet = getSheet_(SHEET_NAMES.LOG_ENTRIES), columns = weeklyLogColumns_(sheet);
   const values = new Array(sheet.getLastColumn()).fill('');
   Object.keys(columns).forEach(key => {
     const value = record[key] === undefined ? '' : record[key];
@@ -396,7 +398,7 @@ function weeklyEntryResponse_(record) {
     firstSubmittedAt:new Date(record.firstSubmittedAt).toISOString(),message:'Weekly progress saved.'};
 }
 
-function submitWeeklyProgress(input) {
+function submitWeeklyProgress_(input) {
   const content = weeklyContent_(input);
   return weeklyLock_(() => {
     const student = authorizeWeeklyStudent_();
@@ -410,9 +412,9 @@ function submitWeeklyProgress(input) {
     }
     const team = weeklyTeam_(student.teamId);
     if (weeklyGuideFrozen_(records,input.weekId,weeklySignedEntryIds_())) throw new Error('Guide confirmation has frozen this week. Further revisions are not allowed.');
-    if (getTeamStatus(team.row) !== 'APPROVED') throw new Error('Your title must be approved before weekly submission.');
+    if (getTeamStatus_(team.row) !== 'APPROVED') throw new Error('Your title must be approved before weekly submission.');
     const eligibility = progressStudentEligibility_(student);
-    if (!getRepoUrlForTeam(student.teamId)) throw new Error('The team repository is unavailable.');
+    if (!getRepoUrlForTeam_(student.teamId)) throw new Error('The team repository is unavailable.');
     const now = new Date(), windows = getWeeklySubmissionWindows_();
     const eligibleFrom = eligibility.eligibleFrom;
     const window = resolveWeeklySubmissionWindow_(windows,eligibleFrom,now,input.weekId);
@@ -431,12 +433,12 @@ function submitWeeklyProgress(input) {
   });
 }
 
-function loadStudentWeeklyProgress() {
+function loadStudentWeeklyProgress_() {
   const student = authorizeWeeklyStudent_(), team = weeklyTeam_(student.teamId);
   const eligibility = progressStudentEligibility_(student);
   const now = new Date(), windows = getWeeklySubmissionWindows_();
   const eligibleFrom = eligibility.eligibleFrom, enforcedFrom = eligibility.enforcedFrom;
-  const ready = !!eligibleFrom && getTeamStatus(team.row) === 'APPROVED';
+  const ready = !!eligibleFrom && getTeamStatus_(team.row) === 'APPROVED';
   const records = readLogEntries_(null,student.regNo);
   const allowed = eligibleWeeklyWindows_(eligibleFrom,windows);
   const signedIds = weeklySignedEntryIds_();
@@ -451,7 +453,7 @@ function loadStudentWeeklyProgress() {
   const serial = records.map(r=>({...r, recordedAt:new Date(r.recordedAt).toISOString(),
     submittedAt:r.submittedAt ? new Date(r.submittedAt).toISOString() : '',
     firstSubmittedAt:r.firstSubmittedAt ? new Date(r.firstSubmittedAt).toISOString() : ''}));
-  return {checkedAt:now.toISOString(),eligibleFrom,enforcedFrom,eligibilityStatus:eligibility.status,ready,complete:!!eligibleFrom && windows.every(w=>now.getTime() > w.late_until) && getLogWeekSummary_(records,enforcedFrom,student.regNo,now).missing === 0,weeks,actions,history:serial,timezone:getSpreadsheet().getSpreadsheetTimeZone(),
+  return {checkedAt:now.toISOString(),eligibleFrom,enforcedFrom,eligibilityStatus:eligibility.status,ready,complete:!!eligibleFrom && windows.every(w=>now.getTime() > w.late_until) && getLogWeekSummary_(records,enforcedFrom,student.regNo,now).missing === 0,weeks,actions,history:serial,timezone:getSpreadsheet_().getSpreadsheetTimeZone(),
     allWeeks:windows.map(w=>({weekId:w.weekId,opens:new Date(w.opens_at).toISOString(),deadline:new Date(w.deadline_at).toISOString()})),
     evidence:readStudentWeeklyEvidence_(student,windows.filter(w=>now.getTime() >= w.opens_at),{logs:records}),
     summary:getLogWeekSummary_(records,eligibleFrom ? enforcedFrom : '',student.regNo,now),
@@ -475,8 +477,8 @@ function appendMissedWeeklyEntries_(students, windows, now) {
 /** Reminder receipts are authoritative in this tab; callers hold the weekly lock. */
 function weeklyReminderSheet_(create) {
   const name = SHEET_NAMES.WEEKLY_REMINDERS, headers = Object.values(FIELD_DEFINITIONS.WEEKLY_REMINDERS);
-  let sheet = getSheet(name);
-  if (!sheet && create) sheet = getSpreadsheet().insertSheet(name);
+  let sheet = getSheet_(name);
+  if (!sheet && create) sheet = getSpreadsheet_().insertSheet(name);
   if (!sheet) throw new Error('WeeklyReminders storage is missing. Run setupWeeklySubmissionStorage.');
   if (!sheet.getLastRow() && create) sheet.getRange(1,1,1,headers.length).setValues([headers]);
   const actual = readSheetRows_(sheet,1,1)[0] || [];
@@ -530,19 +532,10 @@ function migrateWeeklyReminderProperties_(sheet,seen) {
   return {migrated:pending.length,deleted:old.length};
 }
 
-/** Run in the editor to transfer and remove any remaining legacy reminder properties. */
-function cleanupWeeklyReminderScriptProperties() {
-  const email = Session.getActiveUser().getEmail();
-  if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
-  return weeklyLock_(()=>{
-    const sheet = weeklyReminderSheet_(false);
-    return migrateWeeklyReminderProperties_(sheet,weeklyReminderReceipts_(sheet));
-  });
-}
-
 function processWeeklySubmissionSchedule() {
+  requireTriggerOrOperator_();
   const windows = getWeeklySubmissionWindows_();
-  const hours = Number(getConfig('SUBMISSION_REMINDER_HOURS'));
+  const hours = Number(getConfig_('SUBMISSION_REMINDER_HOURS'));
   if (!Number.isFinite(hours) || hours <= 0) throw new Error('SUBMISSION_REMINDER_HOURS must be positive.');
   return weeklyLock_(() => {
     const currentStudents = weeklyStudents_(), now = new Date();
@@ -557,10 +550,10 @@ function processWeeklySubmissionSchedule() {
         if (records.some(r=>textEquals_(r.regNo,student.regNo) && r.weekId === window.weekId && r.entryStatus !== 'MISSED')) return;
         const key = weeklyReminderKey_(student.regNo,window.weekId);
         if (reminders.has(key)) return;
-        const due = Utilities.formatDate(new Date(window.deadline_at),getSpreadsheet().getSpreadsheetTimeZone(),'dd MMM yyyy HH:mm z');
+        const due = Utilities.formatDate(new Date(window.deadline_at),getSpreadsheet_().getSpreadsheetTimeZone(),'dd MMM yyyy HH:mm z');
         try {
           MailApp.sendEmail(student.email,'Weekly progress reminder â€” ' + window.weekId,
-            'Submit your weekly progress by ' + due + '.\n\nOpen your Student Dashboard:\n' + getDashboardUrl());
+            'Submit your weekly progress by ' + due + '.\n\nOpen your Student Dashboard:\n' + getDashboardUrl_());
           const rowNumber = reminderSheet.getLastRow()+1;
           if (rowNumber > reminderSheet.getMaxRows()) reminderSheet.insertRowsAfter(reminderSheet.getMaxRows(),1);
           reminderSheet.getRange(rowNumber,1).setNumberFormat('@');
@@ -577,11 +570,11 @@ function setupWeeklySubmissionStorage() {
   const email = Session.getActiveUser().getEmail();
   if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
   getWeeklySubmissionWindows_();
-  const hours = Number(getConfig('SUBMISSION_REMINDER_HOURS'));
+  const hours = Number(getConfig_('SUBMISSION_REMINDER_HOURS'));
   if (!Number.isFinite(hours) || hours <= 0) throw new Error('SUBMISSION_REMINDER_HOURS must be positive.');
   return weeklyLock_(() => {
-    let sheet = getSheet(SHEET_NAMES.LOG_ENTRIES);
-    if (!sheet) sheet = getSpreadsheet().insertSheet(SHEET_NAMES.LOG_ENTRIES);
+    let sheet = getSheet_(SHEET_NAMES.LOG_ENTRIES);
+    if (!sheet) sheet = getSpreadsheet_().insertSheet(SHEET_NAMES.LOG_ENTRIES);
     if (!sheet.getLastRow()) sheet.getRange(1,1,1,Object.keys(FIELD_DEFINITIONS.LOG_ENTRIES).length).setValues([Object.values(FIELD_DEFINITIONS.LOG_ENTRIES)]);
     weeklyLogColumns_(sheet);
     const reminderSheet = weeklyReminderSheet_(true);
@@ -592,21 +585,3 @@ function setupWeeklySubmissionStorage() {
   });
 }
 
-function setupWeeklySubmissionTriggers() {
-  const email = Session.getActiveUser().getEmail();
-  if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
-  getWeeklySubmissionWindows_();
-  weeklyLogColumns_(getSheet(SHEET_NAMES.LOG_ENTRIES));
-  weeklyReminderReceipts_(weeklyReminderSheet_(false));
-  const hours = Number(getConfig('SUBMISSION_REMINDER_HOURS'));
-  if (!Number.isFinite(hours) || hours <= 0) throw new Error('SUBMISSION_REMINDER_HOURS must be positive.');
-  readProgressEligibility_();
-  return weeklyLock_(() => {
-    const retired = ['onFormSubmit','sendWeeklyLogReminders','sendWeeklyAnalysisDigest'];
-    const triggers = ScriptApp.getProjectTriggers();
-    triggers.filter(t=>retired.includes(t.getHandlerFunction())).forEach(t=>ScriptApp.deleteTrigger(t));
-    const current = triggers.filter(t=>t.getHandlerFunction() === 'processWeeklySubmissionSchedule');
-    current.forEach(t=>ScriptApp.deleteTrigger(t));
-    ScriptApp.newTrigger('processWeeklySubmissionSchedule').timeBased().everyHours(1).create();
-  });
-}

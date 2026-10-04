@@ -11,7 +11,7 @@ Use `readSheetRows_(sheet, firstRow, rowCount)` for selected rows. It reads
 column A through `getLastColumn()`, including all headers and any additional
 populated columns, while preserving absolute column indexes. Omit `rowCount`
 to read through the last populated row. Empty ranges return `[]`. Complete-sheet
-reads may use `getDataRange().getValues()` or `getSheetRows()`.
+reads may use `getDataRange().getValues()` or `getSheetRows_()`.
 
 Do not derive read width from one field's position or a fixed schema length.
 Header-mapped consumers access fields through the column map. Searches may target
@@ -128,7 +128,7 @@ unavailable rather than reporting zero commits. Dashboard reads use only this ta
 
 Collection creates the status tab when needed and updates the same team row on each run.
 
-`fetchAllCommits()` uses `makeGithubRequest()` and its authoritative
+`fetchAllCommits()` uses `makeGithubRequest_()` and its authoritative
 `GITHUB_ADMIN_TOKEN` Script Property, just like provisioning/readiness. The old
 `GITHUB_TOKEN` property is no longer read and may be removed after deployment.
 Repository URLs, collaborators, permissions and provisioning are not changed.

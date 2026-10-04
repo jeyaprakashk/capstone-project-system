@@ -17,7 +17,7 @@ function checkReviewConfiguration_() {
   let registryState='INVALID';
   const blocked=(state,summary,message)=>({valid:false,ready:false,state,registryState,canBootstrap:registryState==='MISSING',summary,count:0,issues:[{sheet:'AssessmentDefinitions',message}],checkedAt,links,storage:[]});
   try {
-    const definitionsSheet=getSheet('AssessmentDefinitions'),rubrics=getSheet('Rubrics'),milestones=getSheet('Milestones');
+    const definitionsSheet=getSheet_('AssessmentDefinitions'),rubrics=getSheet_('Rubrics'),milestones=getSheet_('Milestones');
     for(const [key,sheet] of [['definitions',definitionsSheet],['rubrics',rubrics],['config',milestones]])if(sheet)links[key]='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit#gid='+sheet.getSheetId();
     if(!definitionsSheet){
       registryState='MISSING';
@@ -29,7 +29,7 @@ function checkReviewConfiguration_() {
       return blocked('definitions-empty','Assessment definitions required','AssessmentDefinitions contains no graded assessments. Open Assessment definitions and configure the required instances before initializing storage.');
     }
     registryState='VALID';
-    const result=validateReviewConfigurationRows_(milestones?milestones.getDataRange().getValues():null,rubrics?rubrics.getDataRange().getValues():null,getSpreadsheet().getSpreadsheetTimeZone(),definitions);
+    const result=validateReviewConfigurationRows_(milestones?milestones.getDataRange().getValues():null,rubrics?rubrics.getDataRange().getValues():null,getSpreadsheet_().getSpreadsheetTimeZone(),definitions);
     const storage=definitions.map(d=>{
       const item={assessment:d.key,label:d.label,journal:d.journal,rubric:result.rubrics[d.key]};
       if(d.type==='SEE')return {...item,state:'NOT_REQUIRED',detail:'Not required — evaluated outside this app.'};
@@ -44,12 +44,12 @@ function checkReviewConfiguration_() {
     const canInitializeStorage=valid&&(missing>0||empty>0);
     const readyCount=storage.filter(item=>item.ready).length;
     const summary=readyCount+' / '+definitions.length+' assessments ready'+(!valid?' \u00b7 Configuration needs attention':ready?'': ' \u00b7 '+missing+' missing journals \u00b7 '+empty+' journals need initialization. Use Create missing assessment storage.');
-    if(valid){rubricExecutionStructure_=result.structure;projectScheduleExecution_=null;}
+    if(valid)projectScheduleExecution_=null;
     return {valid,ready,state:!valid?'invalid':ready?'ready':missing?'storage-missing':'storage-empty',registryState,canBootstrap:false,canInitializeStorage,storageComplete,summary,count:result.count,issues,checkedAt,links,storage};
   }catch(err){return blocked('invalid','Configuration needs attention',err.message);}
 }
-function getCoordinatorReviewConfiguration() {
+function getCoordinatorReviewConfiguration_() {
   const email=Session.getActiveUser().getEmail();
-  if(!email||(!emailsMatch(email,getCoordinatorEmail())&&!emailsMatch(email,getConfig('CELL_PD_EMAIL'))))throw new Error('Coordinator access is required.');
+  if(!email||(!emailsMatch_(email,getCoordinatorEmail_())&&!emailsMatch_(email,getConfig_('CELL_PD_EMAIL'))))throw new Error('Coordinator access is required.');
   return checkReviewConfiguration_();
 }

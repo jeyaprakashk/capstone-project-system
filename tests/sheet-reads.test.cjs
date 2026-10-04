@@ -26,12 +26,12 @@ function fixture(data) {
 
 test('full-row reads preserve header gaps, trailing fields and requested row bounds', () => {
   const f = fixture([['Notes','','Team ID','Decision'], ['feedback','','G4','Revise'], ['','','G5','Approved']]);
-  const map = f.c.buildColumnMap(f.sheet, { TEAM_ID:'Team ID', DECISION:'Decision' });
+  const map = f.c.buildColumnMap_(f.sheet, { TEAM_ID:'Team ID', DECISION:'Decision' });
   const rows = f.c.readSheetRows_(f.sheet, 2, 1);
   assert.equal(rows[0][map.TEAM_ID], 'G4');
   assert.equal(rows[0][map.DECISION], 'Revise');
   assert.deepEqual(f.calls, [[1,1,1,4], [2,1,1,4]]);
-  assert.equal(f.c.findTeamStatusRow(f.sheet, 'g5', map), 3);
+  assert.equal(f.c.findTeamStatusRow_(f.sheet, 'g5', map), 3);
   assert.deepEqual(f.calls[2], [2,1,2,4]);
 });
 
@@ -39,7 +39,7 @@ test('empty, header-only and zero-count reads avoid invalid spreadsheet ranges',
   for (const data of [[], [['Header']]]) {
     const f = fixture(data);
     assert.equal(f.c.readSheetRows_(f.sheet, 2).length, 0);
-    assert.equal(f.c.findTeamStatusRow(f.sheet, 'G4', { TEAM_ID:0 }), -1);
+    assert.equal(f.c.findTeamStatusRow_(f.sheet, 'G4', { TEAM_ID:0 }), -1);
     assert.equal(f.c.readSheetRows_(f.sheet, 1, 0).length, 0);
     assert.equal(f.calls.length, 0);
   }
@@ -81,7 +81,7 @@ test('activity reads include all columns for both full and matched scopes', () =
     };
     return range;
   };
-  f.c.getSheet = () => f.sheet;
+  f.c.getSheet_ = () => f.sheet;
   vm.runInContext(fs.readFileSync(path.join(root, 'weekly-activity.js'), 'utf8'), f.c);
   assert.equal(f.c.readActivityRows_('Logs', null, null)[0][3], 'retained');
   assert.equal(f.c.readActivityRows_('Logs', 3, 'G4')[0][3], 'retained');

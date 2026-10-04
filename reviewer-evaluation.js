@@ -2,18 +2,18 @@
 function reviewerTeamContext_(teamId) {
   const email = Session.getActiveUser().getEmail();
   if (!email) throw new Error('Sign in with your institutional account.');
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(r => textEquals_(r[TS.TEAM_ID], teamId));
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const rows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r => textEquals_(r[TS.TEAM_ID], teamId));
   if (rows.length !== 1) throw new Error('Team is missing or ambiguous.');
   const row = rows[0], committee = String(row[TS.COMMITTEE_NUMBER] || '').trim();
-  if (!getCommitteeNumbersForReviewer(email).some(number => textEquals_(number, committee))) throw new Error('You are not an assigned reviewer for this team.');
+  if (!getCommitteeNumbersForReviewer_(email).some(number => textEquals_(number, committee))) throw new Error('You are not an assigned reviewer for this team.');
   const students = getStudentsFromTeamStatusRow_(row, TS).map(student => ({register:normalizeReviewKey_(student.regNo),name:String(student.name || '')}));
   return {TS,row,committee,students,team:String(row[TS.TEAM_ID]),title:String(row[TS.TITLE] || '')};
 }
 
 /** Progress for the given team rows. `onlyKey` limits the work to one Review; its prerequisites are still read once each. */
 function getReviewerReviewProgress_(rows, onlyKey) {
-  const TS=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
+  const TS=getColumnMap_(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
   const result={reviews:[],teams:Object.create(null),error:''};
   let definitions;
   try {result.reviews=getReviewDefinitions_();definitions=getAssessmentDefinitions_();}

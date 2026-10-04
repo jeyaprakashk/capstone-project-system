@@ -223,7 +223,7 @@ function guideWeeklyBrowser_(bridge) {
         card.dataset.stickyDecision=String(bodyHeight>0 && visibleBody>=Math.min(bodyHeight,window.innerHeight)*0.6 && card.getBoundingClientRect().bottom>height);
         const naturalHeight=bounds.height-previous+height;
         const reserve=naturalHeight>window.innerHeight?Math.ceil(height):0;
-        if(reserve!==previous){card.dataset.actionReserve=String(reserve);card.style.setProperty('--guide-action-reserve',reserve+'px');}
+        if(reserve!==previous){card.dataset.actionReserve=String(reserve);}
       });
     };
     actionBarObserver=new ResizeObserver(update);

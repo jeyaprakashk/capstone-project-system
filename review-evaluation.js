@@ -6,7 +6,7 @@ function reviewConfiguration_(key) {
   if(d.type!=='REVIEW')throw new Error('Expected REVIEW assessment.');
   const criteria=assessmentRubric_(d);
   return {key:d.key,label:d.label,criteria,maximum:criteria.reduce((n,c)=>n+c.maxMarks,0),due:d.day,opens:d.opens,
-    timezone:getSpreadsheet().getSpreadsheetTimeZone(),weight:d.weight/100,academicPolicyVersion:d.academicPolicyVersion,
+    timezone:getSpreadsheet_().getSpreadsheetTimeZone(),weight:d.weight/100,academicPolicyVersion:d.academicPolicyVersion,
     prerequisites:d.prerequisites,sequence:d.sequence};
 }
 
@@ -18,16 +18,16 @@ function reviewEligibility_(row, columns) {
 
 function reviewContext_(teamId, staff, key) {
   const actor = guideActor_(staff);
-  const columns = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row=>textEquals_(row[columns.TEAM_ID],teamId));
+  const columns = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const rows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row=>textEquals_(row[columns.TEAM_ID],teamId));
   if (rows.length !== 1) throw new Error('Team is missing or ambiguous.');
   const row = rows[0], committee = String(row[columns.COMMITTEE_NUMBER] || '').trim();
-  if (!staff && !getCommitteeNumbersForReviewer(actor).some(n=>textEquals_(n,committee))) throw new Error('You are not an assigned reviewer for this team.');
+  if (!staff && !getCommitteeNumbersForReviewer_(actor).some(n=>textEquals_(n,committee))) throw new Error('You are not an assigned reviewer for this team.');
   if(!staff){const block=assessmentPrerequisiteBlock_(assessmentDefinition_(key),row[columns.TEAM_ID]);if(block)throw new Error(block);}
-  const students = getStudentsFromTeamStatusRow_(row,columns).map(s=>({register:normalizeReviewKey_(s.regNo),name:String(s.name || ''),email:normalizeEmail(s.email)}));
+  const students = getStudentsFromTeamStatusRow_(row,columns).map(s=>({register:normalizeReviewKey_(s.regNo),name:String(s.name || ''),email:normalizeEmail_(s.email)}));
   if (!students.length || new Set(students.map(s=>s.register)).size !== students.length) throw new Error('Student roster is missing or ambiguous.');
   const roster = {team:normalizeReviewKey_(row[columns.TEAM_ID]),committee,students};
-  const committeeInfo=getCommitteeInfo(committee) || {};
+  const committeeInfo=getCommitteeInfo_(committee) || {};
   return {actor,roster,eligibility:reviewEligibility_(row,columns),details:{team:String(row[columns.TEAM_ID]),
     title:String(row[columns.TITLE] || ''),problem:String(row[columns.PROBLEM] || ''),committee,
     reviewers:[1,2,3,4].map(n=>({name:String(committeeInfo['reviewer'+n+'Name'] || ''),email:String(committeeInfo['reviewer'+n+'Email'] || '')})).filter(r=>r.name || r.email),
@@ -93,7 +93,7 @@ function reviewStudentView_(config,teamScores,student) {
   if(!student.assessment || student.assessment.policyVersion!==config.academicPolicyVersion)throw new Error('Invalid finalized outcome policy.');
   return student;
 }
-function loadReviewEvaluation(teamId,key) {return getReviewEvaluation_(teamId,key);}
+function loadReviewEvaluation_(teamId,key) {return getReviewEvaluation_(teamId,key);}
 function getReviewEvaluation_(teamId,key) {
   const context = reviewContext_(teamId,false,key), config = reviewConfiguration_(key);
   const history=reviewRecords_(key);
@@ -128,7 +128,7 @@ function reviewScore_(config, roster, input, complete, previous) {
 }
 
 function reviewWrite_(action,input,key) {
-  if(action==='publish'){const result=publishInternalAssessment({...input,assessmentId:key});return reviewWriteResult_(result.revision,reviewRecords_(key).records.find(r=>r.team===normalizeText_(input.team)&&r.revision===result.revision));}
+  if(action==='publish'){const result=publishInternalAssessment_({...input,assessmentId:key});return reviewWriteResult_(result.revision,reviewRecords_(key).records.find(r=>r.team===normalizeText_(input.team)&&r.revision===result.revision));}
   const staff=action==='reopen';
   const actor=guideActor_(staff);
   if(!['draft','submit','publish','reopen','makeupDraft','makeupSubmit','absenceCorrection'].includes(action))throw new Error('Unsupported Review command.');
@@ -193,12 +193,12 @@ function reviewWrite_(action,input,key) {
     return reviewWriteResult_(revision,payload);
   });
 }
-function saveReviewEvaluationDraft(input) {return reviewWrite_('draft',input,input.assessmentId);}
-function submitReviewEvaluation(input) {return reviewWrite_('submit',input,input.assessmentId);}
-function reopenReviewEvaluation(input) {return reviewWrite_('reopen',input,input.assessmentId);}
-function saveReviewMakeupDraft(input) {return reviewWrite_('makeupDraft',input,input.assessmentId);}
-function submitReviewMakeup(input) {return reviewWrite_('makeupSubmit',input,input.assessmentId);}
-function recordReviewAbsence(input) {return reviewWrite_('absenceCorrection',input,input.assessmentId);}
+function saveReviewEvaluationDraft_(input) {return reviewWrite_('draft',input,input.assessmentId);}
+function submitReviewEvaluation_(input) {return reviewWrite_('submit',input,input.assessmentId);}
+function reopenReviewEvaluation_(input) {return reviewWrite_('reopen',input,input.assessmentId);}
+function saveReviewMakeupDraft_(input) {return reviewWrite_('makeupDraft',input,input.assessmentId);}
+function submitReviewMakeup_(input) {return reviewWrite_('makeupSubmit',input,input.assessmentId);}
+function recordReviewAbsence_(input) {return reviewWrite_('absenceCorrection',input,input.assessmentId);}
 function reviewAbsenceCorrection_(latest,input,actor) {
   const allowed=['assessmentId','team','student','revision','token','requestId','absence'];
   if(Object.keys(input).some(key=>!allowed.includes(key)))throw new Error('Absence correction changes only absence details.');
@@ -220,7 +220,6 @@ function reviewAbsenceCorrection_(latest,input,actor) {
   return payload;
 }
 function reviewAbsenceFacts_(value) {return reviewPolicyFacts_(value);}
-function reviewScoresComplete_(criteria,scores) {return reviewPolicyScoresComplete_(criteria,scores);}
 function reviewEffectiveStudent_(config,teamScores,student) {return reviewPolicyCalculate_(config,teamScores,student);}
 function reviewMakeup_(latest,action,input,actor) {
   if(input.teamScores || input.components || input.absence || input.decision)throw new Error('Makeup assesses only the pending Individual component.');
@@ -249,7 +248,7 @@ function reviewProgress_(row, columns, records, config, definition, loaded) {
   const roster=getStudentsFromTeamStatusRow_(row,columns), totalStudents=roster.length;
   const latest=reviewLatest_(records,row[columns.TEAM_ID]);
   const currentRoster={team:normalizeReviewKey_(row[columns.TEAM_ID]),committee:String(row[columns.COMMITTEE_NUMBER] || '').trim(),
-    students:roster.map(s=>({register:normalizeReviewKey_(s.regNo),name:String(s.name || ''),email:normalizeEmail(s.email)}))};
+    students:roster.map(s=>({register:normalizeReviewKey_(s.regNo),name:String(s.name || ''),email:normalizeEmail_(s.email)}))};
   const submitted=!!latest && ['Submitted','Published'].includes(latest.status) && evaluationHash_(evaluationMembership_(latest.roster))===evaluationHash_(evaluationMembership_(currentRoster));
   const isComplete=s=>s.assessment.completed;
   const markedStudents=submitted?latest.students.filter(isComplete).length:0;
@@ -259,16 +258,5 @@ function reviewProgress_(row, columns, records, config, definition, loaded) {
   const availability=reviewAvailability_({eligibility:{...reviewEligibility_(row,columns),...(prerequisiteReason?{reason:prerequisiteReason}:{})}},config,latest);
   return {completed,recorded,prerequisiteReason,markedStudents,totalStudents,available:true,status:latest?latest.status:'Not started',...availability};
 }
-function loadCoordinatorReviewEvaluations_(key) {
-  guideActor_(true);
-  const config=reviewConfiguration_(key), {sheet,records}=reviewRecords_(key);
-  const columns=getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
-  return {ready:!!sheet,teams:getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(r=>r[columns.TEAM_ID]).map(row=>{
-    const latest=reviewLatest_(records,row[columns.TEAM_ID]);
-    return {team:String(row[columns.TEAM_ID]),...reviewProgress_(row,columns,records,config),revision:latest?latest.revision:0,
-      late:!!(latest && latest.late),students:latest?latest.students.map(s=>reviewStudentView_(latest.config,latest.teamScores,s)):[]};
-  })};
-}
 function loadPublishedReviewEvaluation_(key) {return loadPublishedAssessment_(key);}
 
-function loadPublishedReviewEvaluation(key) {return loadPublishedReviewEvaluation_(key);}

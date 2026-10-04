@@ -9,21 +9,21 @@ const PROGRESS_ELIGIBILITY_FIELDS_ = {
 };
 
 function progressEligibilityCoordinator_(scheduled) {
-  const active = normalizeEmail(Session.getActiveUser().getEmail());
-  const effective = normalizeEmail(Session.getEffectiveUser ? Session.getEffectiveUser().getEmail() : active);
+  const active = normalizeEmail_(Session.getActiveUser().getEmail());
+  const effective = normalizeEmail_(Session.getEffectiveUser ? Session.getEffectiveUser().getEmail() : active);
   const email = scheduled ? effective : active;
   if (!email || !activityIsCoordinator_(email) || (active && !activityIsCoordinator_(active))) throw new Error('Coordinator access is required.');
   return email;
 }
 
 function progressEligibilityStorage_() {
-  const sheet = getSheet('ProgressEligibility');
+  const sheet = getSheet_('ProgressEligibility');
   if (!sheet) throw new Error('Initialize ProgressEligibility storage first.');
   const headers = readSheetRows_(sheet,1,1)[0] || [];
   Object.values(PROGRESS_ELIGIBILITY_FIELDS_).forEach(header=>{
     if (headers.filter(value=>textEquals_(value,header)).length !== 1) throw new Error('ProgressEligibility requires exactly one ' + header + ' column.');
   });
-  return {sheet,columns:buildColumnMap(sheet,PROGRESS_ELIGIBILITY_FIELDS_,headers)};
+  return {sheet,columns:buildColumnMap_(sheet,PROGRESS_ELIGIBILITY_FIELDS_,headers)};
 }
 
 function readProgressEligibility_() {
@@ -71,8 +71,8 @@ function writeProgressEligibility_(record) {
 function setupProgressEligibilityStorage() {
   progressEligibilityCoordinator_();
   return weeklyLock_(()=>{
-    let sheet = getSheet('ProgressEligibility');
-    if (!sheet) sheet = getSpreadsheet().insertSheet('ProgressEligibility');
+    let sheet = getSheet_('ProgressEligibility');
+    if (!sheet) sheet = getSpreadsheet_().insertSheet('ProgressEligibility');
     if (!sheet.getLastRow()) sheet.getRange(1,1,1,Object.keys(PROGRESS_ELIGIBILITY_FIELDS_).length).setValues([Object.values(PROGRESS_ELIGIBILITY_FIELDS_)]);
     readProgressEligibility_();
     return {ok:true};
@@ -101,10 +101,10 @@ function calculateProgressEligibility_(record, windows, now) {
 
 function progressTitleDate_(team, registry) {
   const r = team.row, c = team.columns;
-  if (getTeamStatus(r) !== 'APPROVED') return '';
-  const matches = registry.filter(a=>textEquals_(a[0],getAcademicYear()) && textEquals_(a[1],r[c.SEMESTER]) &&
-    textEquals_(a[2],team.teamId) && emailsMatch(a[3],r[c.GUIDE_EMAIL]) && String(a[4]) === String(r[c.TITLE]) &&
-    emailsMatch(a[8],r[c.TITLE_APPROVED_BY]));
+  if (getTeamStatus_(r) !== 'APPROVED') return '';
+  const matches = registry.filter(a=>textEquals_(a[0],getAcademicYear_()) && textEquals_(a[1],r[c.SEMESTER]) &&
+    textEquals_(a[2],team.teamId) && emailsMatch_(a[3],r[c.GUIDE_EMAIL]) && String(a[4]) === String(r[c.TITLE]) &&
+    emailsMatch_(a[8],r[c.TITLE_APPROVED_BY]));
   const value = matches.length ? matches[matches.length-1][7] : '';
   return Number.isFinite(progressDateMs_(value)) ? new Date(value) : '';
 }
@@ -213,7 +213,7 @@ function progressEligibilityHolds_() {
 function reconcileProgressEligibility() {
   const owner = progressEligibilityCoordinator_(true), props = PropertiesService.getScriptProperties();
   const installedOwner = props.getProperty('PROGRESS_ELIGIBILITY_TRIGGER_OWNER');
-  if (installedOwner && !emailsMatch(installedOwner,owner)) throw new Error('Eligibility trigger belongs to another coordinator.');
+  if (installedOwner && !emailsMatch_(installedOwner,owner)) throw new Error('Eligibility trigger belongs to another coordinator.');
   const records = readProgressEligibility_(), students = weeklyStudents_(), windows = getWeeklySubmissionWindows_();
   const holds = progressEligibilityHolds_();
   const unresolved = students.map(student=>({student,record:progressStudentEligibility_(student,records,windows)})).filter(item=>!item.record.eligibleFrom);
@@ -226,9 +226,9 @@ function reconcileProgressEligibility() {
     return report;
   }
   const context = {request:progressGithubGet_,cache:new Map(),deadline:Date.now()+240000};
-  const accounts = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS), accountColumns = githubAccountColumns_(accounts), accountRows = readSheetRows_(accounts,2);
+  const accounts = getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS), accountColumns = githubAccountColumns_(accounts), accountRows = readSheetRows_(accounts,2);
   let registry, registryError;
-  try { registry = readSheetRows_(getHubRegistrySheet(),2); } catch(error) { registryError = true; }
+  try { registry = readSheetRows_(getHubRegistrySheet_(),2); } catch(error) { registryError = true; }
   const report = {checked:0,fixed:0,deferred:0,writeErrors:0,held};
   for (const item of pending) {
     if (Date.now() >= context.deadline) { report.deferred += pending.length-report.checked; break; }
@@ -238,13 +238,13 @@ function reconcileProgressEligibility() {
       const team = weeklyTeam_(student.teamId), c = team.columns;
       const slot = [1,2,3,4].find(n=>textEquals_(team.row[c['S'+n+'_REGNO']],student.regNo));
       next.name = team.row[c['S'+slot+'_NAME']] || '';
-      next.titleStatus = getTeamStatus(team.row);
+      next.titleStatus = getTeamStatus_(team.row);
       next.titleDate = registryError ? '' : progressTitleDate_(team,registry);
       const identity = githubStudentIdentity_(student,accountRows,accountColumns,students);
       if (identity.state !== 'available') throw new Error(identity.reason);
       if (record.githubId && record.githubId !== identity.githubId) throw new Error('Eligibility GitHub identity changed; coordinator review required.');
       next.githubId = identity.githubId;
-      const repo = parseGithubRepoUrl_(getRepoUrlForTeam(student.teamId));
+      const repo = parseGithubRepoUrl_(getRepoUrlForTeam_(student.teamId));
       if (!repo) throw new Error('Team repository is unavailable.');
       const slug = repo.owner+'/'+repo.repo;
       if (record.evidence && String(JSON.parse(record.evidence).repo).toLowerCase() !== slug.toLowerCase()) throw new Error('Eligibility repository changed; coordinator review required.');
@@ -253,22 +253,22 @@ function reconcileProgressEligibility() {
       if (!next.error) next = calculateProgressEligibility_(next,windows,new Date());
     } catch(error) { next.status = 'CHECK_ERROR'; next.error = error.message; }
     try { weeklyLock_(()=>{
-      const currentStudent = weeklyStudents_().find(s=>textEquals_(s.regNo,student.regNo) && textEquals_(s.teamId,student.teamId) && emailsMatch(s.email,student.email));
+      const currentStudent = weeklyStudents_().find(s=>textEquals_(s.regNo,student.regNo) && textEquals_(s.teamId,student.teamId) && emailsMatch_(s.email,student.email));
       if (!currentStudent) throw new Error('Student membership changed during reconciliation.');
       const current = progressStudentEligibility_(student);
       if (current.eligibleFrom) return;
       if (current.enforcedFrom || progressEligibilityHolds_().has(normalizeText_(student.regNo))) return;
-      const currentAccounts = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS);
+      const currentAccounts = getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS);
       const currentIdentity = githubStudentIdentity_(student,readSheetRows_(currentAccounts,2),githubAccountColumns_(currentAccounts));
       if (!next.error && next.githubId && (currentIdentity.state !== 'available' || currentIdentity.githubId !== next.githubId)) throw new Error('GitHub identity changed during reconciliation.');
       if (!next.error) {
         const freshTeam = weeklyTeam_(student.teamId);
         if (next.evidence) {
-          const repo = parseGithubRepoUrl_(getRepoUrlForTeam(student.teamId));
+          const repo = parseGithubRepoUrl_(getRepoUrlForTeam_(student.teamId));
           if (!repo || (repo.owner+'/'+repo.repo).toLowerCase() !== String(JSON.parse(next.evidence).repo).toLowerCase()) throw new Error('Repository changed during reconciliation.');
         }
-        next.titleStatus = getTeamStatus(freshTeam.row);
-        next.titleDate = progressTitleDate_(freshTeam,readSheetRows_(getHubRegistrySheet(),2));
+        next.titleStatus = getTeamStatus_(freshTeam.row);
+        next.titleDate = progressTitleDate_(freshTeam,readSheetRows_(getHubRegistrySheet_(),2));
       }
       if (current.firstDetected) next.firstDetected = current.firstDetected;
       // A concurrent run may have established the first observation.
@@ -284,17 +284,3 @@ function reconcileProgressEligibility() {
   return report;
 }
 
-function setupProgressEligibilityTrigger() {
-  const owner = progressEligibilityCoordinator_();
-  if (Session.getEffectiveUser && !emailsMatch(owner,Session.getEffectiveUser().getEmail())) throw new Error('Install the eligibility trigger as the coordinator execution account.');
-  readProgressEligibility_(); getWeeklySubmissionWindows_();
-  return weeklyLock_(()=>{
-    const props = PropertiesService.getScriptProperties(), previous = props.getProperty('PROGRESS_ELIGIBILITY_TRIGGER_OWNER');
-    if (previous && !emailsMatch(previous,owner)) throw new Error('Eligibility trigger belongs to another coordinator; its owner must resolve it.');
-    const matches = ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction() === 'reconcileProgressEligibility');
-    if (matches.length > 1) throw new Error('Multiple eligibility triggers exist; resolve duplicates before setup.');
-    if (!matches.length) ScriptApp.newTrigger('reconcileProgressEligibility').timeBased().atHour(2).everyDays(1).inTimezone(getSpreadsheet().getSpreadsheetTimeZone()).create();
-    props.setProperty('PROGRESS_ELIGIBILITY_TRIGGER_OWNER',owner);
-    return {ok:true,created:!matches.length};
-  });
-}

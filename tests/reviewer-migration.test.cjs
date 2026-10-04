@@ -28,7 +28,7 @@ function serverFixture(email = 'reviewer@example.com') {
     }
   };
   Object.assign(c, {
-    getColumnMap: () => index, getSheetRows: () => rows, getCommitteeNumbersForReviewer: () => ['C1'],
+    getColumnMap_: () => index, getSheetRows_: () => rows, getCommitteeNumbersForReviewer_: () => ['C1'],
     normalizeReviewKey_: s => String(s || '').trim().toLowerCase(), getReviewerReviewProgress_: () => progress
   });
   return { c, progress, rows };
@@ -51,7 +51,7 @@ test('DTO carries the same team facts the server-rendered reviewer HTML showed',
 test('reviewer DTO summary, review columns, notes and excluded committees match the legacy dashboard', () => {
   const { c, progress } = serverFixture();
   const dto = JSON.parse(c.API_reviewer_getDashboard()).data;
-  const data = c.getReviewerDashboardData('reviewer@example.com');
+  const data = c.getReviewerDashboardData_('reviewer@example.com');
   assert.deepEqual(dto.summary, { pending: data.pending.length, approved: data.approved.length, awaitingGuide: data.notYetGuideApproved.length, total: data.total });
   assert.deepEqual(dto.reviews, progress.reviews);
   assert.equal(dto.reviewError, null);
@@ -71,13 +71,13 @@ test('reviewer DTO is stable and contains no markup or spreadsheet layout', () =
 
 test('reviewer endpoints authorize on the server and map failures to safe errors', () => {
   const denied = serverFixture();
-  denied.c.getCommitteeNumbersForReviewer = () => [];
+  denied.c.getCommitteeNumbersForReviewer_ = () => [];
   assert.deepEqual(JSON.parse(denied.c.API_reviewer_getDashboard()), { ok: false, error: { code: 'UNAUTHORIZED', message: 'You do not have Reviewer access.' } });
   assert.equal(JSON.parse(denied.c.API_reviewer_submitDecision('T1', 'Approved', '')).error.code, 'UNAUTHORIZED');
   const anonymous = serverFixture('');
   assert.equal(JSON.parse(anonymous.c.API_reviewer_getDashboard()).error.code, 'UNAUTHENTICATED');
   const broken = serverFixture();
-  broken.c.getReviewerDashboardData = () => { throw new TypeError('secret column 7 undefined'); };
+  broken.c.getReviewerDashboardData_ = () => { throw new TypeError('secret column 7 undefined'); };
   const failure = JSON.parse(broken.c.API_reviewer_getDashboard());
   assert.equal(failure.error.code, 'INTERNAL');
   assert.doesNotMatch(failure.error.message, /secret|column/);
@@ -85,7 +85,7 @@ test('reviewer endpoints authorize on the server and map failures to safe errors
 
 test('reviewer decision keeps the existing business rules and messages', () => {
   const f = serverFixture();
-  f.c.submitReviewerDecision = (team, decision, notes) => { if (decision === 'Revise' && !notes.trim()) throw new Error('Notes are required when requesting revision.'); return { ok: true, message: 'Saved ' + team + ' ' + decision }; };
+  f.c.submitReviewerDecision_ = (team, decision, notes) => { if (decision === 'Revise' && !notes.trim()) throw new Error('Notes are required when requesting revision.'); return { ok: true, message: 'Saved ' + team + ' ' + decision }; };
   assert.deepEqual(JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Approved', '')).data, { message: 'Saved T1 Approved' });
   const rejected = JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Revise', ' '));
   assert.deepEqual(rejected.error, { code: 'REJECTED', message: 'Notes are required when requesting revision.' });
@@ -95,10 +95,10 @@ test('dashboard shell compiles, defines the bridge before the dashboard script a
   const fs = require('node:fs');
   const files = ['common-styles.js', 'common-constants.js', 'common-helpers.js', 'guide-dashboard.js', 'coordinator-dashboard.js', 'student-dashboard.js', 'reviewer-dashboard.js',
     'lucide-icons.js', 'icon-renderer.js', 'review-evaluation-client.js', 'internal-assessment-publishing-client.js', 'guide-evaluation-client.js', 'guide-weekly-client.js',
-    'dashboard-client-scripts.js', 'review-academic-policy.js', 'data-bridge-client.js', 'reviewer-view.js', 'guide-view.js', 'student-view.js', 'coordinator-view.js', 'system-status-view.js', 'student-weekly-view.js', 'student-results-view.js', 'student-api.js', 'coordinator-api.js', 'dashboard-router.js'];
+    'assessment-history-view.js','dashboard-client-scripts.js', 'review-academic-policy.js', 'data-bridge-client.js', 'reviewer-view.js', 'guide-view.js', 'student-view.js', 'coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js', 'system-status-view.js', 'student-weekly-view.js', 'student-results-view.js', 'student-api.js', 'coordinator-api.js', 'dashboard-router.js'];
   const c = loadSources(files, { PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }) },
     HtmlService: { createHtmlOutputFromFile: name => ({ getContent: () => fs.readFileSync(name + '.html', 'utf8') }) } });
-  const html = c.buildDashboardShell('r@example.com', [{ key: 'reviewer', label: 'Reviewer', contentId: 'reviewerContent' }]);
+  const html = c.buildDashboardShell_('r@example.com', [{ key: 'reviewer', label: 'Reviewer', contentId: 'reviewerContent' }]);
   const script = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
   assert.doesNotThrow(() => new vm.Script(script));
   assert(script.indexOf('const DataBridge') >= 0 && script.indexOf('const DataBridge') < script.indexOf('const DashboardUI'));
@@ -109,25 +109,25 @@ test('dashboard shell compiles, defines the bridge before the dashboard script a
 
 test('workflow rejections returned as {ok:false} are errors, never success', () => {
   const f = serverFixture();
-  f.c.submitReviewerDecision = () => ({ ok: false, message: 'You are not an assigned reviewer for Team T1.' });
+  f.c.submitReviewerDecision_ = () => ({ ok: false, message: 'You are not an assigned reviewer for Team T1.' });
   assert.deepEqual(JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Approved', '')),
     { ok: false, error: { code: 'REJECTED', message: 'You are not an assigned reviewer for Team T1.' } });
-  f.c.submitReviewerDecision = () => ({ ok: true, message: 'Decision recorded for Team T1.' });
+  f.c.submitReviewerDecision_ = () => ({ ok: true, message: 'Decision recorded for Team T1.' });
   assert.deepEqual(JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Approved', '')).data, { message: 'Decision recorded for Team T1.' });
 });
 
 test('review marking endpoints map save kinds to the existing rules and keep their messages', () => {
   const f = serverFixture(), calls = [];
-  f.c.loadReviewEvaluation = (team, key) => ({ team, key });
-  f.c.saveReviewEvaluationDraft = input => { calls.push(['draft', input]); return { ok: true, status: 'Draft' }; };
-  f.c.submitReviewEvaluation = () => { throw new Error('Select a proficiency level for every criterion.'); };
-  f.c.recordReviewAbsence = () => ({ ok: false, message: 'Stale revision.' });
+  f.c.loadReviewEvaluation_ = (team, key) => ({ team, key });
+  f.c.saveReviewEvaluationDraft_ = input => { calls.push(['draft', input]); return { ok: true, status: 'Draft' }; };
+  f.c.submitReviewEvaluation_ = () => { throw new Error('Select a proficiency level for every criterion.'); };
+  f.c.recordReviewAbsence_ = () => ({ ok: false, message: 'Stale revision.' });
   assert.deepEqual(JSON.parse(f.c.API_review_getEvaluation('T1', 'review1')).data, { team: 'T1', key: 'review1' });
   assert.deepEqual(JSON.parse(f.c.API_review_save('draft', { a: 1 })).data, { ok: true, status: 'Draft' });
   assert.deepEqual(calls[0], ['draft', { a: 1 }]);
   assert.deepEqual(JSON.parse(f.c.API_review_save('submit', {})).error, { code: 'REJECTED', message: 'Select a proficiency level for every criterion.' });
   assert.deepEqual(JSON.parse(f.c.API_review_save('absence', {})).error, { code: 'REJECTED', message: 'Stale revision.' });
   assert.equal(JSON.parse(f.c.API_review_save('nope', {})).error.code, 'INVALID_INPUT');
-  f.c.loadReviewEvaluation = () => { throw new Error('You are not an assigned reviewer for this team.'); };
+  f.c.loadReviewEvaluation_ = () => { throw new Error('You are not an assigned reviewer for this team.'); };
   assert.deepEqual(JSON.parse(f.c.API_review_getEvaluation('T1', 'review1')).error, { code: 'REJECTED', message: 'You are not an assigned reviewer for this team.' });
 });

@@ -32,17 +32,17 @@ test('student weekly endpoints keep rule messages and reject outsiders', () => {
 
 test('student weekly save never leaks engine errors', () => {
   const f = setup(); f.user('one@example.com');
-  f.c.submitWeeklyProgress = () => { throw new TypeError('column 7 undefined'); };
+  f.c.submitWeeklyProgress_ = () => { throw new TypeError('column 7 undefined'); };
   const frame = JSON.parse(f.c.API_student_submitWeekly({}));
   assert.deepEqual(frame, { ok: false, error: { code: 'INTERNAL', message: 'Something went wrong. Please try again.' } });
 });
 
 test('guide weekly endpoints require guide access and convert workflow rejections', () => {
   const f = setup();
-  f.c.getColumnMap = () => ({ TEAM_ID: 0, GUIDE_EMAIL: 1 });
-  f.c.getSheetRows = () => [['T1', 'guide@example.com']];
-  f.c.loadGuideWeeklyProgress = () => ({ checkedAt: 'now', weeks: [], entries: [] });
-  f.c.submitWeeklyGuideSignoff = (entryId, status) => entryId === 'bad' ? { ok: false, message: 'Entry not found.' } : { ok: true, entryId, status, message: 'Guide confirmation saved. Student revisions are now frozen.' };
+  f.c.getColumnMap_ = () => ({ TEAM_ID: 0, GUIDE_EMAIL: 1 });
+  f.c.getSheetRows_ = () => [['T1', 'guide@example.com']];
+  f.c.loadGuideWeeklyProgress_ = () => ({ checkedAt: 'now', weeks: [], entries: [] });
+  f.c.submitWeeklyGuideSignoff_ = (entryId, status) => entryId === 'bad' ? { ok: false, message: 'Entry not found.' } : { ok: true, entryId, status, message: 'Guide confirmation saved. Student revisions are now frozen.' };
   f.user('stranger@example.com');
   assert.equal(JSON.parse(f.c.API_guide_getWeekly()).error.code, 'UNAUTHORIZED');
   assert.equal(JSON.parse(f.c.API_guide_signWeekly('e1', 'DISCUSSED')).error.code, 'UNAUTHORIZED');
@@ -56,12 +56,12 @@ test('guide weekly endpoints require guide access and convert workflow rejection
 
 test('guide evaluation endpoints require guide access and keep the existing rule messages', () => {
   const f = setup();
-  f.c.getColumnMap = () => ({ TEAM_ID: 0, GUIDE_EMAIL: 1 });
-  f.c.getSheetRows = () => [['T1', 'guide@example.com']];
+  f.c.getColumnMap_ = () => ({ TEAM_ID: 0, GUIDE_EMAIL: 1 });
+  f.c.getSheetRows_ = () => [['T1', 'guide@example.com']];
   const seen = [];
-  f.c.loadGuideEvaluation = (team, register) => { seen.push(['load', team, register]); return { roster: { team }, student: { register } }; };
-  f.c.saveGuideEvaluationDraft = input => { seen.push(['draft', input.requestId]); return { status: 'Draft' }; };
-  f.c.submitGuideEvaluation = input => { if (input.scores === 'bad') throw new Error('Scores are outside the permitted band.'); return { status: 'Submitted', total: 40 }; };
+  f.c.loadGuideEvaluation_ = (team, register) => { seen.push(['load', team, register]); return { roster: { team }, student: { register } }; };
+  f.c.saveGuideEvaluationDraft_ = input => { seen.push(['draft', input.requestId]); return { status: 'Draft' }; };
+  f.c.submitGuideEvaluation_ = input => { if (input.scores === 'bad') throw new Error('Scores are outside the permitted band.'); return { status: 'Submitted', total: 40 }; };
   f.user('stranger@example.com');
   for (const call of [() => f.c.API_guide_getEvaluation('T1', 'S1'), () => f.c.API_guide_saveEvaluationDraft({}), () => f.c.API_guide_submitEvaluation({})]) assert.equal(JSON.parse(call()).error.code, 'UNAUTHORIZED');
   assert.equal(seen.length, 0);
@@ -76,8 +76,8 @@ test('guide evaluation endpoints require guide access and keep the existing rule
 test('published result endpoints return null when nothing is published and keep rule messages otherwise', () => {
   const f = setup(); f.user('one@example.com');
   const asked = [];
-  f.c.loadPublishedReviewEvaluation = key => { asked.push(key); return key === 'review1' ? { config: { label: 'Review 1' } } : null; };
-  f.c.loadPublishedGuideEvaluation = () => { throw new Error('Not a current student.'); };
+  f.c.loadPublishedReviewEvaluation_ = key => { asked.push(key); return key === 'review1' ? { config: { label: 'Review 1' } } : null; };
+  f.c.loadPublishedGuideEvaluation_ = () => { throw new Error('Not a current student.'); };
   assert.equal(JSON.parse(f.c.API_student_getReviewResult('review1')).data.config.label, 'Review 1');
   assert.deepEqual(JSON.parse(f.c.API_student_getReviewResult('review2')), JSON.parse(JSON.stringify({ ok: true, data: null, generatedAt: JSON.parse(f.c.API_student_getReviewResult('review2')).generatedAt })));
   assert.deepEqual(JSON.parse(JSON.stringify(asked)), ['review1', 'review2', 'review2']);

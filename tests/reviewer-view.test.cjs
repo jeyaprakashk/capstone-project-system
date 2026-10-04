@@ -15,7 +15,7 @@ const team = (n, extra = {}) => ({
 const dtoOf = teams => ({ summary: { pending: teams.length, approved: 0, awaitingGuide: 0, total: teams.length }, reviews: [{ key: 'review1', label: 'Review 1' }, { key: 'review2', label: 'Review 2' }], reviewError: null, teams });
 
 function setup(dto) {
-  const { document } = parseHTML('<html><body><div id="reviewerContent"></div></body></html>');
+  const { document, window } = parseHTML('<html><body><div id="reviewerContent"></div></body></html>');
   const calls = { marks: [], refresh: 0, loading: 0, finished: 0, writes: [] };
   const c = loadSources(['data-bridge-client.js', 'reviewer-view.js'], { document, Promise, setTimeout, clearTimeout, Intl, Date });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
@@ -29,7 +29,7 @@ function setup(dto) {
   vm.runInContext('globalThis.__make = ' + c.reviewerViewBrowser_.toString(), c);
   const view = c.__make(bridge, () => ui);
   const host = document.getElementById('reviewerContent');
-  return { view, host, document, calls, state, ui, click: el => host.onclick({ target: el }), settle: () => new Promise(r => setImmediate(r)) };
+  return { view, host, document, calls, state, ui, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
 const rows = f => f.host.querySelectorAll('[data-reviewer-body] tr[data-team-id]');
 
@@ -67,11 +67,11 @@ test('search filters across team, guide, register number, title, committee and s
   const f = setup(); f.view.render(f.host, dtoOf([team(1), team(2, { guideName: 'Dr. Rao' }), team(3, { title: 'Smart Farming' })]));
   const search = f.host.querySelector('#reviewerAssignedSearch');
   for (const [query, expected] of [['rao', ['T2']], ['farming', ['T3']], ['r1a', ['T1']], ['pending review', ['T1', 'T2', 'T3']], ['c1', ['T1', 'T2', 'T3']], ['zzz', []]]) {
-    search.value = query; f.host.oninput({ target: search });
+    search.value = query; f.fire(search, 'input');
     assert.deepEqual(Array.from(rows(f)).map(r => r.getAttribute('data-team-id')), expected, query);
   }
   assert.match(f.host.textContent, /No teams match your search/);
-  search.value = ''; f.host.oninput({ target: search });
+  search.value = ''; f.fire(search, 'input');
   assert.equal(rows(f).length, 3);
 });
 
@@ -90,11 +90,12 @@ test('pagination follows page size, clamps pages and supports All', () => {
   assert.match(f.host.querySelector('#reviewerAssignedPaginationInfo').textContent, /Showing 21 - 23 of 23 teams/);
   assert(f.host.querySelector('[data-action="page"][aria-current="page"]'));
   const size = f.host.querySelector('#reviewerAssignedPageSize');
-  f.host.onchange({ target: { dataset: { action: 'size' }, value: 'all' } });
+  const change = value => { const select = f.host.querySelector('#reviewerAssignedPageSize'); Object.defineProperty(select, 'value', { value, configurable: true }); f.fire(select, 'change'); };
+  change('all');
   assert.equal(rows(f).length, 23);
-  f.host.onchange({ target: { dataset: { action: 'size' }, value: '25' } });
+  change('25');
   assert.equal(rows(f).length, 23);
-  f.host.onchange({ target: { dataset: { action: 'size' }, value: '10' } });
+  change('10');
   assert.equal(rows(f).length, 10);
 });
 
@@ -115,7 +116,7 @@ test('Revise needs a note and sends nothing without one', async () => {
 
 test('approve sends one write, re-reads, keeps search text and shows the new state', async () => {
   const f = setup(dtoOf([team(1), team(2)])); f.view.render(f.host, f.state.dto);
-  const search = f.host.querySelector('#reviewerAssignedSearch'); search.value = 'T2'; f.host.oninput({ target: search });
+  const search = f.host.querySelector('#reviewerAssignedSearch'); search.value = 'T2'; f.fire(search, 'input');
   f.state.dto = dtoOf([team(1), team(2, { titleApproval: { ...team(2).titleApproval, canDecide: false, status: { tone: 'success', label: 'Approved' } } })]);
   const button = f.host.querySelector('[data-decision="Approved"]');
   f.click(button); f.click(button);

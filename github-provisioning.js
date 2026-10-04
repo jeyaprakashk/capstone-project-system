@@ -7,7 +7,7 @@
 // ===================================================================
 // GITHUB API HELPERS
 // ===================================================================
-function makeGithubRequest(method, path, payload) {
+function makeGithubRequest_(method, path, payload) {
   // Use admin token for organization operations (repo creation, adding collaborators)
   // Read directly from Script Properties - do NOT fall back to GITHUB_TOKEN
   const adminToken = PropertiesService.getScriptProperties().getProperty('GITHUB_ADMIN_TOKEN');
@@ -62,7 +62,7 @@ function makeGithubRequest(method, path, payload) {
 }
 
 function getTeamRepoName_(teamId, semester) {
-  const year = String(getAcademicYear() || '').trim();
+  const year = String(getAcademicYear_() || '').trim();
   if (!/^\d{4}-\d{2}$/.test(year)) throw new Error('Set ACADEMIC_YEAR to YYYY-YY (for example, 2026-27) before provisioning repositories.');
   const term = String(semester || '').trim().replace(/\s+/g, '-').toLowerCase();
   const team = String(teamId || '').trim();
@@ -70,15 +70,15 @@ function getTeamRepoName_(teamId, semester) {
   return `capstone-${year}-${term}-team-${team}`;
 }
 
-function createTeamRepo(repoName, teamId) {
-  const ORG_NAME = getConfig('GITHUB_ORG_NAME');
+function createTeamRepo_(repoName, teamId) {
+  const ORG_NAME = getConfig_('GITHUB_ORG_NAME');
   const payload = {
     name: repoName,
     description: `Capstone project — Team ${teamId}`,
     private: true,
     auto_init: false
   };
-  return makeGithubRequest('POST', `/orgs/${ORG_NAME}/repos`, payload);
+  return makeGithubRequest_('POST', `/orgs/${ORG_NAME}/repos`, payload);
 }
 
 /**
@@ -89,7 +89,7 @@ function createTeamRepo(repoName, teamId) {
  * @param {string} permission GitHub repository permission.
  * @return {Object} GitHub API response.
  */
-function addCollaborator(repoSlug, username, permission) {
+function addCollaborator_(repoSlug, username, permission) {
   if (!repoSlug || !String(repoSlug).trim()) {
     throw new Error('Repository slug is required.');
   }
@@ -104,7 +104,7 @@ function addCollaborator(repoSlug, username, permission) {
     permission: permission
   };
 
-  return makeGithubRequest(
+  return makeGithubRequest_(
     'PUT',
     `/repos/${String(repoSlug).trim()}/collaborators/${encodeURIComponent(String(username).trim())}`,
     payload
@@ -130,7 +130,7 @@ function getGithubRepoSlug_(repoUrl) {
  * @return {Object} GitHub API response.
  */
 function getCollaboratorPermission_(repoSlug, username) {
-  return makeGithubRequest(
+  return makeGithubRequest_(
     'GET',
     `/repos/${String(repoSlug).trim()}/collaborators/` +
       `${encodeURIComponent(String(username).trim())}/permission`
@@ -145,12 +145,12 @@ function getCollaboratorPermission_(repoSlug, username) {
  * @return {Array<Object>}
  */
 function getAllGithubOrgRepos_() {
-  const orgName = String(getConfig('GITHUB_ORG_NAME')).trim();
+  const orgName = String(getConfig_('GITHUB_ORG_NAME')).trim();
   const repos = [];
   let page = 1;
 
   while (true) {
-    const response = makeGithubRequest(
+    const response = makeGithubRequest_(
       'GET',
       `/orgs/${encodeURIComponent(orgName)}/repos?per_page=100&page=${page}`
     );
@@ -175,6 +175,7 @@ function getAllGithubOrgRepos_() {
 // BULK PROVISIONING
 // ===================================================================
 function provisionAllTeamRepos() {
+  requireTriggerOrOperator_();
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try { return provisionTeamRepos_(); }
@@ -183,11 +184,11 @@ function provisionAllTeamRepos() {
 
 // Callers hold the script lock; an omitted team ID runs the coordinator batch.
 function provisionTeamRepos_(onlyTeamId) {
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const TR = getColumnMap(SHEET_NAMES.TEAM_ROSTER, FIELD_DEFINITIONS.TEAM_ROSTER);
-  const roster = getSheetRows(SHEET_NAMES.TEAM_ROSTER);
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const TR = getColumnMap_(SHEET_NAMES.TEAM_ROSTER, FIELD_DEFINITIONS.TEAM_ROSTER);
+  const roster = getSheetRows_(SHEET_NAMES.TEAM_ROSTER);
   const results = { success: [], failed: [], waiting: [] };
-  getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID] && (!onlyTeamId || textEquals_(row[TS.TEAM_ID], onlyTeamId))).forEach(row => {
+  getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID] && (!onlyTeamId || textEquals_(row[TS.TEAM_ID], onlyTeamId))).forEach(row => {
     const teamId = row[TS.TEAM_ID];
     try {
       const setup = repairTeamGithubSetup_(teamId);
@@ -198,9 +199,9 @@ function provisionTeamRepos_(onlyTeamId) {
       // Preserve the existing guide/coordinator provisioning behavior without changing student membership.
       const team = roster.find(item => textEquals_(item[TR.TEAM_ID], teamId));
       const guide = String(team && team[TR.GUIDE_GITHUB_USERNAME] || '').trim();
-      const coordinator = String(getConfig('COLLABORATOR_GITHUB_USERNAME') || '').trim();
+      const coordinator = String(getConfig_('COLLABORATOR_GITHUB_USERNAME') || '').trim();
       const slug = getGithubRepoSlug_(setup.repoUrl);
-      const staff = [[guide, getConfig('GUIDE_REPO_PERMISSION')], [coordinator, getConfig('COLLABORATOR_REPO_PERMISSION') || 'maintain']];
+      const staff = [[guide, getConfig_('GUIDE_REPO_PERMISSION')], [coordinator, getConfig_('COLLABORATOR_REPO_PERMISSION') || 'maintain']];
       if (staff.some(item => item[0])) {
         const invitations = getGithubInvitations_(slug);
         staff.filter(item => item[0]).forEach(([username, permission]) => ensureGithubPermission_(slug, username, permission, invitations));
@@ -213,25 +214,26 @@ function provisionTeamRepos_(onlyTeamId) {
 }
 
 function addMissingGuideCollaborators() {
-  const TR = getColumnMap(
+  requireTriggerOrOperator_();
+  const TR = getColumnMap_(
     SHEET_NAMES.TEAM_ROSTER,
     FIELD_DEFINITIONS.TEAM_ROSTER
   );
 
-  const rosterRows = getSheetRows(SHEET_NAMES.TEAM_ROSTER);
-  const repoMap = getRepoUrlMap();
+  const rosterRows = getSheetRows_(SHEET_NAMES.TEAM_ROSTER);
+  const repoMap = getRepoUrlMap_();
 
   // Configuration values are constant for this entire run.
   const guideRepoPermission = String(
-    getConfig('GUIDE_REPO_PERMISSION')
+    getConfig_('GUIDE_REPO_PERMISSION')
   ).trim();
 
   const coordinatorUsername = String(
-    getConfig('COLLABORATOR_GITHUB_USERNAME') || ''
+    getConfig_('COLLABORATOR_GITHUB_USERNAME') || ''
   ).trim();
 
   const coordinatorRepoPermission = String(
-    getConfig('COLLABORATOR_REPO_PERMISSION') || 'maintain'
+    getConfig_('COLLABORATOR_REPO_PERMISSION') || 'maintain'
   ).trim();
 
   const results = {
@@ -286,7 +288,7 @@ function addMissingGuideCollaborators() {
       // -------------------------------------------------------------
       // Add/update guide access
       // -------------------------------------------------------------
-      addCollaborator(
+      addCollaborator_(
         repoSlug,
         guideUsername,
         guideRepoPermission
@@ -296,7 +298,7 @@ function addMissingGuideCollaborators() {
       // Ensure coordinator also has access
       // -------------------------------------------------------------
       if (coordinatorUsername) {
-        addCollaborator(
+        addCollaborator_(
           repoSlug,
           coordinatorUsername,
           coordinatorRepoPermission
@@ -340,6 +342,7 @@ function addMissingGuideCollaborators() {
 // BACKFILL EXISTING GITHUB REPOS INTO TeamStatus
 // ===================================================================
 function backfillExistingRepos() {
+  requireTriggerOrOperator_();
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try { return backfillExistingRepos_(); }
@@ -349,9 +352,9 @@ function backfillExistingRepos() {
 function backfillExistingRepos_() {
   const results = { added: [], skipped: [], failed: [] };
   try {
-    const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]);
-    const repoMap = getRepoUrlMap();
+    const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+    const rows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]);
+    const repoMap = getRepoUrlMap_();
     const repos = getAllGithubOrgRepos_();
     rows.forEach(row => {
       const teamId = row[TS.TEAM_ID];
@@ -382,6 +385,7 @@ function backfillExistingRepos_() {
 // Adds missing student collaborators to already-provisioned repos
 // ===================================================================
 function backfillMissingStudentCollaborators() {
+  requireTriggerOrOperator_();
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try { return provisionTeamRepos_(); }
@@ -401,7 +405,7 @@ function backfillMissingStudentCollaborators() {
  *
  * @return {Object} Summary suitable for the Coordinator Dashboard.
  */
-function syncCoordinatorGithubAccess() {
+function syncCoordinatorGithubAccess_() {
   const lock = LockService.getScriptLock();
 
   try {
@@ -411,11 +415,11 @@ function syncCoordinatorGithubAccess() {
     // Configuration
     // ---------------------------------------------------------------
     const username = String(
-      getConfig('COLLABORATOR_GITHUB_USERNAME')
+      getConfig_('COLLABORATOR_GITHUB_USERNAME')
     ).trim();
 
     const permission = String(
-      getConfig('COLLABORATOR_REPO_PERMISSION')
+      getConfig_('COLLABORATOR_REPO_PERMISSION')
     ).trim();
 
     if (!username) {
@@ -433,7 +437,7 @@ function syncCoordinatorGithubAccess() {
     // ---------------------------------------------------------------
     // Get all provisioned repository URLs
     // ---------------------------------------------------------------
-    const repoUrls = [...new Set(Object.values(getRepoUrlMap()).filter(Boolean))];
+    const repoUrls = [...new Set(Object.values(getRepoUrlMap_()).filter(Boolean))];
 
     let verifiedAccess = 0;
     let alreadyAccessible = 0;
@@ -477,7 +481,7 @@ function syncCoordinatorGithubAccess() {
         // -----------------------------------------------------------
         if (check.status === 404) {
 
-          const add = addCollaborator(
+          const add = addCollaborator_(
             repoSlug,
             username,
             permission
@@ -545,7 +549,7 @@ function syncCoordinatorGithubAccess() {
     // ---------------------------------------------------------------
     // Persist VERIFIED coordinator access count
     // ---------------------------------------------------------------
-    setConfig(
+    setConfig_(
       'COLLABORATOR_REPOS_ACCESS',
       verifiedAccess
     );

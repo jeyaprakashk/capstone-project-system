@@ -4,7 +4,7 @@ function setup(){
  const f=publishingFixture(),c=f.c,roster=c.getStudentsFromTeamStatusRow_;
  for(const file of ['marks-tracker.js','reviewer-evaluation.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
  c.getStudentsFromTeamStatusRow_=roster;
- c.getCommitteeNumbersForReviewer=email=>email==='reviewer@x'?['C1']:[];
+ c.getCommitteeNumbersForReviewer_=email=>email==='reviewer@x'?['C1']:[];
  c.SpreadsheetApp.openById=()=>{throw Error('External file access is forbidden');};
  return f;
 }
@@ -13,14 +13,14 @@ test('role authorization rejects outsiders before assessment access',()=>{
  f.actor('reviewer@x');assert.equal(f.c.reviewerTeamContext_('G18').team,'G18');
 });
 test('generic Review load and save enforce title approval and reject unknown instances',()=>{
- const f=setup(),input=f.input();f.row[3]='';assert.throws(()=>f.c.loadReviewEvaluation('G18','review1'),/title|Approve/i);
- assert.throws(()=>f.c.submitReviewEvaluation({...input,assessmentId:'review1'}),/title|Approve/i);
- assert.throws(()=>f.c.loadReviewEvaluation('G18','unconfigured'),/Unknown assessment/);
+ const f=setup(),input=f.input();f.row[3]='';assert.throws(()=>f.c.loadReviewEvaluation_('G18','review1'),/title|Approve/i);
+ assert.throws(()=>f.c.submitReviewEvaluation_({...input,assessmentId:'review1'}),/title|Approve/i);
+ assert.throws(()=>f.c.loadReviewEvaluation_('G18','unconfigured'),/Unknown assessment/);
 });
 test('reviewer progress reads only registry journals and isolates a missing journal',()=>{
- const f=setup(),getSheet=f.c.getSheet;
- f.c.getSheet=name=>name==='Review2Evaluations'?null:getSheet(name);
- f.c.getSpreadsheet=()=>({getSheets:()=>[],getSpreadsheetTimeZone:()=> 'UTC'});
+ const f=setup(),getSheet_=f.c.getSheet_;
+ f.c.getSheet_=name=>name==='Review2Evaluations'?null:getSheet_(name);
+ f.c.getSpreadsheet_=()=>({getSheets:()=>[],getSpreadsheetTimeZone:()=> 'UTC'});
  const progress=f.c.getReviewerReviewProgress_(f.rows);
  assert.equal(progress.teams.g18.review1.available,true);assert.equal(progress.teams.g18.review2.available,false);
  assert.match(progress.teams.g18.review2.error,/Error in Initialization/);

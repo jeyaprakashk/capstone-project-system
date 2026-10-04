@@ -5,11 +5,11 @@ function weeklyPhase2Columns_(key, sheet) {
   Object.values(FIELD_DEFINITIONS[key]).forEach(header => {
     if (headers.filter(value=>textEquals_(value,header)).length !== 1) throw new Error(key + ' requires exactly one ' + header + ' column.');
   });
-  return buildColumnMap(sheet,FIELD_DEFINITIONS[key],headers);
+  return buildColumnMap_(sheet,FIELD_DEFINITIONS[key],headers);
 }
 
 function weeklyPhase2Rows_(key) {
-  const sheet = getSheet(SHEET_NAMES[key]);
+  const sheet = getSheet_(SHEET_NAMES[key]);
   // Before optional Phase 2 setup, Phase 1 continues to work unchanged.
   if (!sheet) return [];
   const columns = weeklyPhase2Columns_(key,sheet);
@@ -22,7 +22,7 @@ function weeklyPhase2Rows_(key) {
 }
 
 function appendWeeklyPhase2_(key, record) {
-  const sheet = getSheet(SHEET_NAMES[key]), columns = weeklyPhase2Columns_(key,sheet);
+  const sheet = getSheet_(SHEET_NAMES[key]), columns = weeklyPhase2Columns_(key,sheet);
   const row = new Array(sheet.getLastColumn()).fill('');
   Object.keys(columns).forEach(field=>{
     const value = record[field] === undefined ? '' : record[field];
@@ -42,37 +42,37 @@ function weeklyGuideFrozen_(records, weekId, signedIds) {
 }
 
 function weeklyGuideEntry_(entryId) {
-  const email = normalizeEmail(Session.getActiveUser().getEmail());
+  const email = normalizeEmail_(Session.getActiveUser().getEmail());
   if (!email) throw new Error('Sign in with your institutional account.');
   const entry = getEffectiveLogEntries_(readLogEntries_()).find(row=>row.id === entryId);
   if (!entry || !['SUBMITTED','REVISED'].includes(entry.entryStatus)) throw new Error('This submitted entry is no longer current. Refresh weekly progress.');
   const team = weeklyTeam_(entry.teamId);
-  if (!emailsMatch(team.row[team.columns.GUIDE_EMAIL],email)) throw new Error('Only the assigned guide may access this entry.');
+  if (!emailsMatch_(team.row[team.columns.GUIDE_EMAIL],email)) throw new Error('Only the assigned guide may access this entry.');
   const student = weeklyStudents_().find(row=>textEquals_(row.regNo,entry.regNo) && textEquals_(row.teamId,entry.teamId));
   if (!student) throw new Error('Student membership is unavailable.');
   return {entry,student,email};
 }
 
-function submitWeeklyGuideSignoff(entryId, status) {
+function submitWeeklyGuideSignoff_(entryId, status) {
   if (typeof entryId !== 'string' || !['DISCUSSED','NOT_DISCUSSED'].includes(status)) throw new Error('Invalid guide confirmation.');
   return weeklyLock_(()=>{
     const {entry,email} = weeklyGuideEntry_(entryId);
     const previous = weeklyPhase2Rows_('GuideSignoff').filter(row=>row.entryId === entry.id).slice(-1)[0];
     // A repeated click/retry of the same decision is already satisfied.
-    if (!previous || previous.status !== status || !emailsMatch(previous.guideEmail,email)) {
+    if (!previous || previous.status !== status || !emailsMatch_(previous.guideEmail,email)) {
       appendWeeklyPhase2_('GuideSignoff',{id:Utilities.getUuid(),entryId:entry.id,status,guideEmail:email,signedAt:new Date()});
     }
     return {ok:true,entryId:entry.id,status,message:'Guide confirmation saved. Student revisions are now frozen.'};
   });
 }
 
-function loadGuideWeeklyProgress() {
-  const email = normalizeEmail(Session.getActiveUser().getEmail());
+function loadGuideWeeklyProgress_() {
+  const email = normalizeEmail_(Session.getActiveUser().getEmail());
   if (!email) throw new Error('Sign in with your institutional account.');
-  weeklyPhase2Columns_('GuideSignoff',getSheet(SHEET_NAMES.GuideSignoff));
-  weeklyPhase2Columns_('AIProgressAnalysis',getSheet(SHEET_NAMES.AIProgressAnalysis));
-  const columns = getColumnMap(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
-  const teams = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row=>emailsMatch(row[columns.GUIDE_EMAIL],email));
+  weeklyPhase2Columns_('GuideSignoff',getSheet_(SHEET_NAMES.GuideSignoff));
+  weeklyPhase2Columns_('AIProgressAnalysis',getSheet_(SHEET_NAMES.AIProgressAnalysis));
+  const columns = getColumnMap_(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
+  const teams = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row=>emailsMatch_(row[columns.GUIDE_EMAIL],email));
   const signs = new Map(weeklyPhase2Rows_('GuideSignoff').map(row=>[row.entryId,row]));
   const analyses = new Map(weeklyPhase2Rows_('AIProgressAnalysis').map(row=>[row.entryId,row]));
   const evidenceSources = new Map();
@@ -85,7 +85,7 @@ function loadGuideWeeklyProgress() {
     const identity={...student,teamId:entry.teamId};
     let evidence;
     try {
-      const key=normalizeEmail(student.email);
+      const key=normalizeEmail_(student.email);
       if(!evidenceSources.has(key))evidenceSources.set(key,weeklyEvidenceSource_(identity));
       evidence=readWeeklyProgressEvidence_(identity,entry.weekId,evidenceSources.get(key));
     } catch(error) { evidence={state:'unavailable',message:'GitHub evidence could not be read. Use dashboard Refresh to retry.',commits:[]}; }
@@ -103,16 +103,7 @@ function loadGuideWeeklyProgress() {
       const record = progressStudentEligibility_({regNo:student.regNo,teamId:team[columns.TEAM_ID]},eligibility);
       return record.eligibleFrom && eligibleWeeklyWindows_(record.enforcedFrom,windows).some(w=>w.weekId === window.weekId);
     }).map(student=>String(student.regNo)))}));
-  return {entries,weeks,requiredByWeek,checkedAt:new Date().toISOString(),timezone:getSpreadsheet().getSpreadsheetTimeZone()};
-}
-
-function loadGuideWeeklyProgressDetails(entryId) {
-  const {entry,student} = weeklyGuideEntry_(entryId);
-  const analysis = weeklyPhase2Rows_('AIProgressAnalysis').find(row=>row.entryId === entry.id);
-  const evidence = readWeeklyProgressEvidence_(student,entry.weekId);
-  return {entryId:entry.id,workCompleted:entry.workCompleted,guideDiscussion:entry.guideDiscussion,blockers:entry.blockers,nextAction:entry.nextAction,
-    analysis:analysis ? {...analysis,analyzedAt:new Date(analysis.analyzedAt).toISOString()} : null,
-    evidence:{state:evidence.state,message:evidence.message,commits:evidence.commits},timezone:getSpreadsheet().getSpreadsheetTimeZone()};
+  return {entries,weeks,requiredByWeek,checkedAt:new Date().toISOString(),timezone:getSpreadsheet_().getSpreadsheetTimeZone()};
 }
 
 function weeklyAIEligible_(entry, windows, signedIds, now) {
@@ -136,16 +127,16 @@ function weeklyAIIdentifiers_() {
   const identifiers = [];
   [SHEET_NAMES.TEAM_ROSTER,SHEET_NAMES.TEAM_STATUS].forEach(name=>{
     const definitions = name === SHEET_NAMES.TEAM_ROSTER ? FIELD_DEFINITIONS.TEAM_ROSTER : FIELD_DEFINITIONS.TEAM_STATUS;
-    const columns = getColumnMap(name,definitions);
-    getSheetRows(name).forEach(row=>Object.keys(columns).filter(key=>/NAME|EMAIL|REGNO|TEAM_ID/.test(key)).forEach(key=>identifiers.push(row[columns[key]])));
+    const columns = getColumnMap_(name,definitions);
+    getSheetRows_(name).forEach(row=>Object.keys(columns).filter(key=>/NAME|EMAIL|REGNO|TEAM_ID/.test(key)).forEach(key=>identifiers.push(row[columns[key]])));
   });
-  const accounts = getSheet(SHEET_NAMES.GITHUB_ACCOUNTS);
+  const accounts = getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS);
   if (!accounts) throw new Error('Privacy identifiers unavailable.');
-  const columns = buildColumnMap(accounts,{email:'Email address',team:'Team ID',username:'GitHub Username',id:'GitHub ID',name:'GitHub Display Name',url:'GitHub Profile URL'});
+  const columns = buildColumnMap_(accounts,{email:'Email address',team:'Team ID',username:'GitHub Username',id:'GitHub ID',name:'GitHub Display Name',url:'GitHub Profile URL'});
   readSheetRows_(accounts,2).forEach(row=>Object.values(columns).forEach(column=>identifiers.push(row[column])));
-  const commits = getSheet(SHEET_NAMES.COMMITS);
+  const commits = getSheet_(SHEET_NAMES.COMMITS);
   if (!commits) throw new Error('Privacy identifiers unavailable.');
-  const commitColumns = buildColumnMap(commits,{username:FIELD_DEFINITIONS.COMMITS.USERNAME});
+  const commitColumns = buildColumnMap_(commits,{username:FIELD_DEFINITIONS.COMMITS.USERNAME});
   readSheetRows_(commits,2).forEach(row=>identifiers.push(row[commitColumns.username]));
   return identifiers;
 }
@@ -176,13 +167,14 @@ function requestWeeklyAI_(entry, commits, identifiers, apiKey) {
 
 /** Hourly trigger runs as the coordinator who installed it; user lock is separate from student script lock. */
 function processWeeklyProgressAI() {
+  requireTriggerOrOperator_();
   const owner = PropertiesService.getScriptProperties().getProperty('WEEKLY_AI_TRIGGER_OWNER');
-  if (!owner || !emailsMatch(owner,Session.getEffectiveUser().getEmail())) throw new Error('Run Phase 2 trigger setup as coordinator first.');
+  if (!owner || !emailsMatch_(owner,Session.getEffectiveUser().getEmail())) throw new Error('Run Phase 2 trigger setup as coordinator first.');
   const lock = LockService.getUserLock();
   if (!lock.tryLock(1)) return {skipped:true};
   try {
-    weeklyPhase2Columns_('GuideSignoff',getSheet(SHEET_NAMES.GuideSignoff));
-    weeklyPhase2Columns_('AIProgressAnalysis',getSheet(SHEET_NAMES.AIProgressAnalysis));
+    weeklyPhase2Columns_('GuideSignoff',getSheet_(SHEET_NAMES.GuideSignoff));
+    weeklyPhase2Columns_('AIProgressAnalysis',getSheet_(SHEET_NAMES.AIProgressAnalysis));
     const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
     if (!apiKey) throw new Error('GEMINI_API_KEY not found.');
     const windows = getWeeklySubmissionWindows_(), signed = weeklySignedEntryIds_();
@@ -214,20 +206,20 @@ function processWeeklyProgressAI() {
   } finally { lock.releaseLock(); }
 }
 
-function getWeeklyProgressPhase2Readiness() {
-  const email = normalizeEmail(Session.getActiveUser().getEmail());
+function getWeeklyProgressPhase2Readiness_() {
+  const email = normalizeEmail_(Session.getActiveUser().getEmail());
   if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
   const issues = [];
   let storageReady = true, storageValid = true;
   ['GuideSignoff','AIProgressAnalysis'].forEach(key=>{
-    const sheet = getSheet(SHEET_NAMES[key]);
+    const sheet = getSheet_(SHEET_NAMES[key]);
     if (!sheet || !sheet.getLastRow()) { storageReady=false; return; }
     try { weeklyPhase2Columns_(key,sheet); }
     catch(error) { storageReady=false; storageValid=false; issues.push(error.message); }
   });
   const properties = PropertiesService.getScriptProperties(), owner = properties.getProperty('WEEKLY_AI_TRIGGER_OWNER');
-  const sameUser = emailsMatch(email,Session.getEffectiveUser().getEmail());
-  const otherOwner = !!owner && !emailsMatch(owner,email);
+  const sameUser = emailsMatch_(email,Session.getEffectiveUser().getEmail());
+  const otherOwner = !!owner && !emailsMatch_(owner,email);
   // Apps Script exposes only the executing user's installed triggers.
   const triggerReady = otherOwner || !sameUser ? null : !!owner && ScriptApp.getProjectTriggers().some(trigger=>trigger.getHandlerFunction() === 'processWeeklyProgressAI');
   if (triggerReady === null) issues.push('The trigger owner must check or manage the weekly AI schedule.');
@@ -241,8 +233,8 @@ function setupWeeklyProgressPhase2Storage() {
   if (!activityIsCoordinator_(Session.getActiveUser().getEmail())) throw new Error('Coordinator access is required.');
   return weeklyLock_(()=>{
     ['GuideSignoff','AIProgressAnalysis'].forEach(key=>{
-      let sheet = getSheet(SHEET_NAMES[key]);
-      if (!sheet) sheet = getSpreadsheet().insertSheet(SHEET_NAMES[key]);
+      let sheet = getSheet_(SHEET_NAMES[key]);
+      if (!sheet) sheet = getSpreadsheet_().insertSheet(SHEET_NAMES[key]);
       if (!sheet.getLastRow()) sheet.getRange(1,1,1,Object.keys(FIELD_DEFINITIONS[key]).length).setValues([Object.values(FIELD_DEFINITIONS[key])]);
       weeklyPhase2Columns_(key,sheet);
     });
@@ -251,15 +243,15 @@ function setupWeeklyProgressPhase2Storage() {
 }
 
 function setupWeeklyProgressPhase2Triggers() {
-  const email = normalizeEmail(Session.getActiveUser().getEmail());
+  const email = normalizeEmail_(Session.getActiveUser().getEmail());
   if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
-  if (!emailsMatch(email,Session.getEffectiveUser().getEmail())) throw new Error('The coordinator must also be the script execution owner to install the weekly AI schedule.');
-  ['GuideSignoff','AIProgressAnalysis'].forEach(key=>weeklyPhase2Columns_(key,getSheet(SHEET_NAMES[key])));
+  if (!emailsMatch_(email,Session.getEffectiveUser().getEmail())) throw new Error('The coordinator must also be the script execution owner to install the weekly AI schedule.');
+  ['GuideSignoff','AIProgressAnalysis'].forEach(key=>weeklyPhase2Columns_(key,getSheet_(SHEET_NAMES[key])));
   const properties = PropertiesService.getScriptProperties();
   if (!properties.getProperty('GEMINI_API_KEY')) throw new Error('GEMINI_API_KEY not found.');
   return weeklyLock_(()=>{
     const owner = properties.getProperty('WEEKLY_AI_TRIGGER_OWNER');
-    if (owner && !emailsMatch(owner,email)) throw new Error('The existing Phase 2 trigger owner must manage this trigger.');
+    if (owner && !emailsMatch_(owner,email)) throw new Error('The existing Phase 2 trigger owner must manage this trigger.');
     const installed = ScriptApp.getProjectTriggers().some(trigger=>trigger.getHandlerFunction() === 'processWeeklyProgressAI');
     if (!installed) ScriptApp.newTrigger('processWeeklyProgressAI').timeBased().everyHours(1).create();
     properties.setProperty('WEEKLY_AI_TRIGGER_OWNER',email);

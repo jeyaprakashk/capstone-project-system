@@ -17,31 +17,31 @@ function fixture() {
   const c=createSheetReadContext({console,Date,PropertiesService:{getScriptProperties:()=>({getProperty:key=>properties.has(key)?properties.get(key):null,setProperty:(key,value)=>properties.set(key,value),deleteProperty:key=>properties.delete(key)})},
     SHEET_NAMES:{TEAM_STATUS:'teams',TEAM_ROSTER:'roster',GITHUB_ACCOUNTS:'users',TEAM_INTAKE_RAW:'intake',RAW_LOG:'logs'},
     FIELD_DEFINITIONS:{TEAM_STATUS:{},TEAM_ROSTER:{}},
-    getColumnMap:()=>columns,getSheetRows:name=>name==='teams'?[team]:name==='users'?usernames:[],
-    getRepoUrlForTeam:()=>team[7],getOptionalHeaderIndex_:()=>7,
-    normalizeEmail:norm,normalizeText_:norm,textEquals_:(a,b)=>norm(a)===norm(b),emailsMatch:(a,b)=>norm(a)===norm(b),
+    getColumnMap_:()=>columns,getSheetRows_:name=>name==='teams'?[team]:name==='users'?usernames:[],
+    getRepoUrlForTeam_:()=>team[7],getOptionalHeaderIndex_:()=>7,
+    normalizeEmail_:norm,normalizeText_:norm,textEquals_:(a,b)=>norm(a)===norm(b),emailsMatch_:(a,b)=>norm(a)===norm(b),
     Session:{getActiveUser:()=>({getEmail:()=>team[3]})},
     LockService:{getScriptLock:()=>({hasLock:()=>true,waitLock(){},releaseLock(){}})},SpreadsheetApp:{flush(){}},
-    getConfig:key=>key==='GITHUB_ORG_NAME'?'org':key==='GUIDE_REPO_PERMISSION'?'push':key==='COLLABORATOR_REPO_PERMISSION'?'maintain':'',
-    getCoordinatorEmail:()=> 'coord@example.com',getAcademicYear:()=> '2026-27',Logger:{log(){}},
-    MailApp:{sendEmail:(...args)=>mails.push(args)},driveFileUrl:x=>x,findTeamStatusRow:()=>2,
-    getDashboardUrl:()=> 'https://dashboard',getHubRegistrySheet:()=>({getDataRange:()=>({getValues:()=>[[]]})}),
-    setStatusFields:(sheet,row,fields)=>writes.push(fields),
-    getSheet:name=>name==='logs'?{appendRow:row=>logs.push(row)}:{getLastColumn:()=>team.length,getDataRange:()=>({getValues:()=>[[],team]}),getRange:()=>({getValues:()=>[team],getValue:()=>team[10]})},
+    getConfig_:key=>key==='GITHUB_ORG_NAME'?'org':key==='GUIDE_REPO_PERMISSION'?'push':key==='COLLABORATOR_REPO_PERMISSION'?'maintain':'',
+    getCoordinatorEmail_:()=> 'coord@example.com',getAcademicYear_:()=> '2026-27',Logger:{log(){}},
+    MailApp:{sendEmail:(...args)=>mails.push(args)},driveFileUrl_:x=>x,findTeamStatusRow_:()=>2,
+    getDashboardUrl_:()=> 'https://dashboard',getHubRegistrySheet_:()=>({getDataRange:()=>({getValues:()=>[[]]})}),
+    setStatusFields_:(sheet,row,fields)=>writes.push(fields),
+    getSheet_:name=>name==='logs'?{appendRow:row=>logs.push(row)}:{getLastColumn:()=>team.length,getDataRange:()=>({getValues:()=>[[],team]}),getRange:()=>({getValues:()=>[team],getValue:()=>team[10]})},
     projectDay_:(date,tz)=>{
       const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).map(p=>[p.type,p.value]));
       return Date.parse(`${parts.year}-${parts.month}-${parts.day}T00:00:00Z`)/86400000;
     }
   });
-  const originalSheet=c.getSheet;
-  c.getSheet=name=>name==='users'?{getLastColumn:()=>7,getLastRow:()=>usernames.length+1,getRange:(r,c,n)=>({getValues:()=>r===1?[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL']]:usernames})}:originalSheet(name);
+  const originalSheet=c.getSheet_;
+  c.getSheet_=name=>name==='users'?{getLastColumn:()=>7,getLastRow:()=>usernames.length+1,getRange:(r,c,n)=>({getValues:()=>r===1?[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL']]:usernames})}:originalSheet(name);
   for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-template.js','github-provisioning.js','intake-approval-workflow.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.installGithubTemplate_=()=>({verified:true}); // Template installation has its own tests; setup only resumes it.
   c.weeklyStudents_=()=>[1,2].filter(n=>team[n+2]).map(n=>({teamId:team[0],email:team[n+2],regNo:team[n+7]}));
   c.refreshGithubAccountMetadata_=()=>{}; // Metadata persistence is exercised by account integration tests.
   c.updateTeamStatusRepoUrl_=(id,url)=>{if(failWrite)throw Error('Sheet write failed');team[7]=url;writes.push({id,url});};
   c.setReadmeHeading=()=>calls.push({method:'README'});
-  c.makeGithubRequest=(method,path,payload)=>{
+  c.makeGithubRequest_=(method,path,payload)=>{
     calls.push({method,path,payload});
     if(outage && path.includes(outage))return {status:503};
     if(path.startsWith('/user/')) {
@@ -73,7 +73,7 @@ function fixture() {
 
 test('bulk readiness batches 62 teams and preserves live access decisions',()=>{
   const f=fixture(), batches=[];
-  const live=f.c.makeGithubRequest;
+  const live=f.c.makeGithubRequest_;
   f.c.PropertiesService={getScriptProperties:()=>({getProperty:key=>key==='GITHUB_ADMIN_TOKEN'?'test-token':null})};
   f.c.UrlFetchApp={fetchAll:requests=>{
     batches.push(requests.length);
@@ -82,14 +82,14 @@ test('bulk readiness batches 62 teams and preserves live access decisions',()=>{
       return {getResponseCode:()=>result.status,getContentText:()=>JSON.stringify(result.body || {})};
     });
   }};
-  f.c.makeGithubRequest=()=>{throw Error('Serial GitHub request is forbidden');};
+  f.c.makeGithubRequest_=()=>{throw Error('Serial GitHub request is forbidden');};
   const rows=[],users=[],repos={};
   for(let n=1;n<=62;n++) {
     const row=[...f.team];row[0]='T'+n;rows.push(row);repos['t'+n]='https://github.com/org/team-'+n;
     f.usernames.forEach(user=>{const copy=[...user];copy[2]=row[0];users.push(copy);});
   }
   f.c.weeklyStudents_=()=>rows.flatMap(row=>[1,2].map(n=>({teamId:row[0],email:row[n+2],regNo:row[n+7]})));
-  const read=()=>f.c.getTeamsGithubSetup_(rows,f.c.getColumnMap(),repos,users);
+  const read=()=>f.c.getTeamsGithubSetup_(rows,f.c.getColumnMap_(),repos,users);
   const result=read();
   assert.equal(Object.keys(result).length,62);
   assert(Object.values(result).every(setup=>setup.ready));
@@ -171,10 +171,10 @@ test('repository and invitation API failures fail closed without creating replac
 
 test('invitation inspection follows pagination and rejects expired invitations',()=>{
   const f=fixture();
-  const original=f.c.makeGithubRequest;
+  const original=f.c.makeGithubRequest_;
   const pages=[];
   f.permissions.delete('two');
-  f.c.makeGithubRequest=(method,path,payload)=>{
+  f.c.makeGithubRequest_=(method,path,payload)=>{
     if(path.includes('/invitations?')) {
       pages.push(path);
       return {status:200,body:path.endsWith('page=1')?Array.from({length:100},(_,id)=>({id,invitee:{login:'unrelated'+id},permissions:'write'})):[{id:101,invitee:{login:'two',id:102},permissions:'write'}]};
@@ -182,7 +182,7 @@ test('invitation inspection follows pagination and rejects expired invitations',
     return original(method,path,payload);
   };
   assert.equal(f.state().ready,true);assert.equal(pages.length,2);
-  f.c.makeGithubRequest=original;
+  f.c.makeGithubRequest_=original;
   f.invitations.push({id:101,invitee:{login:'two',id:102},permissions:'write',expired:true});
   assert.equal(f.state().ready,false);
 });

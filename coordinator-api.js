@@ -53,25 +53,16 @@ function buildCoordinatorDto_(data) {
 }
 
 function API_coordinator_getOverview() {
-  return apiHandle_(() => coordinatorRead_('overview', () => { coordinatorAccessOrThrow_(); return buildCoordinatorDto_(getCoordinatorDashboardData_(true, true, [])); }));
-}
-
-function API_coordinator_getProgress() {
-  return apiHandle_(() => coordinatorRead_('progress', () => {
-    coordinatorAccessOrThrow_();
-    const timings = [], data = getCoordinatorDashboardData_(false, true, timings);
-    console.log(JSON.stringify({event:'coordinator_phases', section:'progress', timings}));
-    return buildCoordinatorDto_(data);
-  }));
+  return apiHandle_(() => coordinatorRead_('overview', () => { coordinatorAccessOrThrow_(); return buildCoordinatorDto_(getCoordinatorDashboardData_(true)); }));
 }
 
 /**
  * The progress stage as independent reads, so each card and tracker column settles (or fails) on its own and
- * the calls can run in parallel. Together they carry what `API_coordinator_getProgress` returns.
+ * the calls can run in parallel.
  */
 function coordinatorTeamRows_() {
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  return getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]).map(row => ({teamId:String(row[TS.TEAM_ID]), key:normalizeText_(row[TS.TEAM_ID])}));
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  return getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]).map(row => ({teamId:String(row[TS.TEAM_ID]), key:normalizeText_(row[TS.TEAM_ID])}));
 }
 
 function buildReviewProgressDto_(key) {
@@ -116,26 +107,26 @@ function buildHealthDto_(data) {
 function API_coordinator_getHealth() {
   return apiHandle_(() => coordinatorRead_('health', () => {
     coordinatorAccessOrThrow_();
-    const timings = [], data = getCoordinatorDashboardData_(false, true, timings);
+    const timings = [], data = getCoordinatorDashboardData_(false, timings);
     console.log(JSON.stringify({event:'coordinator_phases', section:'health', timings}));
     return buildHealthDto_(data);
   }));
 }
 
 function API_coordinator_getActivity() {
-  return apiHandle_(() => { coordinatorAccessOrThrow_(); return loadAllTeamsWeeklyActivity(); });
+  return apiHandle_(() => { coordinatorAccessOrThrow_(); return loadAllTeamsWeeklyActivity_(); });
 }
 
 /** System Status frame data; every card's own readiness checks load separately. */
 function buildSystemStatusDto_() {
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const rows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]);
-  const repos = getRepoUrlMap();
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const rows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]);
+  const repos = getRepoUrlMap_();
   let publishing = {configured:true, items:[]};
   try { publishing.items = publicationDefinitions_().map(d => ({key:String(d.key), title:String(internalPublishingConfig_(d.key).title)})); }
   catch (err) { publishing = {configured:false, items:[]}; }
   return {
-    github:{coordUsername:String(getConfig('COLLABORATOR_GITHUB_USERNAME') || '').trim(), reposWithAccess:Number(getConfig('COLLABORATOR_REPOS_ACCESS')) || 0,
+    github:{coordUsername:String(getConfig_('COLLABORATOR_GITHUB_USERNAME') || '').trim(), reposWithAccess:Number(getConfig_('COLLABORATOR_REPOS_ACCESS')) || 0,
       totalRepos:rows.filter(row => repos[normalizeText_(row[TS.TEAM_ID])]).length},
     publishing
   };
@@ -147,7 +138,7 @@ function API_coordinator_getSystemStatus() {
 
 /** Weekly progress setup card: the existing readiness check and one-time setup actions. */
 function API_coordinator_getWeeklySetup() {
-  return apiHandle_(() => { coordinatorAccessOrThrow_(); return getWeeklyProgressPhase2Readiness(); });
+  return apiHandle_(() => { coordinatorAccessOrThrow_(); return getWeeklyProgressPhase2Readiness_(); });
 }
 
 /** kind is storage or triggers; the existing setup functions keep their rules and messages. */
@@ -161,12 +152,12 @@ function API_coordinator_setupWeekly(kind) {
 }
 
 /** System Status card actions. The existing functions authorize the coordinator, validate and keep their rules and messages. */
-function API_coordinator_getCommitteeConfiguration() { return apiHandle_(() => getCoordinatorCommitteeConfiguration()); }
-function API_coordinator_getReviewConfiguration() { return apiHandle_(() => getCoordinatorReviewConfiguration()); }
-function API_coordinator_createDefinitions() { return apiHandle_(() => createAssessmentDefinitions()); }
-function API_coordinator_prepareStorage() { return apiHandle_(() => prepareReviewAssessmentStorage()); }
-function API_coordinator_syncGithub() { return apiHandle_(() => syncCoordinatorGithubAccess()); }
-function API_coordinator_resendInvitations(cursor) { return apiHandle_(() => resendExpiredStudentInvitations(cursor === undefined || cursor === null ? '' : String(cursor))); }
+function API_coordinator_getCommitteeConfiguration() { return apiHandle_(() => getCoordinatorCommitteeConfiguration_()); }
+function API_coordinator_getReviewConfiguration() { return apiHandle_(() => getCoordinatorReviewConfiguration_()); }
+function API_coordinator_createDefinitions() { return apiHandle_(() => createAssessmentDefinitions_()); }
+function API_coordinator_prepareStorage() { return apiHandle_(() => prepareReviewAssessmentStorage_()); }
+function API_coordinator_syncGithub() { return apiHandle_(() => syncCoordinatorGithubAccess_()); }
+function API_coordinator_resendInvitations(cursor) { return apiHandle_(() => resendExpiredStudentInvitations_(cursor === undefined || cursor === null ? '' : String(cursor))); }
 
 /** Team drawer sections (basic, progress, activity): the existing read, which authorizes and validates the section. */
-function API_coordinator_getTeamDrawer(teamId, section) { return apiHandle_(() => loadCoordinatorDrawerSection(String(teamId || ''), String(section || ''))); }
+function API_coordinator_getTeamDrawer(teamId, section) { return apiHandle_(() => loadCoordinatorDrawerSection_(String(teamId || ''), String(section || ''))); }

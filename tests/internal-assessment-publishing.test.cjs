@@ -1,10 +1,10 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),crypto=require('node:crypto');
 const {publishingFixture}=require('./internal-publishing-fixture.cjs');
 const plain=value=>JSON.parse(JSON.stringify(value));
-function browser(){const c=vm.createContext({Map,Set,window:{crypto},document:{},setTimeout,clearTimeout});for(const file of ['common-helpers.js','lucide-icons.js','icon-renderer.js','internal-assessment-publishing-client.js'])vm.runInContext(file==='common-helpers.js'?fs.readFileSync(file,'utf8').slice(fs.readFileSync(file,'utf8').indexOf('function renderAssessmentHistory_')):fs.readFileSync(file,'utf8'),c);c.DashboardUI={renderIcon:c.renderLucideIcon_,renderAssessmentHistory:c.renderAssessmentHistory_};return c.internalAssessmentPublishingBrowser_();}
+function browser(){const c=vm.createContext({Map,Set,window:{crypto},document:{},setTimeout,clearTimeout});for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js','internal-assessment-publishing-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);c.DashboardUI={renderIcon:c.renderLucideIcon_,renderAssessmentHistory:c.renderAssessmentHistory_};return c.internalAssessmentPublishingBrowser_();}
 const view=()=>({query:'',filter:'all',open:new Set(),outcomes:new Map()});
 
-function historyRenderer(){const c=vm.createContext({});vm.runInContext(fs.readFileSync('common-helpers.js','utf8').slice(fs.readFileSync('common-helpers.js','utf8').indexOf('function renderAssessmentHistory_')),c);return c.renderAssessmentHistory_;}
+function historyRenderer(){const c=vm.createContext({});vm.runInContext(fs.readFileSync('assessment-history-view.js','utf8'),c);return c.renderAssessmentHistory_;}
 test('shared history is immutable, escaped, newest first and preserves note suppression and dates',()=>{
   const render=historyRenderer();
   const decisions=Object.freeze([
@@ -15,7 +15,7 @@ test('shared history is immutable, escaped, newest first and preserves note supp
   ]);
   const before=JSON.stringify(decisions),html=render(decisions);
   assert.equal(JSON.stringify(decisions),before);assert.equal(render(decisions),html);
-  assert.match(html,/Assessment history <span>4<\/span>/);assert.match(html,/Updated &lt;date&gt; &amp; evidence\nSecond line/);assert.match(html,/&lt;reviewer&gt;/);
+  assert.match(html,/Assessment history <span[^>]*>4<\/span>/);assert.match(html,/Updated &lt;date&gt; &amp; evidence\nSecond line/);assert.match(html,/&lt;reviewer&gt;/);
   assert.doesNotMatch(html,/source facts|recorded as unapproved|Absence details recorded|Invalid Date/);
   assert.match(html,/datetime="2026-09-24T23:05:12.872Z"/);assert.match(html,/Awaiting makeup/);assert.match(html,/Completed after makeup/);
   assert(html.indexOf('Assessment completed')<html.indexOf('Absence details updated'));
@@ -24,12 +24,14 @@ test('shared history is immutable, escaped, newest first and preserves note supp
 test('shared history preserves all drawer labels and fallback behavior',()=>{
   const render=historyRenderer();
   const actions={exception:'Absence details updated',targetSubmit:'Assessment completed',targetDraft:'Assessment draft saved',MAKEUP_ALTERNATIVE_ASSESSMENT:'Assessment authorized',DEFERRED_ASSESSMENT:'Assessment deferred',TEAM_MARK_APPLICABLE:'Team mark approved',TEAM_MARK_NOT_APPLICABLE:'Team mark not applicable',OTHER:'Academic decision recorded',unknown:'Assessment updated'};
-  for(const [decision,label] of Object.entries(actions))assert(render([{decision}]).includes('<strong>'+label+'</strong>'));
+  for(const [decision,label] of Object.entries(actions))assert(render([{decision}]).includes('>'+label+'</strong>'));
   const statuses={COMPLETED:'Completed',MAKEUP_PENDING:'Awaiting makeup',COMPLETED_AFTER_MAKEUP:'Completed after makeup',ABSENT_UNAPPROVED:'Unapproved absence',ACADEMIC_DECISION_PENDING:'Awaiting academic decision',NON_PARTICIPATION:'Non-participation',INCOMPLETE:'Incomplete'};
-  for(const [status,label] of Object.entries(statuses))assert(render([{previousStatus:status,resultingStatus:status}]).includes(label+' <span>changed to</span> '+label));
-  assert.match(render([{decision:'unknown',at:'bad'}]),/Not assessed <span>changed to<\/span> Updated/);
+  for(const [status,label] of Object.entries(statuses))assert(render([{previousStatus:status,resultingStatus:status}]).includes(label+' <span class="text-muted">changed to</span> '+label));
+  assert.match(render([{decision:'unknown',at:'bad'}]),/Not assessed <span[^>]*>changed to<\/span> Updated/);
   assert.doesNotMatch(render([{at:'bad'}]),/<time/);
-  assert.equal(render([{decision:'targetSubmit',previousStatus:'INCOMPLETE',resultingStatus:'COMPLETED',reason:'Updated date.',reviewer:'reviewer@example.test'}]),'<details><summary>Assessment history <span>1</span></summary><ol><li><div><strong>Assessment completed</strong></div><div>Incomplete <span>changed to</span> Completed</div><p>Updated date.</p><small>reviewer@example.test</small></li></ol></details>');
+  const one=render([{decision:'targetSubmit',previousStatus:'INCOMPLETE',resultingStatus:'COMPLETED',reason:'Updated date.',reviewer:'reviewer@example.test'}]);
+  for(const part of ['Assessment completed','Incomplete','changed to','Completed','Updated date.','reviewer@example.test'])assert(one.includes(part),part);
+  assert.doesNotMatch(one,/\sstyle=|\son[a-z]+=/);
 });
 test('Review publishing uses the exact shared history output and Guide does not gain history',()=>{
   for(const key of ['review1','review2']){
@@ -72,7 +74,7 @@ for(const key of ['review1','review2'])for(const scenario of ['COMPLETED','MAKEU
 for(const key of ['review1','review2'])test(key+': makeup republication keeps old snapshots until individual publish; reopen retains snapshots',()=>{
   const f=publishingFixture(key),input=f.input();input.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true,reason:'Documented'};input.students[0].scores={};f.submit(input);f.publish();
   f.actor('reviewer@x');const d=f.c.getReviewEvaluation_('G18',key);
-  f.c.submitReviewMakeup({assessmentId:key,team:'G18',student:'s1',revision:d.revision,token:d.token,requestId:crypto.randomUUID(),submit:true,reason:'Makeup completed',scores:{I:{level:3,marks:33,remark:''}}});
+  f.c.submitReviewMakeup_({assessmentId:key,team:'G18',student:'s1',revision:d.revision,token:d.token,requestId:crypto.randomUUID(),submit:true,reason:'Makeup completed',scores:{I:{level:3,marks:33,remark:''}}});
   const team=f.report().teams[0];assert.equal(team.students[0].assessmentStatus,'COMPLETED');assert.equal(team.students[0].publicationStatus,'UPDATE_PENDING');assert.equal(team.students[0].publicationPermission,'ALLOWED');assert.equal(team.students[1].publicationStatus,'PUBLISHED');
   f.actor('one@x');assert.equal(f.c.loadPublishedReviewEvaluation_(key).total,null);f.publish('s1');f.actor('one@x');assert.equal(f.c.loadPublishedReviewEvaluation_(key).total,81);
   const latest=f.report().teams[0];f.c.reviewWrite_('reopen',{team:'G18',revision:latest.revision,requestId:crypto.randomUUID(),reason:'Correction'},key);
@@ -81,14 +83,14 @@ for(const key of ['review1','review2'])test(key+': makeup republication keeps ol
 
 test('Review stale revisions, duplicate IDs, changed roster and authorization remain enforced',()=>{
   const f=publishingFixture();f.submit();const team=f.report().teams[0],input={team:team.team,revision:team.revision,requestId:crypto.randomUUID()};
-  const first=f.c.publishInternalAssessment({...(input),assessmentId:'review1'}),length=f.tables.Review1Evaluations.length;
-  assert.equal(f.c.publishInternalAssessment({...(input),assessmentId:'review1'}).revision,first.revision);assert.equal(f.tables.Review1Evaluations.length,length);
-  assert.throws(()=>f.c.publishInternalAssessment({...({...input,requestId:crypto.randomUUID()}),assessmentId:'review1'}),/changed/);
-  assert.throws(()=>f.c.publishInternalAssessment({...({...input,student:'s1'}),assessmentId:'review1'}),/Request ID/);
-  f.actor('one@x');assert.throws(()=>f.c.loadInternalAssessmentPublishing('review1'),/Coordinator/);
+  const first=f.c.publishInternalAssessment_({...(input),assessmentId:'review1'}),length=f.tables.Review1Evaluations.length;
+  assert.equal(f.c.publishInternalAssessment_({...(input),assessmentId:'review1'}).revision,first.revision);assert.equal(f.tables.Review1Evaluations.length,length);
+  assert.throws(()=>f.c.publishInternalAssessment_({...({...input,requestId:crypto.randomUUID()}),assessmentId:'review1'}),/changed/);
+  assert.throws(()=>f.c.publishInternalAssessment_({...({...input,student:'s1'}),assessmentId:'review1'}),/Request ID/);
+  f.actor('one@x');assert.throws(()=>f.c.loadInternalAssessmentPublishing_('review1'),/Coordinator/);
   const changed=publishingFixture();changed.submit();changed.students[0].name='Updated';const model=changed.report().teams[0];
   assert.equal(model.canPublishTeam,true);assert.equal(model.canReopen,true);assert.equal(model.publicationState,'READY_TO_PUBLISH');changed.students[0].regNo='replacement';
-  assert.throws(()=>changed.c.publishInternalAssessment({...({team:'G18',revision:1,requestId:crypto.randomUUID()}),assessmentId:'review1'}),/Roster/);
+  assert.throws(()=>changed.c.publishInternalAssessment_({...({team:'G18',revision:1,requestId:crypto.randomUUID()}),assessmentId:'review1'}),/Roster/);
 });
 
 test('genuine zero roster, duplicate members, removed and new members surface data issues',()=>{
@@ -110,7 +112,7 @@ test('Guide sequential publication uses real individual revisions/history and re
 
 test('Guide sequential all-success, unknown response and same-ID retry do not duplicate writes',async()=>{
   const f=publishingFixture('guide_eval');f.students.forEach(s=>f.guideSubmit(s.regNo));const report=f.report(),api=browser();
-  const jobs=report.teams[0].students.map(s=>({method:'publishGuideEvaluation',input:{assessmentId:'guide_eval',team:'g18',student:s.register,revision:s.revision,requestId:crypto.randomUUID()}}));
+  const jobs=report.teams[0].students.map(s=>({method:'publishInternalAssessment_',input:{assessmentId:'guide_eval',team:'g18',student:s.register,revision:s.revision,requestId:crypto.randomUUID()}}));
   const results=await api.runSequence(jobs,async(method,[input])=>{const result=f.c[method](input);if(input.student==='s2')throw Error('Connection lost');return result;});
   assert.deepEqual(Array.from(results,r=>r.outcome),['success','uncertain','success']);const refreshed=f.report();assert.equal(refreshed.teams[0].publicationState,'PUBLISHED');assert.equal(refreshed.teams[0].students[1].publishedRequestId,jobs[1].input.requestId);
   const length=f.tables.GuideEvaluations.length;const retried=await api.runSequence(results.filter(r=>r.outcome!=='success'),async(method,[input])=>f.c[method](input));assert.equal(retried[0].outcome,'success');assert.equal(f.tables.GuideEvaluations.length,length);
@@ -119,18 +121,18 @@ test('Guide sequential all-success, unknown response and same-ID retry do not du
 
 test('Guide eligibility and reopen retain individual scope, roster guards and snapshot visibility',()=>{
   const f=publishingFixture('guide_eval');f.guideSubmit('S1');let report=f.report();assert.equal(report.teams[0].publicationState,'PARTIAL_OR_EXCEPTION');assert.equal(report.teams[0].students[1].publicationPermission,'BLOCKED');
-  const input={team:'g18',student:'s1',revision:1,requestId:crypto.randomUUID()};f.c.publishGuideEvaluation(input);f.actor('one@x');assert.equal(f.c.loadPublishedGuideEvaluation().total,32);
-  f.actor('two@x');assert.equal(f.c.loadPublishedGuideEvaluation(),null);f.report();assert.throws(()=>f.c.publishGuideEvaluation({...input,requestId:crypto.randomUUID()}),/changed/);
-  f.c.reopenGuideEvaluation({...input,revision:2,requestId:crypto.randomUUID(),reason:'Correction'});f.actor('one@x');assert.equal(f.c.loadPublishedGuideEvaluation().underCorrection,true);
+  const input={team:'g18',student:'s1',revision:1,requestId:crypto.randomUUID()};f.c.publishInternalAssessment_({...input,assessmentId:'guide_eval'});f.actor('one@x');assert.equal(f.c.loadPublishedGuideEvaluation_().total,32);
+  f.actor('two@x');assert.equal(f.c.loadPublishedGuideEvaluation_(),null);f.report();assert.throws(()=>f.c.publishInternalAssessment_({...{...input,requestId:crypto.randomUUID()},assessmentId:'guide_eval'}),/changed/);
+  f.c.reopenGuideEvaluation_({...input,revision:2,requestId:crypto.randomUUID(),reason:'Correction'});f.actor('one@x');assert.equal(f.c.loadPublishedGuideEvaluation_().underCorrection,true);
   f.guideSubmit('S2');f.students[1].regNo='replacement';report=f.report();assert.equal(report.teams[0].students[1].publicationPermission,'BLOCKED');assert.equal(report.teams[0].students[1].canReopen,false);
-  assert.throws(()=>f.c.publishGuideEvaluation({team:'g18',student:'replacement',revision:0,requestId:crypto.randomUUID()}),/not available/);
+  assert.throws(()=>f.c.publishInternalAssessment_({...{team:'g18',student:'replacement',revision:0,requestId:crypto.randomUUID()},assessmentId:'guide_eval'}),/not available/);
   assert(!report.teams[0].students.some(s=>/MAKEUP|ACADEMIC/.test(s.assessmentStatus)));
 });
 
 test('Guide academic completion is independent of publication status',()=>{
   const f=publishingFixture('guide_eval');f.guideSubmit('S1');let student=f.report().teams[0].students[0];
   assert.equal(student.assessmentStatus,'COMPLETED');assert.equal(student.publicationPermission,'ALLOWED');assert.equal(student.publicationStatus,'NOT_PUBLISHED');
-  f.c.publishGuideEvaluation({team:'g18',student:'s1',revision:1,requestId:crypto.randomUUID()});student=f.report().teams[0].students[0];
+  f.c.publishInternalAssessment_({...{team:'g18',student:'s1',revision:1,requestId:crypto.randomUUID()},assessmentId:'guide_eval'});student=f.report().teams[0].students[0];
   assert.equal(student.assessmentStatus,'COMPLETED');assert.equal(student.publicationPermission,'BLOCKED');assert.equal(student.publicationStatus,'PUBLISHED');
 });
 
@@ -153,9 +155,9 @@ test('publication endpoints delegate to the existing functions, keep their rules
   const f=publishingFixture();f.submit();vm.runInContext(fs.readFileSync('api-envelope.js','utf8'),f.c);
   f.report();const read=JSON.parse(f.c.API_publishing_get('review1'));assert.equal(read.ok,true);assert.deepEqual(plain(read.data),plain(f.report()));
   const team=f.report().teams[0],input={assessmentId:'review1',team:team.team,revision:team.revision,requestId:crypto.randomUUID()};
-  const published=JSON.parse(f.c.API_publishing_run('publishInternalAssessment',input));assert.equal(published.ok,true);
-  const stale=JSON.parse(f.c.API_publishing_run('publishInternalAssessment',{...input,requestId:crypto.randomUUID()}));
+  const published=JSON.parse(f.c.API_publishing_run('publishInternalAssessment_',input));assert.equal(published.ok,true);
+  const stale=JSON.parse(f.c.API_publishing_run('publishInternalAssessment_',{...input,requestId:crypto.randomUUID()}));
   assert.equal(stale.ok,false);assert.equal(stale.error.code,'REJECTED');assert.match(stale.error.message,/changed/);
-  for(const name of ['publishGuideEvaluation','constructor','toString'])assert.equal(JSON.parse(f.c.API_publishing_run(name,input)).error.code,'INVALID_INPUT');
+  for(const name of ['constructor','toString'])assert.equal(JSON.parse(f.c.API_publishing_run(name,input)).error.code,'INVALID_INPUT');
   f.actor('one@x');assert.match(JSON.parse(f.c.API_publishing_get('review1')).error.message,/Coordinator/);
 });

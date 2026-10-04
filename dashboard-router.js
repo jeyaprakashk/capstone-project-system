@@ -26,33 +26,33 @@ function buildDashboardResponse_(e) {
     );
   }
 
-  return HtmlService.createHtmlOutput(buildDashboardShell(email, views))
+  return HtmlService.createHtmlOutput(buildDashboardShell_(email, views))
     .setTitle(views.length === 1 ? views[0].label + ' Dashboard' : 'Dashboard')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 /**
  * Lightweight role detection. TeamStatus and ReviewCommittee are each read
- * at most once in this Apps Script execution because getSheetRows() is cached.
+ * at most once in this Apps Script execution because getSheetRows_() is cached.
  */
 function getDashboardRoleViews_(email) {
   const views = [];
-  const TS = getColumnMap(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const statusRows = getSheetRows(SHEET_NAMES.TEAM_STATUS).filter(r => r[TS.TEAM_ID]);
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const statusRows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r => r[TS.TEAM_ID]);
 
   const studentTeamId = statusRows.find(r =>
-    [r[TS.S1_EMAIL], r[TS.S2_EMAIL], r[TS.S3_EMAIL], r[TS.S4_EMAIL]].some(e => emailsMatch(e, email))
+    [r[TS.S1_EMAIL], r[TS.S2_EMAIL], r[TS.S3_EMAIL], r[TS.S4_EMAIL]].some(e => emailsMatch_(e, email))
   );
   if (studentTeamId) {
     views.push({ key: 'student', label: 'My Team', contentId: 'studentContent' });
   }
 
-  if (statusRows.some(r => emailsMatch(r[TS.GUIDE_EMAIL], email))) {
+  if (statusRows.some(r => emailsMatch_(r[TS.GUIDE_EMAIL], email))) {
     views.push({ key: 'guide', label: 'My Teams (Guide)', contentId: 'guideContent' });
   }
 
   // Reviewer role: inspect committee membership only; do not build reviewer data.
-  const reviewerCommittees = getCommitteeNumbersForReviewer(email);
+  const reviewerCommittees = getCommitteeNumbersForReviewer_(email);
   if (reviewerCommittees.length > 0) {
     const committeeSet = new Set(reviewerCommittees.map(normalizeText_));
     if (statusRows.some(r => committeeSet.has(normalizeText_(r[TS.COMMITTEE_NUMBER])))) {
@@ -60,9 +60,9 @@ function getDashboardRoleViews_(email) {
     }
   }
 
-  const coordinatorEmail = getCoordinatorEmail();
-  const cellPdEmail = String(getConfig('CELL_PD_EMAIL') || '').trim();
-  if (emailsMatch(email, coordinatorEmail) || (cellPdEmail && emailsMatch(email, cellPdEmail))) {
+  const coordinatorEmail = getCoordinatorEmail_();
+  const cellPdEmail = String(getConfig_('CELL_PD_EMAIL') || '').trim();
+  if (emailsMatch_(email, coordinatorEmail) || (cellPdEmail && emailsMatch_(email, cellPdEmail))) {
     views.push({ key: 'coord', label: 'Coordinator', contentId: 'coordinatorContent' });
   }
 
@@ -70,28 +70,27 @@ function getDashboardRoleViews_(email) {
 }
 
 // Role dashboards load as data: API_student_getDashboard, API_reviewer_getDashboard, API_guide_getDashboard and
-// API_coordinator_* (see DATA-CONTRACTS.md). Each re-checks authorization on the server.
-function buildSingleRoleDashboardPage(email, key, label, contentId, html) {
-  return buildDashboardShell(email, [{ key, label, contentId, html }]);
-}
+// API_coordinator_* (see DATA-CONTRACTS.md). Each re-checks authorization on the server. The shell below is the
+// static page frame only: tabs, empty panels and loading placeholders; it carries no dashboard data.
+const SYSTEM_STATUS_HEADER = '<div><div><h2>System Status</h2><p id="systemStatusUpdated">Waiting for data…</p></div><button type="button" class="border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" data-refresh-button id="systemStatusRefresh" aria-label="Refresh System Status" data-shell-refresh="systemStatus">' + renderLucideIcon_('refresh-cw') + 'Refresh</button></div><p id="systemStatusRefreshStatus" class="empty:hidden" data-refresh-status role="status" aria-live="polite"></p>';
 
-function buildDashboardShell(email, views) {
+function buildDashboardShell_(email, views) {
   const multiRole = views.length > 1;
 
   // Role tabs are followed by common utility tabs (Rubrics, System Status). They are not roles.
   const roleIcons = { student:'graduation-cap', guide:'book-open', reviewer:'clipboard-check', coord:'network' };
   const TAB = "border-0 inline-flex w-full items-center gap-2 rounded-lg bg-transparent px-3 py-2 text-left text-sm text-ink-2 hover:bg-tint aria-selected:bg-tint aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50";
-  const initials = escapeHtml(String(email).split("@")[0].split(/[._-]+/).filter(Boolean).slice(0, 2).map(p => p[0]).join("").toUpperCase());
+  const initials = escapeHtml_(String(email).split("@")[0].split(/[._-]+/).filter(Boolean).slice(0, 2).map(p => p[0]).join("").toUpperCase());
   const roleButtons = views.map((view, index) =>
-    `<button type="button" class="${TAB}${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml(view.key)}" aria-controls="rolePanel-${escapeHtml(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml(view.key)}">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml(view.label)}</button>`
+    `<button type="button" class="${TAB}${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml_(view.key)}" aria-controls="rolePanel-${escapeHtml_(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml_(view.key)}">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml_(view.label)}</button>`
   ).join('');
   const rubricsButton = `<button type="button" class="${TAB}" role="tab" id="roleTab-rubrics" aria-controls="rolePanel-rubrics" aria-selected="false" tabindex="-1" data-role-tab="rubrics">${renderLucideIcon_('book-open')}Timeline &amp; Rubrics</button>`;
   const hasCoordinator = views.some(view => view.key === 'coord');
   const systemButton = hasCoordinator ? `<button type="button" class="${TAB}" role="tab" id="roleTab-system-status" aria-controls="rolePanel-system-status" aria-selected="false" tabindex="-1" data-role-tab="system-status">${renderLucideIcon_('activity')}System Status</button>` : '';
-  const systemPanel = hasCoordinator ? `<section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-system-status" role="tabpanel" aria-labelledby="roleTab-system-status" data-role-panel="system-status" hidden>${buildDashboardContainerHeader_('System Status', 'systemStatus')}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
+  const systemPanel = hasCoordinator ? `<section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-system-status" role="tabpanel" aria-labelledby="roleTab-system-status" data-role-panel="system-status" hidden>${SYSTEM_STATUS_HEADER}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
 
   const rolePanels = views.map((view, index) =>
-    `<section class="role-panel hidden [&.active]:block pt-4${index === 0 ? ' active' : ''}" id="rolePanel-${escapeHtml(view.key)}" role="tabpanel" aria-labelledby="roleTab-${escapeHtml(view.key)}" data-role-panel="${escapeHtml(view.key)}"${index === 0 ? '' : ' hidden'}><div id="${escapeHtml(view.contentId)}" data-role-content="${escapeHtml(view.key)}">${getSkeletonMarkup_('panel', 'Loading ' + view.label)}</div></section>`
+    `<section class="role-panel hidden [&.active]:block pt-4${index === 0 ? ' active' : ''}" id="rolePanel-${escapeHtml_(view.key)}" role="tabpanel" aria-labelledby="roleTab-${escapeHtml_(view.key)}" data-role-panel="${escapeHtml_(view.key)}"${index === 0 ? '' : ' hidden'}><div id="${escapeHtml_(view.contentId)}" data-role-content="${escapeHtml_(view.key)}">${getSkeletonMarkup_('panel', 'Loading ' + view.label)}</div></section>`
   ).join('');
 
 
@@ -109,11 +108,11 @@ ${HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent()}
 <header class="border-b border-edge bg-paper px-4 py-3 md:fixed md:inset-y-0 md:left-0 md:w-60 md:overflow-y-auto md:border-b-0 md:border-r">
 <h1 class="m-0 mb-3 text-base font-semibold text-ink">Dashboard</h1>
 <nav class="dashboard-navigation group/nav" id="dashboardNavigation" aria-label="Dashboard sections">
-<button type="button" class="role-menu-toggle flex md:hidden border-0 items-center gap-2 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span id="roleMenuLabel">${escapeHtml(views[0].label)}</span><span>Menu</span></button>
+<button type="button" class="role-menu-toggle flex md:hidden border-0 items-center gap-2 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span id="roleMenuLabel">${escapeHtml_(views[0].label)}</span><span>Menu</span></button>
 <div class="role-tabs hidden group-[.menu-open]/nav:flex md:flex flex-col gap-1 mt-2 md:mt-0" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}${rubricsButton}${systemButton}</div>
 </nav>
 </header>
-<div class="flex items-center justify-between gap-3 border-b border-edge bg-paper px-4 py-3 text-sm text-muted"><span>Workspace</span><span class="inline-flex items-center gap-2">Signed in as ${escapeHtml(email)}<span class="inline-flex size-8 items-center justify-center rounded-full bg-tint text-xs font-semibold text-primary">${initials}</span></span></div>
+<div class="flex items-center justify-between gap-3 border-b border-edge bg-paper px-4 py-3 text-sm text-muted"><span>Workspace</span><span class="inline-flex items-center gap-2">Signed in as ${escapeHtml_(email)}<span class="inline-flex size-8 items-center justify-center rounded-full bg-tint text-xs font-semibold text-primary">${initials}</span></span></div>
 <main class="mx-auto max-w-[1100px] px-4 pb-10">
 <section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-rubrics" role="tabpanel" aria-labelledby="roleTab-rubrics" data-role-panel="rubrics" hidden>
 <section id="sharedProjectTimeline" hidden class="mb-4 rounded-card border border-edge bg-paper p-4 shadow-card" aria-label="Project timeline" aria-busy="true"><div><h2>Project timeline</h2></div>${getSkeletonMarkup_('timeline', 'Loading project timeline')}</section>
@@ -131,9 +130,9 @@ ${systemPanel}
 </aside>
 <script>
 ${getMigratedViewsClientScript_()}
-${getDashboardClientScript()}
+${getDashboardClientScript_()}
 ${getInternalAssessmentPublishingClientScript_()}
-${getGuideEvaluationClientScript()}
+${getGuideEvaluationClientScript_()}
 ${getGuideWeeklyClientScript_()}
 ${getReviewEvaluationClientScript_()}
 </script>
@@ -142,7 +141,7 @@ ${getReviewEvaluationClientScript_()}
 }
 
 /** Lightweight, serializable schedule data; never return user records or Date objects. */
-function loadSharedProjectTimeline() {
+function loadSharedProjectTimeline_() {
   return withDashboardRead_(() => {
     const email = Session.getActiveUser().getEmail();
     if (!email || !getDashboardRoleViews_(email).length) throw new Error('Dashboard access is required.');
@@ -164,4 +163,4 @@ function getSharedProjectTimelineData_() {
 }
 
 /** Shared Timeline and Rubrics tabs: the existing reads, returned as data. */
-function API_shared_getTimeline() { return apiHandle_(() => loadSharedProjectTimeline()); }
+function API_shared_getTimeline() { return apiHandle_(() => loadSharedProjectTimeline_()); }

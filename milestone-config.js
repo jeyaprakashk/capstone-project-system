@@ -42,9 +42,9 @@ function parseMilestoneRows_(rows, timezone) {
 }
 function getMilestones_() {
   if (milestonesExecution_) return milestonesExecution_;
-  const sheet = getSheet('Milestones');
+  const sheet = getSheet_('Milestones');
   if (!sheet) throw new Error('Milestones tab is required.');
-  return (milestonesExecution_=parseMilestoneRows_(sheet.getDataRange().getValues(),getSpreadsheet().getSpreadsheetTimeZone()));
+  return (milestonesExecution_=parseMilestoneRows_(sheet.getDataRange().getValues(),getSpreadsheet_().getSpreadsheetTimeZone()));
 }
 /** Presentation composition only. Neither configuration source overrides the other. */
 function composeProjectTimeline_(milestones, assessments) {

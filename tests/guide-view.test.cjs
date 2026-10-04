@@ -13,7 +13,7 @@ function dtoFromServer(options) {
 }
 
 function setup(dto = dtoFromServer()) {
-  const { document } = parseHTML('<html><body><div id="guideContent"></div></body></html>');
+  const { document, window } = parseHTML('<html><body><div id="guideContent"></div></body></html>');
   const calls = { weekly: [], loads: 0, refresh: 0, writes: [], toggles: [] };
   const c = loadSources(['data-bridge-client.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
@@ -28,7 +28,7 @@ function setup(dto = dtoFromServer()) {
   vm.runInContext('globalThis.__make = ' + c.guideViewBrowser_.toString(), c);
   const view = c.__make(bridge, () => ui, () => weekly);
   const host = document.getElementById('guideContent');
-  return { view, host, document, calls, s, ui, weekly, c, click: el => host.onclick({ target: el }), settle: () => new Promise(r => setImmediate(r)) };
+  return { view, host, document, calls, s, ui, weekly, c, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
 const byAttr = (f, attr, value) => f.host.querySelector('[' + attr + '="' + value + '"]');
 
