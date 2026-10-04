@@ -152,12 +152,12 @@ function API_coordinator_setupWeekly(kind) {
 }
 
 /** System Status card actions. The existing functions authorize the coordinator, validate and keep their rules and messages. */
-function API_coordinator_getCommitteeConfiguration() { return apiHandle_(() => getCoordinatorCommitteeConfiguration_()); }
-function API_coordinator_getReviewConfiguration() { return apiHandle_(() => getCoordinatorReviewConfiguration_()); }
-function API_coordinator_createDefinitions() { return apiHandle_(() => createAssessmentDefinitions_()); }
-function API_coordinator_prepareStorage() { return apiHandle_(() => prepareReviewAssessmentStorage_()); }
-function API_coordinator_syncGithub() { return apiHandle_(() => syncCoordinatorGithubAccess_()); }
-function API_coordinator_resendInvitations(cursor) { return apiHandle_(() => resendExpiredStudentInvitations_(cursor === undefined || cursor === null ? '' : String(cursor))); }
+function API_coordinator_getCommitteeConfiguration() { return apiHandle_(() => { coordinatorAccessOrThrow_(); return getCoordinatorCommitteeConfiguration_(); }); }
+function API_coordinator_getReviewConfiguration() { return apiHandle_(() => { coordinatorAccessOrThrow_(); return getCoordinatorReviewConfiguration_(); }); }
+function API_coordinator_createDefinitions() { return apiHandle_(() => { coordinatorAccessOrThrow_(); return createAssessmentDefinitions_(); }); }
+function API_coordinator_prepareStorage() { return apiHandle_(() => { coordinatorAccessOrThrow_(); return prepareReviewAssessmentStorage_(); }); }
+function API_coordinator_syncGithub() { return apiHandle_(() => { coordinatorAccessOrThrow_(); return syncCoordinatorGithubAccess_(); }); }
+function API_coordinator_resendInvitations(cursor) { return apiHandle_(() => { coordinatorAccessOrThrow_(); return resendExpiredStudentInvitations_(cursor === undefined || cursor === null ? '' : String(cursor)); }); }
 
 /** Team drawer sections (basic, progress, activity): the existing read, which authorizes and validates the section. */
 function API_coordinator_getTeamDrawer(teamId, section) { return apiHandle_(() => loadCoordinatorDrawerSection_(String(teamId || ''), String(section || ''))); }
