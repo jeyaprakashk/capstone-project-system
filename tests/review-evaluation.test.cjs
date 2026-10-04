@@ -1125,3 +1125,32 @@ test('the drawer reads and saves through the bridge, and its markup uses only co
   const used = [...html.matchAll(/class="([^"]*)"/g)].flatMap(m => m[1].split(/\s+/)).filter(c => c && !/^(review-|team-drawer|lucide)/.test(c));
   assert.deepEqual(missingClasses(used), []);
 });
+
+// Student names, rubric text and reviewer remarks all reach the Review drawer; none may become markup.
+const EVIL='<img src=x onerror=PWN>"\'&';
+function assertInert(html,label){
+  assert(!/<img/i.test(html),label+': a tag from data became markup');
+  assert(!/PWN>/i.test(html),label+': an unescaped payload reached the page');
+  assert(/&lt;img src=x onerror=PWN&gt;/i.test(html),label+': the hostile text should be displayed, escaped');
+  {const rest=html.replace(/&lt;img[^&]*&gt;/gi,''),hit=rest.match(/.{40}\son(?:error|click|load)=.{40}/i);assert(!hit,label+': an event-handler attribute appeared: '+(hit&&hit[0]));}
+}
+test('hostile names, rubric text and reviewer details never become markup in the Review drawer',()=>{
+  const f=browserFixture(true,'review1'),data=f.data;
+  Object.assign(data.details,{team:EVIL,title:EVIL,problem:EVIL,committee:EVIL,guideName:EVIL,guideEmail:EVIL});
+  data.details.reviewers=[{name:EVIL,email:EVIL}];
+  data.roster.students.forEach(student=>{student.name=EVIL;student.email=EVIL;});
+  data.config.label=EVIL;
+  data.config.criteria.forEach(criterion=>{criterion.name=EVIL;criterion.co=EVIL;criterion.descriptors=criterion.descriptors.map(()=>EVIL);});
+  f.api.open('T1',f.trigger);f.requests[0].success(data);
+  assertInert(f.drawer.innerHTML,'loaded evaluation');
+});
+test('hostile remarks and the reopening reason are escaped when a saved evaluation is shown',()=>{
+  const f=fixture(),input=f.input();
+  input.teamScores.T={level:3,marks:48,remark:EVIL};
+  input.students.forEach(student=>{student.scores.I={level:3,marks:30,remark:EVIL};});
+  f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'});
+  const saved=JSON.parse(JSON.stringify(f.c.getReviewEvaluation_('T1','review1')));
+  if(saved.evaluation)saved.evaluation.reason=EVIL;
+  const browser=browserFixture(true,'review1');browser.api.open('T1',browser.trigger);browser.requests[0].success(saved);
+  assertInert(browser.drawer.innerHTML,'saved evaluation');
+});

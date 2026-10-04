@@ -97,6 +97,6 @@ refresh and settle loading on every path. This lives in the bridge, not in views
 
 ## Tests
 
-`npm test` runs everything; `npm run test:migration` runs the bridge, view and DTO tests. Known baseline failures at Version 127, unrelated to
-this migration: 7 tests in `tests/team-github-setup.test.cjs`. Do not hide them;
-fix them separately. No other test may regress.
+`npm test` runs everything; `npm run test:migration` runs the bridge, view and DTO tests. All tests pass (the 7
+`tests/team-github-setup.test.cjs` failures recorded at Version 127 no longer occur); no test may regress. A test file
+that is not listed in the `test` script in `package.json` never runs.
