@@ -59,7 +59,7 @@ function studentViewBrowser_(bridge, getUi) {
     return '<form data-github-form class="mt-4 flex flex-col gap-2"><label for="studentGithubProfile" class="text-sm font-semibold text-ink">Submit GitHub Account</label>' +
       '<p class="text-sm text-muted">GitHub → <strong>Your profile</strong> → copy the profile URL and paste below.</p>' +
       '<input id="studentGithubProfile" name="profileUrl" type="url" required maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://github.com/student123" aria-describedby="githubSubmitStatus"' + disabled + ' class="w-full max-w-md scroll-mt-20 rounded-md border border-control px-3 py-2 text-sm">' +
-      '<div><button class="' + PRIMARY + '" type="submit"' + disabled + '>Continue</button></div><div data-github-confirmation hidden class="flex max-w-md flex-col gap-3 rounded-tile border border-edge bg-paper p-4"></div>' +
+      '<div><button class="' + PRIMARY + '" type="submit" data-github-submit' + disabled + '>Continue</button></div><div data-github-confirmation hidden class="flex max-w-md flex-col gap-3 rounded-tile border border-edge bg-paper p-4"></div>' +
       '<p id="githubSubmitStatus" role="status" aria-live="polite" class="text-sm text-ink-2"></p>' +
       '<div><button id="githubStatusRefresh" class="' + BUTTON + '" type="button" hidden data-action="github-refresh">Refresh GitHub status</button></div></form>';
   }

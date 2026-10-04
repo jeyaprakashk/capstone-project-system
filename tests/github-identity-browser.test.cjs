@@ -6,7 +6,7 @@ const {parseHTML}=require('linkedom');
 const { Sync } = require('./sync-promise.cjs');
 const LEGACY = { API_student_previewGithub: 'previewStudentGithubAccount_', API_student_confirmGithub: 'confirmStudentGithubAccount_', API_student_completeGithubSetup: 'completeStudentGithubSetup_' };
 function fixture() {
-  const {document}=parseHTML('<html><body><form><input name="profileUrl" value="https://github.com/student"><button type="submit">Continue</button><div data-github-confirmation hidden></div></form><p id="githubSubmitStatus"></p></body></html>');
+  const {document}=parseHTML('<html><body><form><input name="profileUrl" value="https://github.com/student"><button type="submit" data-github-submit>Continue</button><div data-github-confirmation hidden></div></form><p id="githubSubmitStatus"></p></body></html>');
   const form=document.querySelector('form'),input=form.querySelector('input'),requests=[],refreshes=[];
   form.elements={profileUrl:input};form.reportValidity=()=>true;
   const source=fs.readFileSync('dashboard-client-scripts.js','utf8').replace(/\r\n/g,'\n');
@@ -30,11 +30,11 @@ test('form jump scrolls and focuses inside the current card without navigation o
   f.document.body.setAttribute('data-step-card','');f.input.id='studentGithubProfile';
   f.input.scrollIntoView=options=>calls.push(['scroll',options.block,options.behavior]);
   f.input.focus=options=>calls.push(['focus',options.preventScroll]);
-  f.context.focusGithubAccountForm(f.form.querySelector('button'));
+  f.context.focusGithubAccountForm(f.form.querySelector('[data-github-submit]'));
   assert.deepEqual(calls,[['scroll','center','auto'],['focus',true]]);
   assert.equal(f.requests.length,0);
-  f.input.disabled=true;f.context.focusGithubAccountForm(f.form.querySelector('button'));assert.equal(calls.length,2);
-  f.input.remove();assert.doesNotThrow(()=>f.context.focusGithubAccountForm(f.form.querySelector('button')));
+  f.input.disabled=true;f.context.focusGithubAccountForm(f.form.querySelector('[data-github-submit]'));assert.equal(calls.length,2);
+  f.input.remove();assert.doesNotThrow(()=>f.context.focusGithubAccountForm(f.form.querySelector('[data-github-submit]')));
 });
 
 test('profile lookup previews safely, prevents duplicate requests, and never saves before confirmation',()=>{
@@ -65,6 +65,6 @@ test('confirmation panel uses compiled Tailwind utilities only',()=>{
   const f=fixture();f.preview();f.reply();
   assert.deepEqual(missingClasses(renderedClasses(f.panel)),[]);
   assert.equal(f.panel.querySelector('.btn'),null);
-  assert.equal(f.panel.querySelectorAll('button').length,2);
+  assert.equal(f.panel.querySelectorAll('[data-confirm-account],[data-change-account]').length,2);
   assert.match(f.panel.textContent,/Is this your GitHub account\?/);
 });

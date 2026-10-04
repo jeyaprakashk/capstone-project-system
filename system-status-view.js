@@ -32,7 +32,7 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
       '<div class="mt-3"><button type="button" class="' + PRIMARY + '" data-action="resend">Resend expired student invitations</button></div>' +
       '<p data-resend-status role="status" aria-live="polite" class="mt-2 text-sm text-ink-2"></p>' +
       '<details data-resend-log hidden class="mt-2"><summary class="cursor-pointer text-sm font-semibold">View student invitation log</summary>' +
-      '<div data-resend-results data-tooltip-boundary class="tracker-table-scroll max-w-full overflow-x-auto overscroll-x-contain mt-2 rounded-tile border border-edge" role="region" aria-label="Student invitation results" tabindex="0"></div>' +
+      '<div data-resend-results data-tooltip-boundary class="max-w-full overflow-x-auto overscroll-x-contain mt-2 rounded-tile border border-edge" role="region" aria-label="Student invitation results" tabindex="0"></div>' +
       '<nav aria-label="Pagination" class="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-muted"><span id="studentInvitationsPaginationInfo">Showing 0 - 0 of 0 students</span>' +
       '<label class="flex items-center gap-2">Rows per page <select id="studentInvitationsPageSize" data-action="resend-size" class="rounded-md border border-control px-2 py-1"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="all">All</option></select></label>' +
       '<div id="studentInvitationsPaginationButtons" class="flex items-center gap-1" aria-label="Student table pages"></div></nav></details></section>';

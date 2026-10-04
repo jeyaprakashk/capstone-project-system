@@ -18,16 +18,16 @@ test('framework modal queues confirmations, preserves literal text and returns f
  assert.equal(f.overlay().querySelector('[data-dialog-body]').textContent,'<b>Discard?</b>');
  const queued=f.api.ask('Duplicate');
  assert.doesNotMatch(f.overlay().textContent,/Duplicate/);
- f.overlay().querySelector('[data-dialog-footer] button').click();
+ f.overlay().querySelector('[data-dialog-cancel],[data-dialog-confirm]').click();
  assert.equal(await result,false);await Promise.resolve();
  assert.match(f.overlay().textContent,/Duplicate/);
- f.overlay().querySelector('[data-dialog-footer] button').click();assert.equal(await queued,false);
+ f.overlay().querySelector('[data-dialog-cancel],[data-dialog-confirm]').click();assert.equal(await queued,false);
  assert.equal(f.overlay(),null);assert.equal(f.document.activeElement,previous);
- const next=f.api.ask('Submit?');f.overlay().querySelector('[data-dialog-footer] button:last-child').click();assert.equal(await next,true);
+ const next=f.api.ask('Submit?');f.overlay().querySelector('[data-dialog-confirm]').click();assert.equal(await next,true);
 });
 test('framework modal traps focus and Escape cancels',async()=>{
  const f=dialogFixture(),result=f.api.ask('Close drawer?'),overlay=f.overlay();
- const buttons=overlay.querySelectorAll('button');buttons[1].focus();
+ const buttons=overlay.querySelectorAll('[data-dialog-cancel],[data-dialog-confirm]');buttons[1].focus();
  const tab=new f.document.defaultView.Event('keydown',{bubbles:true,cancelable:true});
  Object.defineProperty(tab,'key',{value:'Tab'});Object.defineProperty(tab,'shiftKey',{value:false});
  overlay.dispatchEvent(tab);assert.equal(f.document.activeElement,buttons[0]);
@@ -37,16 +37,16 @@ test('framework modal traps focus and Escape cancels',async()=>{
 test('framework prompt validates blank remarks and returns trimmed input',async()=>{
  const f=dialogFixture(),result=f.api.requestText('Reason');
  const input=f.overlay().querySelector('textarea');input.value='   ';
- f.overlay().querySelector('[data-dialog-footer] button:last-child').click();
+ f.overlay().querySelector('[data-dialog-confirm]').click();
  assert.equal(f.overlay().querySelector('[role="alert"]').textContent,'Please enter a remark.');
- input.value=' Evidence ';f.overlay().querySelector('[data-dialog-footer] button:last-child').click();
+ input.value=' Evidence ';f.overlay().querySelector('[data-dialog-confirm]').click();
  assert.equal(await result,'Evidence');
- const cancelled=f.api.requestText('Reason');f.overlay().querySelector('[data-dialog-footer] button').click();assert.equal(await cancelled,null);
+ const cancelled=f.api.requestText('Reason');f.overlay().querySelector('[data-dialog-cancel],[data-dialog-confirm]').click();assert.equal(await cancelled,null);
 });
 test('framework confirmation works without a remote dialog library',async()=>{
  const f=dialogFixture(),result=f.api.ask('Publish?');
  assert.equal(f.document.querySelector('script[src*="sweetalert"]'),null);
- f.overlay().querySelector('[data-dialog-footer] button:last-child').click();assert.equal(await result,true);
+ f.overlay().querySelector('[data-dialog-confirm]').click();assert.equal(await result,true);
 });
 test('danger confirmation uses framework notice, inerts the page and cancels on scrim click',async()=>{
  const f=dialogFixture(),previous=f.document.getElementById('previous');
@@ -63,9 +63,9 @@ test('danger confirmation uses framework notice, inerts the page and cancels on 
 test('notifications wait for an existing confirmation',async()=>{
  const f=dialogFixture(),decision=f.api.ask('Discard?'),notice=f.api.notify('Sync completed','success');
  assert.match(f.overlay().textContent,/Discard/);
- f.overlay().querySelector('[data-dialog-footer] button').click();await decision;await Promise.resolve();
+ f.overlay().querySelector('[data-dialog-cancel],[data-dialog-confirm]').click();await decision;await Promise.resolve();
  assert.match(f.overlay().textContent,/Sync completed/);
- f.overlay().querySelector('[data-dialog-footer] button').click();await notice;
+ f.overlay().querySelector('[data-dialog-cancel],[data-dialog-confirm]').click();await notice;
 });
 test('Coordinator storage setup displays journals, blocks duplicates and retries failures',async()=>{
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body>'+['reviewConfigurationCard','createAssessmentDefinitionsButton','reviewDefinitionsLink','reviewAssessmentReadiness','reviewConfigurationRecheck','initializeAssessmentStorageButton','reviewConfigurationSummary','reviewConfigurationIssues','reviewConfigurationCheckedAt','reviewConfigLink','reviewRubricsLink','assessmentStorageStatus','assessmentStorageResults'].map(id=>'<div id="'+id+'"></div>').join('')+'</body></html>');
@@ -717,6 +717,6 @@ test('the shell markup has no inline handlers and no legacy component classes; a
   const router=fs.readFileSync('dashboard-router.js','utf8'),helpers=fs.readFileSync('common-helpers.js','utf8'),client=fs.readFileSync('dashboard-client-scripts.js','utf8');
   for(const [name,src] of [['router',router],['helpers',helpers]])assert.doesNotMatch(src,/\son(click|change|input|keydown|submit)=/i,name);
   assert.doesNotMatch(router,/class="(?:[^"]*\s)?(tab|tabs|tabpanel|card|drawer|drawer-header|drawer-body|drawer-footer|drawer-scrim)(?:\s[^"]*)?"/);
-  for(const hook of ["closest('[data-role-tab]')","closest('#roleMenuToggle')","closest('#rubricDrawerClose')","closest('[data-shell-refresh]')"])assert(client.includes(hook),hook);
-  assert(router.includes('data-shell-refresh="systemStatus"'));
+  for(const hook of ["closest('[data-role-tab]')","closest('#roleMenuToggle')","closest('#rubricDrawerClose')","closest('[data-shell-refresh-active]')"])assert(client.includes(hook),hook);
+  assert(router.includes('id="shellRefresh"') && router.includes('data-shell-refresh-active'));
 });

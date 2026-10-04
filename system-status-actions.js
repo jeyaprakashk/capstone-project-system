@@ -327,7 +327,7 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     if (studentInvitationResendBusy) return;
     const host = document.getElementById('studentInvitationResend');
     if (!host) return;
-    const button = host.querySelector('button'), status = host.querySelector('[data-resend-status]');
+    const button = host.querySelector('[data-action="resend"]'), status = host.querySelector('[data-resend-status]');
     const output = host.querySelector('[data-resend-results]');
     const results = host.resendResults || new Map();
     host.resendResults = results;

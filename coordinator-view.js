@@ -227,7 +227,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
       '<div class="mt-3 inline-flex flex-wrap gap-1 rounded-xl bg-tint p-1" data-tracker-filters></div>' +
       '<div class="mt-2"><button class="' + BUTTON + '" type="button" id="weeklyActivityRetry" data-action="activity-retry" hidden>Retry activity</button><p id="weeklyActivityStatus" class="text-xs text-muted" role="status" aria-live="polite"></p></div>' +
       '<div class="mt-3 flex flex-wrap gap-2"><input type="text" id="trackerSearch" class="w-full max-w-md rounded-md border border-control px-3 py-2 text-sm" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" data-action="search"><button class="' + BUTTON + '" type="button" data-action="reset">Reset</button></div>' +
-      '<div class="tracker-table-scroll max-w-full overflow-x-auto overscroll-x-contain mt-3 rounded-card border border-edge" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="w-full border-collapse text-sm"><thead class="bg-soft"></thead><tbody id="trackerBody"></tbody></table></div><div data-tracker-pagination></div></div>';
+      '<div class="max-w-full overflow-x-auto overscroll-x-contain mt-3 rounded-card border border-edge" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="w-full border-collapse text-sm"><thead class="bg-soft"></thead><tbody id="trackerBody"></tbody></table></div><div data-tracker-pagination></div></div>';
   }
 
   // ---- frame ----
@@ -239,8 +239,7 @@ function coordinatorViewBrowser_(bridge, getUi) {
       '<div id="teamDrawerContent" class="team-drawer-content flex-1 overflow-auto p-5" data-drawer-content></div><div class="flex justify-end gap-2 border-t border-edge px-5 py-3" hidden></div></aside>';
   }
   function headerMarkup() {
-    return '<div class="flex items-start justify-between gap-4"><div><h2 class="text-xl font-semibold text-ink">Coordinator Dashboard</h2><p id="coordUpdated" class="text-sm text-muted">Waiting for data…</p></div>' +
-      '<button type="button" class="' + BUTTON + ' inline-flex items-center gap-1" data-refresh-button id="coordRefresh" aria-label="Refresh Coordinator Dashboard" data-action="refresh">' + icon('refresh-cw') + 'Refresh</button></div>' +
+    return '<h2 class="text-xl font-semibold text-ink">Coordinator Dashboard</h2>' +
       '<p id="coordRefreshStatus" class="mt-1 text-sm text-muted" data-refresh-status role="status" aria-live="polite"></p>';
   }
   const updatedLabel = () => 'Last updated: ' + new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true}) + ' IST';
@@ -370,7 +369,6 @@ function coordinatorViewBrowser_(bridge, getUi) {
     else if (action === 'reset') { state.query = ''; state.filter = 'all'; state.page = 1; const box = q('#trackerSearch'); if (box) box.value = ''; updateTracker(); }
     else if (action === 'view-team') ui.focusCoordinatorTeam(target.getAttribute('data-team'));
     else if (action === 'close-drawer') ui.closeCoordinatorTeamDrawer();
-    else if (action === 'refresh') ui.refreshRoleDashboard('coord');
     else if (action === 'progress-retry') retryProgress();
     else if (action === 'activity-retry') retryActivity();
   }

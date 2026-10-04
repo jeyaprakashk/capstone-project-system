@@ -390,6 +390,26 @@ const DashboardUI = (function() {
   function updatedLabel() {
     return 'Last updated: ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) + ' IST';
   }
+  // Header refresh details: mirrors the active tab's last-updated time and refreshes that tab.
+  const shellUpdatedAt = Object.create(null);
+  function shellTabBusy(key) { return key === 'system-status' ? systemStatusState.loading : !!loadingRoleTabs[key]; }
+  function syncShellRefresh() {
+    const button = byId('shellRefresh');
+    if (!button) return;
+    const key = activeRole;
+    const refreshable = key !== 'rubrics' && (key === 'system-status' || !!migratedRoles[key]);
+    const stamp = shellUpdatedAt[key] || '';
+    const label = byId('shellUpdated');
+    if (label) { label.textContent = refreshable ? stamp : ''; }
+    button.disabled = !refreshable || shellTabBusy(key);
+  }
+  function refreshActiveTab() {
+    const key = activeRole;
+    if (key === 'system-status') { ensureSystemStatusLoaded(true); return; }
+    if (!migratedRoles[key]) return;
+    if (pendingRequests) { setText('shellUpdated', 'Please wait for the current operation to finish, then refresh.'); return; }
+    loadRoleContent(key, false, true);
+  }
   function refreshRoleDashboard(key) {
     if (!['guide', 'reviewer', 'coord'].includes(key)) return;
     if (pendingRequests) {
@@ -418,6 +438,7 @@ const DashboardUI = (function() {
     if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = renderSkeleton('inline', 'Refreshing'); }
     setText(activeKey + 'RefreshStatus', '');
     loadingRoleTabs[activeKey] = true;
+    syncShellRefresh();
     attemptedRoles[activeKey] = true;
     const requestStarted = Date.now();
 
@@ -430,6 +451,8 @@ const DashboardUI = (function() {
         if (activeKey === 'coord') console.log(JSON.stringify({event:'coordinator_core_render', durationMs:Date.now() - requestStarted, htmlCharacters:migrated ? 0 : html.length}));
         loadedRoleTabs[activeKey] = true;
         loadingRoleTabs[activeKey] = false;
+        shellUpdatedAt[activeKey] = updatedLabel();
+        syncShellRefresh();
 
         recordPerformance({event:'role_core_render', role:activeKey, background:!!background, durationMs:Date.now() - requestStarted});
         if (activeRole === activeKey) {
@@ -438,9 +461,10 @@ const DashboardUI = (function() {
         activateRole(activeKey);
     }
     function onRoleFailed(err) {
-        if (err && err.superseded) { finishLoading(); loadingRoleTabs[activeKey] = false; return; }
+        if (err && err.superseded) { finishLoading(); loadingRoleTabs[activeKey] = false; syncShellRefresh(); return; }
         finishLoading();
         loadingRoleTabs[activeKey] = false;
+        syncShellRefresh();
         if (onError) { onError(err); return; }
         if (refreshButton) { refreshButton.disabled = false; refreshButton.innerHTML = renderLucideIcon_('refresh-cw') + 'Refresh'; }
         if (hadContent) {
@@ -479,6 +503,7 @@ const DashboardUI = (function() {
     }
     systemStatusState.loading = true;
     systemStatusState.attempted = true;
+    syncShellRefresh();
     const button = byId('systemStatusRefresh');
     if (button) { button.disabled = true; button.innerHTML = renderSkeleton('inline', 'Refreshing'); }
     if (!systemStatusState.loaded) target.innerHTML = renderSkeleton('panel', 'Loading system status');
@@ -498,12 +523,15 @@ const DashboardUI = (function() {
       if (button) { button.disabled = false; button.innerHTML = renderLucideIcon_('refresh-cw') + 'Refresh'; }
       setText('systemStatusMessage', '');
       setText('systemStatusUpdated', updatedLabel());
+      shellUpdatedAt['system-status'] = updatedLabel();
+      syncShellRefresh();
       SystemStatusActions.recheckAll();
       target.querySelectorAll('[data-publishing]').forEach(function(section) { InternalAssessmentPublishing.refresh(section.dataset.publishing); });
     }); }).catch(function(err) {
-      if (err && err.superseded) return;
+      if (err && err.superseded) { systemStatusState.loading = false; syncShellRefresh(); return; }
       finishCards.forEach(function(finish) { finish(); });
       systemStatusState.loading = false;
+      syncShellRefresh();
       target.setAttribute('aria-busy', 'false');
       if (button) { button.disabled = false; button.innerHTML = renderLucideIcon_('refresh-cw') + 'Refresh'; }
       buttons.forEach(function(item) { item.el.disabled = item.disabled; });
@@ -537,6 +565,7 @@ const DashboardUI = (function() {
       if (tab) { showRoleTab(tab.getAttribute('data-role-tab')); return; }
       if (origin.closest('#roleMenuToggle')) { toggleRoleMenu(); return; }
       if (origin.closest('#rubricDrawerClose')) { closeRubricDrawer(); return; }
+      if (origin.closest('[data-shell-refresh-active]')) { refreshActiveTab(); return; }
       const refresh = origin.closest('[data-shell-refresh]');
       if (refresh) { const key = refresh.getAttribute('data-shell-refresh'); if (key === 'systemStatus') ensureSystemStatusLoaded(true); else refreshRoleDashboard(key); }
     });
@@ -603,6 +632,7 @@ const DashboardUI = (function() {
     });
     const menuToggle = byId('roleMenuToggle');
     if (menuToggle) setRoleMenuOpen(false, menuToggle.getAttribute('aria-expanded') === 'true');
+    syncShellRefresh();
     if (activeKey === 'rubrics') {
       loadSharedRubrics_();
     } else if (activeKey === 'system-status') {

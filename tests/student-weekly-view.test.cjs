@@ -303,7 +303,7 @@ test('zero commits hide the form and expose the exact guidance and GitHub refres
  assert.equal(panel.querySelector('[data-weekly-github-refresh]').previousElementSibling.tagName,'H5');
  assert.equal(panel.querySelector('[data-weekly-github-refresh] svg').dataset.icon,'refresh-cw');
  assert.equal(panel.querySelector('[data-weekly-github-refresh]').hasAttribute('onclick'),false);assert.equal(panel.querySelector('[data-weekly-github-refresh]').getAttribute('data-action'),'github-evidence-refresh');
- f.load();assert.equal(panel.querySelector('button').disabled,true);f.load();assert.equal(f.requests.length,2);
+ f.load();assert.equal(panel.querySelector('[data-weekly-github-refresh]').disabled,true);f.load();assert.equal(f.requests.length,2);
  f.data.evidence=[{weekId:'W1',state:'available',count:1,commits:[{timestamp:'2026-01-02T12:00:00Z',message:'Lab results',shortSha:'abcdef0',url:'https://github.com/org/team/commit/'+'a'.repeat(40)}]}];
  f.reply();assert(f.host.querySelector('form'));assert.equal(f.host.querySelector('[data-weekly-form]').hidden,false);
  assert.match(panel.textContent,/Your GitHub activity/);assert.match(panel.textContent,/Lab results/);

@@ -104,8 +104,8 @@ test('AI quality handles blank scores and explains the actual rating calculation
 
 test('refresh failure retains successful DOM, settles controls, and retries cleanly',()=>{
   const f=fixture();f.api.load();f.reply();const row=f.host.querySelector('[data-entry]');
-  f.api.load();assert.equal(f.host.querySelector('button').disabled,true);f.requests.at(-1).failure(Error('offline'));
-  assert.equal(f.host.querySelector('[data-entry]'),row);assert.equal(f.host.querySelector('button').disabled,false);
+  f.api.load();assert.equal(f.host.querySelector('[data-week-step]').disabled,true);f.requests.at(-1).failure(Error('offline'));
+  assert.equal(f.host.querySelector('[data-entry]'),row);assert.equal(f.host.querySelector('[data-week-step]').disabled,false);
   assert.match(f.host.querySelector('[data-guide-weekly-status]').textContent,/offline.*Refresh/);
   f.api.load();f.reply();assert.equal(f.host.querySelector('[data-guide-weekly-status]').textContent,'');assert.deepEqual(f.counts(),[3,3]);
 });
@@ -222,21 +222,21 @@ function setupFixture() {
 
 test('weekly setup hides each completed action and rechecks after setup without duplicate requests',()=>{
   const f=setupFixture();f.api.load();f.api.load();assert.equal(f.requests.length,1);f.requests[0].success(f.report);
-  let buttons=f.host.querySelectorAll('button');assert.equal(buttons.length,2);assert.equal(buttons[0].disabled,false);assert.equal(buttons[1].disabled,true);
+  let buttons=f.host.querySelectorAll('[data-setup-kind]');assert.equal(buttons.length,2);assert.equal(buttons[0].disabled,false);assert.equal(buttons[1].disabled,true);
   buttons[0].click();buttons[0].click();assert.equal(f.requests.length,2);assert.equal(f.requests[1].method,'API_coordinator_setupWeekly');assert.deepEqual(Array.from(f.requests[1].args),['storage']);
   f.requests[1].success({ok:true});assert.equal(f.requests[2].method,'API_coordinator_getWeeklySetup');
   f.requests[2].success({...f.report,storageReady:true,canSetupStorage:false,canSetupTriggers:true});
-  buttons=f.host.querySelectorAll('button');assert.equal(buttons.length,1);assert.match(buttons[0].textContent,/schedule/);
+  buttons=f.host.querySelectorAll('[data-setup-kind]');assert.equal(buttons.length,1);assert.match(buttons[0].textContent,/schedule/);
   buttons[0].click();assert.equal(f.requests[3].method,'API_coordinator_setupWeekly');assert.deepEqual(Array.from(f.requests[3].args),['triggers']);f.requests[3].success({ok:true});
-  f.requests[4].success({...f.report,storageReady:true,triggerReady:true,canSetupStorage:false});assert.equal(f.host.querySelectorAll('button').length,0);
+  f.requests[4].success({...f.report,storageReady:true,triggerReady:true,canSetupStorage:false});assert.equal(f.host.querySelectorAll('[data-setup-kind]').length,0);
 });
 
 test('weekly setup read failures preserve content; failed mutations settle and allow retry',()=>{
-  const f=setupFixture();f.api.load();f.requests[0].success(f.report);const button=f.host.querySelector('button');
-  f.api.load();f.requests[1].failure(Error('offline'));assert.equal(f.host.querySelector('button'),button);assert.equal(button.disabled,false);
+  const f=setupFixture();f.api.load();f.requests[0].success(f.report);const button=f.host.querySelector('[data-setup-kind]');
+  f.api.load();f.requests[1].failure(Error('offline'));assert.equal(f.host.querySelector('[data-setup-kind]'),button);assert.equal(button.disabled,false);
   assert.match(f.host.textContent,/Recheck/);f.api.load();f.requests[2].success(f.report);assert(!f.host.textContent.includes('offline'));
-  f.host.querySelector('button').click();f.requests[3].failure(Error('denied'));f.requests[4].success(f.report);
-  assert.match(f.host.textContent,/Setup stopped: denied/);assert.equal(f.host.querySelector('button').disabled,false);
+  f.host.querySelector('[data-setup-kind]').click();f.requests[3].failure(Error('denied'));f.requests[4].success(f.report);
+  assert.match(f.host.textContent,/Setup stopped: denied/);assert.equal(f.host.querySelector('[data-setup-kind]').disabled,false);
 });
 
 test('team workspace filters weekly cards, preserves title drafts and retains selection after refresh',()=>{

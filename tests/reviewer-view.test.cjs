@@ -176,9 +176,9 @@ test('review errors are shown without hiding the table', () => {
   assert.equal(f.host.querySelectorAll('thead th').length, 6);
 });
 
-test('refresh button asks the dashboard shell to reload the role', () => {
+test('refresh and updated time live in the page header, not the view', () => {
   const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
-  f.click(f.host.querySelector('[data-action="refresh"]'));
-  assert.equal(f.calls.refresh, 1);
-  assert.equal(f.host.querySelector('#reviewerRefresh').hasAttribute('data-refresh-button'), true);
+  assert.equal(f.host.querySelector('[data-action="refresh"]'), null);
+  assert.equal(f.host.querySelector('#reviewerRefresh'), null);
+  assert.equal(f.host.querySelector('#reviewerUpdated'), null);
 });

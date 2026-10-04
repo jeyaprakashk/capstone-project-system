@@ -61,7 +61,7 @@ function studentResultsViewBrowser_(bridge, getUi) {
       notice.setAttribute('data-results-error', '');
       notice.textContent = spec.failure(label) + ' ' + (error && error.message || '') + ' ';
       const retry = document.createElement('button');
-      retry.type = 'button'; retry.className = BUTTON; retry.textContent = 'Retry';
+      retry.type = 'button'; retry.setAttribute('data-results-retry', ''); retry.className = BUTTON; retry.textContent = 'Retry';
       retry.addEventListener('click', function() { notice.remove(); load(spec); });
       notice.appendChild(retry);
       host.appendChild(notice);

@@ -57,7 +57,7 @@ function legacyFacts(html) {
     return {
       title: text(card.querySelector('h4')), badge: text(card.querySelector('[data-step-header] > span')),
       body: Array.from(body.children).filter(n => n.tagName === 'P').map(text),
-      members: Array.from(body.querySelectorAll('li[data-member-status]')).map(li => ({ status: li.getAttribute('data-member-status'), regno: text(li.querySelector('[data-member-register]')), state: text(li.querySelector('[data-member-state]')), button: !!li.querySelector('button') })),
+      members: Array.from(body.querySelectorAll('li[data-member-status]')).map(li => ({ status: li.getAttribute('data-member-status'), regno: text(li.querySelector('[data-member-register]')), state: text(li.querySelector('[data-member-state]')), button: !!li.querySelector('[data-github-form-jump]') })),
       repo: repo ? (repo.querySelector('a') ? text(repo.querySelector('a')) : text(repo.querySelector('span:last-child'))) : null,
       cta: form ? { kind: 'form', inputDisabled: form.querySelector('#studentGithubProfile').hasAttribute('disabled') } : link ? { kind: 'link', text: text(link), href: link.getAttribute('href') } : null
     };

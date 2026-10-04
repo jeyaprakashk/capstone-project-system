@@ -35,7 +35,7 @@ for (const key of ['review1', 'guide_eval']) test(key + ' student release refres
   p.calls[0].ok(result); assert.match(host.textContent, /Under correction/); assert.doesNotMatch(host.textContent, /Private correction/);
   const heading = host.querySelector('h3'); load(); p.calls[1].fail({ message: 'Offline' });
   assert.equal(host.querySelector('h3'), heading); assert.match(host.textContent, /Offline/); assert.equal(p.counts()[0], p.counts()[1]);
-  host.querySelector('button').click(); p.calls[2].ok(result); assert(!host.querySelector('button')); assert.equal(p.counts()[0], p.counts()[1]);
+  host.querySelector('[data-results-retry]').click(); p.calls[2].ok(result); assert(!host.querySelector('[data-results-retry]')); assert.equal(p.counts()[0], p.counts()[1]);
   load(); host.remove(); p.document.body.innerHTML = '<section id="' + host.id + '">Replacement screen</section>'; p.calls[3].ok(result);
   assert.equal(p.document.querySelector('section').textContent, 'Replacement screen'); assert.equal(p.counts()[0], p.counts()[1]);
 });
@@ -45,7 +45,7 @@ test('student result refresh preserves published content on failure and renders 
   host.innerHTML = 'Existing published result';
   p.api.review('review1'); p.api.review('review1'); assert.equal(p.calls.length, 1); assert.equal(p.counts()[0], 1);
   p.calls[0].fail({ message: 'Offline' }); assert.match(host.textContent, /Existing published result/); assert.equal(p.counts()[1], 1);
-  host.querySelector('button').click(); assert.equal(p.calls.length, 2);
+  host.querySelector('[data-results-retry]').click(); assert.equal(p.calls.length, 2);
   p.calls[1].ok({ config: { label: 'Review 1', maximum: 100, weight: .2, criteria: [] }, total: null, weighted: null, assessment: { teamMark: 48, individualMark: null, status: 'MAKEUP_PENDING' } });
   assert.equal(p.counts()[1], 2);
   assert.match(host.innerHTML, /Individual Mark: Pending/); assert.match(host.innerHTML, /Review Total: Pending/); assert.doesNotMatch(host.innerHTML, /Review Total: 0/);
@@ -83,7 +83,7 @@ test('failures name the panel and the markup uses only compiled Tailwind utiliti
   p.api.all(); p.calls[0].fail({ message: 'Offline' }); p.calls[1].fail({ message: 'Down' });
   assert.match(p.document.getElementById('studentAssessment-review1').textContent, /Review 1 results unavailable\. Offline/);
   assert.match(p.document.getElementById('studentGuideEvaluation').textContent, /Guide evaluation unavailable\. Down/);
-  p.document.querySelectorAll('button').forEach(b => b.click());
+  p.document.querySelectorAll('[data-results-retry]').forEach(b => b.click());
   p.calls[2].ok({ config: { label: 'Review 1', maximum: 10, weight: .1, criteria: [] }, total: 5, weighted: 1, assessment: {} });
   p.calls[3].ok(null);
   assert.deepEqual(missingClasses(renderedClasses(p.document).filter(c => !c.startsWith('lucide'))), []);

@@ -59,7 +59,7 @@ test('a failed read shows the reason with Retry and ignores superseded replies',
   const f = setup();
   const first = f.api.open('T1', 'S1'); f.requests[0].fail({ message: 'Offline' });
   assert.match(f.host.textContent, /Unable to load: Offline/);
-  f.host.querySelector('button').click(); assert.equal(f.requests.length, 2);
+  f.host.querySelector('[data-guide-retry]').click(); assert.equal(f.requests.length, 2);
   f.requests[1].ok(load('S1')); assert.equal(f.host.querySelectorAll('fieldset').length, 2);
   void first;
 });

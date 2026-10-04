@@ -59,7 +59,7 @@ test('the overview renders at once with progress-dependent values still loading'
   for (const label of ['Review 1 Completed', 'Review 2 Completed', 'Guide Evaluation Completed', 'Need Attention', 'Active This Week']) assert(card(f, label).querySelector('[data-skeleton]'), label);
   assert.equal(f.host.querySelectorAll('#trackerBody [data-col="health"] [data-skeleton]').length, 5);
   assert.equal(f.host.querySelector('[data-tracker-filters] [data-filter="attention"]').disabled, true);
-  assert.equal(f.host.querySelector('#coordUpdated').textContent, 'Waiting for data…');
+  assert.equal(f.host.querySelector('#coordUpdated'), null, 'the updated time lives in the page header');
   await releaseAll(f); // settle held reads so no timeout timer lingers
 });
 
@@ -94,7 +94,7 @@ test('progress fills in assessments, health, counts and the updated time', async
   const t1 = f.host.querySelector('[data-team-id="T1"]');
   assert.deepEqual(Array.from(t1.querySelectorAll('[data-col="review"]')).map(norm), ['Completed', 'Pending']);
   assert.equal(norm(t1.querySelector('[data-col="health"]')), 'Monitor');
-  assert.match(f.host.querySelector('#coordUpdated').textContent, /^Last updated: /);
+  assert.equal(f.host.querySelector('[data-action="refresh"]'), null, 'refresh lives in the page header');
   assert.equal(f.host.querySelector('[data-tracker-filters] [data-filter="attention"]').disabled, false);
   assert.match(f.host.querySelector('#coordinatorProgressStatus').textContent, /Counts are partial/);
   assert(f.host.querySelector('#coordinatorProgressStatus [data-action="progress-retry"]'));
@@ -236,7 +236,6 @@ test('team actions open the drawer, email the team, or explain why they cannot',
   assert.match(mail.getAttribute('href'), /subject=Capstone%20%E2%80%94%20Team%20T1$/);
   assert.equal(t3.querySelector('a[href^="mailto:"]') === null || true, true);
   f.click(f.host.querySelector('[data-action="close-drawer"]')); assert.equal(f.calls.close, 1);
-  f.click(f.host.querySelector('[data-action="refresh"]')); assert.equal(f.calls.refresh, 1);
   for (const id of ['teamDrawer', 'teamDrawerBackdrop', 'teamDrawerContent', 'teamDrawerTitle']) assert(f.host.querySelector('#' + id), id);
   assert.equal(f.host.querySelector('#teamDrawer').hasAttribute('hidden'), true);
 });

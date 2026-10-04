@@ -58,8 +58,8 @@ test('renders the workspace contract GuideWeekly and GuideEvaluation depend on',
   assert.deepEqual(JSON.parse(weekly.getAttribute('data-guide-weeks')).map(w => w.weekId), ['W1', 'W2']);
   assert(weekly.querySelector('[data-guide-weekly-status]') && weekly.querySelector('[data-guide-weekly-read]'));
   assert(f.host.querySelector('#guideEvaluationEditor').hasAttribute('hidden'));
-  for (const id of ['guideRefresh', 'guideUpdated', 'guideRefreshStatus']) assert(f.host.querySelector('#' + id), id);
-  assert(f.host.querySelector('#guideRefresh').hasAttribute('data-refresh-button'));
+  assert(f.host.querySelector('#guideRefreshStatus'));
+  for (const id of ['guideRefresh', 'guideUpdated']) assert.equal(f.host.querySelector('#' + id), null, id + ' lives in the page header');
   for (const el of f.host.querySelectorAll('[hidden]')) assert.doesNotMatch(el.getAttribute('class') || '', /(^|\s)(flex|grid|block|inline|inline-flex|hidden|table)(\s|$)/, 'hidden-toggled elements carry no display utility');
 });
 
@@ -123,7 +123,6 @@ test('team and tab buttons delegate to GuideWeekly', () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
   f.click(byAttr(f, 'data-guide-select', 'T1')); f.click(byAttr(f, 'data-guide-tab', 'documents')); f.click(byAttr(f, 'data-guide-tab', 'evaluation'));
   assert.deepEqual(f.calls.weekly, [['team', 'T1'], ['view', 'documents']]);
-  f.click(f.host.querySelector('[data-action="refresh"]')); assert.equal(f.calls.refresh, 1);
 });
 
 test('the title timing popover is positioned through GuideWeekly when it opens', () => {

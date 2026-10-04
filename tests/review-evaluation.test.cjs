@@ -282,7 +282,7 @@ function browserFixture(extended=false,key='review1') {
         if(selector==='[data-review-actions]')return {set innerHTML(value){for(const m of value.matchAll(/(data-(?:target-draft|target-submit|reload|close))/g))buttons.push(button(m[1]));}};
       }
       if(selector==='[data-message]')return status;if(selector==='form')return form;if(selector.startsWith('[data-total='))return totals[Number(selector.match(/\d+/)[0])];return buttons.find(b=>b.hasAttribute(selector.slice(1,-1)));},
-    querySelectorAll(selector){if(selector==='[data-index]')return fields;if(selector.startsWith('[data-absence]'))return [...absenceNodes.values()].flatMap(h=>Object.values(h.controls));const inputs=fields.flatMap(f=>Object.values(f.controls));return selector.includes('button')?[...buttons,...inputs,...fields.flatMap(f=>[...f.buttons,...f.querySelector('[data-feedback-options]').querySelectorAll('button')])]:inputs;}
+    querySelectorAll(selector){if(selector==='[data-index]')return fields;if(selector.startsWith('[data-absence]'))return [...absenceNodes.values()].flatMap(h=>Object.values(h.controls));const inputs=fields.flatMap(f=>Object.values(f.controls));return selector.includes('button')?[...buttons,...inputs,...fields.flatMap(f=>[...f.buttons,...f.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')])]:inputs;}
   };
   const trigger={isConnected:true,focus(){focusCount++;}};
   function runner(success,failure){return new Proxy({},{get:(_,name)=>name==='withSuccessHandler'?fn=>runner(fn,failure):name==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({name,args,success,failure})});}
@@ -446,7 +446,7 @@ for(const key of ['review1','review2']) {
     field.querySelector=s=>s==='[data-custom-feedback]'?custom:s==='[data-custom-feedback-label]'?label:s==='[data-other-feedback]'?other:query(s);
     field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='48';f.events.input();
     assert.equal(label.hidden,true);
-    const pill=field.querySelector('[data-feedback-options]').querySelectorAll('button')[0];f.events.click({target:pill});
+    const pill=field.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')[0];f.events.click({target:pill});
     const selected=field.controls['[data-remark]'].value;assert(selected);assert.equal(custom.value,'');assert.equal(label.hidden,true);
     f.events.click({target:other});assert.equal(label.hidden,false);assert.equal(other.attrs['aria-pressed'],'true');
     custom.value='Additional reviewer observation.';f.events.input({target:custom});
@@ -741,7 +741,7 @@ test('level buttons update descriptors and clear previous feedback',()=>{
   pick(2);assert.equal(field.controls['[data-level]'].value,'2');assert.equal(field.querySelector('[data-descriptor]').textContent,'Level 2: Partial comparison');
   assert.equal(remark.value,'');remark.value='Faculty observation.';
   assert.match(field.querySelector('[data-feedback-options]').innerHTML,/Compare relevant recent sources/);
-  const chip=field.querySelector('[data-feedback-options]').querySelectorAll('button')[1];
+  const chip=field.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')[1];
   f.events.click({target:chip});assert.equal(remark.value,'Faculty observation.\nCompare relevant recent sources and existing solutions.');
   assert.equal(chip.attrs['aria-pressed'],'true');assert.equal(chip.disabled,false);
   f.events.click({target:chip});assert.equal(remark.value,'Faculty observation.');assert.equal(chip.attrs['aria-pressed'],'false');
@@ -753,7 +753,7 @@ test('feedback length and read-only evaluations prevent unintended changes',()=>
   const f=browserFixture();f.api.open('T1',f.trigger);f.requests[0].success(f.data);const field=f.fields()[0];
   f.events.click({target:field.querySelectorAll('[data-pick-level]')[1]});
   const remark=field.controls['[data-remark]'];remark.value='x'.repeat(1999);
-  f.events.click({target:field.querySelector('[data-feedback-options]').querySelectorAll('button')[0]});
+  f.events.click({target:field.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')[0]});
   assert.equal(remark.value.length,1999);assert.match(f.status.textContent,/2000 characters/);
   f.data.availability.editable=false;f.data.status='Submitted';f.api.open('T1',f.trigger);f.requests[1].success(f.data);
   const locked=f.fields()[0];assert(locked.querySelectorAll('[data-pick-level]').every(b=>b.disabled));
@@ -800,11 +800,11 @@ test('half-mark bounds round fractional band limits inward and disable empty ban
 test('selected feedback survives a draft save and remains student-specific',()=>{
   const f=browserFixture();f.api.open('T1',f.trigger);f.requests[0].success(f.data);const student=f.fields()[1];
   f.events.click({target:student.querySelectorAll('[data-pick-level]')[3]});
-  f.events.click({target:student.querySelector('[data-feedback-options]').querySelectorAll('button')[1]});
+  f.events.click({target:student.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')[1]});
   const text=student.controls['[data-remark]'].value;assert.match(text,/explanation is clear/);
   f.click('data-draft');assert.equal(f.requests[1].args[0].students[0].scores.I.remark,text);assert.equal(f.requests[1].args[0].students[1].scores.I.remark,'');
   f.requests[1].success({revision:1,status:'Draft'});assert.equal(f.fields()[1].controls['[data-remark]'].value,text);
-  assert.equal(f.fields()[1].querySelector('[data-feedback-options]').querySelectorAll('button')[1].attrs['aria-pressed'],'true');
+  assert.equal(f.fields()[1].querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')[1].attrs['aria-pressed'],'true');
 });
 
 function feedbackFixture() {
@@ -812,7 +812,7 @@ function feedbackFixture() {
   const field=f.fields()[0],remark=field.controls['[data-remark]'];
   const pick=n=>f.events.click({target:field.querySelectorAll('[data-pick-level]')[n]});
   pick(2);
-  const pills=()=>field.querySelector('[data-feedback-options]').querySelectorAll('button');
+  const pills=()=>field.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]');
   const toggle=i=>f.events.click({target:pills()[i]});
   const edit=value=>{remark.value=value;f.events.input();};
   return {...f,field,remark,pick,pills,toggle,edit};
@@ -917,7 +917,7 @@ test('submitted and published evaluations show selected pills without enabling t
     f.data.status=status;f.data.availability.editable=false;
     f.data.evaluation={teamScores:{T:{level:2,marks:40,remark:text}},students:[]};
     f.api.open('T1',f.trigger);f.requests[1].success(f.data);
-    const field=f.fields()[0],pill=field.querySelector('[data-feedback-options]').querySelectorAll('button')[1];
+    const field=f.fields()[0],pill=field.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')[1];
     assert.equal(pill.attrs['aria-pressed'],'true');assert.equal(pill.disabled,true);
     f.events.click({target:pill});assert.equal(field.controls['[data-remark]'].value,text);
   }

@@ -100,7 +100,7 @@ test('browser blocks duplicate clicks, accumulates batches, preserves results on
   const row={teamId:'T0',email:'a@x',student:'<student>',username:'user1',status:'invited',reason:'Created'};
   f.requests[0].success({results:[row],nextCursor:'t4',stopped:false});assert.equal(f.requests.length,2);
   f.requests[1].failure(Error('Offline'));assert.match(f.host.textContent,/Offline/);assert.match(f.host.textContent,/<student>/);assert.equal(f.host.querySelector('student'),null);
-  assert.equal(f.host.querySelector('button').disabled,false);f.run();assert.equal(f.requests[2].cursor,'t4');assert.equal(f.requests[2].method,'API_coordinator_resendInvitations');
+  assert.equal(f.host.querySelector('[data-action="resend"]').disabled,false);f.run();assert.equal(f.requests[2].cursor,'t4');assert.equal(f.requests[2].method,'API_coordinator_resendInvitations');
   f.requests[2].success({results:[],nextCursor:null,stopped:false});assert.match(f.host.textContent,/complete/);assert.equal(f.host.getAttribute('aria-busy'),'false');
 });
 test('browser stops on rate limits and replaces previous result when retried',()=>{

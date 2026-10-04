@@ -108,8 +108,7 @@ function reviewerViewBrowser_(bridge, getUi) {
   }
 
   function headerMarkup(updated) {
-    return '<div class="flex items-start justify-between gap-4"><div><h2 class="text-xl font-semibold text-ink">Reviewer Dashboard</h2><p id="reviewerUpdated" class="text-sm text-muted">' + escape(updated) + '</p></div>' +
-      '<button type="button" class="border-0 inline-flex items-center gap-1 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" data-refresh-button id="reviewerRefresh" aria-label="Refresh Reviewer Dashboard" data-action="refresh">' + icon('refresh-cw') + 'Refresh</button></div>' +
+    return '<h2 class="text-xl font-semibold text-ink">Reviewer Dashboard</h2>' +
       '<p id="reviewerRefreshStatus" class="mt-1 text-sm text-muted" data-refresh-status role="status" aria-live="polite"></p>';
   }
   function updatedLabel() {
@@ -153,7 +152,6 @@ function reviewerViewBrowser_(bridge, getUi) {
     const action = target.dataset.action;
     if (action === 'page') { state.page = Number(target.dataset.page); updateTable(); }
     else if (action === 'marks') getUi().openReviewerMarks(target.dataset.team, target.dataset.review, target);
-    else if (action === 'refresh') getUi().refreshRoleDashboard('reviewer');
     else if (action === 'decide') decide(target.dataset.team, target.dataset.decision);
   }
 

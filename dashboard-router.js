@@ -72,7 +72,27 @@ function getDashboardRoleViews_(email) {
 // Role dashboards load as data: API_student_getDashboard, API_reviewer_getDashboard, API_guide_getDashboard and
 // API_coordinator_* (see DATA-CONTRACTS.md). Each re-checks authorization on the server. The shell below is the
 // static page frame only: tabs, empty panels and loading placeholders; it carries no dashboard data.
-const SYSTEM_STATUS_HEADER = '<div><div><h2>System Status</h2><p id="systemStatusUpdated">Waiting for data…</p></div><button type="button" class="border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" data-refresh-button id="systemStatusRefresh" aria-label="Refresh System Status" data-shell-refresh="systemStatus">' + renderLucideIcon_('refresh-cw') + 'Refresh</button></div><p id="systemStatusRefreshStatus" class="empty:hidden" data-refresh-status role="status" aria-live="polite"></p>';
+const SYSTEM_STATUS_HEADER = '<h2>System Status</h2><p id="systemStatusRefreshStatus" class="empty:hidden" data-refresh-status role="status" aria-live="polite"></p>';
+
+// Name as recorded in TeamStatus (student or guide) or ReviewCommittee (reviewer); else the email's local part.
+function getDashboardUserName_(email) {
+  try {
+    const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+    for (const r of getSheetRows_(SHEET_NAMES.TEAM_STATUS)) {
+      for (const slot of ['S1', 'S2', 'S3', 'S4']) {
+        if (emailsMatch_(r[TS[slot + '_EMAIL']], email) && String(r[TS[slot + '_NAME']] || '').trim()) return String(r[TS[slot + '_NAME']]).trim();
+      }
+      if (emailsMatch_(r[TS.GUIDE_EMAIL], email) && String(r[TS.GUIDE_NAME] || '').trim()) return String(r[TS.GUIDE_NAME]).trim();
+    }
+    const RC = getReviewCommitteeColumns_();
+    for (const r of getAllCommitteeRows_()) {
+      for (const n of [1, 2, 3, 4]) {
+        if (emailsMatch_(r[RC['REVIEWER' + n + '_EMAIL']], email) && String(r[RC['REVIEWER' + n + '_NAME']] || '').trim()) return String(r[RC['REVIEWER' + n + '_NAME']]).trim();
+      }
+    }
+  } catch (err) { /* fall back to the email below */ }
+  return String(email).split('@')[0].split(/[._-]+/).filter(Boolean).map(p => p[0].toUpperCase() + p.slice(1)).join(' ') || String(email);
+}
 
 function buildDashboardShell_(email, views) {
   const multiRole = views.length > 1;
@@ -80,7 +100,8 @@ function buildDashboardShell_(email, views) {
   // Role tabs are followed by common utility tabs (Rubrics, System Status). They are not roles.
   const roleIcons = { student:'graduation-cap', guide:'book-open', reviewer:'clipboard-check', coord:'network' };
   const TAB = "border-0 inline-flex w-full items-center gap-2 rounded-lg bg-transparent px-3 py-2 text-left text-sm text-ink-2 hover:bg-tint aria-selected:bg-tint aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50";
-  const initials = escapeHtml_(String(email).split("@")[0].split(/[._-]+/).filter(Boolean).slice(0, 2).map(p => p[0]).join("").toUpperCase());
+  const displayName = getDashboardUserName_(email);
+  const initials = escapeHtml_(displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?');
   const roleButtons = views.map((view, index) =>
     `<button type="button" class="${TAB}${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml_(view.key)}" aria-controls="rolePanel-${escapeHtml_(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml_(view.key)}">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml_(view.label)}</button>`
   ).join('');
@@ -109,10 +130,10 @@ ${HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent()}
 <h1 class="m-0 mb-3 text-base font-semibold text-ink">Dashboard</h1>
 <nav class="dashboard-navigation group/nav" id="dashboardNavigation" aria-label="Dashboard sections">
 <button type="button" class="role-menu-toggle flex md:hidden border-0 items-center gap-2 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span id="roleMenuLabel">${escapeHtml_(views[0].label)}</span><span>Menu</span></button>
-<div class="role-tabs hidden group-[.menu-open]/nav:flex md:flex flex-col gap-1 mt-2 md:mt-0" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}${rubricsButton}${systemButton}</div>
+<div class="role-tabs hidden group-[.menu-open]/nav:flex md:flex flex-col gap-1 mt-2 md:mt-0" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}<div class="my-1 border-t border-edge" role="separator" aria-orientation="horizontal"></div>${rubricsButton}${systemButton}</div>
 </nav>
 </header>
-<div class="flex items-center justify-between gap-3 border-b border-edge bg-paper px-4 py-3 text-sm text-muted"><span>Workspace</span><span class="inline-flex items-center gap-2">Signed in as ${escapeHtml_(email)}<span class="inline-flex size-8 items-center justify-center rounded-full bg-tint text-xs font-semibold text-primary">${initials}</span></span></div>
+<div class="flex items-center justify-between gap-3 border-b border-edge bg-paper px-4 py-3"><div class="flex min-w-0 items-center gap-2"><span class="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-paper" id="userAvatar">${initials}</span><div class="min-w-0"><div class="truncate text-sm font-semibold text-ink" id="userName">${escapeHtml_(displayName)}</div><div class="truncate text-xs text-muted" id="userEmail">${escapeHtml_(email)}</div></div></div><div class="flex items-center gap-3"><span class="hidden text-xs text-muted sm:inline" id="shellUpdated" role="status" aria-live="polite"></span><button type="button" class="border-0 inline-flex items-center gap-1 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" id="shellRefresh" data-shell-refresh-active aria-label="Refresh this page" disabled>${renderLucideIcon_('refresh-cw')}Refresh</button></div></div>
 <main class="mx-auto max-w-[1100px] px-4 pb-10">
 <section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-rubrics" role="tabpanel" aria-labelledby="roleTab-rubrics" data-role-panel="rubrics" hidden>
 <section id="sharedProjectTimeline" hidden class="mb-4 rounded-card border border-edge bg-paper p-4 shadow-card" aria-label="Project timeline" aria-busy="true"><div><h2>Project timeline</h2></div>${getSkeletonMarkup_('timeline', 'Loading project timeline')}</section>

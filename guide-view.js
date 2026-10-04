@@ -135,8 +135,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
     return '<button type="button" class="' + STEP + '" data-guide-tab="' + view + '" aria-pressed="' + selected + '"' + (disabled ? ' disabled title="' + escape(subtitle) + '"' : '') + '><strong class="flex items-center gap-1">' + icon(iconName) + title + '</strong><span class="text-xs text-muted">' + escape(disabled ? subtitle : subtitle) + '</span></button>';
   }
   function headerMarkup(updated) {
-    return '<div class="flex items-start justify-between gap-4"><div><h2 class="text-xl font-semibold text-ink">Guide Dashboard</h2><p id="guideUpdated" class="text-sm text-muted">' + escape(updated) + '</p></div>' +
-      '<button type="button" class="' + BUTTON + ' inline-flex items-center gap-1" data-refresh-button id="guideRefresh" aria-label="Refresh Guide Dashboard" data-action="refresh">' + icon('refresh-cw') + 'Refresh</button></div>' +
+    return '<h2 class="text-xl font-semibold text-ink">Guide Dashboard</h2>' +
       '<p id="guideRefreshStatus" class="mt-1 text-sm text-muted" data-refresh-status role="status" aria-live="polite"></p>';
   }
   const updatedLabel = () => 'Last updated: ' + new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true}) + ' IST';
@@ -176,7 +175,6 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
     if (!target || target.disabled) return;
     const weekly = getWeekly();
     if (target.dataset.action === 'decide') decide(target.dataset.team, target.dataset.decision);
-    else if (target.dataset.action === 'refresh') getUi().refreshRoleDashboard('guide');
     else if (target.hasAttribute('data-guide-select') && weekly) weekly.selectTeam(target.dataset.guideSelect);
     else if (target.hasAttribute('data-guide-tab') && weekly) weekly.selectView(target.dataset.guideTab);
   }
