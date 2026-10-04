@@ -668,6 +668,8 @@ const DashboardUI = (function() {
     runStudentInvitationResend: function() { SystemStatusActions.runStudentInvitationResend(); },
     initializeAssessmentStorage: function() { SystemStatusActions.initializeAssessmentStorage(); },
     recheckCommitteeConfiguration: function() { SystemStatusActions.recheckCommitteeConfiguration(); },
+    recheckTeamFolders: function() { SystemStatusActions.recheckTeamFolders(); },
+    createTeamFolders: function() { SystemStatusActions.createTeamFolders(); },
     bootstrapAssessmentDefinitions: function() { SystemStatusActions.bootstrapAssessmentDefinitions(); },
     recheckReviewConfiguration: function() { SystemStatusActions.recheckReviewConfiguration(); },
   };

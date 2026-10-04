@@ -136,6 +136,15 @@ function API_coordinator_getSystemStatus() {
   return apiHandle_(() => coordinatorRead_('system-status', () => { coordinatorAccessOrThrow_(); return buildSystemStatusDto_(); }));
 }
 
+/** Team folders card: the read never creates anything; the write creates Team Documents and the missing team folders in batches. */
+function API_coordinator_getTeamFolders() {
+  return apiHandle_(() => coordinatorRead_('team-folders', () => { coordinatorAccessOrThrow_(); return buildTeamFoldersDto_(); }));
+}
+
+function API_coordinator_createTeamFolders(cursor) {
+  return apiHandle_(() => { coordinatorAccessOrThrow_(); return createTeamFolders_(cursor === undefined || cursor === null ? '' : String(cursor)); });
+}
+
 /** Weekly progress setup card: the existing readiness check and one-time setup actions. */
 function API_coordinator_getWeeklySetup() {
   return apiHandle_(() => { coordinatorAccessOrThrow_(); return getWeeklyProgressPhase2Readiness_(); });

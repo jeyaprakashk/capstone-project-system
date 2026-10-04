@@ -109,6 +109,30 @@ by their dashboard modules against hooks the view renders. `getCoordinatorCommit
 `committees:[{number, members:[{name,email}], teams:[string]}]`; the view builds the directory (no server HTML).
 Contract tests: `tests/system-status-view.test.cjs` and the System Status cases in `tests/project-schedule.test.cjs`.
 
+### TeamFolders
+
+```
+read  API_coordinator_getTeamFolders():
+{ configured:boolean,                    // false when the spreadsheet has no single usable parent folder
+  baseFolder:{name,url}|null,            // the spreadsheet's folder
+  teamDocuments:{exists:boolean, url:string|null},
+  total, existing, missing:[teamId], duplicates:[teamId], collisions:[teamId],
+  issues:[string], canCreate:boolean }
+
+write API_coordinator_createTeamFolders(cursor):
+{ teamDocuments:{url, justCreated:boolean}, created:[teamId], failed:[{teamId,reason}],
+  remaining:number, nextCursor:string|null }
+```
+
+Layout in Drive: `<spreadsheet's folder>/Team Documents/<year>_<semester>_team_<teamid>`. The name is lowercase, each run of
+characters other than `a-z`, `0-9` and `_` becomes one `_`, repeated `_` collapse, and each part is trimmed (`teamFolderName_`).
+`Team Documents` is matched by exact name; trashed folders are ignored. Whether a team has a folder is answered from Drive by name,
+never from a sheet column. The read never creates anything. The write takes the script lock, creates `Team Documents` if needed, then
+up to 25 team folders per call from `cursor` (the last Team ID key handled); it re-reads Drive, skips folders that exist, and is safe to
+repeat. Two `Team Documents` folders, duplicate team folders or names that collide are reported and never merged, removed or created.
+`findTeamFolder_(teamId, semester)` is the shared server lookup for later features (it never creates anything). The browser asks for
+confirmation, naming the parent folder, before the write. Contract tests: `tests/team-folders.test.cjs`, `tests/team-folders-view.test.cjs`.
+
 ### StudentDashboard
 
 ```

@@ -10,11 +10,11 @@ const COORDINATOR_CALLS = {
   API_coordinator_getOverview: [], API_coordinator_getReviewProgress: ['review1'], API_coordinator_getGuideProgress: [], API_coordinator_getHealth: [],
   API_coordinator_getActivity: [], API_coordinator_getSystemStatus: [], API_coordinator_getWeeklySetup: [], API_coordinator_setupWeekly: ['storage'],
   API_coordinator_getCommitteeConfiguration: [], API_coordinator_getReviewConfiguration: [], API_coordinator_createDefinitions: [],
-  API_coordinator_prepareStorage: [], API_coordinator_syncGithub: [], API_coordinator_resendInvitations: [''], API_coordinator_getTeamDrawer: ['T1', 'basic']
+  API_coordinator_prepareStorage: [], API_coordinator_syncGithub: [], API_coordinator_getTeamFolders: [], API_coordinator_createTeamFolders: [''], API_coordinator_resendInvitations: [''], API_coordinator_getTeamDrawer: ['T1', 'basic']
 };
 // Functions the endpoints delegate to for their effects; they must never run for an unauthorized caller.
 const DELEGATES = ['getCoordinatorCommitteeConfiguration_', 'getCoordinatorReviewConfiguration_', 'createAssessmentDefinitions_', 'prepareReviewAssessmentStorage_',
-  'syncCoordinatorGithubAccess_', 'resendExpiredStudentInvitations_'];
+  'syncCoordinatorGithubAccess_', 'resendExpiredStudentInvitations_', 'buildTeamFoldersDto_', 'createTeamFolders_'];
 
 function stubbed() {
   const g = coordinatorFixture(), ran = [];
@@ -39,7 +39,7 @@ test('the coordinator reaches the delegated functions of the card endpoints', ()
   const { g, ran } = stubbed();
   g.f.user('coord@example.com');
   for (const name of ['API_coordinator_getCommitteeConfiguration', 'API_coordinator_getReviewConfiguration', 'API_coordinator_createDefinitions',
-    'API_coordinator_prepareStorage', 'API_coordinator_syncGithub', 'API_coordinator_resendInvitations']) assert.equal(JSON.parse(g.c[name]('')).ok, true, name);
+    'API_coordinator_prepareStorage', 'API_coordinator_syncGithub', 'API_coordinator_resendInvitations', 'API_coordinator_getTeamFolders', 'API_coordinator_createTeamFolders']) assert.equal(JSON.parse(g.c[name]('')).ok, true, name);
   assert.deepEqual(ran.sort(), DELEGATES.slice().sort());
 });
 

@@ -105,6 +105,76 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     bridge.read('committee-configuration','API_coordinator_getCommitteeConfiguration',[],{timeoutMs:120000}).then(report=>finish(report,null),error=>finish(null,errorMessage(error)));
   }
 
+  let checkingTeamFolders = false;
+  let creatingTeamFolders = false;
+  let teamFoldersReport = null;
+  /** Reads the team folder state. A failed refresh keeps what the card already shows. */
+  function recheckTeamFolders() {
+    const card = byId('teamFoldersCard');
+    if (!card || checkingTeamFolders || creatingTeamFolders) return;
+    checkingTeamFolders = true;
+    const finishLoading = beginContentLoading(card, 'Checking team folders');
+    const recheck = byId('teamFoldersRecheck'), create = byId('teamFoldersCreate');
+    recheck.disabled = true;
+    create.disabled = true;
+    card.setAttribute('aria-busy', 'true');
+    function finish(report, error) {
+      finishLoading();
+      if (byId('teamFoldersCard') !== card) return;
+      checkingTeamFolders = false;
+      recheck.disabled = false;
+      card.setAttribute('aria-busy', 'false');
+      if (error) {
+        create.disabled = !teamFoldersReport || !teamFoldersReport.canCreate;
+        SystemStatusView.renderIssues(byId('teamFoldersIssues'), ['Unable to check team folders: ' + error + '. Try Recheck.']);
+        if (!teamFoldersReport) setText('teamFoldersSummary', 'Unable to check team folders');
+        return;
+      }
+      teamFoldersReport = report;
+      SystemStatusView.renderTeamFolders(report);
+    }
+    bridge.read('team-folders', 'API_coordinator_getTeamFolders', [], {timeoutMs:120000}).then(report => finish(report, null), error => finish(null, errorMessage(error)));
+  }
+
+  /** Asks first, naming the folder the team folders will go into, then creates them batch by batch. */
+  function createTeamFolders() {
+    const report = teamFoldersReport;
+    if (!report || !report.canCreate || creatingTeamFolders || checkingTeamFolders) return;
+    const count = report.missing.length;
+    getUi().confirmDialog({
+      title: 'Create team folders',
+      body: 'Create the folder "Team Documents" (if it does not exist) inside "' + report.baseFolder.name + '", and ' + count + ' team folder' + (count === 1 ? '' : 's') + ' inside it?',
+      confirmText: 'Create folders', cancelText: 'Cancel'
+    }).then(approved => { if (approved) runTeamFolderCreation(); });
+  }
+  function runTeamFolderCreation() {
+    const card = byId('teamFoldersCard'), button = byId('teamFoldersCreate'), recheck = byId('teamFoldersRecheck');
+    if (!card || creatingTeamFolders) return;
+    creatingTeamFolders = true;
+    button.disabled = true;
+    recheck.disabled = true;
+    card.setAttribute('aria-busy', 'true');
+    const created = [], failed = [];
+    function finish(message) {
+      creatingTeamFolders = false;
+      if (byId('teamFoldersCard') !== card) return;
+      recheck.disabled = false;
+      card.setAttribute('aria-busy', 'false');
+      setText('teamFoldersStatus', message);
+      recheckTeamFolders();
+    }
+    function batch(cursor) {
+      setText('teamFoldersStatus', 'Creating team folders… ' + created.length + ' created so far.');
+      bridge.write('API_coordinator_createTeamFolders', [cursor]).then(result => {
+        created.push(...result.created);
+        failed.push(...result.failed);
+        if (result.nextCursor !== null) { if (card.isConnected) batch(result.nextCursor); else finish('Run paused because this section was closed. Recheck to continue.'); return; }
+        finish(created.length + ' team folder' + (created.length === 1 ? '' : 's') + ' created.' + (failed.length ? ' Failed: ' + failed.map(item => item.teamId + ' (' + item.reason + ')').join('; ') + '. Use Recheck, then create again to retry.' : ''));
+      }, error => finish('Folder creation stopped: ' + errorMessage(error) + '. ' + created.length + ' created before the stop. Recheck, then create again to resume.'));
+    }
+    batch('');
+  }
+
   let reviewConfigurationValid = false;
   let assessmentStorageAvailable = false;
   let checkingReviewConfiguration = false;
@@ -304,8 +374,8 @@ function systemStatusActionsBrowser_(bridge, getUi) {
 
 
   /** A freshly rendered System Status frame starts every check from a clean state. */
-  function resetChecks() { checkingReviewConfiguration = false; checkingCommitteeConfiguration = false; reviewConfigurationValid = false; }
-  function recheckAll() { recheckReviewConfiguration(); recheckCommitteeConfiguration(); }
+  function resetChecks() { checkingReviewConfiguration = false; checkingCommitteeConfiguration = false; checkingTeamFolders = false; teamFoldersReport = null; reviewConfigurationValid = false; }
+  function recheckAll() { recheckReviewConfiguration(); recheckCommitteeConfiguration(); recheckTeamFolders(); }
 
-  return {renderTeamPagination, resetChecks, recheckAll, recheckCommitteeConfiguration, recheckReviewConfiguration, bootstrapAssessmentDefinitions, initializeAssessmentStorage, runGithubSync, runStudentInvitationResend, changeTeamPageSize};
+  return {renderTeamPagination, resetChecks, recheckAll, recheckTeamFolders, createTeamFolders, recheckCommitteeConfiguration, recheckReviewConfiguration, bootstrapAssessmentDefinitions, initializeAssessmentStorage, runGithubSync, runStudentInvitationResend, changeTeamPageSize};
 }

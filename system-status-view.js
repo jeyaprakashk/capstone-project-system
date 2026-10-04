@@ -45,6 +45,40 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
       '<button class="' + BUTTON + '" type="button" data-refresh data-action="publishing-refresh" data-key="' + key + '">Refresh evaluations</button></div>' +
       '<div data-notice role="status" aria-live="polite"></div><div data-publishing-content>' + skeleton('panel', 'Reading ' + item.title + ' publication status') + '</div></div></section>';
   }
+  function teamFoldersCard() {
+    return '<section id="teamFoldersCard" class="' + CARD + '" aria-labelledby="teamFoldersHeading" aria-busy="true"><div class="flex items-center justify-between gap-3"><div class="flex flex-wrap items-center gap-2"><h3 id="teamFoldersHeading" class="text-base font-semibold text-ink">Team folders</h3>' +
+      '<span id="teamFoldersSummary" role="status" aria-live="polite" class="text-sm text-ink-2">' + skeleton('inline', 'Checking team folders') + '</span></div>' +
+      '<button class="' + BUTTON + '" id="teamFoldersRecheck" type="button" data-action="team-folders-recheck">Recheck</button></div>' +
+      '<ul id="teamFoldersIssues" hidden class="mt-2 list-disc pl-5 text-sm text-danger"></ul>' + note('Each team gets a folder inside the Team Documents folder, next to the spreadsheet. Existing folders are never changed.') +
+      '<div class="mt-2"><button type="button" id="teamFoldersCreate" hidden disabled class="' + PRIMARY + '" data-action="team-folders-create">Create missing folders</button></div>' +
+      '<p id="teamFoldersStatus" role="status" aria-live="polite" class="mt-2 text-sm text-ink-2 empty:hidden"></p><div id="teamFoldersLists" hidden></div>' +
+      '<div class="mt-3 flex flex-wrap items-center gap-3">' + link('teamDocumentsLink', 'Team Documents folder') + '</div></section>';
+  }
+  /** Collapsed team ID lists (missing, duplicates, collisions) for the team folders card. */
+  function teamFolderLists(report) {
+    return [['missing', 'Missing folders', report.missing], ['duplicates', 'Duplicate folders', report.duplicates], ['collisions', 'Skipped (same folder name)', report.collisions]].filter(entry => entry[2].length).map(entry =>
+      '<details class="mt-2" data-team-folders-list="' + entry[0] + '"><summary class="cursor-pointer text-sm font-semibold">' + escape(entry[1]) + ' (' + entry[2].length + ')</summary>' +
+      '<div class="mt-1 flex flex-wrap gap-1">' + entry[2].map(team => '<span class="rounded-md bg-tint px-2 py-0.5 text-xs font-semibold text-primary">' + escape(team) + '</span>').join('') + '</div></details>').join('');
+  }
+  /** Fills the card's summary, links, lists and create button from a TeamFolders DTO. */
+  function renderTeamFolders(report) {
+    const byId = id => document.getElementById(id);
+    const documentsUrl = report.teamDocuments.exists ? report.teamDocuments.url : null;
+    const summary = !report.configured ? 'Folder location unavailable' : !report.teamDocuments.exists ? 'Team Documents folder not created yet' : report.existing + ' of ' + report.total + ' teams have folders';
+    byId('teamFoldersSummary').textContent = summary;
+    renderIssues(byId('teamFoldersIssues'), report.issues);
+    const lists = byId('teamFoldersLists'), html = report.configured ? teamFolderLists(report) : '';
+    lists.innerHTML = html;
+    lists.hidden = !html;
+    [['teamDocumentsLink', documentsUrl]].forEach(pair => {
+      const anchor = byId(pair[0]);
+      anchor.hidden = !pair[1];
+      if (pair[1]) anchor.href = pair[1];
+    });
+    const create = byId('teamFoldersCreate');
+    create.hidden = !report.canCreate;
+    create.disabled = !report.canCreate;
+  }
   function committeeCard() {
     return '<section id="committeeConfigurationCard" class="' + CARD + '" aria-labelledby="committeeConfigurationHeading" aria-busy="true"><div class="flex items-center justify-between gap-3"><div class="flex flex-wrap items-center gap-2"><h3 id="committeeConfigurationHeading" class="text-base font-semibold text-ink">Review Committees</h3>' +
       '<span id="committeeConfigurationSummary" role="status" aria-live="polite" class="text-sm text-ink-2">' + skeleton('inline', 'Checking review committees') + '</span></div>' +
@@ -112,7 +146,7 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
 
   function render(target, dto) {
     const items = dto.publishing.configured ? dto.publishing.items.map(publishingCard).join('') : '<p role="status" class="text-sm text-warning">Assessment configuration needs attention. Use Assessment readiness below.</p>';
-    target.innerHTML = '<div data-status-cards class="flex flex-col gap-4"><div data-status-primary class="grid gap-4 lg:grid-cols-2">' + githubCard(dto.github) + invitationsCard() + '</div>' + items + committeeCard() + reviewCard() + '</div>';
+    target.innerHTML = '<div data-status-cards class="flex flex-col gap-4"><div data-status-primary class="grid gap-4 lg:grid-cols-2">' + githubCard(dto.github) + invitationsCard() + '</div>' + items + teamFoldersCard() + committeeCard() + reviewCard() + '</div>';
     if (!delegated.has(target)) { delegated.add(target); target.addEventListener('click', onClick); target.addEventListener('change', onChange); }
   }
 
@@ -128,6 +162,8 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
     else if (action === 'resend') ui.runStudentInvitationResend();
     else if (action === 'publishing-toggle') getPublishing().toggle(key);
     else if (action === 'publishing-refresh') getPublishing().refresh(key);
+    else if (action === 'team-folders-recheck') ui.recheckTeamFolders();
+    else if (action === 'team-folders-create') ui.createTeamFolders();
     else if (action === 'committee-recheck') ui.recheckCommitteeConfiguration();
     else if (action === 'review-recheck') ui.recheckReviewConfiguration();
     else if (action === 'bootstrap-definitions') ui.bootstrapAssessmentDefinitions();
@@ -136,5 +172,5 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
 
   function load() { return bridge.read('system-status', 'API_coordinator_getSystemStatus', [], {timeoutMs:120000}); }
 
-  return {load, render, committeeDirectory, publishingCard, renderIssues, renderReadiness, renderJournalResults};
+  return {load, render, renderTeamFolders, committeeDirectory, publishingCard, renderIssues, renderReadiness, renderJournalResults};
 }
