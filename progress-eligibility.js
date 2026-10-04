@@ -201,24 +201,14 @@ function progressResolveEvidence_(record, slug, context) {
   }
 }
 
-/** Coordinator-managed holds prevent automated changes while evidence needs manual review. */
-function progressEligibilityHolds_() {
-  const raw = PropertiesService.getScriptProperties().getProperty('PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS');
-  if (!raw) return new Set();
-  const values = JSON.parse(raw);
-  if (!Array.isArray(values) || values.some(value=>typeof value !== 'string' || !normalizeText_(value))) throw new Error('Invalid eligibility reconciliation holds.');
-  return new Set(values.map(normalizeText_));
-}
-
 function reconcileProgressEligibility() {
   const owner = progressEligibilityCoordinator_(true), props = PropertiesService.getScriptProperties();
   const installedOwner = props.getProperty('PROGRESS_ELIGIBILITY_TRIGGER_OWNER');
   if (installedOwner && !emailsMatch_(installedOwner,owner)) throw new Error('Eligibility trigger belongs to another coordinator.');
   const records = readProgressEligibility_(), students = weeklyStudents_(), windows = getWeeklySubmissionWindows_();
-  const holds = progressEligibilityHolds_();
   const unresolved = students.map(student=>({student,record:progressStudentEligibility_(student,records,windows)})).filter(item=>!item.record.eligibleFrom);
-  const held = unresolved.filter(item=>holds.has(normalizeText_(item.student.regNo)) || item.record.enforcedFrom).length;
-  const pending = unresolved.filter(item=>!holds.has(normalizeText_(item.student.regNo)) && !item.record.enforcedFrom)
+  const held = unresolved.filter(item=>item.record.enforcedFrom).length;
+  const pending = unresolved.filter(item=>!item.record.enforcedFrom)
     .sort((a,b)=>(progressDateMs_(a.record.checkedAt)||0)-(progressDateMs_(b.record.checkedAt)||0));
   if (!pending.length) {
     const report = {checked:0,fixed:0,deferred:0,held};
@@ -257,7 +247,7 @@ function reconcileProgressEligibility() {
       if (!currentStudent) throw new Error('Student membership changed during reconciliation.');
       const current = progressStudentEligibility_(student);
       if (current.eligibleFrom) return;
-      if (current.enforcedFrom || progressEligibilityHolds_().has(normalizeText_(student.regNo))) return;
+      if (current.enforcedFrom) return;
       const currentAccounts = getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS);
       const currentIdentity = githubStudentIdentity_(student,readSheetRows_(currentAccounts,2),githubAccountColumns_(currentAccounts));
       if (!next.error && next.githubId && (currentIdentity.state !== 'available' || currentIdentity.githubId !== next.githubId)) throw new Error('GitHub identity changed during reconciliation.');

@@ -35,13 +35,9 @@ only unresolved roster students. Fixed students generate no eligibility GitHub
 requests or writes. No dashboard, save, approval, provisioning or hourly scheduler
 calls reconciliation.
 
-Coordinator-managed `PROGRESS_ELIGIBILITY_RECONCILIATION_HOLDS` stores a JSON array
-of normalized register numbers. Daily reconciliation skips held unresolved students
-without GitHub requests or row writes and reports their count as `held`. An unresolved
-row with a persisted enforcement floor is also protected from automatic fixing,
-including if the explicit hold property is missing. The hold/floor is rechecked
-under the write lock. Malformed hold configuration stops reconciliation.
-Fixed rows remain immutable and do not require removal from the hold list.
+An unresolved row with a persisted enforcement floor is protected from automatic fixing: daily
+reconciliation skips it without GitHub requests or row writes and counts it as `held`. The floor is
+rechecked under the write lock. Fixed rows remain immutable.
 
 ## Schema
 
