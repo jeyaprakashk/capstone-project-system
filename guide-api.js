@@ -105,21 +105,21 @@ function guideEvaluationDto_(schedule, clock) {
 }
 
 /** Pure DTO builder over getGuideDashboardData_(). */
-function buildGuideDto_(data) {
+function buildGuideDto_(data, timings) {
   const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const teams = data.teams;
   let githubByTeam = null;
   if (teams.length) {
     try {
       const repoUrls = Object.fromEntries(teams.map(t => [normalizeText_(t.row[TS.TEAM_ID]), t.repoUrl || '']));
-      githubByTeam = getTeamsGithubSetup_(teams.map(t => t.row), TS, repoUrls, getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS));
+      githubByTeam = timedPhase_(timings, 'github_setup', () => getTeamsGithubSetup_(teams.map(t => t.row), TS, repoUrls, getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS)));
     } catch (error) { /* A failed status read must not block title review or imply missing accounts. */ }
   }
   return {
     teams:teams.map(t => guideTeamDto_(t, TS, data, githubByTeam)),
     githubDue:Number.isFinite(data.schedule && data.schedule.git) ? formatProjectDay_(data.schedule.git) : null,
     evaluation:guideEvaluationDto_(data.schedule, data.clock),
-    weeks:teams.length ? getWeeklySubmissionWindows_().map(w => ({weekId:w.weekId, opensAt:w.opens_at, deadlineAt:w.deadline_at})) : []
+    weeks:teams.length ? timedPhase_(timings, 'weekly_windows', () => getWeeklySubmissionWindows_()).map(w => ({weekId:w.weekId, opensAt:w.opens_at, deadlineAt:w.deadline_at})) : []
   };
 }
 
@@ -132,7 +132,16 @@ function guideAccessOrThrow_() {
 }
 
 function API_guide_getDashboard() {
-  return apiHandle_(() => withDashboardRead_(() => buildGuideDto_(getGuideDashboardData_(guideAccessOrThrow_()))));
+  const started = Date.now(), timings = [];
+  try {
+    return apiHandle_(() => withDashboardRead_(() => {
+      const email = timedPhase_(timings, 'access', () => guideAccessOrThrow_());
+      const data = getGuideDashboardData_(email, timings);
+      const dto = timedPhase_(timings, 'dto_total', () => buildGuideDto_(data, timings));
+      timings.push({phase:'teams', durationMs:0, success:true, count:data.teams ? data.teams.length : 0});
+      return dto;
+    }));
+  } finally { logPhases_('guide_phases', 'dashboard', timings, started); }
 }
 
 /** Commits per mapped member, read from the collected-commit log (all time, template bootstrap excluded). */
@@ -168,7 +177,10 @@ function API_guide_submitDecision(teamId, decision, notes, editedTitle) {
 
 /** Weekly progress for the guide's teams; the browser module renders and saves through the bridge. */
 function API_guide_getWeekly() {
-  return apiHandle_(() => { guideAccessOrThrow_(); return loadGuideWeeklyProgress_(); });
+  const started = Date.now(), timings = [];
+  try {
+    return apiHandle_(() => { timedPhase_(timings, 'access', () => guideAccessOrThrow_()); return loadGuideWeeklyProgress_(timings); });
+  } finally { logPhases_('guide_phases', 'weekly', timings, started); }
 }
 
 function API_guide_signWeekly(entryId, status) {
@@ -177,7 +189,10 @@ function API_guide_signWeekly(entryId, status) {
 
 /** Guide Evaluation: existing rules and messages; the browser module renders and saves through the bridge. */
 function API_guide_getEvaluation(teamId, register) {
-  return apiHandle_(() => { guideAccessOrThrow_(); return loadGuideEvaluation_(String(teamId || ''), String(register || '')); });
+  const started = Date.now(), timings = [];
+  try {
+    return apiHandle_(() => { timedPhase_(timings, 'access', () => guideAccessOrThrow_()); return timedPhase_(timings, 'evaluation_load', () => loadGuideEvaluation_(String(teamId || ''), String(register || ''))); });
+  } finally { logPhases_('guide_phases', 'evaluation', timings, started); }
 }
 
 function API_guide_saveEvaluationDraft(input) {

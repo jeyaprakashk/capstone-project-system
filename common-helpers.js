@@ -135,6 +135,19 @@ function getSheet_(sheetName) {
   return sheetExecutionHandles_[key];
 }
 
+/** Times one phase into `timings` (no-op when `timings` is absent). Names and durations only; no identifiers or sheet values. */
+function timedPhase_(timings, phase, read) {
+  if (!timings) return read();
+  const started = Date.now();
+  let success = false;
+  try { const value = read(); success = true; return value; }
+  finally { timings.push({phase, durationMs:Date.now() - started, success}); }
+}
+
+function logPhases_(event, operation, timings, startedAt) {
+  if (typeof console !== 'undefined') console.log(JSON.stringify({event, operation, totalMs:Date.now() - startedAt, timings}));
+}
+
 /** Opt-in snapshots are limited to read-only dashboard endpoints. Writers stay live. */
 function withDashboardRead_(read) {
   if (dashboardReadSnapshot_) return read();
@@ -575,13 +588,15 @@ function getLogWeekSummary_(records, eligibleFrom, regNo, now, knownWindows) {
 }
 
 /** Roll up persisted individual obligations; students without an obligation do not prevent completion. */
-function getTeamLogWeekSummary_(row, columns, logs, schedule, clock) {
+function getTeamLogWeekSummary_(row, columns, logs, schedule, clock, shared) {
   const registers = [1,2,3,4].filter(n=>row[columns['S'+n+'_EMAIL']]).map(n=>row[columns['S'+n+'_REGNO']]);
   if (registers.some(r=>!r) || new Set(registers.map(normalizeText_)).size !== registers.length) throw new Error('Student register numbers are missing or ambiguous.');
-  const eligibility = readProgressEligibility_();
+  // `shared` ({eligibility, windows}) lets a caller summarising many teams read each sheet once per request, not once per team or student.
+  shared = shared || {};
+  const eligibility = shared.eligibility || (shared.eligibility = readProgressEligibility_());
   const summaries = registers.map(regNo=>{
-    const record = progressStudentEligibility_({regNo,teamId:row[columns.TEAM_ID]},eligibility);
-    return getLogWeekSummary_(logs,record.eligibleFrom ? record.enforcedFrom : '',regNo,clock && clock.now);
+    const record = progressStudentEligibility_({regNo,teamId:row[columns.TEAM_ID]},eligibility,shared.windows);
+    return getLogWeekSummary_(logs,record.eligibleFrom ? record.enforcedFrom : '',regNo,clock && clock.now,shared.windows || (shared.windows = getWeeklySubmissionWindows_()));
   });
   const dueDates = summaries.filter(s=>s.firstMissingDue !== null).map(s=>s.firstMissingDue);
   const active = summaries.filter(s=>s.active), current = active[0];

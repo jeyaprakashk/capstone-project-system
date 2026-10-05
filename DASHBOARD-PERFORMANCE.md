@@ -316,6 +316,26 @@ These are nested diagnostics: review read children are included in
 `review_detail_read`, and all repository details are included in `repository_map`.
 Do not sum parent and child durations. No persistent caching is introduced.
 
+## Guide server phase timings
+
+`API_guide_getDashboard`, `API_guide_getWeekly` and `API_guide_getEvaluation` log one
+`guide_phases` line per request to the Apps Script execution log:
+`{event, operation: dashboard|weekly|evaluation, totalMs, timings:[{phase, durationMs, success, count?}]}`.
+The response payload is unchanged. Phases contain names and durations only.
+
+- dashboard: `access`, `team_status_read`, `repository_map`, `schedule`, `log_entries_read`,
+  `team_log_summaries`, `hub_registry`, `intake_history`, `dto_total` (includes `github_setup` and
+  `weekly_windows`), `teams` (count only).
+- weekly: `access`, `setup_and_signoffs`, `log_entries_read`, `entries_and_evidence` (includes
+  `evidence_reads`, whose `count` is the number of per-student evidence sources built),
+  `weekly_windows`, `eligibility_read`.
+- evaluation: `access`, `evaluation_load`.
+
+`dto_total` and `entries_and_evidence` contain their nested phases; do not add parent and child
+durations. Measure by opening the Guide dashboard on the deployed web app (cold, then warm), then read
+Executions in the Apps Script project and filter on `guide_phases`. Record p50/p95 for dashboard, weekly
+and the per-team evaluation calls with the same account and data before changing anything further.
+
 ## Coordinator System Status tab
 
 System Status is shown only when the shell includes the Coordinator role. Its

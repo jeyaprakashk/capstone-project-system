@@ -66,17 +66,23 @@ function submitWeeklyGuideSignoff_(entryId, status) {
   });
 }
 
-function loadGuideWeeklyProgress_() {
+function loadGuideWeeklyProgress_(timings) {
   const email = normalizeEmail_(Session.getActiveUser().getEmail());
   if (!email) throw new Error('Sign in with your institutional account.');
-  weeklyPhase2Columns_('GuideSignoff',getSheet_(SHEET_NAMES.GuideSignoff));
-  weeklyPhase2Columns_('AIProgressAnalysis',getSheet_(SHEET_NAMES.AIProgressAnalysis));
-  const columns = getColumnMap_(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
-  const teams = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row=>emailsMatch_(row[columns.GUIDE_EMAIL],email));
-  const signs = new Map(weeklyPhase2Rows_('GuideSignoff').map(row=>[row.entryId,row]));
-  const analyses = new Map(weeklyPhase2Rows_('AIProgressAnalysis').map(row=>[row.entryId,row]));
+  const {signs,analyses,teams,columns} = timedPhase_(timings,'setup_and_signoffs',()=>{
+    weeklyPhase2Columns_('GuideSignoff',getSheet_(SHEET_NAMES.GuideSignoff));
+    weeklyPhase2Columns_('AIProgressAnalysis',getSheet_(SHEET_NAMES.AIProgressAnalysis));
+    const columns = getColumnMap_(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
+    const teams = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row=>emailsMatch_(row[columns.GUIDE_EMAIL],email));
+    const signs = new Map(weeklyPhase2Rows_('GuideSignoff').map(row=>[row.entryId,row]));
+    const analyses = new Map(weeklyPhase2Rows_('AIProgressAnalysis').map(row=>[row.entryId,row]));
+    return {signs,analyses,teams,columns};
+  });
   const evidenceSources = new Map();
-  const entries = getEffectiveLogEntries_(readLogEntries_()).filter(row=>row.entryStatus !== 'MISSED').flatMap(entry=>{
+  let evidenceMs = 0, evidenceSourceReads = 0;
+  const logRecords = timedPhase_(timings,'log_entries_read',()=>readLogEntries_());
+  const entriesStarted = Date.now();
+  const entries = getEffectiveLogEntries_(logRecords).filter(row=>row.entryStatus !== 'MISSED').flatMap(entry=>{
     const team = teams.find(row=>textEquals_(row[columns.TEAM_ID],entry.teamId));
     if (!team) return [];
     const student = getStudentsFromTeamStatusRow_(team,columns).find(row=>textEquals_(row.regNo,entry.regNo));
@@ -84,23 +90,29 @@ function loadGuideWeeklyProgress_() {
     const analysis = analyses.get(entry.id);
     const identity={...student,teamId:entry.teamId};
     let evidence;
+    const evidenceStarted = Date.now();
     try {
       const key=normalizeEmail_(student.email);
-      if(!evidenceSources.has(key))evidenceSources.set(key,weeklyEvidenceSource_(identity));
+      if(!evidenceSources.has(key)){evidenceSources.set(key,weeklyEvidenceSource_(identity));evidenceSourceReads++;}
       evidence=readWeeklyProgressEvidence_(identity,entry.weekId,evidenceSources.get(key));
     } catch(error) { evidence={state:'unavailable',message:'GitHub evidence could not be read. Use dashboard Refresh to retry.',commits:[]}; }
+    evidenceMs += Date.now() - evidenceStarted;
 
     return [{entryId:entry.id,weekId:entry.weekId,student:String(student.name || entry.regNo),regNo:String(entry.regNo),
       workCompleted:entry.workCompleted,guideDiscussion:entry.guideDiscussion,blockers:entry.blockers,nextAction:entry.nextAction,
       analysis:analysis ? {...analysis,analyzedAt:new Date(analysis.analyzedAt).toISOString()} : null,evidence:{state:evidence.state,message:evidence.message,commits:evidence.commits},
       firstSubmittedAt:entry.firstSubmittedAt ? new Date(entry.firstSubmittedAt).toISOString() : null,timeliness:entry.timeliness,submittedAt:entry.submittedAt ? new Date(entry.submittedAt).toISOString() : null,discussion:String(entry.guideDiscussion || ''),status:signs.get(entry.id)?.status || 'PENDING',score:analysis ? analysis.score : null}];
   });
-  const weeks = getWeeklySubmissionWindows_().filter(window=>entries.some(entry=>entry.weekId === window.weekId))
-    .sort((a,b)=>b.opens_at-a.opens_at).map(window=>window.weekId);
-  const eligibility = readProgressEligibility_(), windows = getWeeklySubmissionWindows_();
+  if (timings) timings.push({phase:'entries_and_evidence',durationMs:Date.now() - entriesStarted,success:true,count:entries.length},
+    {phase:'evidence_reads',durationMs:evidenceMs,success:true,count:evidenceSourceReads});
+  // One windows read serves both the week list and the eligibility roll-up.
+  const windows = timedPhase_(timings,'weekly_windows',()=>getWeeklySubmissionWindows_());
+  const weeks = windows.filter(window=>entries.some(entry=>entry.weekId === window.weekId))
+    .slice().sort((a,b)=>b.opens_at-a.opens_at).map(window=>window.weekId);
+  const eligibility = timedPhase_(timings,'eligibility_read',()=>readProgressEligibility_());
   const requiredByWeek = windows.map(window=>({weekId:window.weekId,regNos:teams.flatMap(team=>
     getStudentsFromTeamStatusRow_(team,columns).filter(student=>{
-      const record = progressStudentEligibility_({regNo:student.regNo,teamId:team[columns.TEAM_ID]},eligibility);
+      const record = progressStudentEligibility_({regNo:student.regNo,teamId:team[columns.TEAM_ID]},eligibility,windows);
       return record.eligibleFrom && eligibleWeeklyWindows_(record.enforcedFrom,windows).some(w=>w.weekId === window.weekId);
     }).map(student=>String(student.regNo)))}));
   return {entries,weeks,requiredByWeek,checkedAt:new Date().toISOString(),timezone:getSpreadsheet_().getSpreadsheetTimeZone()};
