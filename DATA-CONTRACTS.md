@@ -139,7 +139,7 @@ confirmation, naming the parent folder, before the write. Contract tests: `tests
 
 ### StudentCore and StudentProject
 
-The browser loads the student dashboard in two parts: `API_student_getCore` first (it renders the Weeks and Assessments screens and the Project heading and roster), and `API_student_getProject` the first time the Project screen is shown, or when a GitHub action refreshes it. `StudentDashboard` below is their union, the shape the page shows once both parts have loaded. The former combined `API_student_getDashboard` was removed after the split was verified live; `tests/student-migration.test.cjs` still freezes the facts of the union for every scenario.
+The browser loads the student dashboard in two parts: `API_student_getCore` first (it renders the Weeks and Assessments screens and the team heading and roster shown above every screen), and `API_student_getProject` once, the first time the GitHub status or Title confirmation screen is shown (both screens draw from that one response), or when a GitHub action refreshes it. `StudentDashboard` below is their union, the shape the page shows once both parts have loaded. The former combined `API_student_getDashboard` was removed after the split was verified live; `tests/student-migration.test.cjs` still freezes the facts of the union for every scenario.
 
 - `StudentCore` = `{teamId, titleApproved, roster, assessments}`.
 - `StudentProject` = `{setup, github, title}`.
@@ -158,7 +158,7 @@ The browser loads the student dashboard in two parts: `API_student_getCore` firs
   assessments:{ reviews:[{key,label}], guideEvaluationLabel } }
 ```
 
-The view lays the DTO out as three screens (Weeks, Assessments, Project) behind a sidebar that becomes a bottom bar on small viewports; the DTO is unchanged. Weekly progress (status card, week list, week detail), assessment results and the GitHub account connection are separate modules that attach to
+The view lays the DTO out as four screens (Weeks, Assessments, GitHub status, Title confirmation) behind a sidebar that becomes a bottom bar on small viewports; the DTO is unchanged. Weekly progress (status card, week list, week detail), assessment results and the GitHub account connection are separate modules that attach to
 placeholders in the view (`#studentWeeklyProgress`, `#studentAssessment-<key>`,
 `#studentGuideEvaluation`, `#studentGithubProfile`); the GitHub connection uses the endpoints above through the bridge.
 Contract tests: `tests/student-migration.test.cjs` (snapshot `tests/invariants/snapshots/student-legacy-facts.json`,

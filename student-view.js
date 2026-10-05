@@ -1,7 +1,8 @@
 /**
  * STUDENT VIEW — browser module serialized into the dashboard shell as `StudentView`.
- * Renders the student DTO (DATA-CONTRACTS.md) with Tailwind utilities as three screens (Weeks,
- * Assessments, Project) whose links it renders into the shell sidebar (#studentSideNav). It keeps the DOM
+ * Renders the student DTO (DATA-CONTRACTS.md) with Tailwind utilities as four screens (Weeks,
+ * Assessments, GitHub status, Title confirmation) whose links it renders into the shell sidebar
+ * (#studentSideNav); the team heading and roster sit above every screen. It keeps the DOM
  * hooks the weekly-progress, assessment and GitHub-connection modules attach to
  * (#studentWeeklyProgress, #studentAssessment-*, #studentGuideEvaluation,
  * [data-step-card], #studentGithubProfile, #githubSubmitStatus, #githubStatusRefresh).
@@ -10,7 +11,7 @@
 function studentViewBrowser_(bridge, getUi) {
   'use strict';
   const delegated = new WeakSet();
-  const state = {dto:null, host:null, tab:null, loaded:{}, project:null};
+  const state = {dto:null, host:null, tab:null, loaded:{}, project:null, projectBusy:false};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
   const icon = (name, label, className) => getUi().renderIcon(name, label, className);
@@ -73,25 +74,24 @@ function studentViewBrowser_(bridge, getUi) {
   function titleCard(dto) {
     const t = dto.title;
     let body;
-    if (t.locked) body = p('Finish GitHub setup first.') + (t.currentTitle ? p('<strong>Current title:</strong> ' + escape(t.currentTitle)) + p(escape(t.statusText)) : '');
+    if (t.locked) body = p('Finish GitHub setup first.') + '<div class="mt-2"><button type="button" class="' + BUTTON + '" data-action="show-tab" data-tab="github">Open GitHub status</button></div>' + (t.currentTitle ? p('<strong>Current title:</strong> ' + escape(t.currentTitle)) + p(escape(t.statusText)) : '');
     else body = p(escape(t.statusText)) + (t.currentTitle ? p('<strong>Current title:</strong> ' + escape(t.currentTitle)) : '') + (t.note ? p(escape(t.note)) : '') +
       p('Approval due ' + escape(t.due.date) + (t.due.overdue ? ' · Overdue' : ''), t.due.overdue ? 'text-danger' : 'text-ink-2');
     const cta = t.intake ? '<div class="mt-4"><a class="' + PRIMARY + ' inline-block no-underline" href="' + escape(safeUrl(t.intake.url)) + '" target="_blank" rel="noopener">' + escape(t.intake.label) + '</a></div>' : '';
     return stepCard(2, 'Project title', t.state, body, cta);
   }
-  function setupMarkup(dto) {
-    const done = dto.setup.complete;
-    const header = '<h3 class="text-base font-semibold text-ink">Project Setup</h3><span class="' + (done ? STEP_BADGE.done : STEP_BADGE.waiting) + '">' + (done ? '&#10003; Complete' : 'Action needed') + '</span>';
-    const steps = '<div class="mt-3 flex flex-col gap-3">' + githubCard(dto) + titleCard(dto) + '</div>';
-    if (done) return '<details class="student-project-setup group ' + CARD + ' p-4"><summary class="flex cursor-pointer items-center gap-3 [&::-webkit-details-marker]:hidden">' + header + '<span class="setup-view text-sm text-primary group-open:hidden">View</span><span class="setup-hide hidden text-sm text-primary group-open:inline">Hide</span></summary>' + steps + '</details>';
-    return '<section class="student-project-setup ' + CARD + ' p-4" aria-label="Project Setup"><header class="flex items-center gap-3">' + header + '</header><div data-setup-pending>' + dto.setup.pendingSteps.map(text => p(escape(text))).join('') + '</div>' + steps + '</section>';
+  // GitHub status screen: what is still pending for setup, then the GitHub card. The Title screen is the title card alone.
+  function githubMarkup(project) {
+    const pending = project.setup.complete ? '' : '<div data-setup-pending>' + project.setup.pendingSteps.map(text => p(escape(text))).join('') + '</div>';
+    return pending + '<div class="mt-3">' + githubCard(project) + '</div>';
   }
-  const TABS = [['weeks', 'Weeks', 'calendar'], ['assessments', 'Assessments', 'clipboard-check'], ['project', 'Project', 'folder']];
+  function titleMarkup(project) { return '<div>' + titleCard(project) + '</div>'; }
+  const TABS = [['weeks', 'Weeks', 'calendar'], ['assessments', 'Assessments', 'clipboard-check'], ['github', 'GitHub status', 'git-branch'], ['title', 'Title confirmation', 'file-text']];
   // The screen links live in the shell sidebar (#studentSideNav, below the role separator); the view fills it.
   // Below md the links become a bottom bar (icon over label); from md up they are a sidebar group after the last menu item.
   const TAB = 'border-0 flex w-full flex-col items-center justify-center gap-1 border-t-2 border-t-transparent bg-transparent px-1 py-2 text-xs text-ink-2 hover:bg-tint aria-[current=page]:border-t-primary aria-[current=page]:font-semibold aria-[current=page]:text-primary md:flex-row md:justify-start md:gap-2 md:rounded-lg md:border-t-0 md:px-3 md:text-left md:text-sm md:aria-[current=page]:bg-tint';
   function navMarkup(active) {
-    return '<nav aria-label="Student sections" class="grid grid-cols-3 md:flex md:flex-col md:gap-1">' + TABS.map(t =>
+    return '<nav aria-label="Student sections" class="grid grid-cols-4 md:flex md:flex-col md:gap-1">' + TABS.map(t =>
       '<button type="button" class="' + TAB + '" id="studentTab-' + t[0] + '" aria-controls="studentPanel-' + t[0] + '"' + (t[0] === active ? ' aria-current="page"' : '') + ' data-student-tab="' + t[0] + '">' + icon(t[2]) + t[1] + '</button>').join('') + '</nav>';
   }
   function panelMarkup(key, active, body) {
@@ -111,44 +111,49 @@ function studentViewBrowser_(bridge, getUi) {
       a.reviews.map(r => '<section id="studentAssessment-' + escape(r.key) + '" data-review-result="' + escape(r.key) + '" data-assessment-label="' + escape(r.label) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading ' + r.label + ' results') + '</section>').join('') +
       '<section id="studentGuideEvaluation" data-assessment-label="' + escape(a.guideEvaluationLabel) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading guide evaluation') + '</section></div></section>';
   }
-  // The team heading and roster come with the core DTO; the setup cards (GitHub checks) load into the slot on demand.
-  function projectMarkup(dto, ui) {
-    return '<h2 class="text-xl font-semibold text-ink">Team <span class="text-primary">' + escape(dto.teamId) + '</span></h2>' + rosterMarkup(dto.roster) +
-      '<div class="mt-4" data-project-setup>' + ui.renderSkeleton('panel', 'Loading project setup') + '</div>';
+  // The team heading and roster come with the core DTO and stay above every screen.
+  function teamMarkup(dto) {
+    return '<header data-team-header class="mb-4"><h2 class="text-xl font-semibold text-ink">Team <span class="text-primary">' + escape(dto.teamId) + '</span></h2>' + rosterMarkup(dto.roster) + '</header>';
   }
-  /** Loads (or reloads) the Project cards. Content already shown stays on a failed refresh; Retry is offered. */
+  // The GitHub and Title screens share one fetch; each has a slot the project cards are drawn into.
+  function projectSlot(key, ui) { return '<div data-project-slot="' + key + '">' + ui.renderSkeleton('panel', 'Loading ' + (key === 'github' ? 'GitHub status' : 'title confirmation')) + '</div>'; }
+  /** Loads (or reloads) both project screens. Content already shown stays on a failed refresh; Retry is offered. */
   function loadProject(onLoaded, onError) {
-    const host = state.host, slot = host && host.querySelector('[data-project-setup]'), ui = getUi();
-    if (!slot) { if (onError) onError(new Error('The dashboard panel is unavailable. Reload the page.')); return; }
-    if (slot.projectBusy) { if (onError) onError(new Error('A dashboard refresh is already in progress. Please retry shortly.')); return; }
-    slot.projectBusy = true;
-    const finish = ui.beginContentLoading(slot, 'Loading project setup', {compact:true});
-    const current = () => slot.isConnected && state.host === host;
+    const host = state.host, slots = host ? Array.from(host.querySelectorAll('[data-project-slot]')) : [], ui = getUi();
+    if (!slots.length) { if (onError) onError(new Error('The dashboard panel is unavailable. Reload the page.')); return; }
+    if (state.projectBusy) { if (onError) onError(new Error('A dashboard refresh is already in progress. Please retry shortly.')); return; }
+    state.projectBusy = true; state.loaded.project = true;
+    const finishers = slots.map(slot => ui.beginContentLoading(slot, 'Loading project setup', {compact:true}));
+    const finish = () => { finishers.forEach(done => done()); state.projectBusy = false; };
+    const current = () => slots[0].isConnected && state.host === host;
     bridge.read('student-project', 'API_student_getProject', [], {timeoutMs:120000}).then(function(project) {
-      finish(); slot.projectBusy = false;
+      finish();
       if (!current()) return;
       state.project = project;
-      slot.innerHTML = setupMarkup(project);
+      slots.forEach(slot => { slot.innerHTML = slot.getAttribute('data-project-slot') === 'github' ? githubMarkup(project) : titleMarkup(project); });
       if (onLoaded) onLoaded();
     }, function(error) {
-      finish(); slot.projectBusy = false;
+      finish();
       if (error && error.superseded) return;
       if (!current()) return;
       if (onError) { onError(error); return; }
       const message = error && typeof error.message === 'string' && error.message.trim() ? error.message.trim() : 'The server did not provide error details';
       const notice = '<p data-project-error role="alert" class="m-0 mb-3 flex flex-wrap items-center gap-2 rounded-md border border-danger/20 bg-danger-tint px-3 py-2 text-sm text-danger">Could not load project setup: ' + escape(message) + ' <button type="button" class="' + BUTTON + '" data-action="project-retry">Retry</button></p>';
-      const old = slot.querySelector('[data-project-error]');
-      if (old) old.remove();
-      if (state.project) slot.insertAdjacentHTML('afterbegin', notice); else slot.innerHTML = notice;
+      slots.forEach(slot => {
+        const old = slot.querySelector('[data-project-error]');
+        if (old) old.remove();
+        if (state.project) slot.insertAdjacentHTML('afterbegin', notice); else slot.innerHTML = notice;
+      });
     });
   }
 
   function render(host, dto) {
-    state.host = host; state.dto = dto; state.loaded = {}; state.project = null;
-    if (!state.tab) state.tab = dto.titleApproved ? 'weeks' : 'project';
+    state.host = host; state.dto = dto; state.loaded = {}; state.project = null; state.projectBusy = false;
+    if (!state.tab) state.tab = dto.titleApproved ? 'weeks' : 'github';
     const ui = getUi();
-    host.innerHTML = '<div class="min-w-0">' +
-      panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) + panelMarkup('project', state.tab, projectMarkup(dto, ui)) + '</div>';
+    host.innerHTML = '<div class="min-w-0">' + teamMarkup(dto) +
+      panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) +
+      panelMarkup('github', state.tab, projectSlot('github', ui)) + panelMarkup('title', state.tab, projectSlot('title', ui)) + '</div>';
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); }
     const side = document.getElementById('studentSideNav');
     if (side) {
@@ -163,7 +168,7 @@ function studentViewBrowser_(bridge, getUi) {
     state.loaded[key] = true;
     if (key === 'weeks' && state.dto.titleApproved) ui.loadWeeklyProgress();
     else if (key === 'assessments') ui.loadStudentResults();
-    else if (key === 'project') loadProject();
+    else if ((key === 'github' || key === 'title') && !state.loaded.project) loadProject();
   }
   function showTab(key) {
     state.tab = key;
@@ -185,6 +190,7 @@ function studentViewBrowser_(bridge, getUi) {
     if (target.hasAttribute('data-github-form-jump')) ui.focusGithubAccountForm(target);
     else if (action === 'github-refresh') ui.refreshGithubStatus(target);
     else if (action === 'project-retry') loadProject();
+    else if (action === 'show-tab') showTab(target.getAttribute('data-tab'));
   }
   function onKeydown(event) {
     const tab = event.target.closest ? event.target.closest('[data-student-tab]') : null;

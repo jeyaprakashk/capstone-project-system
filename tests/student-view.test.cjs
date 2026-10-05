@@ -46,21 +46,43 @@ test('weekly progress appears only after title approval; the title action stays 
   assert.equal(norm(titleLink((await setup(dtoFor('revise'))).host)), 'Resubmit title');
 });
 
-test('setup is collapsed only when complete; incomplete setup lists what is pending', async () => {
+test('GitHub status and Title confirmation each show one step card; pending setup is listed on GitHub status only', async () => {
   for (const name of Object.keys(SCENARIOS)) {
-    const dto = dtoFor(name), f = (await setup(dto)), root = f.host.querySelector('.student-project-setup');
+    const dto = dtoFor(name), f = (await setup(dto));
+    const github = f.host.querySelector('[data-student-panel="github"]'), title = f.host.querySelector('[data-student-panel="title"]');
     const complete = dto.github.state === 'done' && dto.titleApproved;
-    assert.equal(root.tagName, complete ? 'DETAILS' : 'SECTION', name);
-    assert.equal(root.hasAttribute('open'), false, name);
-    assert.equal(root.querySelectorAll('[data-step-row]').length, 2, name);
+    assert.equal(github.querySelectorAll('[data-step-row]').length, 1, name);
+    assert.equal(title.querySelectorAll('[data-step-row]').length, 1, name);
+    assert.match(norm(github.querySelector('h4')), /GitHub setup/, name);
+    assert.match(norm(title.querySelector('h4')), /Project title/, name);
+    assert.equal(f.host.querySelector('details'), null, name);
     assert.equal(!!f.host.querySelector('#studentWeeklyProgress'), name === 'approved', name);
-    if (complete) assert.match(norm(root.querySelector('summary')), /✓ CompleteViewHide/);
-    else { assert(root.querySelector('[data-setup-pending]'), name); assert.match(norm(root), /Step 2:/); }
+    assert.equal(!!github.querySelector('[data-setup-pending]'), !complete, name);
+    assert.equal(title.querySelector('[data-setup-pending]'), null, name);
+    if (!complete) assert.match(norm(github), /Step 2:/, name);
     assert.equal(f.host.querySelectorAll('#studentGithubProfile').length, name === 'githubActive' ? 1 : 0, name);
+    assert.equal(title.querySelectorAll('#studentGithubProfile,[data-github-form]').length, 0, name);
   }
   const waiting = (await setup(dtoFor('githubWaiting')));
   assert.match(norm(waiting.host.querySelector('[data-setup-pending]')), /Step 1: Repository invitations must be accepted\./);
   assert.match(norm(waiting.host.querySelector('[data-setup-pending]')), /Finish GitHub setup first\./);
+});
+
+test('a locked title card offers a jump back to GitHub status', async () => {
+  const f = (await setup(dtoFor('githubWaiting'))), title = f.host.querySelector('[data-student-panel="title"]');
+  assert.match(norm(title), /Finish GitHub setup first\./);
+  f.click(title.querySelector('[data-action="show-tab"]'));
+  assert.deepEqual(Array.from(f.host.querySelectorAll('[data-student-panel]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel')), ['github']);
+  assert.equal(f.document.querySelector('#studentSideNav [aria-current="page"]').getAttribute('data-student-tab'), 'github');
+  const open = (await setup(dtoFor('needsReview'))).host.querySelector('[data-student-panel="title"]');
+  assert.equal(open.querySelector('[data-action="show-tab"]'), null);
+});
+
+test('the team heading and roster sit above every screen, once', async () => {
+  const f = (await setup(dtoFor('approved'))), header = f.host.querySelector('[data-team-header]');
+  assert(header); assert.equal(f.host.querySelectorAll('h2').length, 1);
+  assert.equal(header.closest('[data-student-panel]'), null);
+  assert.match(norm(header.querySelector('h2')), /^Team /);
 });
 
 test('an unregistered student sees only account connection', async () => {
@@ -166,19 +188,21 @@ test('the endpoint authorizes on the server and returns safe errors', async () =
   assert.equal(failure.error.code, 'INTERNAL'); assert.doesNotMatch(failure.error.message, /column/);
 });
 
-test('the student screens are sidebar links: Weeks, Assessments and Project, with the first needed screen open', async () => {
+test('the student screens are sidebar links: Weeks, Assessments, GitHub status and Title confirmation, with the first needed screen open', async () => {
   const names = f => Array.from(f.document.querySelectorAll('#studentSideNav [data-student-tab]')).map(t => norm(t));
   const approved = (await setup(dtoFor('approved'))), setupFirst = (await setup(dtoFor('notSubmitted')));
-  assert.deepEqual(names(approved), ['Weeks', 'Assessments', 'Project']);
+  assert.deepEqual(names(approved), ['Weeks', 'Assessments', 'GitHub status', 'Title confirmation']);
   const open = host => Array.from(host.querySelectorAll('[data-student-panel]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel'));
   assert.deepEqual(open(approved.host), ['weeks']);
-  assert.deepEqual(open(setupFirst.host), ['project']);
+  assert.deepEqual(open(setupFirst.host), ['github']);
   assert.equal(approved.document.querySelector('#studentSideNav [aria-current="page"]').getAttribute('data-student-tab'), 'weeks');
   for (const tab of approved.document.querySelectorAll('#studentSideNav [data-student-tab]')) assert.equal(approved.host.querySelector('#' + tab.getAttribute('aria-controls')).getAttribute('aria-labelledby'), tab.id);
   assert(approved.host.querySelector('[data-student-panel="weeks"] #studentWeeklyProgress'));
   assert(approved.host.querySelector('[data-student-panel="assessments"] [data-review-result]'));
-  assert(approved.host.querySelector('[data-student-panel="project"] [data-step-card]'));
+  assert(approved.host.querySelector('[data-student-panel="github"] [data-step-card]'));
+  assert(approved.host.querySelector('[data-student-panel="title"] [data-step-card]'));
   assert.equal(approved.host.querySelector('[data-student-panel="weeks"] [data-step-card]'), null);
+  assert.equal(approved.host.querySelector('[data-student-panel="project"]'), null);
   assert.equal(approved.host.querySelector('[role="tab"]'), null);
 });
 
@@ -186,17 +210,21 @@ test('selecting a link shows its panel, supports arrow keys and survives a re-re
   const f = (await setup(dtoFor('approved')));
   const tab = key => f.document.querySelector('#studentSideNav [data-student-tab="' + key + '"]');
   const open = () => Array.from(f.host.querySelectorAll('[data-student-panel]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel'));
-  f.click(tab('project'));
-  assert.deepEqual(open(), ['project']);
-  assert.equal(tab('project').getAttribute('aria-current'), 'page'); assert.equal(tab('weeks').hasAttribute('aria-current'), false);
+  f.click(tab('title'));
+  assert.deepEqual(open(), ['title']);
+  assert.equal(tab('title').getAttribute('aria-current'), 'page'); assert.equal(tab('weeks').hasAttribute('aria-current'), false);
   const key = (el, name) => { const e = new f.window.Event('keydown', { bubbles: true, cancelable: true }); e.key = name; el.dispatchEvent(e); };
-  key(tab('project'), 'ArrowDown');
+  key(tab('title'), 'ArrowUp');
+  assert.deepEqual(open(), ['github']);
+  key(tab('github'), 'ArrowDown');
+  assert.deepEqual(open(), ['title']);
+  key(tab('title'), 'ArrowDown');
   assert.deepEqual(open(), ['weeks']);
   key(tab('weeks'), 'End');
-  assert.deepEqual(open(), ['project']);
+  assert.deepEqual(open(), ['title']);
   f.view.render(f.host, dtoFor('approved'));
-  assert.deepEqual(open(), ['project']);
-  assert.equal(f.document.querySelectorAll('#studentSideNav [data-student-tab]').length, 3);
+  assert.deepEqual(open(), ['title']);
+  assert.equal(f.document.querySelectorAll('#studentSideNav [data-student-tab]').length, 4);
 });
 
 test('the sidebar links use only utilities', async () => {
@@ -206,15 +234,24 @@ test('the sidebar links use only utilities', async () => {
   assert.deepEqual(missingClasses(renderedClasses(nav).filter(c => !c.startsWith('lucide'))), []);
 });
 
+test('the GitHub and Title screens render only utilities', async () => {
+  const f = (await setup(dtoFor('githubWaiting'))), panels = f.host.querySelectorAll('[data-student-panel="github"],[data-student-panel="title"],[data-team-header]');
+  const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
+  for (const panel of panels) assert.deepEqual(missingClasses(renderedClasses(panel).filter(c => !c.startsWith('lucide'))), []);
+});
+
 test('each screen loads its own data the first time it is shown, and only once per render', async () => {
-  const f = (await setup(dtoFor('approved'))), tab = key => f.document.querySelector('#studentSideNav [data-student-tab="' + key + '"]');
+  const f = (await setup(dtoFor('approved'), { project: false })), tab = key => f.document.querySelector('#studentSideNav [data-student-tab="' + key + '"]');
+  let projectCalls = 0; const read = f.bridge.read; f.bridge.read = (...args) => { if (args[1] === 'API_student_getProject') projectCalls++; return read.apply(f.bridge, args); };
   assert.deepEqual([f.calls.weekly, f.calls.results], [0, 0]);
   f.view.activate(); f.view.activate();
   assert.deepEqual([f.calls.weekly, f.calls.results], [1, 0]);
   f.click(tab('assessments')); f.click(tab('weeks')); f.click(tab('assessments'));
   assert.deepEqual([f.calls.weekly, f.calls.results], [1, 1]);
-  f.click(tab('project'));
+  assert.equal(projectCalls, 0);
+  f.click(tab('github')); f.click(tab('title')); f.click(tab('github'));
   assert.deepEqual([f.calls.weekly, f.calls.results], [1, 1]);
+  assert.equal(projectCalls, 1);
   f.view.render(f.host, dtoFor('approved'));
   f.view.activate(); f.click(tab('weeks'));
   assert.deepEqual([f.calls.weekly, f.calls.results], [2, 1]);
@@ -228,24 +265,33 @@ test('a student whose title is not approved loads no weekly or assessment data u
   assert.deepEqual([f.calls.weekly, f.calls.results], [0, 1]);
 });
 
-test('the Project cards load on demand into their slot, keep content on a failed refresh and offer Retry', async () => {
-  const f = await setup(dtoFor('githubWaiting'), { project: false }), slot = () => f.host.querySelector('[data-project-setup]');
-  assert(slot().querySelector('[data-skeleton]'));
+test('one project load fills both screens, keeps content on a failed refresh and offers Retry on each', async () => {
+  const f = await setup(dtoFor('githubWaiting'), { project: false }), slot = key => f.host.querySelector('[data-project-slot="' + key + '"]');
+  assert(slot('github').querySelector('[data-skeleton]')); assert(slot('title').querySelector('[data-skeleton]'));
   assert.equal(f.host.querySelector('[data-step-card]'), null);
-  assert.equal(f.host.querySelectorAll('[data-student-panel="project"] h2').length, 1);
-  f.ctl.fail = true; f.view.state.tab = 'project'; f.view.activate(); await new Promise(r => setTimeout(r, 20));
-  assert.match(norm(slot().querySelector('[data-project-error]')), /Project setup is unavailable./);
+  f.ctl.fail = true; f.view.state.tab = 'github'; f.view.activate(); await new Promise(r => setTimeout(r, 20));
+  for (const key of ['github', 'title']) assert.match(norm(slot(key).querySelector('[data-project-error]')), /Project setup is unavailable./);
   assert.equal(f.host.querySelector('[data-step-card]'), null);
-  f.ctl.fail = false; f.click(slot().querySelector('[data-action="project-retry"]')); await new Promise(r => setTimeout(r, 20));
-  assert(f.host.querySelector('[data-step-card]')); assert.equal(slot().querySelector('[data-project-error]'), null);
+  f.ctl.fail = false; f.click(slot('title').querySelector('[data-action="project-retry"]')); await new Promise(r => setTimeout(r, 20));
+  assert(slot('github').querySelector('[data-step-card]')); assert(slot('title').querySelector('[data-step-card]'));
+  for (const key of ['github', 'title']) assert.equal(slot(key).querySelector('[data-project-error]'), null);
   f.ctl.fail = true; await new Promise(resolve => f.view.reloadProject(resolve, resolve));
-  assert(f.host.querySelector('[data-step-card]'));
+  assert(slot('github').querySelector('[data-step-card]')); assert(slot('title').querySelector('[data-step-card]'));
 });
 
-test('GitHub refresh reloads only the Project cards and reports back through the callbacks', async () => {
+test('GitHub refresh reloads both project screens and reports back through the callbacks', async () => {
   const f = await setup(dtoFor('githubWaiting'));
   let loaded = 0; await new Promise(resolve => f.view.reloadProject(() => { loaded++; resolve(); }));
   assert.equal(loaded, 1); assert.deepEqual([f.calls.weekly, f.calls.results], [0, 0]);
   f.ctl.fail = true; const error = await new Promise(resolve => f.view.reloadProject(() => resolve(null), resolve));
   assert.match(error.message, /Project setup is unavailable/);
+});
+
+test('a second refresh while one is running is refused, and the busy state clears afterwards', async () => {
+  const f = await setup(dtoFor('githubWaiting'), { project: false });
+  const first = new Promise(resolve => f.view.reloadProject(resolve));
+  const refused = await new Promise(resolve => f.view.reloadProject(() => resolve(null), resolve));
+  assert.match(refused.message, /already in progress/);
+  await first;
+  assert.equal(await new Promise(resolve => f.view.reloadProject(() => resolve('ok'), resolve)), 'ok');
 });
