@@ -135,7 +135,7 @@ function buildDashboardShell_(email, views) {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
 ${HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent()}
 </head>
-<body class="min-h-screen bg-canvas md:pl-60${topBar ? ' max-md:pt-14' : ''}">
+<body class="min-h-screen bg-canvas md:pl-60 ${topBar ? 'max-md:pt-14' : ''}">
 <header class="border-b border-edge bg-paper px-4 py-3${topBar ? ' max-md:border-b-0 max-md:p-0' : ''} md:fixed md:inset-y-0 md:left-0 md:w-60 md:overflow-y-auto md:border-b-0 md:border-r">
 <h1 class="m-0 mb-3 text-base font-semibold text-ink${topBar ? ' max-md:sr-only' : ''}">Dashboard</h1>
 <nav class="${navClass}" id="dashboardNavigation" aria-label="Dashboard sections">
