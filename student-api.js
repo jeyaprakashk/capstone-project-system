@@ -87,7 +87,7 @@ function API_student_getCore() {
   }));
 }
 
-/** GitHub status and Title confirmation screens: setup state with the GitHub checks (the slow part). Authorized on its own like every endpoint. */
+/** Title and GitHub screens: setup state with the GitHub checks (the slow part). Authorized on its own like every endpoint. */
 function API_student_getProject() {
   return apiHandle_(() => withDashboardRead_(() => {
     const student = studentAccessOrThrow_();

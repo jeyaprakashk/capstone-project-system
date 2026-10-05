@@ -46,7 +46,7 @@ test('weekly progress appears only after title approval; the title action stays 
   assert.equal(norm(titleLink((await setup(dtoFor('revise'))).host)), 'Resubmit title');
 });
 
-test('GitHub status and Title confirmation each show one step card; pending setup is listed on GitHub status only', async () => {
+test('Title and GitHub each show one step card; pending setup is listed on GitHub only', async () => {
   for (const name of Object.keys(SCENARIOS)) {
     const dto = dtoFor(name), f = (await setup(dto));
     const github = f.host.querySelector('[data-student-panel="github"]'), title = f.host.querySelector('[data-student-panel="title"]');
@@ -68,7 +68,7 @@ test('GitHub status and Title confirmation each show one step card; pending setu
   assert.match(norm(waiting.host.querySelector('[data-setup-pending]')), /Finish GitHub setup first\./);
 });
 
-test('a locked title card offers a jump back to GitHub status', async () => {
+test('a locked title card offers a jump back to GitHub', async () => {
   const f = (await setup(dtoFor('githubWaiting'))), title = f.host.querySelector('[data-student-panel="title"]');
   assert.match(norm(title), /Finish GitHub setup first\./);
   f.click(title.querySelector('[data-action="show-tab"]'));
@@ -78,15 +78,17 @@ test('a locked title card offers a jump back to GitHub status', async () => {
   assert.equal(open.querySelector('[data-action="show-tab"]'), null);
 });
 
-test('the team heading and roster sit above every screen, once', async () => {
-  const f = (await setup(dtoFor('approved'))), header = f.host.querySelector('[data-team-header]');
-  assert(header); assert.equal(f.host.querySelectorAll('h2').length, 1);
-  assert.equal(header.closest('[data-student-panel]'), null);
-  assert.match(norm(header.querySelector('h2')), /^Team /);
+test('the team heading and roster live only on the Team screen, which needs no fetch', async () => {
+  const f = (await setup(dtoFor('approved'), { project: false })), team = f.host.querySelector('[data-student-panel="team"]');
+  assert.equal(f.host.querySelectorAll('h2').length, 1);
+  assert.match(norm(team.querySelector('h2')), /^Team /);
+  assert.equal(team.querySelectorAll('[data-github-form-jump],[data-step-card]').length, 0);
+  assert(norm(team).includes(dtoFor('approved').roster[0].regno));
+  for (const key of ['weeks', 'assessments', 'title', 'github']) assert.equal(f.host.querySelector('[data-student-panel="' + key + '"] h2'), null, key);
 });
 
 test('an unregistered student sees only account connection', async () => {
-  const f = (await setup(dtoFor('githubActive'))), card = f.host.querySelector('[data-step-row]');
+  const f = (await setup(dtoFor('githubActive'))), card = f.host.querySelector('[data-student-panel="github"] [data-step-row]');
   assert.match(norm(card), /Waiting for GitHub account connection/);
   assert.doesNotMatch(norm(card), /Retry GitHub setup|valid username|could not verify/i);
   assert.equal(norm(card.querySelector('button[type="submit"]')), 'Continue');
@@ -107,7 +109,7 @@ test('an unregistered student sees only account connection', async () => {
 test('GitHub rows show each teammate with an icon; only the student can jump to the form', async () => {
   const dto = dtoFor('githubWaiting'); dto.github.connected = false;
   dto.github.members = [{ regno: 'R1', status: 'pending', canConnect: false }, { regno: 'R2', status: 'joined', canConnect: false }, { regno: 'R3', status: 'missing', canConnect: true }, { regno: 'R4', status: 'missing', canConnect: false }];
-  const f = (await setup(dto)), card = f.host.querySelector('[data-step-row]');
+  const f = (await setup(dto)), card = f.host.querySelector('[data-student-panel="github"] [data-step-row]');
   assert.equal(card.querySelector('table'), null);
   assert.deepEqual(Array.from(card.querySelectorAll('[data-member-status]')).map(r => [norm(r.querySelector('[data-member-register]')), norm(r.querySelector('[data-member-state]'))]),
     [['R1', 'Accept Invitation Email'], ['R2', 'Repository joined'], ['R3', 'Submit GitHub Account'], ['R4', 'Submit GitHub Account']]);
@@ -121,11 +123,11 @@ test('GitHub rows show each teammate with an icon; only the student can jump to 
   assert.equal((norm(card).match(/GitHub setup due/g) || []).length, 1);
   assert.equal(card.querySelector('.break-all').getAttribute('href'), 'https://github.com/org/team');
   const noRepo = dtoFor('githubWaiting'); noRepo.github.repoUrl = '';
-  assert.match(norm((await setup(noRepo)).host.querySelector('[data-step-body]')), /Not available yet/);
+  assert.match(norm((await setup(noRepo)).host.querySelector('[data-student-panel="github"] [data-step-body]')), /Not available yet/);
 });
 
 test('connected students have no secondary actions on the GitHub card', async () => {
-  const dto = dtoFor('githubWaiting'), card = (await setup(dto)).host.querySelector('[data-step-row]');
+  const dto = dtoFor('githubWaiting'), card = (await setup(dto)).host.querySelector('[data-student-panel="github"] [data-step-row]');
   assert.equal(card.querySelectorAll('form,input,[data-github-confirmation],#githubSubmitStatus').length, 0);
   assert.equal(card.querySelectorAll('[data-github-form-jump]').length, 0);
   assert.deepEqual(Array.from(card.querySelector('[data-step-card]').children).map(n => n.hasAttribute('data-step-header') ? 'header' : n.hasAttribute('data-step-body') ? 'body' : n.tagName), ['header', 'body']);
@@ -188,10 +190,10 @@ test('the endpoint authorizes on the server and returns safe errors', async () =
   assert.equal(failure.error.code, 'INTERNAL'); assert.doesNotMatch(failure.error.message, /column/);
 });
 
-test('the student screens are sidebar links: Weeks, Assessments, GitHub status and Title confirmation, with the first needed screen open', async () => {
+test('the student screens are sidebar links: Weeks, Assessments, Title, GitHub and Team, with the first needed screen open', async () => {
   const names = f => Array.from(f.document.querySelectorAll('#studentSideNav [data-student-tab]')).map(t => norm(t));
   const approved = (await setup(dtoFor('approved'))), setupFirst = (await setup(dtoFor('notSubmitted')));
-  assert.deepEqual(names(approved), ['Weeks', 'Assessments', 'GitHub status', 'Title confirmation']);
+  assert.deepEqual(names(approved), ['Weeks', 'Assessments', 'Title', 'GitHub', 'Team']);
   const open = host => Array.from(host.querySelectorAll('[data-student-panel]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel'));
   assert.deepEqual(open(approved.host), ['weeks']);
   assert.deepEqual(open(setupFirst.host), ['github']);
@@ -214,17 +216,19 @@ test('selecting a link shows its panel, supports arrow keys and survives a re-re
   assert.deepEqual(open(), ['title']);
   assert.equal(tab('title').getAttribute('aria-current'), 'page'); assert.equal(tab('weeks').hasAttribute('aria-current'), false);
   const key = (el, name) => { const e = new f.window.Event('keydown', { bubbles: true, cancelable: true }); e.key = name; el.dispatchEvent(e); };
-  key(tab('title'), 'ArrowUp');
+  key(tab('title'), 'ArrowDown');
   assert.deepEqual(open(), ['github']);
   key(tab('github'), 'ArrowDown');
-  assert.deepEqual(open(), ['title']);
-  key(tab('title'), 'ArrowDown');
+  assert.deepEqual(open(), ['team']);
+  key(tab('team'), 'ArrowDown');
   assert.deepEqual(open(), ['weeks']);
   key(tab('weeks'), 'End');
-  assert.deepEqual(open(), ['title']);
+  assert.deepEqual(open(), ['team']);
+  key(tab('team'), 'ArrowUp');
+  assert.deepEqual(open(), ['github']);
   f.view.render(f.host, dtoFor('approved'));
-  assert.deepEqual(open(), ['title']);
-  assert.equal(f.document.querySelectorAll('#studentSideNav [data-student-tab]').length, 4);
+  assert.deepEqual(open(), ['github']);
+  assert.equal(f.document.querySelectorAll('#studentSideNav [data-student-tab]').length, 5);
 });
 
 test('the sidebar links use only utilities', async () => {
@@ -234,8 +238,8 @@ test('the sidebar links use only utilities', async () => {
   assert.deepEqual(missingClasses(renderedClasses(nav).filter(c => !c.startsWith('lucide'))), []);
 });
 
-test('the GitHub and Title screens render only utilities', async () => {
-  const f = (await setup(dtoFor('githubWaiting'))), panels = f.host.querySelectorAll('[data-student-panel="github"],[data-student-panel="title"],[data-team-header]');
+test('the Title, GitHub and Team screens render only utilities', async () => {
+  const f = (await setup(dtoFor('githubWaiting'))), panels = f.host.querySelectorAll('[data-student-panel="github"],[data-student-panel="title"],[data-student-panel="team"]');
   const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
   for (const panel of panels) assert.deepEqual(missingClasses(renderedClasses(panel).filter(c => !c.startsWith('lucide'))), []);
 });
@@ -249,7 +253,7 @@ test('each screen loads its own data the first time it is shown, and only once p
   f.click(tab('assessments')); f.click(tab('weeks')); f.click(tab('assessments'));
   assert.deepEqual([f.calls.weekly, f.calls.results], [1, 1]);
   assert.equal(projectCalls, 0);
-  f.click(tab('github')); f.click(tab('title')); f.click(tab('github'));
+  f.click(tab('github')); f.click(tab('title')); f.click(tab('team')); f.click(tab('github'));
   assert.deepEqual([f.calls.weekly, f.calls.results], [1, 1]);
   assert.equal(projectCalls, 1);
   f.view.render(f.host, dtoFor('approved'));
