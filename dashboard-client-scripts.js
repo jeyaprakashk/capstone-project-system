@@ -614,6 +614,8 @@ const DashboardUI = (function() {
     syncRubricsDisclosure();
     const studentNav = byId('studentSideNav');
     if (studentNav) studentNav.hidden = activeKey !== 'student';
+    const main = byId('dashboardMain');
+    if (main) main.dataset.role = activeKey;
     tabSelectedAt = performance.now();
     recordPerformance({event:'tab_selected', role:activeKey, cached:!!loadedRoleTabs[activeKey], prefetched:!!preloadedRoles[activeKey]});
     if (!roleQueue) roleQueue = Array.from(document.querySelectorAll('[data-role-content]')).map(function(el) { return el.getAttribute('data-role-content'); });
