@@ -30,10 +30,10 @@ const norm = n => n.textContent.replace(/\s+/g, ' ').trim();
 test('weekly progress appears only after title approval; the title action stays available', () => {
   const pending = setup(dtoFor('awaitingReviewer')), approved = setup(dtoFor('approved'));
   assert.equal(pending.host.querySelector('#studentWeeklyProgress'), null);
-  assert.match(norm(pending.host.querySelector('#studentRecentActivity')), /Weekly logs will appear after project setup\./);
-  assert.equal(pending.host.querySelector('a[href="#studentWeeklyProgress"]'), null);
-  for (const hook of ['[data-weekly-read]', '[data-weekly-status]', '[data-weekly-form]', '[data-weekly-refresh]']) assert(approved.host.querySelector('#studentWeeklyProgress ' + hook), hook);
-  assert(approved.host.querySelector('a[href="#studentWeeklyProgress"]'));
+  assert.match(norm(pending.host.querySelector('[data-weekly-locked]')), /Weekly logs will appear after project setup\./);
+  assert.equal(approved.host.querySelector('[data-weekly-locked]'), null);
+  for (const hook of ['[data-weekly-read]', '[data-weekly-status]', '[data-weekly-form]', '[data-weekly-detail]']) assert(approved.host.querySelector('#studentWeeklyProgress ' + hook), hook);
+  assert.equal(approved.host.querySelector('#studentRecentActivity'), null);
   const needsTitle = setup(dtoFor('notSubmitted'));
   const titleLink = host => Array.from(host.querySelectorAll('[data-step-card] a[target="_blank"]')).find(a => /title/i.test(norm(a)));
   const action = titleLink(needsTitle.host);
@@ -117,8 +117,6 @@ test('the weekly panel does not depend on teammate setup and keeps repository an
 
 test('delegated actions reach the dashboard modules without inline handlers', () => {
   const f = setup(dtoFor('approved'));
-  f.click(f.host.querySelector('[data-action="weekly-refresh"]')); assert.equal(f.calls.weekly, 1);
-  const link = f.host.querySelector('[data-action="open-logs"]'); f.click(link); assert.deepEqual(f.calls.logs, [link]);
   const g = setup(dtoFor('githubActive'));
   g.click(g.host.querySelector('[data-action="github-refresh"]')); assert.equal(g.calls.refresh, 1);
   const form = g.host.querySelector('[data-github-form]'); const submit = new g.window.Event('submit', { bubbles: true, cancelable: true }); form.dispatchEvent(submit);
@@ -162,4 +160,42 @@ test('the endpoint authorizes on the server and returns safe errors', () => {
   broken.c.getStudentDashboardData_ = () => { throw new TypeError('column 9 undefined'); };
   const failure = JSON.parse(broken.c.API_student_getDashboard());
   assert.equal(failure.error.code, 'INTERNAL'); assert.doesNotMatch(failure.error.message, /column/);
+});
+
+test('the student screens are tabs: Weeks, Assessments and Project, with the first needed screen open', () => {
+  const names = host => Array.from(host.querySelectorAll('[role="tab"]')).map(t => norm(t));
+  const approved = setup(dtoFor('approved')), setupFirst = setup(dtoFor('notSubmitted'));
+  assert.deepEqual(names(approved.host), ['Weeks', 'Assessments', 'Project']);
+  const open = host => Array.from(host.querySelectorAll('[role="tabpanel"]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel'));
+  assert.deepEqual(open(approved.host), ['weeks']);
+  assert.deepEqual(open(setupFirst.host), ['project']);
+  for (const tab of approved.host.querySelectorAll('[role="tab"]')) assert.equal(approved.host.querySelector('#' + tab.getAttribute('aria-controls')).getAttribute('aria-labelledby'), tab.id);
+  assert(approved.host.querySelector('[data-student-panel="weeks"] #studentWeeklyProgress'));
+  assert(approved.host.querySelector('[data-student-panel="assessments"] [data-review-result]'));
+  assert(approved.host.querySelector('[data-student-panel="project"] [data-step-card]'));
+  assert.equal(approved.host.querySelector('[data-student-panel="weeks"] [data-step-card]'), null);
+});
+
+test('selecting a tab shows its panel, supports arrow keys and survives a re-render', () => {
+  const f = setup(dtoFor('approved'));
+  const tab = key => f.host.querySelector('[data-student-tab="' + key + '"]');
+  const open = () => Array.from(f.host.querySelectorAll('[role="tabpanel"]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel'));
+  f.click(tab('project'));
+  assert.deepEqual(open(), ['project']);
+  assert.equal(tab('project').getAttribute('aria-selected'), 'true'); assert.equal(tab('weeks').getAttribute('aria-selected'), 'false');
+  assert.equal(tab('project').getAttribute('tabindex'), '0'); assert.equal(tab('weeks').getAttribute('tabindex'), '-1');
+  const key = (el, name) => { const e = new f.window.Event('keydown', { bubbles: true, cancelable: true }); e.key = name; el.dispatchEvent(e); };
+  key(tab('project'), 'ArrowRight');
+  assert.deepEqual(open(), ['weeks']);
+  key(tab('weeks'), 'End');
+  assert.deepEqual(open(), ['project']);
+  f.view.render(f.host, dtoFor('approved'));
+  assert.deepEqual(open(), ['project']);
+});
+
+test('the navigation is a sidebar on wide screens and a bottom bar on small ones, using only utilities', () => {
+  const nav = setup(dtoFor('approved')).host.querySelector('nav[aria-label="Student sections"]');
+  const classes = nav.getAttribute('class').split(/\s+/);
+  for (const name of ['fixed', 'bottom-0', 'xl:sticky']) assert(classes.includes(name), name);
+  assert.equal(nav.querySelectorAll('[style]').length, 0);
 });

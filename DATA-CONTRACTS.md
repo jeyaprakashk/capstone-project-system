@@ -148,8 +148,8 @@ confirmation, naming the parent folder, before the write. Contract tests: `tests
   assessments:{ reviews:[{key,label}], guideEvaluationLabel } }
 ```
 
-Weekly progress, recent logs, assessment results and the GitHub account connection are separate modules that attach to
-placeholders in the view (`#studentWeeklyProgress`, `#studentRecentActivity`, `#studentAssessment-<key>`,
+The view lays the DTO out as three screens (Weeks, Assessments, Project) behind a sidebar that becomes a bottom bar on small viewports; the DTO is unchanged. Weekly progress (status card, week list, week detail), assessment results and the GitHub account connection are separate modules that attach to
+placeholders in the view (`#studentWeeklyProgress`, `#studentAssessment-<key>`,
 `#studentGuideEvaluation`, `#studentGithubProfile`); the GitHub connection uses the endpoints above through the bridge.
 Contract tests: `tests/student-migration.test.cjs` (snapshot `tests/invariants/snapshots/student-legacy-facts.json`,
 captured from the removed HTML for eight states).

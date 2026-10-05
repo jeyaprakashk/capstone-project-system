@@ -1,18 +1,19 @@
 /**
  * STUDENT VIEW — browser module serialized into the dashboard shell as `StudentView`.
- * Renders the student DTO (DATA-CONTRACTS.md) with Tailwind utilities. It keeps the DOM hooks the
- * weekly-progress, recent-logs, assessment and GitHub-connection modules attach to
- * (#studentWeeklyProgress, #studentRecentActivity, #studentAssessment-*, #studentGuideEvaluation,
+ * Renders the student DTO (DATA-CONTRACTS.md) with Tailwind utilities as three screens (Weeks,
+ * Assessments, Project) behind a sidebar that becomes a bottom bar on small viewports. It keeps the DOM
+ * hooks the weekly-progress, assessment and GitHub-connection modules attach to
+ * (#studentWeeklyProgress, #studentAssessment-*, #studentGuideEvaluation,
  * [data-step-card], #studentGithubProfile, #githubSubmitStatus, #githubStatusRefresh).
  * It never calls google.script.run; account-connection actions stay in DashboardUI.
  */
 function studentViewBrowser_(bridge, getUi) {
   'use strict';
   const delegated = new WeakSet();
-  const state = {dto:null, host:null};
+  const state = {dto:null, host:null, tab:null};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
-  const icon = (name, label) => getUi().renderIcon(name, label);
+  const icon = (name, label, className) => getUi().renderIcon(name, label, className);
 
   const CARD = 'rounded-card border border-edge bg-paper shadow-card';
   const BADGE = 'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ';
@@ -85,37 +86,66 @@ function studentViewBrowser_(bridge, getUi) {
     if (done) return '<details class="student-project-setup group ' + CARD + ' p-4"><summary class="flex cursor-pointer items-center gap-3 [&::-webkit-details-marker]:hidden">' + header + '<span class="setup-view text-sm text-primary group-open:hidden">View</span><span class="setup-hide hidden text-sm text-primary group-open:inline">Hide</span></summary>' + steps + '</details>';
     return '<section class="student-project-setup ' + CARD + ' p-4" aria-label="Project Setup"><header class="flex items-center gap-3">' + header + '</header><div data-setup-pending>' + dto.setup.pendingSteps.map(text => p(escape(text))).join('') + '</div>' + steps + '</section>';
   }
-  function weeklyMarkup(ui) {
-    return '<section class="mt-4 ' + CARD + ' p-4"><section id="studentWeeklyProgress" aria-label="Weekly progress"><div class="flex items-center justify-between gap-2"><h3 class="text-base font-semibold text-ink">Weekly progress</h3>' +
-      '<button type="button" class="' + BUTTON + '" data-weekly-refresh aria-label="Refresh weekly progress" data-action="weekly-refresh">Refresh</button></div>' +
-      '<div data-weekly-read class="empty:hidden">' + ui.renderSkeleton('panel', 'Loading weekly progress') + '</div><p data-weekly-status role="status" aria-live="polite" class="text-sm text-ink-2 empty:hidden"></p><div data-weekly-form></div></section></section>';
+  const TABS = [['weeks', 'Weeks', 'calendar'], ['assessments', 'Assessments', 'clipboard-check'], ['project', 'Project', 'folder']];
+  const TAB = 'border-0 flex flex-col items-center justify-center gap-1 bg-transparent px-2 text-xs font-semibold text-muted hover:text-ink aria-selected:text-primary aria-selected:shadow-[inset_0_2px_0_0_var(--color-primary)] xl:flex-row xl:justify-start xl:gap-3 xl:rounded-lg xl:px-3 xl:py-2.5 xl:text-sm xl:text-ink-2 xl:hover:bg-tint xl:aria-selected:bg-tint xl:aria-selected:shadow-none';
+  function navMarkup(active) {
+    return '<nav aria-label="Student sections" class="fixed inset-x-0 bottom-0 z-10 border-t border-edge bg-paper md:left-60 xl:sticky xl:top-4 xl:z-auto xl:border-0 xl:bg-transparent">' +
+      '<div role="tablist" aria-label="Student sections" class="grid h-16 grid-cols-3 xl:flex xl:h-auto xl:flex-col xl:gap-1">' + TABS.map(t =>
+        '<button type="button" role="tab" class="' + TAB + '" id="studentTab-' + t[0] + '" aria-controls="studentPanel-' + t[0] + '" aria-selected="' + (t[0] === active) + '" tabindex="' + (t[0] === active ? 0 : -1) + '" data-student-tab="' + t[0] + '">' + icon(t[2], null, 'size-5 xl:size-4') + t[1] + '</button>').join('') + '</div></nav>';
   }
-  function sideMarkup(dto, ui) {
+  function panelMarkup(key, active, body) {
+    return '<section role="tabpanel" id="studentPanel-' + key + '" aria-labelledby="studentTab-' + key + '" data-student-panel="' + key + '" class="min-w-0"' + (key === active ? '' : ' hidden') + '>' + body + '</section>';
+  }
+  function weeklyMarkup(dto, ui) {
+    if (!dto.titleApproved) return '<section data-weekly-locked class="' + CARD + ' p-5" aria-label="Weekly progress"><h3 class="text-base font-semibold text-ink">Weekly progress</h3>' + p('Weekly logs will appear after project setup.', 'text-muted') + '</section>';
+    return '<section id="studentWeeklyProgress" aria-label="Weekly progress" data-weekly-view="list" class="group/weekly">' +
+      '<p data-weekly-status role="status" aria-live="polite" class="sticky top-2 z-10 mb-3 rounded-md bg-paper px-3 py-2 text-sm text-ink-2 shadow-card ring-1 ring-inset ring-line empty:hidden"></p>' +
+      '<div class="grid gap-4 xl:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] xl:items-start">' +
+      '<div data-weekly-read class="min-w-0 empty:hidden group-data-[weekly-view=detail]/weekly:max-xl:hidden">' + ui.renderSkeleton('panel', 'Loading weekly progress') + '</div>' +
+      '<article data-weekly-detail hidden class="min-w-0 rounded-card border border-edge bg-paper p-5 shadow-card group-data-[weekly-view=list]/weekly:max-xl:hidden"><div data-weekly-form></div></article></div></section>';
+  }
+  function assessmentsMarkup(dto, ui) {
     const a = dto.assessments;
-    return '<div class="mt-4 grid gap-4 lg:grid-cols-2"><section class="' + CARD + ' p-4" aria-label="Recent logs"><header class="flex items-center justify-between gap-2"><h3 class="text-base font-semibold text-ink">Recent logs</h3>' +
-      (dto.titleApproved ? '<a class="text-sm text-primary underline" href="#studentWeeklyProgress" data-action="open-logs">View all logs</a>' : '') + '</header>' +
-      '<div id="studentRecentActivity" class="mt-2">' + (dto.titleApproved ? ui.renderSkeleton('panel', 'Loading recent logs') : '<p class="text-sm text-muted">Weekly logs will appear after project setup.</p>') + '</div></section>' +
-      '<section class="' + CARD + ' p-4" aria-label="Assessments"><header><h3 class="text-base font-semibold text-ink">Assessments</h3></header><div class="mt-2 flex flex-col gap-3">' +
+    return '<section class="' + CARD + ' p-5" aria-label="Assessments"><header><h3 class="text-base font-semibold text-ink">Assessments</h3></header><div class="mt-3 flex flex-col gap-3">' +
       a.reviews.map(r => '<section id="studentAssessment-' + escape(r.key) + '" data-review-result="' + escape(r.key) + '" data-assessment-label="' + escape(r.label) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading ' + r.label + ' results') + '</section>').join('') +
-      '<section id="studentGuideEvaluation" data-assessment-label="' + escape(a.guideEvaluationLabel) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading guide evaluation') + '</section></div></section></div>';
+      '<section id="studentGuideEvaluation" data-assessment-label="' + escape(a.guideEvaluationLabel) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading guide evaluation') + '</section></div></section>';
+  }
+  function projectMarkup(dto) {
+    return '<h2 class="text-xl font-semibold text-ink">Team <span class="text-primary">' + escape(dto.teamId) + '</span></h2>' + rosterMarkup(dto.roster) + '<div class="mt-4">' + setupMarkup(dto) + '</div>';
   }
 
   function render(host, dto) {
     state.host = host; state.dto = dto;
+    if (!state.tab) state.tab = dto.titleApproved ? 'weeks' : 'project';
     const ui = getUi();
-    host.innerHTML = '<div><h2 class="text-xl font-semibold text-ink">Team <span class="text-primary">' + escape(dto.teamId) + '</span></h2>' + rosterMarkup(dto.roster) + '<div class="mt-4">' + setupMarkup(dto) + '</div>' +
-      (dto.titleApproved ? weeklyMarkup(ui) : '') + sideMarkup(dto, ui) + '</div>';
-    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); }
+    host.innerHTML = '<div data-student-shell class="flex flex-col gap-4 pb-20 xl:grid xl:grid-cols-[11rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:pb-0">' + navMarkup(state.tab) + '<div class="min-w-0">' +
+      panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) + panelMarkup('project', state.tab, projectMarkup(dto)) + '</div></div>';
+    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); host.addEventListener('keydown', onKeydown); }
+  }
+  function showTab(host, key) {
+    state.tab = key;
+    host.querySelectorAll('[data-student-tab]').forEach(tab => {
+      const selected = tab.getAttribute('data-student-tab') === key;
+      tab.setAttribute('aria-selected', String(selected)); tab.setAttribute('tabindex', selected ? '0' : '-1');
+    });
+    host.querySelectorAll('[data-student-panel]').forEach(panel => { panel.hidden = panel.getAttribute('data-student-panel') !== key; });
   }
 
   function onClick(event) {
-    const target = event.target.closest ? event.target.closest('[data-action],[data-github-form-jump]') : null;
+    const target = event.target.closest ? event.target.closest('[data-action],[data-github-form-jump],[data-student-tab]') : null;
     if (!target || target.disabled) return;
     const ui = getUi(), action = target.getAttribute('data-action');
-    if (target.hasAttribute('data-github-form-jump')) ui.focusGithubAccountForm(target);
+    if (target.hasAttribute('data-student-tab')) showTab(state.host, target.getAttribute('data-student-tab'));
+    else if (target.hasAttribute('data-github-form-jump')) ui.focusGithubAccountForm(target);
     else if (action === 'github-refresh') ui.refreshGithubStatus(target);
-    else if (action === 'weekly-refresh') ui.loadWeeklyProgress();
-    else if (action === 'open-logs') { if (event.preventDefault) event.preventDefault(); ui.openWeeklyActivity(target); }
+  }
+  function onKeydown(event) {
+    const tab = event.target.closest ? event.target.closest('[data-student-tab]') : null;
+    if (!tab || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tabs = Array.from(state.host.querySelectorAll('[data-student-tab]')), index = tabs.indexOf(tab);
+    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + step + tabs.length) % tabs.length;
+    event.preventDefault(); tabs[next].focus(); showTab(state.host, tabs[next].getAttribute('data-student-tab'));
   }
   function onSubmit(event) {
     const form = event.target.closest ? event.target.closest('[data-github-form]') : null;

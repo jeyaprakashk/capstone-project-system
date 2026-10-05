@@ -28,7 +28,11 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   const PRIMARY = 'border-0 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
   const PILL = 'flex items-center gap-2 border-0 rounded-lg bg-transparent px-3 py-1.5 text-sm text-ink-2 aria-pressed:bg-paper aria-pressed:text-primary aria-pressed:shadow-selected';
   const STEP = 'flex w-full flex-col gap-0.5 border-0 rounded-lg bg-transparent px-3 py-2 text-left text-sm hover:bg-tint aria-pressed:bg-tint disabled:opacity-60';
-  const TAB = 'flex items-center gap-1 border-0 border-b-2 border-b-transparent bg-transparent px-4 py-3 text-sm text-ink hover:bg-tint aria-pressed:border-b-primary aria-pressed:text-primary disabled:text-muted disabled:hover:bg-transparent';
+  // Below md the workspace tabs become a bottom bar (icon over label); Guide Evaluation moves into a "More" sheet.
+  const TAB_BASE = 'relative items-center border-0 bg-transparent text-ink hover:bg-tint aria-pressed:text-primary disabled:text-muted disabled:hover:bg-transparent max-md:justify-center max-md:border-t-2 max-md:border-t-transparent max-md:px-1 max-md:py-2 max-md:text-xs max-md:aria-pressed:border-t-primary md:gap-1 md:border-b-2 md:border-b-transparent md:px-4 md:py-3 md:text-sm md:aria-pressed:border-b-primary [&_[data-guide-tab-attention]]:max-md:absolute [&_[data-guide-tab-attention]]:max-md:right-2 [&_[data-guide-tab-attention]]:max-md:top-0.5';
+  const TAB = 'flex ' + TAB_BASE;
+  const TAB_SHEET = 'hidden group-data-[more-open]/tabs:flex max-md:absolute max-md:inset-x-0 max-md:bottom-full max-md:justify-start max-md:border-t max-md:border-edge max-md:bg-paper max-md:px-5 max-md:py-4 max-md:text-sm md:flex ' + TAB_BASE;
+  const TAB_MORE = 'flex flex-col items-center justify-center gap-1 border-0 border-t-2 border-t-transparent bg-transparent px-1 py-2 text-xs text-ink hover:bg-tint aria-expanded:border-t-primary aria-expanded:text-primary group-has-[[data-guide-tab=evaluation][aria-pressed=true]]/tabs:border-t-primary group-has-[[data-guide-tab=evaluation][aria-pressed=true]]/tabs:text-primary md:hidden';
   const LINK = 'border-0 bg-transparent p-0 text-sm font-semibold text-primary underline';
   const TILE ='flex w-full flex-col gap-1 rounded-card border border-edge border-l-4 shadow-card border-l-transparent bg-paper p-3 text-left text-sm hover:bg-tint aria-pressed:border-l-primary aria-pressed:bg-tint disabled:opacity-60';
 
@@ -155,8 +159,9 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
         : titleCard(team)) + '</div>' +
       '<div data-guide-view="documents" hidden>' + documentsView(team) + '</div></section>';
   }
-  function tabMarkup(view, iconName, title, selected, locked) {
-    return '<button type="button" class="' + TAB + '" data-guide-tab="' + view + '" aria-pressed="' + selected + '"' + (locked ? ' data-evaluation-locked' : '') + '><strong class="flex items-center gap-2 font-semibold">' + icon(iconName) + title + '</strong></button>';
+  function tabMarkup(view, iconName, title, selected, locked, short, sheet) {
+    const label = short ? '<span class="max-md:hidden">' + title + '</span><span class="md:hidden">' + short + '</span>' : title;
+    return '<button type="button" class="' + (sheet ? TAB_SHEET : TAB) + '" data-guide-tab="' + view + '" aria-pressed="' + selected + '"' + (locked ? ' data-evaluation-locked' : '') + '><strong class="flex items-center gap-2 font-semibold max-md:flex-col max-md:gap-1 max-md:text-xs max-md:font-medium' + (sheet ? ' max-md:flex-row max-md:gap-3 max-md:text-sm' : '') + '">' + icon(iconName) + label + '</strong></button>';
   }
   function headerMarkup(teams) {
     return '<div class="flex flex-wrap items-center justify-between gap-4"><div><h2 class="text-xl font-semibold text-ink">Guide Dashboard</h2>' +
@@ -172,12 +177,13 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   function workspaceMarkup(dto) {
     const teams = dto.teams, ui = getUi();
     const evaluation = dto.evaluation;
-    return '<div data-guide-workspace class="flex flex-col gap-4">' + headerMarkup(teams) +
+    return '<div data-guide-workspace class="flex flex-col gap-4 max-md:pb-16">' + headerMarkup(teams) +
       '<div class="rounded-card border border-edge bg-paper p-5 shadow-card">' + teams.map(headingMarkup).join('') + '</div>' +
-      '<div class="rounded-card border border-edge bg-paper shadow-card"><nav class="flex flex-wrap items-center gap-1 border-b border-edge px-4" aria-label="Team workspace">' +
-        tabMarkup('github', 'git-branch', 'GitHub status', false) + tabMarkup('title', 'tag', 'Title review', true) + tabMarkup('weekly', 'trending-up', 'Weekly progress', false) +
-        tabMarkup('documents', 'file-text', 'Documents', false) +
-        tabMarkup('evaluation', 'graduation-cap', 'Guide Evaluation', false, !evaluation.enabled) + '</nav>' +
+      '<div class="rounded-card border border-edge bg-paper shadow-card"><nav class="group/tabs fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-edge bg-paper shadow-card md:static md:z-auto md:flex md:flex-wrap md:items-center md:gap-1 md:border-t-0 md:border-b md:px-4 md:shadow-none" aria-label="Team workspace">' +
+        tabMarkup('github', 'git-branch', 'GitHub status', false, false, 'GitHub') + tabMarkup('title', 'tag', 'Title review', true, false, 'Title') + tabMarkup('weekly', 'trending-up', 'Weekly progress', false, false, 'Progress') +
+        tabMarkup('documents', 'file-text', 'Documents', false, false, 'Docs') +
+        '<button type="button" class="' + TAB_MORE + '" data-guide-more aria-expanded="false" aria-label="More sections">' + icon('ellipsis') + '<span>More</span></button>' +
+        tabMarkup('evaluation', 'graduation-cap', 'Guide Evaluation', false, !evaluation.enabled, '', true) + '</nav>' +
       '<div class="p-5">' + teams.map((t, i) => panelMarkup(t, i, dto.githubDue)).join('') +
       '<section id="guideWeeklyProgress" data-guide-weeks="' + escape(JSON.stringify(dto.weeks)) + '" hidden aria-label="Weekly progress confirmation">' +
         '<p data-guide-weekly-status role="status" class="m-0 text-sm text-muted empty:hidden"></p>' +
@@ -249,8 +255,15 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   }
 
   function onClick(event) {
-    const target = event.target.closest ? event.target.closest('[data-action],[data-guide-select],[data-guide-tab]') : null;
+    const target = event.target.closest ? event.target.closest('[data-action],[data-guide-select],[data-guide-tab],[data-guide-more]') : null;
     if (!target || target.disabled) return;
+    const nav = target.closest('nav');
+    if (target.hasAttribute('data-guide-more')) {
+      const open = !nav.hasAttribute('data-more-open');
+      nav.toggleAttribute('data-more-open', open); target.setAttribute('aria-expanded', String(open));
+      return;
+    }
+    if (nav && nav.hasAttribute('data-more-open')) { nav.removeAttribute('data-more-open'); const more = nav.querySelector('[data-guide-more]'); if (more) more.setAttribute('aria-expanded', 'false'); }
     const weekly = getWeekly();
     if (target.dataset.action === 'toggle-problem') {
       const text = target.parentElement.querySelector('[data-problem-text]'), open = target.getAttribute('aria-expanded') === 'true';

@@ -24,7 +24,7 @@ function fixture() {
   evidence:['W1','W0'].map(weekId=>({weekId,state:'available',count:1,commits:[{timestamp:'2026-01-02T12:00:00Z',message:'Project work',shortSha:'abcdef0',url:'https://github.com/org/team/commit/'+'a'.repeat(40)}]})),
   actions:[{weekId:'W1',state:'OPEN',editable:true,deadline:'2026-01-05T18:00:00Z',cutoff:'2026-01-14T23:59:59Z'}]};
  function form() {const el=host.querySelector('form');const elements=Array.from(el.querySelectorAll('textarea,button'));elements.forEach(e=>{if(e.name)elements[e.name]=e;});Object.defineProperty(el,'elements',{value:elements,configurable:true});el.reportValidity=()=>true;return el;}
- return {c:context,api,ui,document,host,requests,data,form,counts:()=>[starts,finishes],load:()=>api.load(),reply:(d=data)=>requests.at(-1).success({...d,weeks:d.weeks || d.actions}),
+ return {c:context,api,ui,document,window,host,requests,data,form,counts:()=>[starts,finishes],load:()=>api.load(),reply:(d=data)=>requests.at(-1).success({...d,weeks:d.weeks || d.actions}),
   click:async target=>{target.dispatchEvent(new window.Event('click',{bubbles:true,cancelable:true}));await new Promise(r=>setImmediate(r));},
   submit:formElement=>formElement.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}))};
 }
@@ -126,7 +126,7 @@ test('personal GitHub activity stays visible before the gated form across week c
   assert.match(panel.textContent,/Your GitHub activity/);
   assert.equal(f.host.querySelectorAll('[data-weekly-github]').length,1);};
  check();f.data.actions.push({...f.data.actions[0],weekId:'W0',state:'LATE'});f.load();f.reply();
- await f.click(f.host.querySelector('[data-week="W0"]'));check();
+ await f.click(f.host.querySelector('[data-weekly-row][data-week="W0"]'));check();
 });
 
 test('weekly read deduplicates, preserves unsaved form and history on failed refresh, and retries',()=>{
@@ -164,7 +164,7 @@ test('weekly save retains text and request identity on failure, prevents duplica
 test('LATE opens the same form automatically; frozen forms retain text and hide submit; history escapes content',async()=>{
  const f=fixture();f.data.actions[0].state='LATE';f.data.history=[{weekId:'W0',entryStatus:'SUBMITTED',timeliness:'ON_TIME',recordedAt:'2026-01-01T00:00:00Z',firstSubmittedAt:'2026-01-01T00:00:00Z',workCompleted:'<script>bad()</script>'}];
  f.load();f.reply();assert.equal(f.host.querySelector('script'),null);
- const form=f.form();assert.equal(form.dataset.week,'W1');assert.match(f.host.querySelector('[data-weekly-state]').textContent,/LATE · Submission available until/);
+ const form=f.form();assert.equal(form.dataset.week,'W1');assert.equal(f.host.querySelector('[data-weekly-state]').textContent,'Late');assert.match(f.host.querySelector('[data-weekly-dates]').textContent,/Late submission until/);
  form.elements.workCompleted.value='Retain';f.load();f.reply({...f.data,actions:[]});
  assert.equal(form.elements.workCompleted.value,'Retain');assert.equal(form.elements.workCompleted.disabled,true);
  assert.equal(form.querySelector('[type="submit"]').hidden,true);
@@ -179,7 +179,7 @@ test('superseded weekly responses cannot render into a replacement dashboard',()
 test('GitHub evidence renders safe details, neutral mapping, zero and failure states independently',()=>{
  const f=fixture();f.data.evidence=[{weekId:'W1',state:'available',count:1,commits:[{timestamp:'2026-01-02T12:00:00Z',message:'<script>bad()</script>',shortSha:'abcdef0',url:'https://github.com/org/team/commit/'+'a'.repeat(40)}]}];
  f.load();f.reply();f.form();const panel=f.host.querySelector('[data-weekly-github]');
- assert.match(panel.textContent,/Your GitHub activity · Week 01/);
+ assert.match(panel.textContent,/Your GitHub activity/);assert.equal(f.host.querySelector('[data-weekly-heading]').textContent,'Week 01');
  assert.equal(panel.querySelector('script'),null);assert.equal(panel.querySelector('a').textContent,'abcdef0');
  assert.equal(panel.querySelector('a').getAttribute('rel'),'noopener noreferrer');
  assert.match(panel.querySelector('time').textContent,/2 Jan/);
@@ -192,8 +192,8 @@ test('GitHub evidence renders safe details, neutral mapping, zero and failure st
 test('GitHub evidence switches to a selected late week and survives refresh failure',async()=>{
  const f=fixture();f.data.actions.push({...f.data.actions[0],weekId:'W0',state:'LATE'});
  f.data.evidence=[{weekId:'W1',state:'available',count:0,commits:[]},{weekId:'W0',state:'unmapped',count:null,commits:[]}];
- f.load();f.reply();await f.click(f.host.querySelector('[data-week="W0"]'));
- const panel=f.host.querySelector('[data-weekly-github]');assert.match(panel.textContent,/Week 00/);const before=panel.innerHTML;
+ f.load();f.reply();await f.click(f.host.querySelector('[data-weekly-row][data-week="W0"]'));
+ const panel=f.host.querySelector('[data-weekly-github]');assert.equal(f.host.querySelector('[data-weekly-heading]').textContent,'Week 00');const before=panel.innerHTML;
  f.load();f.requests.at(-1).failure(Error('offline'));assert.equal(panel.innerHTML,before);
 });
 
@@ -204,15 +204,15 @@ test('weekly form shows configured range, concise deadlines, accessible guidance
  f.data.actions[0].opens='2026-09-28T00:00:00+05:30';
  f.data.actions[0].deadline='2026-10-02T18:00:00+05:30';f.data.actions[0].cutoff='2026-10-05T18:00:00+05:30';
  f.load();f.reply();const form=f.form();
- assert.equal(f.host.querySelector('h4[data-weekly-heading]').textContent,'Week 01 '+String.fromCharCode(183)+' 28 Sep '+String.fromCharCode(8211)+' 2 Oct');
+ assert.equal(f.host.querySelector('h4[data-weekly-heading]').textContent,'Week 01');assert.equal(f.host.querySelector('[data-weekly-range]').textContent,'28 Sep '+String.fromCharCode(8211)+' 2 Oct');
  assert.match(f.host.querySelector('[data-weekly-dates]').textContent,/Due 2 Oct/);
  assert(f.host.querySelector('[data-weekly-dates]').textContent.includes('Late submission until'));
- assert.equal(f.host.querySelector('[data-weekly-state]').textContent,'OPEN · Not submitted');
- assert.equal(form.querySelector('[type="submit"]').textContent,'Submit Week 01 Progress');
+ assert.equal(f.host.querySelector('[data-weekly-state]').textContent,'Open');
+ assert.equal(form.querySelector('[type="submit"]').textContent,'Submit Week 01');
  assert.equal(form.querySelector('[name="evidenceLinks"]'),null);
  for(const input of form.querySelectorAll('textarea')) {
-  assert(input.hasAttribute('required'));assert.equal(input.getAttribute('maxlength'),'10000');assert(input.getAttribute('placeholder'));
-  assert.equal(input.hasAttribute('aria-describedby'),false);
+  assert(input.hasAttribute('required'));assert.equal(input.getAttribute('maxlength'),'10000');assert.equal(input.hasAttribute('placeholder'),false);
+  assert(form.querySelector('#'+input.getAttribute('aria-describedby')).textContent.length>10);
  }
  assert.equal(form.querySelectorAll('textarea').length,4);
  assert(!f.host.textContent.includes(' ? '));assert(!f.host.textContent.includes('Evidence Link(s)'));
@@ -220,12 +220,12 @@ test('weekly form shows configured range, concise deadlines, accessible guidance
 
 test('status and update label refresh without replacing unsaved input or changing immutable timeliness',()=>{
  const f=fixture();f.load();f.reply();const form=f.form();form.elements.workCompleted.value='Unsaved changes';
- for(const [state,timing,expected] of [['SUBMITTED','ON_TIME','SUBMITTED ON TIME'],['REVISED','ON_TIME','SUBMITTED ON TIME'],['REVISED','LATE','SUBMITTED LATE']]) {
+ for(const [state,timing,expected] of [['SUBMITTED','ON_TIME','Submitted on time'],['REVISED','ON_TIME','Submitted on time'],['REVISED','LATE','Submitted late']]) {
   f.data.history=[{id:'entry',weekId:'W1',entryStatus:state,timeliness:timing,recordedAt:'2026-01-05T00:00:00Z',firstSubmittedAt:'2026-01-05T00:00:00Z'}];
   f.load();f.reply();
   assert.equal(f.host.querySelector('form'),form);assert.equal(form.elements.workCompleted.value,'Unsaved changes');
   assert.equal(f.host.querySelector('[data-weekly-state]').textContent,expected);
-  assert.equal(form.querySelector('[type="submit"]').textContent,'Update Week 01 Progress');
+  assert.equal(form.querySelector('[type="submit"]').textContent,'Save changes');assert.equal(f.host.querySelector('[data-weekly-heading]').textContent,'Edit Week 01');
  }
 });
 
@@ -234,8 +234,8 @@ test('OPEN to LATE preserves the same draft form and submits its selected Week I
  for(const name of ['workCompleted','guideDiscussion','blockers','nextAction'])form.elements[name].value='Preserved draft';
  f.data.actions[0].state='LATE';f.load();f.reply();
  assert.equal(f.host.querySelector('form'),form);assert.equal(form.elements.workCompleted.value,'Preserved draft');
- assert.match(f.host.querySelector('[data-weekly-state]').textContent,/LATE · Submission available until/);
- assert.equal(form.querySelector('[type="submit"]').textContent,'Submit Week 01 Progress');
+ assert.equal(f.host.querySelector('[data-weekly-state]').textContent,'Late');
+ assert.equal(form.querySelector('[type="submit"]').textContent,'Submit Week 01');
  f.submit(form);
  assert.deepEqual(Object.keys(f.requests.at(-1).input).sort(),['blockers','guideDiscussion','nextAction','requestId','weekId','workCompleted']);
  assert.equal(f.requests.at(-1).input.weekId,'W1');
@@ -244,7 +244,7 @@ test('OPEN to LATE preserves the same draft form and submits its selected Week I
 test('submitted reports freeze without an Update button and remain readable after reload',()=>{
  for(const timeliness of ['ON_TIME','LATE']) {
   const f=fixture();f.load();f.reply();const form=f.form();form.elements.workCompleted.value='Draft kept';
-  const state=timeliness==='ON_TIME'?'SUBMITTED ON TIME':'SUBMITTED LATE';
+  const state=timeliness==='ON_TIME'?'Submitted on time':'Submitted late';
   f.data.history=[{weekId:'W1',entryStatus:'REVISED',timeliness,recordedAt:'2026-01-05T00:00:00Z',firstSubmittedAt:'2026-01-02T00:00:00Z',workCompleted:'Saved work'}];
   f.data.weeks=[{...f.data.actions[0],state,editable:false}];f.data.actions=[];
   f.load();f.reply();assert.equal(form.elements.workCompleted.value,'Draft kept');assert.equal(form.elements.workCompleted.disabled,true);
@@ -257,40 +257,43 @@ test('submitted reports freeze without an Update button and remain readable afte
 
 test('MISSED weeks have no editable form or action button',()=>{
  const f=fixture();f.data.weeks=[{...f.data.actions[0],state:'MISSED',editable:false}];f.data.actions=[];
- f.load();f.reply();assert.equal(f.host.querySelector('form'),null);assert.equal(f.host.querySelector('button[data-week]'),null);
- assert.match(f.host.querySelector('[data-weekly-read]').textContent,/Week 01 · MISSED/);
+ f.load();f.reply();assert.equal(f.host.querySelector('form'),null);assert.equal(f.host.querySelector('[data-weekly-edit]'),null);
+ assert.match(f.host.querySelector('[data-weekly-row]').textContent,/Week 01.*Missed/);
+ assert.match(f.host.querySelector('[data-weekly-form]').textContent,/No submission was recorded/);assert.equal(f.host.querySelector('[data-weekly-github]').hidden,true);
+ assert.match(f.host.querySelector('[data-weekly-status-card]').textContent,/Nothing due right now/);
 });
 
 test('simple weekly layout avoids a redundant week selector, empty history and repeated guidance',()=>{
  const f=fixture();f.load();f.reply();const form=f.form();
- assert.equal(f.host.querySelector('button[data-week]'),null);
+ assert.equal(f.host.querySelectorAll('[data-weekly-row]').length,1);
  assert(!f.host.textContent.includes('Expected weeks:'));
  assert.equal(f.host.querySelector('[data-weekly-history]'),null);
  assert.equal(f.host.querySelector('[data-weekly-github] details').hasAttribute('open'),false);
  assert.equal(form.querySelector('.weekly-helper'),null);
- assert.equal(form.querySelector('textarea[aria-describedby]'),null);
+ assert.equal(form.querySelectorAll('textarea[aria-describedby]').length,4);
  f.data.history=[{weekId:'W1',entryStatus:'SUBMITTED',timeliness:'ON_TIME',recordedAt:'2026-01-02T12:00:00Z',firstSubmittedAt:'2026-01-02T12:00:00Z'}];
  f.load();f.reply();const history=f.host.querySelector('[data-weekly-history]');
  assert.equal(history,null);
 });
 
-test('recent logs own submission history and open details in the shared drawer',()=>{
- const f=fixture(),recent=f.document.createElement('div');recent.id='studentRecentActivity';f.document.body.appendChild(recent);
+test('the week list owns submission history and opens details in the shared drawer',()=>{
+ const f=fixture();
  f.data.checkedAt='2026-01-03T00:00:00Z';
  f.data.allWeeks=[{weekId:'W1',opens:'2026-01-01T00:00:00Z',deadline:'2026-01-05T00:00:00Z'},{weekId:'W2',opens:'2026-01-08T00:00:00Z',deadline:'2026-01-12T00:00:00Z'}];
  f.data.history=[{weekId:'W1',entryStatus:'SUBMITTED',timeliness:'ON_TIME',recordedAt:'2026-01-02T00:00:00Z',workCompleted:'<script>unsafe</script>'},{weekId:'W1',entryStatus:'REVISED',timeliness:'ON_TIME',recordedAt:'2026-01-02T12:00:00Z',workCompleted:'Revised work'}];
  f.load();f.reply();
- assert.equal(recent.querySelectorAll('[data-activity-row]').length,1);
- assert.match(recent.textContent,/Submitted on time/);
+ const rows=f.host.querySelectorAll('[data-weekly-row]');
+ assert.equal(rows.length,1);assert.match(rows[0].textContent,/Submitted on time/);assert.match(rows[0].textContent,/edited/);
  assert.equal(f.host.querySelector('[data-weekly-history]'),null);
- let content;f.ui.openContentDrawer=(title,html)=>{assert.equal(title,'All weekly logs');content=html;};f.api.openActivity();
+ let content;f.ui.openContentDrawer=(title,html)=>{assert.equal(title,'All weekly logs');content=html;};
+ f.click(f.host.querySelector('[data-action="open-logs"]'));
  const {document}=parseHTML('<html><body>'+content+'</body></html>');
  assert.equal(document.querySelectorAll('details').length,2);
  assert.match(document.querySelector('details').textContent,/Revised work/);
  assert.match(document.querySelector('details').textContent,/Project work/);
  assert.match(document.querySelector('[data-future]').textContent,/Week 02/);
  assert.equal(document.querySelector('script'),null);
- const saved=recent.innerHTML;f.load();f.requests.at(-1).failure(Error('offline'));assert.equal(recent.innerHTML,saved);
+ const saved=f.host.querySelector('[data-weekly-read]').innerHTML;f.load();f.requests.at(-1).failure(Error('offline'));assert.equal(f.host.querySelector('[data-weekly-read]').innerHTML,saved);
 });
 
 test('zero commits hide the form and expose the exact guidance and GitHub refresh action',()=>{
@@ -338,11 +341,11 @@ test('evidence loss hides and disables the draft, and a successful refresh resto
 test('week switching cannot reuse another weeks qualifying commits',async()=>{
  const f=fixture();f.data.actions.push({...f.data.actions[0],weekId:'W0',state:'LATE'});
  f.data.evidence=f.data.evidence.map(e=>e.weekId==='W0'?{...e,count:0,commits:[]}:e);
- f.load();f.reply();f.form();await f.click(f.host.querySelector('button[data-week="W0"]'));
+ f.load();f.reply();f.form();await f.click(f.host.querySelector('[data-weekly-row][data-week="W0"]'));
  assert.equal(f.host.querySelector('[data-weekly-form]').hidden,true);
- assert.match(f.host.querySelector('[data-weekly-github]').textContent,/Week 00/);
+ assert.equal(f.host.querySelector('[data-weekly-heading]').textContent,'Week 00');
  f.load();f.reply();assert.equal(f.host.querySelector('[data-weekly-form]').hidden,true);
- await f.click(f.host.querySelector('button[data-week="W1"]'));
+ await f.click(f.host.querySelector('[data-weekly-row][data-week="W1"]'));
  assert.equal(f.host.querySelector('[data-weekly-form]').hidden,false);assert.equal(f.host.querySelector('form').dataset.week,'W1');
 });
 
@@ -351,13 +354,14 @@ test('markup uses only compiled Tailwind utilities and no inline handlers', () =
  const f=fixture();f.data.history=[{weekId:'W1',entryStatus:'SUBMITTED',timeliness:'ON_TIME',workCompleted:'Saved',guideDiscussion:'D',blockers:'None',nextAction:'N'}];
  f.data.actions.push({...f.data.actions[0],weekId:'W0',state:'LATE'});
  f.load();f.reply();
+ assert(f.host.querySelector('[data-weekly-status-card]'));
  assert.deepEqual(missingClasses(renderedClasses(f.host).filter(c=>!c.startsWith('lucide'))),[]);
  f.click(f.host.querySelector('[data-weekly-edit]'));
  assert.deepEqual(missingClasses(renderedClasses(f.host).filter(c=>!c.startsWith('lucide'))),[]);
  assert.deepEqual(Array.from(f.host.querySelectorAll('*')).flatMap(n=>Array.from(n.attributes).map(a=>a.name)).filter(name=>/^on/i.test(name)),[]);
  // the source also carries only compiled classes
  const src=fs.readFileSync('student-weekly-view.js','utf8');
- const literal=[...src.matchAll(/(?:BUTTON|PRIMARY|FIELD|BADGE) = '([^']+)'/g)].flatMap(m=>m[1].split(/\s+/));
+ const literal=[...src.matchAll(/(?:BUTTON|PRIMARY|WIDE_PRIMARY|ICON_BUTTON|FIELD|BADGE|CIRCLE|CARD|ROW|NOTE|ACTIONS) = '([^']+)'/g)].flatMap(m=>m[1].split(/\s+/));
  assert.deepEqual(missingClasses(literal),[]);
 });
 
@@ -373,4 +377,44 @@ test('reads and saves use the bridge endpoints with the request identity the ser
  assert.deepEqual(calls[0].slice(0,3),['read','student-weekly','API_student_getWeekly']);
  assert.equal(calls[0][3].timeoutMs,60000);
  assert.match(document.querySelector('[data-weekly-read]').textContent,/Not ready/);
+});
+
+test('the status card asks for the open week, then reports up to date and offers the editable week',async()=>{
+ const f=fixture();f.data.checkedAt='2026-01-03T00:00:00Z';f.load();f.reply();
+ let card=f.host.querySelector('[data-weekly-status-card]');
+ assert.equal(card.dataset.tone,'warning');assert.match(card.textContent,/Week 01 is open/);
+ assert.equal(card.querySelector('[data-action="choose-week"]').textContent,'Submit Week 01');
+ const g=fixture();g.data.checkedAt='2026-01-03T00:00:00Z';
+ g.data.history=[{weekId:'W1',entryStatus:'SUBMITTED',timeliness:'ON_TIME',recordedAt:'2026-01-02T00:00:00Z',workCompleted:'Saved',guideDiscussion:'G',blockers:'None',nextAction:'N'}];
+ g.load();g.reply();card=g.host.querySelector('[data-weekly-status-card]');
+ assert.equal(card.dataset.tone,'success');assert.match(card.textContent,/You're up to date/);assert.match(card.textContent,/Week 01 can still be edited until/);
+ await g.click(card.querySelector('[data-action="edit-week"]'));
+ const form=g.form();assert.equal(form.elements.workCompleted.value,'Saved');
+ assert.equal(g.host.querySelector('[data-weekly-heading]').textContent,'Edit Week 01');
+ assert.match(g.host.querySelector('[data-weekly-dates]').textContent,/Edits close/);
+ assert.equal(g.host.dataset.weeklyView,'detail');
+});
+
+test('the week list marks the selected week, opens saved weeks without an action and switches mobile screens',async()=>{
+ const f=fixture();f.data.actions.push({...f.data.actions[0],weekId:'W0',state:'LATE'});
+ f.data.history=[{weekId:'W2',entryStatus:'SUBMITTED',timeliness:'LATE',recordedAt:'2026-01-02T00:00:00Z',firstSubmittedAt:'2026-01-02T00:00:00Z',workCompleted:'Closed week answer'}];
+ f.data.weeks=[...f.data.actions,{weekId:'W2',state:'SUBMITTED LATE',deadline:'2026-01-01T18:00:00Z',cutoff:'2026-01-02T18:00:00Z'}];
+ f.load();f.reply();
+ assert.deepEqual(Array.from(f.host.querySelectorAll('[data-weekly-row]')).map(r=>r.dataset.week),['W2','W0','W1']);
+ assert.deepEqual(Array.from(f.host.querySelectorAll('[aria-current="true"]')).map(r=>r.dataset.week),['W1']);
+ await f.click(f.host.querySelector('[data-weekly-row][data-week="W2"]'));
+ assert.deepEqual(Array.from(f.host.querySelectorAll('[aria-current="true"]')).map(r=>r.dataset.week),['W2']);
+ assert.match(f.host.querySelector('[data-submission-summary]').textContent,/Closed week answer/);
+ assert.equal(f.host.querySelector('[data-weekly-edit]'),null);assert.equal(f.host.dataset.weeklyView,'detail');
+ assert.match(f.host.querySelector('[data-weekly-dates]').textContent,/Was due/);
+ await f.click(f.host.querySelector('[data-action="weekly-back"]'));assert.equal(f.host.dataset.weeklyView,'list');
+});
+
+test('an edited form shows an honest unsaved-changes marker and never claims a draft was saved',()=>{
+ const f=fixture();f.load();f.reply();const form=f.form(),marker=form.querySelector('[data-weekly-dirty]');
+ assert.equal(marker.hidden,true);
+ form.elements.workCompleted.value='Typing';
+ form.dispatchEvent(new f.window.Event('input',{bubbles:true}));
+ assert.equal(marker.hidden,false);assert.equal(form.weeklyDirty,true);
+ assert.match(marker.textContent,/Unsaved changes/);assert(!f.host.textContent.includes('Draft saved'));
 });
