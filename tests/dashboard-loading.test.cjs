@@ -737,15 +737,15 @@ test('dashboards are not loaded in the background: only the viewed one is reques
  assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,0);
 });
 
-test('the student sidebar links slot sits below the role separator and only exists for student users',()=>{
+test('the student sidebar links slot follows the last menu item and only exists for student users',()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
  for(const file of ['common-styles.js','busy-state.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
  for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_']) c[name]=()=>'';
  const page=views=>require('linkedom').parseHTML(c.buildDashboardShell_('a@example.test',views)).document;
  const both=page([{key:'student',label:'My Team',contentId:'s'},{key:'guide',label:'Guide',contentId:'g'}]);
  const nav=both.querySelector('#studentSideNav');
- assert.equal(nav.hidden,false);assert.equal(nav.previousElementSibling.getAttribute('role'),'separator');
- assert.equal(nav.nextElementSibling.getAttribute('data-role-tab'),'rubrics');
+ assert.equal(nav.hidden,false);assert.equal(nav.previousElementSibling.id,'dashboardNavigation');
+ assert.equal(nav.parentElement.tagName,'HEADER');assert.match(nav.className,/border-t/);assert.match(nav.className,/max-md|bottom-0/);
  assert.equal(page([{key:'guide',label:'Guide',contentId:'g'},{key:'student',label:'My Team',contentId:'s'}]).querySelector('#studentSideNav').hidden,true);
  assert.equal(page([{key:'guide',label:'Guide',contentId:'g'}]).querySelector('#studentSideNav'),null);
 });

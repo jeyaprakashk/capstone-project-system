@@ -88,9 +88,10 @@ function studentViewBrowser_(bridge, getUi) {
   }
   const TABS = [['weeks', 'Weeks', 'calendar'], ['assessments', 'Assessments', 'clipboard-check'], ['project', 'Project', 'folder']];
   // The screen links live in the shell sidebar (#studentSideNav, below the role separator); the view fills it.
-  const TAB = 'border-0 inline-flex w-full items-center gap-2 rounded-lg bg-transparent px-3 py-2 text-left text-sm text-ink-2 hover:bg-tint aria-[current=page]:bg-tint aria-[current=page]:font-semibold aria-[current=page]:text-primary';
+  // Below md the links become a bottom bar (icon over label); from md up they are a sidebar group after the last menu item.
+  const TAB = 'border-0 flex w-full flex-col items-center justify-center gap-1 border-t-2 border-t-transparent bg-transparent px-1 py-2 text-xs text-ink-2 hover:bg-tint aria-[current=page]:border-t-primary aria-[current=page]:font-semibold aria-[current=page]:text-primary md:flex-row md:justify-start md:gap-2 md:rounded-lg md:border-t-0 md:px-3 md:text-left md:text-sm md:aria-[current=page]:bg-tint';
   function navMarkup(active) {
-    return '<nav aria-label="Student sections" class="flex flex-col gap-1">' + TABS.map(t =>
+    return '<nav aria-label="Student sections" class="grid grid-cols-3 md:flex md:flex-col md:gap-1">' + TABS.map(t =>
       '<button type="button" class="' + TAB + '" id="studentTab-' + t[0] + '" aria-controls="studentPanel-' + t[0] + '"' + (t[0] === active ? ' aria-current="page"' : '') + ' data-student-tab="' + t[0] + '">' + icon(t[2]) + t[1] + '</button>').join('') + '</nav>';
   }
   function panelMarkup(key, active, body) {
