@@ -565,6 +565,7 @@ const DashboardUI = (function() {
       const tab = origin.closest('[data-role-tab]');
       if (tab) { showRoleTab(tab.getAttribute('data-role-tab')); return; }
       if (origin.closest('#roleMenuToggle')) { toggleRoleMenu(); return; }
+      if (origin.closest('[data-student-tab]')) { setRoleMenuOpen(false, false); return; }
       if (origin.closest('#rubricDrawerClose')) { closeRubricDrawer(); return; }
       if (origin.closest('[data-shell-refresh-active]')) { refreshActiveTab(); return; }
       const refresh = origin.closest('[data-shell-refresh]');
@@ -611,6 +612,8 @@ const DashboardUI = (function() {
     const timeline = byId('sharedProjectTimeline');
     if (timeline) timeline.hidden = activeKey !== 'rubrics';
     syncRubricsDisclosure();
+    const studentNav = byId('studentSideNav');
+    if (studentNav) studentNav.hidden = activeKey !== 'student';
     tabSelectedAt = performance.now();
     recordPerformance({event:'tab_selected', role:activeKey, cached:!!loadedRoleTabs[activeKey], prefetched:!!preloadedRoles[activeKey]});
     if (!roleQueue) roleQueue = Array.from(document.querySelectorAll('[data-role-content]')).map(function(el) { return el.getAttribute('data-role-content'); });

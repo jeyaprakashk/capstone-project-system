@@ -9,7 +9,7 @@ const { studentFixture, SCENARIOS } = require('./student-fixture.cjs');
 const dtoFor = (name, options) => { const s = studentFixture(name, options); return JSON.parse(s.c.API_student_getDashboard()).data; };
 
 function setup(dto) {
-  const { document, window } = parseHTML('<html><body><div id="studentContent"></div></body></html>');
+  const { document, window } = parseHTML('<html><body><nav id="studentSideNav"></nav><div id="studentContent"></div></body></html>');
   const calls = { jump: [], refresh: 0, weekly: 0, logs: [], preview: [] };
   const c = loadSources(['data-bridge-client.js', 'student-view.js'], { document, Promise, JSON });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
@@ -162,40 +162,42 @@ test('the endpoint authorizes on the server and returns safe errors', () => {
   assert.equal(failure.error.code, 'INTERNAL'); assert.doesNotMatch(failure.error.message, /column/);
 });
 
-test('the student screens are tabs: Weeks, Assessments and Project, with the first needed screen open', () => {
-  const names = host => Array.from(host.querySelectorAll('[role="tab"]')).map(t => norm(t));
+test('the student screens are sidebar links: Weeks, Assessments and Project, with the first needed screen open', () => {
+  const names = f => Array.from(f.document.querySelectorAll('#studentSideNav [data-student-tab]')).map(t => norm(t));
   const approved = setup(dtoFor('approved')), setupFirst = setup(dtoFor('notSubmitted'));
-  assert.deepEqual(names(approved.host), ['Weeks', 'Assessments', 'Project']);
-  const open = host => Array.from(host.querySelectorAll('[role="tabpanel"]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel'));
+  assert.deepEqual(names(approved), ['Weeks', 'Assessments', 'Project']);
+  const open = host => Array.from(host.querySelectorAll('[data-student-panel]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel'));
   assert.deepEqual(open(approved.host), ['weeks']);
   assert.deepEqual(open(setupFirst.host), ['project']);
-  for (const tab of approved.host.querySelectorAll('[role="tab"]')) assert.equal(approved.host.querySelector('#' + tab.getAttribute('aria-controls')).getAttribute('aria-labelledby'), tab.id);
+  assert.equal(approved.document.querySelector('#studentSideNav [aria-current="page"]').getAttribute('data-student-tab'), 'weeks');
+  for (const tab of approved.document.querySelectorAll('#studentSideNav [data-student-tab]')) assert.equal(approved.host.querySelector('#' + tab.getAttribute('aria-controls')).getAttribute('aria-labelledby'), tab.id);
   assert(approved.host.querySelector('[data-student-panel="weeks"] #studentWeeklyProgress'));
   assert(approved.host.querySelector('[data-student-panel="assessments"] [data-review-result]'));
   assert(approved.host.querySelector('[data-student-panel="project"] [data-step-card]'));
   assert.equal(approved.host.querySelector('[data-student-panel="weeks"] [data-step-card]'), null);
+  assert.equal(approved.host.querySelector('[role="tab"]'), null);
 });
 
-test('selecting a tab shows its panel, supports arrow keys and survives a re-render', () => {
+test('selecting a link shows its panel, supports arrow keys and survives a re-render', () => {
   const f = setup(dtoFor('approved'));
-  const tab = key => f.host.querySelector('[data-student-tab="' + key + '"]');
-  const open = () => Array.from(f.host.querySelectorAll('[role="tabpanel"]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel'));
+  const tab = key => f.document.querySelector('#studentSideNav [data-student-tab="' + key + '"]');
+  const open = () => Array.from(f.host.querySelectorAll('[data-student-panel]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel'));
   f.click(tab('project'));
   assert.deepEqual(open(), ['project']);
-  assert.equal(tab('project').getAttribute('aria-selected'), 'true'); assert.equal(tab('weeks').getAttribute('aria-selected'), 'false');
-  assert.equal(tab('project').getAttribute('tabindex'), '0'); assert.equal(tab('weeks').getAttribute('tabindex'), '-1');
+  assert.equal(tab('project').getAttribute('aria-current'), 'page'); assert.equal(tab('weeks').hasAttribute('aria-current'), false);
   const key = (el, name) => { const e = new f.window.Event('keydown', { bubbles: true, cancelable: true }); e.key = name; el.dispatchEvent(e); };
-  key(tab('project'), 'ArrowRight');
+  key(tab('project'), 'ArrowDown');
   assert.deepEqual(open(), ['weeks']);
   key(tab('weeks'), 'End');
   assert.deepEqual(open(), ['project']);
   f.view.render(f.host, dtoFor('approved'));
   assert.deepEqual(open(), ['project']);
+  assert.equal(f.document.querySelectorAll('#studentSideNav [data-student-tab]').length, 3);
 });
 
-test('the navigation is a sidebar on wide screens and a bottom bar on small ones, using only utilities', () => {
-  const nav = setup(dtoFor('approved')).host.querySelector('nav[aria-label="Student sections"]');
-  const classes = nav.getAttribute('class').split(/\s+/);
-  for (const name of ['fixed', 'bottom-0', 'xl:sticky']) assert(classes.includes(name), name);
+test('the sidebar links use only utilities', () => {
+  const f = setup(dtoFor('approved')), nav = f.document.querySelector('#studentSideNav nav');
   assert.equal(nav.querySelectorAll('[style]').length, 0);
+  const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
+  assert.deepEqual(missingClasses(renderedClasses(nav).filter(c => !c.startsWith('lucide'))), []);
 });

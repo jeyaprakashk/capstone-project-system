@@ -1,7 +1,7 @@
 /**
  * STUDENT VIEW — browser module serialized into the dashboard shell as `StudentView`.
  * Renders the student DTO (DATA-CONTRACTS.md) with Tailwind utilities as three screens (Weeks,
- * Assessments, Project) behind a sidebar that becomes a bottom bar on small viewports. It keeps the DOM
+ * Assessments, Project) whose links it renders into the shell sidebar (#studentSideNav). It keeps the DOM
  * hooks the weekly-progress, assessment and GitHub-connection modules attach to
  * (#studentWeeklyProgress, #studentAssessment-*, #studentGuideEvaluation,
  * [data-step-card], #studentGithubProfile, #githubSubmitStatus, #githubStatusRefresh).
@@ -87,14 +87,14 @@ function studentViewBrowser_(bridge, getUi) {
     return '<section class="student-project-setup ' + CARD + ' p-4" aria-label="Project Setup"><header class="flex items-center gap-3">' + header + '</header><div data-setup-pending>' + dto.setup.pendingSteps.map(text => p(escape(text))).join('') + '</div>' + steps + '</section>';
   }
   const TABS = [['weeks', 'Weeks', 'calendar'], ['assessments', 'Assessments', 'clipboard-check'], ['project', 'Project', 'folder']];
-  const TAB = 'border-0 flex flex-col items-center justify-center gap-1 bg-transparent px-2 text-xs font-semibold text-muted hover:text-ink aria-selected:text-primary aria-selected:shadow-[inset_0_2px_0_0_var(--color-primary)] xl:flex-row xl:justify-start xl:gap-3 xl:rounded-lg xl:px-3 xl:py-2.5 xl:text-sm xl:text-ink-2 xl:hover:bg-tint xl:aria-selected:bg-tint xl:aria-selected:shadow-none';
+  // The screen links live in the shell sidebar (#studentSideNav, below the role separator); the view fills it.
+  const TAB = 'border-0 inline-flex w-full items-center gap-2 rounded-lg bg-transparent px-3 py-2 text-left text-sm text-ink-2 hover:bg-tint aria-[current=page]:bg-tint aria-[current=page]:font-semibold aria-[current=page]:text-primary';
   function navMarkup(active) {
-    return '<nav aria-label="Student sections" class="fixed inset-x-0 bottom-0 z-10 border-t border-edge bg-paper md:left-60 xl:sticky xl:top-4 xl:z-auto xl:border-0 xl:bg-transparent">' +
-      '<div role="tablist" aria-label="Student sections" class="grid h-16 grid-cols-3 xl:flex xl:h-auto xl:flex-col xl:gap-1">' + TABS.map(t =>
-        '<button type="button" role="tab" class="' + TAB + '" id="studentTab-' + t[0] + '" aria-controls="studentPanel-' + t[0] + '" aria-selected="' + (t[0] === active) + '" tabindex="' + (t[0] === active ? 0 : -1) + '" data-student-tab="' + t[0] + '">' + icon(t[2], null, 'size-5 xl:size-4') + t[1] + '</button>').join('') + '</div></nav>';
+    return '<nav aria-label="Student sections" class="flex flex-col gap-1">' + TABS.map(t =>
+      '<button type="button" class="' + TAB + '" id="studentTab-' + t[0] + '" aria-controls="studentPanel-' + t[0] + '"' + (t[0] === active ? ' aria-current="page"' : '') + ' data-student-tab="' + t[0] + '">' + icon(t[2]) + t[1] + '</button>').join('') + '</nav>';
   }
   function panelMarkup(key, active, body) {
-    return '<section role="tabpanel" id="studentPanel-' + key + '" aria-labelledby="studentTab-' + key + '" data-student-panel="' + key + '" class="min-w-0"' + (key === active ? '' : ' hidden') + '>' + body + '</section>';
+    return '<section id="studentPanel-' + key + '" aria-labelledby="studentTab-' + key + '" data-student-panel="' + key + '" class="min-w-0"' + (key === active ? '' : ' hidden') + '>' + body + '</section>';
   }
   function weeklyMarkup(dto, ui) {
     if (!dto.titleApproved) return '<section data-weekly-locked class="' + CARD + ' p-5" aria-label="Weekly progress"><h3 class="text-base font-semibold text-ink">Weekly progress</h3>' + p('Weekly logs will appear after project setup.', 'text-muted') + '</section>';
@@ -118,34 +118,41 @@ function studentViewBrowser_(bridge, getUi) {
     state.host = host; state.dto = dto;
     if (!state.tab) state.tab = dto.titleApproved ? 'weeks' : 'project';
     const ui = getUi();
-    host.innerHTML = '<div data-student-shell class="flex flex-col gap-4 pb-20 xl:grid xl:grid-cols-[11rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:pb-0">' + navMarkup(state.tab) + '<div class="min-w-0">' +
-      panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) + panelMarkup('project', state.tab, projectMarkup(dto)) + '</div></div>';
-    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); host.addEventListener('keydown', onKeydown); }
+    host.innerHTML = '<div class="min-w-0">' +
+      panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) + panelMarkup('project', state.tab, projectMarkup(dto)) + '</div>';
+    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); }
+    const side = document.getElementById('studentSideNav');
+    if (side) {
+      side.innerHTML = navMarkup(state.tab);
+      if (!delegated.has(side)) { delegated.add(side); side.addEventListener('click', onNavClick); side.addEventListener('keydown', onKeydown); }
+    }
   }
-  function showTab(host, key) {
+  function showTab(key) {
     state.tab = key;
-    host.querySelectorAll('[data-student-tab]').forEach(tab => {
-      const selected = tab.getAttribute('data-student-tab') === key;
-      tab.setAttribute('aria-selected', String(selected)); tab.setAttribute('tabindex', selected ? '0' : '-1');
+    document.querySelectorAll('#studentSideNav [data-student-tab]').forEach(tab => {
+      if (tab.getAttribute('data-student-tab') === key) tab.setAttribute('aria-current', 'page'); else tab.removeAttribute('aria-current');
     });
-    host.querySelectorAll('[data-student-panel]').forEach(panel => { panel.hidden = panel.getAttribute('data-student-panel') !== key; });
+    state.host.querySelectorAll('[data-student-panel]').forEach(panel => { panel.hidden = panel.getAttribute('data-student-panel') !== key; });
   }
 
+  function onNavClick(event) {
+    const tab = event.target.closest ? event.target.closest('[data-student-tab]') : null;
+    if (tab) showTab(tab.getAttribute('data-student-tab'));
+  }
   function onClick(event) {
-    const target = event.target.closest ? event.target.closest('[data-action],[data-github-form-jump],[data-student-tab]') : null;
+    const target = event.target.closest ? event.target.closest('[data-action],[data-github-form-jump]') : null;
     if (!target || target.disabled) return;
     const ui = getUi(), action = target.getAttribute('data-action');
-    if (target.hasAttribute('data-student-tab')) showTab(state.host, target.getAttribute('data-student-tab'));
-    else if (target.hasAttribute('data-github-form-jump')) ui.focusGithubAccountForm(target);
+    if (target.hasAttribute('data-github-form-jump')) ui.focusGithubAccountForm(target);
     else if (action === 'github-refresh') ui.refreshGithubStatus(target);
   }
   function onKeydown(event) {
     const tab = event.target.closest ? event.target.closest('[data-student-tab]') : null;
-    if (!tab || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const tabs = Array.from(state.host.querySelectorAll('[data-student-tab]')), index = tabs.indexOf(tab);
-    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+    if (!tab || !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    const tabs = Array.from(document.querySelectorAll('#studentSideNav [data-student-tab]')), index = tabs.indexOf(tab);
+    const step = event.key === 'ArrowDown' ? 1 : -1;
     const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + step + tabs.length) % tabs.length;
-    event.preventDefault(); tabs[next].focus(); showTab(state.host, tabs[next].getAttribute('data-student-tab'));
+    event.preventDefault(); tabs[next].focus(); showTab(tabs[next].getAttribute('data-student-tab'));
   }
   function onSubmit(event) {
     const form = event.target.closest ? event.target.closest('[data-github-form]') : null;
