@@ -10,7 +10,7 @@
 function studentViewBrowser_(bridge, getUi) {
   'use strict';
   const delegated = new WeakSet();
-  const state = {dto:null, host:null, tab:null, loaded:{}};
+  const state = {dto:null, host:null, tab:null, loaded:{}, project:null};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
   const icon = (name, label, className) => getUi().renderIcon(name, label, className);
@@ -110,16 +110,44 @@ function studentViewBrowser_(bridge, getUi) {
       a.reviews.map(r => '<section id="studentAssessment-' + escape(r.key) + '" data-review-result="' + escape(r.key) + '" data-assessment-label="' + escape(r.label) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading ' + r.label + ' results') + '</section>').join('') +
       '<section id="studentGuideEvaluation" data-assessment-label="' + escape(a.guideEvaluationLabel) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading guide evaluation') + '</section></div></section>';
   }
-  function projectMarkup(dto) {
-    return '<h2 class="text-xl font-semibold text-ink">Team <span class="text-primary">' + escape(dto.teamId) + '</span></h2>' + rosterMarkup(dto.roster) + '<div class="mt-4">' + setupMarkup(dto) + '</div>';
+  // The team heading and roster come with the core DTO; the setup cards (GitHub checks) load into the slot on demand.
+  function projectMarkup(dto, ui) {
+    return '<h2 class="text-xl font-semibold text-ink">Team <span class="text-primary">' + escape(dto.teamId) + '</span></h2>' + rosterMarkup(dto.roster) +
+      '<div class="mt-4" data-project-setup>' + ui.renderSkeleton('panel', 'Loading project setup') + '</div>';
+  }
+  /** Loads (or reloads) the Project cards. Content already shown stays on a failed refresh; Retry is offered. */
+  function loadProject(onLoaded, onError) {
+    const host = state.host, slot = host && host.querySelector('[data-project-setup]'), ui = getUi();
+    if (!slot) { if (onError) onError(new Error('The dashboard panel is unavailable. Reload the page.')); return; }
+    if (slot.projectBusy) { if (onError) onError(new Error('A dashboard refresh is already in progress. Please retry shortly.')); return; }
+    slot.projectBusy = true;
+    const finish = ui.beginContentLoading(slot, 'Loading project setup', {compact:true});
+    const current = () => slot.isConnected && state.host === host;
+    bridge.read('student-project', 'API_student_getProject', [], {timeoutMs:120000}).then(function(project) {
+      finish(); slot.projectBusy = false;
+      if (!current()) return;
+      state.project = project;
+      slot.innerHTML = setupMarkup(project);
+      if (onLoaded) onLoaded();
+    }, function(error) {
+      finish(); slot.projectBusy = false;
+      if (error && error.superseded) return;
+      if (!current()) return;
+      if (onError) { onError(error); return; }
+      const message = error && typeof error.message === 'string' && error.message.trim() ? error.message.trim() : 'The server did not provide error details';
+      const notice = '<p data-project-error role="alert" class="m-0 mb-3 flex flex-wrap items-center gap-2 rounded-md border border-danger/20 bg-danger-tint px-3 py-2 text-sm text-danger">Could not load project setup: ' + escape(message) + ' <button type="button" class="' + BUTTON + '" data-action="project-retry">Retry</button></p>';
+      const old = slot.querySelector('[data-project-error]');
+      if (old) old.remove();
+      if (state.project) slot.insertAdjacentHTML('afterbegin', notice); else slot.innerHTML = notice;
+    });
   }
 
   function render(host, dto) {
-    state.host = host; state.dto = dto; state.loaded = {};
+    state.host = host; state.dto = dto; state.loaded = {}; state.project = null;
     if (!state.tab) state.tab = dto.titleApproved ? 'weeks' : 'project';
     const ui = getUi();
     host.innerHTML = '<div class="min-w-0">' +
-      panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) + panelMarkup('project', state.tab, projectMarkup(dto)) + '</div>';
+      panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) + panelMarkup('project', state.tab, projectMarkup(dto, ui)) + '</div>';
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); }
     const side = document.getElementById('studentSideNav');
     if (side) {
@@ -134,6 +162,7 @@ function studentViewBrowser_(bridge, getUi) {
     state.loaded[key] = true;
     if (key === 'weeks' && state.dto.titleApproved) ui.loadWeeklyProgress();
     else if (key === 'assessments') ui.loadStudentResults();
+    else if (key === 'project') loadProject();
   }
   function showTab(key) {
     state.tab = key;
@@ -154,6 +183,7 @@ function studentViewBrowser_(bridge, getUi) {
     const ui = getUi(), action = target.getAttribute('data-action');
     if (target.hasAttribute('data-github-form-jump')) ui.focusGithubAccountForm(target);
     else if (action === 'github-refresh') ui.refreshGithubStatus(target);
+    else if (action === 'project-retry') loadProject();
   }
   function onKeydown(event) {
     const tab = event.target.closest ? event.target.closest('[data-student-tab]') : null;
@@ -168,7 +198,7 @@ function studentViewBrowser_(bridge, getUi) {
     if (form) getUi().previewGithubAccount(event, form);
   }
 
-  function load() { return bridge.read('role:student', 'API_student_getDashboard', []); }
+  function load() { return bridge.read('role:student', 'API_student_getCore', []); }
 
-  return {load, render, activate, state};
+  return {load, render, activate, reloadProject:loadProject, state};
 }

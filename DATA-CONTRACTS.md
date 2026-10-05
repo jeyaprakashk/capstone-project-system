@@ -39,6 +39,8 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_guide_saveEvaluationDraft(input)` / `API_guide_submitEvaluation(input)` | Guide | `{team, student, revision, token, scores, requestId}`; the request ID makes a retry safe | `{status, …}` as before | `saveGuideEvaluationDraft_` / `submitGuideEvaluation_` called directly |
 | `API_student_getReviewResult(key)` / `API_student_getGuideResult()` | Student | assessment key | the published result (`config, identity, total, weighted, scores, assessment, underCorrection`) or `null` when nothing is published | `loadPublishedReviewEvaluation_` / `loadPublishedGuideEvaluation_` called directly |
 | `API_student_getDashboard()` | Student | none | `StudentDashboard` (below) | `buildStudentContent` (removed) |
+| `API_student_getCore()` | Student | none | `StudentCore` (below): team, roster, `titleApproved`, assessment labels; sheet data only, no GitHub calls | `getStudentBaseData_` + `buildStudentCoreDto_` |
+| `API_student_getProject()` | Student | none | `StudentProject` (below): setup, GitHub and title cards (the GitHub checks) | `getStudentDashboardData_` + `buildStudentProjectDto_` |
 | `API_guide_getDashboard()` | Guide | none | `GuideDashboard` (below) | `buildDashboardContent` (removed) |
 | `API_guide_getCommits(teamId)` | Guide (own team only) | team ID | `{teamId, state:'available'|'unavailable', message, repositoryUrl?, members:[{regno, username, count:number|null, commits:[{sha, shortSha, message, timestamp, url}]}]}`; `count` is every collected commit by that member in the team repository (all time, bootstrap commit excluded) and `commits` the latest 3; read when the GitHub status tab is first shown | `buildGuideCommitsDto_` over `readCollectedCommits_` |
 | `API_guide_submitDecision(teamId, decision, notes, editedTitle)` | Guide | `decision` is `Approved` or `Rejected`; notes required for `Rejected` | `{message}` | `decide` in the old client |
@@ -133,6 +135,13 @@ up to 25 team folders per call from `cursor` (the last Team ID key handled); it 
 repeat. Two `Team Documents` folders, duplicate team folders or names that collide are reported and never merged, removed or created.
 `findTeamFolder_(teamId, semester)` is the shared server lookup for later features (it never creates anything). The browser asks for
 confirmation, naming the parent folder, before the write. Contract tests: `tests/team-folders.test.cjs`, `tests/team-folders-view.test.cjs`.
+
+### StudentCore and StudentProject
+
+The browser loads the student dashboard in two parts: `API_student_getCore` first (it renders the Weeks and Assessments screens and the Project heading and roster), and `API_student_getProject` the first time the Project screen is shown, or when a GitHub action refreshes it. `StudentDashboard` below is their union; `API_student_getDashboard` stays as that reference and `tests/student-migration.test.cjs` asserts `{...core, ...project}` equals it for every scenario.
+
+- `StudentCore` = `{teamId, titleApproved, roster, assessments}`.
+- `StudentProject` = `{setup, github, title}`.
 
 ### StudentDashboard
 

@@ -434,7 +434,7 @@ function timelineBrowser() {
       // Migrated reviewer role answers through the data bridge with a response envelope.
       API_reviewer_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'reviewer',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
       API_guide_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'guide',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
-      API_student_getDashboard(){const {success}=handlers;requests.push({type:'role',role:'student',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
+      API_student_getCore(){const {success}=handlers;requests.push({type:'role',role:'student',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});},
       API_coordinator_getOverview(){const {success}=handlers;requests.push({type:'role',role:'coord',...handlers,success:html=>success(JSON.stringify({ok:true,data:{html}}))});}};
     return chain;
   }};

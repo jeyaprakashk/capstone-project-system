@@ -38,8 +38,20 @@ function studentTitleDto_(d, teamId, githubDone, titleApproved) {
   };
 }
 
-/** Pure DTO builder over getStudentDashboardData_(). */
-function buildStudentDto_(email, teamId, d) {
+/** Core DTO: team, roster, title approval and assessment labels. Needs sheet data only (getStudentBaseData_). */
+function buildStudentCoreDto_(email, teamId, d) {
+  const definitions = getAssessmentDefinitions_();
+  const guideEvaluation = definitions.find(item => item.type === 'GUIDE_EVALUATION');
+  return {
+    teamId:String(teamId),
+    roster:d.rosterSlots.map(s => ({name:String(s.name || ''), initials:initialsOf_(s.name), regno:String(s.regno || ''), isMe:emailsMatch_(s.email, email)})),
+    titleApproved:d.titleStatus === 'APPROVED',
+    assessments:{reviews:definitions.filter(item => item.type === 'REVIEW').map(item => ({key:String(item.key), label:String(item.label)})), guideEvaluationLabel:String((guideEvaluation || {}).label || 'Guide Evaluation')}
+  };
+}
+
+/** Project DTO: setup state, GitHub and title cards. Needs the GitHub state (getStudentDashboardData_). */
+function buildStudentProjectDto_(email, teamId, d) {
   const githubDone = d.githubReady;
   const titleApproved = d.titleStatus === 'APPROVED';
   const label = STUDENT_TITLE_LABEL[d.titleStatus];
@@ -49,17 +61,16 @@ function buildStudentDto_(email, teamId, d) {
     pendingSteps.push('Step 2: ' + label.text + '. ' + (!githubDone ? 'Finish GitHub setup first. ' : '') +
       (label.state === 'active' ? (d.title ? 'Your team must address the feedback below and resubmit the title.' : 'Your team must submit a project title for approval.') : 'Your team is waiting for approval; check the review status below.'));
   }
-  const definitions = getAssessmentDefinitions_();
-  const guideEvaluation = definitions.find(item => item.type === 'GUIDE_EVALUATION');
   return {
-    teamId:String(teamId),
-    roster:d.rosterSlots.map(s => ({name:String(s.name || ''), initials:initialsOf_(s.name), regno:String(s.regno || ''), isMe:emailsMatch_(s.email, email)})),
-    titleApproved,
     setup:{complete:githubDone && titleApproved, pendingSteps},
     github:studentGithubDto_(d, email),
-    title:studentTitleDto_(d, teamId, githubDone, titleApproved),
-    assessments:{reviews:definitions.filter(item => item.type === 'REVIEW').map(item => ({key:String(item.key), label:String(item.label)})), guideEvaluationLabel:String((guideEvaluation || {}).label || 'Guide Evaluation')}
+    title:studentTitleDto_(d, teamId, githubDone, titleApproved)
   };
+}
+
+/** The complete StudentDashboard (core plus project): the reference the split endpoints are verified against. */
+function buildStudentDto_(email, teamId, d) {
+  return Object.assign({}, buildStudentCoreDto_(email, teamId, d), buildStudentProjectDto_(email, teamId, d));
 }
 
 function studentAccessOrThrow_() {
@@ -70,6 +81,24 @@ function studentAccessOrThrow_() {
     [r[TS.S1_EMAIL], r[TS.S2_EMAIL], r[TS.S3_EMAIL], r[TS.S4_EMAIL]].some(e => emailsMatch_(e, email)));
   if (!row) throw apiFail_('NOT_FOUND', 'Student team was not found.');
   return {email, teamId:row[TS.TEAM_ID], row};
+}
+
+/** Fast first load: sheet data only. Weeks and Assessments render from this without waiting for GitHub checks. */
+function API_student_getCore() {
+  return apiHandle_(() => withDashboardRead_(() => {
+    const student = studentAccessOrThrow_();
+    studentPerfReset_();
+    return buildStudentCoreDto_(student.email, student.teamId, getStudentBaseData_(student.teamId, student.row));
+  }));
+}
+
+/** Project screen: setup state with the GitHub checks (the slow part). Authorized on its own like every endpoint. */
+function API_student_getProject() {
+  return apiHandle_(() => withDashboardRead_(() => {
+    const student = studentAccessOrThrow_();
+    studentPerfReset_();
+    return buildStudentProjectDto_(student.email, student.teamId, getStudentDashboardData_(student.email, student.teamId, student.row));
+  }));
 }
 
 function API_student_getDashboard() {

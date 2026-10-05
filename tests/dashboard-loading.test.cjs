@@ -126,7 +126,7 @@ function fixture(system=false,shipped=false) {
   if(key==='API_coordinator_getSystemStatus')return requests.push({key:'loadCoordinatorSystemStatus',args,success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   const legacy={API_coordinator_getCommitteeConfiguration:'getCoordinatorCommitteeConfiguration_',API_coordinator_getReviewConfiguration:'getCoordinatorReviewConfiguration_',API_coordinator_createDefinitions:'createAssessmentDefinitions_',API_coordinator_prepareStorage:'prepareReviewAssessmentStorage_',API_coordinator_syncGithub:'syncCoordinatorGithubAccess_',API_coordinator_resendInvitations:'resendExpiredStudentInvitations_',API_shared_getTimeline:'loadSharedProjectTimeline_',API_shared_getRubrics:'loadSharedRubrics_',API_coordinator_getTeamDrawer:'loadCoordinatorDrawerSection_'}[key];
   if(legacy)return requests.push({key:legacy,args,success:value=>success(JSON.stringify({ok:true,data:value})),failure});
-  const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getDashboard:'student',API_coordinator_getOverview:'coord'}[key];
+  const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getCore:'student',API_coordinator_getOverview:'coord'}[key];
   if(migrated)return requests.push({key:'loadDashboardRoleContent',args:[migrated],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   return requests.push({key,args,success,failure});}}); }
  const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:(fn,delay)=>{timers.set(++id,Object.assign(()=>fn(),{delay}));return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
@@ -488,26 +488,15 @@ test('compact refresh uses the initial skeleton and restores the original conten
  assert(!host.hasAttribute('data-loading-compact'));
 });
 
-test('GitHub status refresh uses compact student loading and restores content after failure',async()=>{
- const f=fixture(),{document}=require('linkedom').parseHTML('<html><body><section><button>Saved GitHub username</button></section></body></html>');
- const host=document.querySelector('section'),button=host.firstElementChild;
- Object.defineProperty(host,'clientHeight',{value:900});
- f.c.document.createElement=tag=>document.createElement(tag);
- const original=f.c.document.querySelector;
- f.c.document.querySelector=selector=>selector==='[data-role-content="student"]'?host:original(selector);
- const ui=vm.runInContext('DashboardUI',f.c);
- ui.refreshGithubStatus();ui.refreshGithubStatus();
+test('GitHub status refresh reloads only the student Project cards and leaves other roles on the full reload',async()=>{
+ const f=fixture(),ui=vm.runInContext('DashboardUI',f.c),calls=[];
+ vm.runInContext('StudentView.reloadProject=(ok,fail)=>{globalThis.__reloads=(globalThis.__reloads||[]);globalThis.__reloads.push([ok,fail]);}',f.c);
+ ui.refreshGithubStatus();
+ const reloads=vm.runInContext('globalThis.__reloads',f.c);
+ assert.equal(reloads.length,1);assert.equal(typeof reloads[0][0],'function');assert.equal(typeof reloads[0][1],'function');
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,0);
+ ui.reloadRole('guide',()=>{},()=>{});
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
- assert(host.hasAttribute('data-loading-compact'));
- assert.equal(host.querySelectorAll('[data-skeleton]').length,1);
- assert.equal(button.inert,true);
- const request=f.requests.at(-1);request.done=true;request.failure(new Error('offline'));await f.settle();
- assert.equal(host.firstElementChild,button);assert(!button.inert);
- assert.equal(host.getAttribute('aria-busy'),'false');
- assert(!host.hasAttribute('data-loading-compact'));
- ui.refreshGithubStatus();f.done('loadDashboardRoleContent','Updated student');await f.settle();
- assert.equal(host.innerHTML,'Updated student');
- assert.equal(host.getAttribute('aria-busy'),'false');
 });
 
 test('shared loading preserves live children and restores interaction on repeated cleanup',async()=>{

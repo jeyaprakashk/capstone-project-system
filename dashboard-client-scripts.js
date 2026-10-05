@@ -678,7 +678,8 @@ const DashboardUI = (function() {
     retryGithubSetup: function(button) { StudentGithub.retryGithubSetup(button); },
     focusGithubAccountForm: function(button) { StudentGithub.focusGithubAccountForm(button); },
     previewGithubAccount: function(event, form) { StudentGithub.previewGithubAccount(event, form); },
-    reloadRole: function(key, onLoaded, onError) { loadRoleContent(key, false, true, onLoaded, onError); },
+    // The student's GitHub flows only change the Project cards, so they reload just that part.
+    reloadRole: function(key, onLoaded, onError) { if (key === 'student') StudentView.reloadProject(onLoaded, onError); else loadRoleContent(key, false, true, onLoaded, onError); },
     renderAssessmentHistory: renderAssessmentHistory,
     renderSkeleton: renderSkeleton,
     beginContentLoading: beginContentLoading,

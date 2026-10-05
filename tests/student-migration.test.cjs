@@ -92,4 +92,19 @@ test('assessment placeholders follow the configured definitions', () => {
   assert.equal(dto.assessments.guideEvaluationLabel, 'Guide Evaluation');
 });
 
+test('the split endpoints carry exactly the full dashboard, in every state, and the core never touches GitHub', () => {
+  for (const name of Object.keys(SCENARIOS)) {
+    const s = studentFixture(name), call = method => JSON.parse(s.c[method]()).data;
+    const full = call('API_student_getDashboard');
+    s.c.getStudentGithubState_ = () => { throw new Error('the core must not read GitHub state'); };
+    s.c.getTeamGithubSetup_ = s.c.getStudentGithubState_;
+    const core = call('API_student_getCore');
+    assert.deepEqual(Object.keys(core).sort(), ['assessments', 'roster', 'teamId', 'titleApproved'], name);
+    const github = studentFixture(name);
+    const project = JSON.parse(github.c.API_student_getProject()).data;
+    assert.deepEqual(Object.keys(project).sort(), ['github', 'setup', 'title'], name);
+    assert.deepEqual({ ...core, ...project }, full, name);
+  }
+});
+
 module.exports = { legacyFacts, dtoFacts, build, normalize };

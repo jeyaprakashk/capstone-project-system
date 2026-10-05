@@ -32,6 +32,8 @@ const REQUEST = { requestId: 'request_123456789', revision: 0, team: TEAM, stude
 const OUTSIDER = ['', 'outsider@example.com'];
 const ENDPOINTS = {
   API_student_getDashboard: [[], [...OUTSIDER, 'guide@example.com']],
+  API_student_getCore: [[], [...OUTSIDER, 'guide@example.com']],
+  API_student_getProject: [[], [...OUTSIDER, 'guide@example.com']],
   API_student_getWeekly: [[], [...OUTSIDER, 'guide@example.com']],
   API_student_submitWeekly: [[{ requestId: 'request_123456789', weekId: 'W1', workCompleted: 'x', guideDiscussion: 'x', blockers: 'x', nextAction: 'x' }], [...OUTSIDER, 'guide@example.com']],
   API_student_getReviewResult: [['review1'], [...OUTSIDER, 'guide@example.com']],

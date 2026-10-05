@@ -18,7 +18,11 @@ function studentPerfLog_(label, startMs) {
   return now;
 }
 
-function getStudentDashboardData_(email, teamId, teamStatusRow) {
+/**
+ * Sheet-only part of the dashboard: title status, repository URL and roster. It makes no GitHub,
+ * schedule or clock calls, so the Weeks and Assessments screens never wait for them.
+ */
+function getStudentBaseData_(teamId, teamStatusRow) {
   const perfStart = Date.now();
   let perfLap = perfStart;
   const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
@@ -51,9 +55,18 @@ function getStudentDashboardData_(email, teamId, teamStatusRow) {
     { name: r[TS.S3_NAME], email: r[TS.S3_EMAIL], regno: r[TS.S3_REGNO] },
     { name: r[TS.S4_NAME], email: r[TS.S4_EMAIL], regno: r[TS.S4_REGNO] },
   ].filter(s => s.email);
-
   perfLap = studentPerfLog_('Roster and title state', perfLap);
-  const github = getStudentGithubState_(email, teamId, rosterSlots, repoUrl);
+
+  studentPerfLog_('getStudentBaseData_ TOTAL', perfStart);
+  return { teamId, title: r[TS.TITLE], problem: r[TS.PROBLEM], titleStatus, note, repoUrl, rosterSlots };
+}
+
+function getStudentDashboardData_(email, teamId, teamStatusRow) {
+  const perfStart = Date.now();
+  let perfLap = perfStart;
+  const base = getStudentBaseData_(teamId, teamStatusRow);
+
+  const github = getStudentGithubState_(email, teamId, base.rosterSlots, base.repoUrl);
   perfLap = studentPerfLog_('GitHub state (getStudentGithubState_)', perfLap);
   const { githubAccount, githubCaptureReady, githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup } = github;
 
@@ -64,10 +77,10 @@ function getStudentDashboardData_(email, teamId, teamStatusRow) {
   studentPerfLog_('getStudentDashboardData_ TOTAL', perfStart);
 
   return {
-    teamId, title: r[TS.TITLE], problem: r[TS.PROBLEM],
-    titleStatus, note,
-    githubAccount, githubCaptureReady, githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup, repoUrl,
-    rosterSlots, schedule, clock
+    teamId, title: base.title, problem: base.problem,
+    titleStatus: base.titleStatus, note: base.note,
+    githubAccount, githubCaptureReady, githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup, repoUrl: base.repoUrl,
+    rosterSlots: base.rosterSlots, schedule, clock
   };
 }
 
