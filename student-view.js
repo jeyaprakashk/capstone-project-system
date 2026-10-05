@@ -33,14 +33,9 @@ function studentViewBrowser_(bridge, getUi) {
       '<div class="flex items-center gap-2 rounded-card border border-edge bg-paper shadow-card px-3 py-2"><span class="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold text-paper ' + AVATAR[i % 3] + '">' + escape(r.initials) + '</span>' +
       '<div><div class="text-sm font-semibold text-ink">' + escape(r.name) + (r.isMe ? ' <span class="ml-1 rounded-md bg-tint px-1.5 py-0.5 text-xs font-semibold text-primary">you</span>' : '') + '</div><div class="text-xs text-muted">' + escape(r.regno) + '</div></div></div>').join('') + '</div>';
   }
-  function stepNode(number, state) {
-    const content = state === 'done' ? icon('check', 'Complete') : state === 'locked' ? icon('lock-keyhole', 'Locked') : number;
-    const tone = state === 'done' ? 'border-success bg-success text-paper' : state === 'locked' ? 'border-control bg-soft text-muted' : 'border-primary bg-paper text-primary';
-    return '<div class="inline-flex size-7 items-center justify-center rounded-full border-2 text-xs font-bold ' + tone + '">' + content + '</div>';
-  }
-  function stepCard(number, title, stepState, body, cta) {
-    return '<div data-step-row class="flex gap-3"><div class="pt-3">' + stepNode(number, stepState) + '</div>' +
-      '<div class="min-w-0 flex-1 ' + CARD + ' p-4" data-step-card><div data-step-header class="flex items-center justify-between gap-2"><h4 class="m-0 text-base font-semibold text-ink">' + escape(title) + '</h4><span class="' + STEP_BADGE[stepState] + '">' + STEP_TEXT[stepState] + '</span></div>' +
+  function stepCard(title, stepState, body, cta) {
+    return '<div data-step-row>' +
+      '<div class="min-w-0 ' + CARD + ' p-4" data-step-card><div data-step-header class="flex items-center justify-between gap-2"><h4 class="m-0 text-base font-semibold text-ink">' + escape(title) + '</h4><span class="' + STEP_BADGE[stepState] + '">' + STEP_TEXT[stepState] + '</span></div>' +
       '<div data-step-body>' + body + '</div>' + (cta || '') + '</div></div>';
   }
   function memberRow(m) {
@@ -67,7 +62,7 @@ function studentViewBrowser_(bridge, getUi) {
   }
   function githubCard(dto) {
     const g = dto.github;
-    return stepCard(1, 'GitHub setup', g.state,
+    return stepCard('GitHub setup', g.state,
       p('GitHub setup due ' + escape(g.due) + ' · ' + escape(g.statusText)) + '<ul aria-label="Team GitHub status" class="mt-2 divide-y divide-edge">' + g.members.map(memberRow).join('') + '</ul>' + repoLine(g.repoUrl),
       g.connected ? '' : githubForm(g));
   }
@@ -78,7 +73,7 @@ function studentViewBrowser_(bridge, getUi) {
     else body = p(escape(t.statusText)) + (t.currentTitle ? p('<strong>Current title:</strong> ' + escape(t.currentTitle)) : '') + (t.note ? p(escape(t.note)) : '') +
       p('Approval due ' + escape(t.due.date) + (t.due.overdue ? ' · Overdue' : ''), t.due.overdue ? 'text-danger' : 'text-ink-2');
     const cta = t.intake ? '<div class="mt-4"><a class="' + PRIMARY + ' inline-block no-underline" href="' + escape(safeUrl(t.intake.url)) + '" target="_blank" rel="noopener">' + escape(t.intake.label) + '</a></div>' : '';
-    return stepCard(2, 'Project title', t.state, body, cta);
+    return stepCard('Project title', t.state, body, cta);
   }
   // GitHub status screen: what is still pending for setup, then the GitHub card. The Title screen is the title card alone.
   function githubMarkup(project) {

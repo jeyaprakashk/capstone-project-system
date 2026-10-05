@@ -100,14 +100,22 @@ function buildDashboardShell_(email, views) {
   // Role tabs are followed by common utility tabs (Rubrics, System Status). They are not roles.
   const roleIcons = { student:'graduation-cap', guide:'book-open', reviewer:'clipboard-check', coord:'network' };
   const TAB = "border-0 inline-flex w-full items-center gap-2 rounded-lg bg-transparent px-3 py-2 text-left text-sm text-ink-2 hover:bg-tint aria-selected:bg-tint aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50";
+  // A student-only user has two menu items (My Team, Timeline & Rubrics): below md they are a fixed top bar of two tabs, like the bottom bar of the student screens, with no Menu toggle.
+  const topBar = views.length === 1 && views[0].key === 'student';
+  const TOP_TAB = "border-0 flex w-full flex-col items-center justify-center gap-1 border-b-2 border-b-transparent bg-transparent px-1 py-2 text-xs text-ink-2 hover:bg-tint aria-selected:border-b-primary aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50 md:flex-row md:justify-start md:gap-2 md:rounded-lg md:border-b-0 md:px-3 md:text-left md:text-sm md:aria-selected:bg-tint";
+  const tabClass = topBar ? TOP_TAB : TAB;
   const displayName = getDashboardUserName_(email);
   const initials = escapeHtml_(displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?');
   const roleButtons = views.map((view, index) =>
-    `<button type="button" class="${TAB}${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml_(view.key)}" aria-controls="rolePanel-${escapeHtml_(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml_(view.key)}">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml_(view.label)}</button>`
+    `<button type="button" class="${tabClass}${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml_(view.key)}" aria-controls="rolePanel-${escapeHtml_(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml_(view.key)}">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml_(view.label)}</button>`
   ).join('');
-  const rubricsButton = `<button type="button" class="${TAB}" role="tab" id="roleTab-rubrics" aria-controls="rolePanel-rubrics" aria-selected="false" tabindex="-1" data-role-tab="rubrics">${renderLucideIcon_('book-open')}Timeline &amp; Rubrics</button>`;
+  const rubricsButton = `<button type="button" class="${tabClass}" role="tab" id="roleTab-rubrics" aria-controls="rolePanel-rubrics" aria-selected="false" tabindex="-1" data-role-tab="rubrics">${renderLucideIcon_('book-open')}Timeline &amp; Rubrics</button>`;
   // Student screens (Weeks, Assessments, Project) are rendered here by StudentView; shown only on the student tab.
   const studentNav = views.some(view => view.key === 'student') ? `<div id="studentSideNav" class="fixed inset-x-0 bottom-0 z-30 border-t border-edge bg-paper shadow-card md:static md:z-auto md:mt-2 md:pt-2 md:shadow-none" role="presentation"${views[0].key === 'student' ? '' : ' hidden'}></div>` : '';
+  const menuToggle = topBar ? '' : `<button type="button" class="role-menu-toggle flex md:hidden border-0 items-center gap-2 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span id="roleMenuLabel">${escapeHtml_(views[0].label)}</span><span>Menu</span></button>`;
+  const navClass = topBar ? 'dashboard-navigation group/nav max-md:fixed max-md:inset-x-0 max-md:top-0 max-md:z-30 max-md:border-b max-md:border-edge max-md:bg-paper max-md:shadow-card' : 'dashboard-navigation group/nav';
+  const itemsClass = topBar ? 'role-tabs grid grid-cols-2 md:flex md:flex-col md:gap-1' : 'role-tabs hidden group-[.menu-open]/nav:flex md:flex flex-col gap-1 mt-2 md:mt-0';
+  const separatorClass = topBar ? 'my-1 border-t border-edge max-md:hidden' : 'my-1 border-t border-edge';
   const hasCoordinator = views.some(view => view.key === 'coord');
   const systemButton = hasCoordinator ? `<button type="button" class="${TAB}" role="tab" id="roleTab-system-status" aria-controls="rolePanel-system-status" aria-selected="false" tabindex="-1" data-role-tab="system-status">${renderLucideIcon_('activity')}System Status</button>` : '';
   const systemPanel = hasCoordinator ? `<section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-system-status" role="tabpanel" aria-labelledby="roleTab-system-status" data-role-panel="system-status" hidden>${SYSTEM_STATUS_HEADER}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
@@ -127,12 +135,12 @@ function buildDashboardShell_(email, views) {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
 ${HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent()}
 </head>
-<body class="min-h-screen bg-canvas md:pl-60">
+<body class="min-h-screen bg-canvas md:pl-60${topBar ? ' max-md:pt-14' : ''}">
 <header class="border-b border-edge bg-paper px-4 py-3 md:fixed md:inset-y-0 md:left-0 md:w-60 md:overflow-y-auto md:border-b-0 md:border-r">
 <h1 class="m-0 mb-3 text-base font-semibold text-ink">Dashboard</h1>
-<nav class="dashboard-navigation group/nav" id="dashboardNavigation" aria-label="Dashboard sections">
-<button type="button" class="role-menu-toggle flex md:hidden border-0 items-center gap-2 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" id="roleMenuToggle" aria-expanded="false" aria-controls="roleMenuItems"><span id="roleMenuIcon">${renderLucideIcon_('menu')}</span><span id="roleMenuLabel">${escapeHtml_(views[0].label)}</span><span>Menu</span></button>
-<div class="role-tabs hidden group-[.menu-open]/nav:flex md:flex flex-col gap-1 mt-2 md:mt-0" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}<div class="my-1 border-t border-edge" role="separator" aria-orientation="horizontal"></div>${rubricsButton}${systemButton}</div>
+<nav class="${navClass}" id="dashboardNavigation" aria-label="Dashboard sections">
+${menuToggle}
+<div class="${itemsClass}" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}<div class="${separatorClass}" role="separator" aria-orientation="horizontal"></div>${rubricsButton}${systemButton}</div>
 </nav>
 ${studentNav}
 </header>

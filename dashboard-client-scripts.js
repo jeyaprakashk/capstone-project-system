@@ -576,7 +576,7 @@ const DashboardUI = (function() {
     });
     document.addEventListener('keydown', function(event) {
       const toggle = byId('roleMenuToggle');
-      if (event.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+      if (event.key === 'Escape' && toggle && toggle.getAttribute('aria-expanded') === 'true') {
         setRoleMenuOpen(false, true);
         event.preventDefault();
       }

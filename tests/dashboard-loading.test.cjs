@@ -737,6 +737,28 @@ test('dashboards are not loaded in the background: only the viewed one is reques
  assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,0);
 });
 
+test('a student-only user gets a two-tab top bar on small screens instead of a Menu toggle',()=>{
+ const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
+ for(const file of ['common-styles.js','busy-state.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_']) c[name]=()=>'';
+ const page=views=>require('linkedom').parseHTML(c.buildDashboardShell_('a@example.test',views)).document;
+ const student=page([{key:'student',label:'My Team',contentId:'s'}]);
+ const tabs=Array.from(student.querySelectorAll('#roleMenuItems [role="tab"]'));
+ assert.deepEqual(tabs.map(t=>t.textContent.trim()),['My Team','Timeline & Rubrics']);
+ assert.equal(student.querySelector('#roleMenuToggle'),null);
+ const nav=student.querySelector('#dashboardNavigation');
+ assert.match(nav.className,/max-md:fixed/);assert.match(nav.className,/max-md:top-0/);
+ assert.match(student.querySelector('#roleMenuItems').className,/grid-cols-2/);
+ assert.doesNotMatch(student.querySelector('#roleMenuItems').className,/(^|\s)hidden(\s|$)/);
+ assert.match(student.body.className,/max-md:pt-14/);
+ for(const tab of tabs){assert.match(tab.className,/flex-col/);assert.match(tab.className,/aria-selected:border-b-primary/);assert.equal(tab.hasAttribute('onclick'),false);}
+ const multi=page([{key:'student',label:'My Team',contentId:'s'},{key:'guide',label:'Guide',contentId:'g'}]);
+ assert(multi.querySelector('#roleMenuToggle'));assert.doesNotMatch(multi.querySelector('#dashboardNavigation').className,/max-md:fixed/);
+ assert.doesNotMatch(multi.body.className,/max-md:pt-14/);
+ assert(page([{key:'guide',label:'Guide',contentId:'g'}]).querySelector('#roleMenuToggle'));
+ assert.doesNotThrow(()=>vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8').includes("toggle && toggle.getAttribute('aria-expanded')")?'0':'throw new Error("Escape handler must tolerate a missing toggle")',c));
+});
+
 test('the student sidebar links slot follows the last menu item and only exists for student users',()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
  for(const file of ['common-styles.js','busy-state.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
