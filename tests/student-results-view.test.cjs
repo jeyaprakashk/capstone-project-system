@@ -68,7 +68,7 @@ test('review results show component marks, policy zeros and makeups; guide resul
   const review = p.document.getElementById('studentAssessment-review1');
   assert.match(review.textContent, /Team Mark: 40 · Individual Mark: 40 · Review Total: 80 \/ 100 · Course contribution 16 \/ 20 · Status: COMPLETED/);
   assert.match(review.textContent, /Policy-assigned zero/); assert.match(review.textContent, /Individual Makeup result/);
-  assert.match(review.textContent, /Asha <i> \(R1\)/); assert.equal(review.querySelectorAll('i, script').length, 0);
+  assert.match(review.textContent, /Asha <i> \(R1\) \(You\)/); assert.equal(review.querySelectorAll('i, script').length, 0);
   assert.match(review.querySelector('summary').textContent, /Review 1.*Published.*View marks/);
   assert.equal(review.querySelector('details').hasAttribute('open'), false);
   p.api.guide();

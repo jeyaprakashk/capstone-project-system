@@ -26,12 +26,13 @@ function studentViewBrowser_(bridge, getUi) {
   const BUTTON = 'border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const PRIMARY = 'border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
   const AVATAR = ['bg-teal-700', 'bg-purple-700', 'bg-primary'];
+  const registerLabel = (regno, isMe) => escape(regno) + (isMe ? ' (You)' : '');
   const p = (html, extra) => '<p class="mt-2 text-sm ' + (extra || 'text-ink-2') + '">' + html + '</p>';
 
   function rosterMarkup(roster) {
     return '<div class="mt-3 flex flex-wrap gap-3">' + roster.map((r, i) =>
       '<div class="flex items-center gap-2 rounded-card border border-edge bg-paper shadow-card px-3 py-2"><span class="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold text-paper ' + AVATAR[i % 3] + '">' + escape(r.initials) + '</span>' +
-      '<div><div class="text-sm font-semibold text-ink">' + escape(r.name) + (r.isMe ? ' <span class="ml-1 rounded-md bg-tint px-1.5 py-0.5 text-xs font-semibold text-primary">you</span>' : '') + '</div><div class="text-xs text-muted">' + escape(r.regno) + '</div></div></div>').join('') + '</div>';
+      '<div><div class="text-sm font-semibold text-ink">' + escape(r.name) + '</div><div class="text-xs text-muted">' + registerLabel(r.regno, r.isMe) + '</div></div></div>').join('') + '</div>';
   }
   function stepCard(title, stepState, body, cta) {
     return '<div data-step-row>' +
@@ -43,7 +44,7 @@ function studentViewBrowser_(bridge, getUi) {
     const label = m.canConnect
       ? '<button type="button" class="' + BUTTON + '" data-github-form-jump>' + escape(status[0]) + '</button>'
       : '<span>' + escape(status[0]) + '</span>';
-    return '<li data-member-status="' + m.status + '" class="flex flex-wrap items-center gap-x-3 gap-y-1 py-1 text-sm"><span data-member-register class="min-w-16 font-semibold">' + escape(m.regno) + '</span>' +
+    return '<li data-member-status="' + m.status + '" class="flex flex-wrap items-center gap-x-3 gap-y-1 py-1 text-sm"><span data-member-register class="min-w-16 font-semibold">' + registerLabel(m.regno, m.isMe) + '</span>' +
       '<span data-member-state class="inline-flex items-center gap-1">' + icon(status[1]) + label + '</span></li>';
   }
   function repoLine(repoUrl) {

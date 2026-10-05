@@ -87,6 +87,16 @@ test('the team heading and roster live only on the Team screen, which needs no f
   for (const key of ['weeks', 'assessments', 'title', 'github']) assert.equal(f.host.querySelector('[data-student-panel="' + key + '"] h2'), null, key);
 });
 
+test('only the logged-in student own register number is marked (You), on the roster and the GitHub list', async () => {
+  const dto = dtoFor('githubWaiting');
+  dto.roster = [{ name: 'A', initials: 'A', regno: 'R1', isMe: false }, { name: 'B', initials: 'B', regno: 'R2', isMe: true }];
+  dto.github.members = [{ regno: 'R1', status: 'joined', canConnect: false, isMe: false }, { regno: 'R2', status: 'missing', canConnect: false, isMe: true }];
+  const f = (await setup(dto)), team = f.host.querySelector('[data-student-panel="team"]');
+  const roster = Array.from(team.querySelectorAll('.text-xs.text-muted')).map(norm);
+  assert.deepEqual(roster, ['R1', 'R2 (You)']);
+  assert.deepEqual(Array.from(f.host.querySelectorAll('[data-member-register]')).map(norm), ['R1', 'R2 (You)']);
+});
+
 test('an unregistered student sees only account connection', async () => {
   const f = (await setup(dtoFor('githubActive'))), card = f.host.querySelector('[data-student-panel="github"] [data-step-row]');
   assert.match(norm(card), /Waiting for GitHub account connection/);

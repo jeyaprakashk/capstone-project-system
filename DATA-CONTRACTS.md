@@ -152,7 +152,7 @@ The browser loads the student dashboard in two parts: `API_student_getCore` firs
   setup:{complete:boolean, pendingSteps:[string]},            // complete = GitHub ready and title approved
   github:{ state:'done'|'waiting'|'active'|'locked', text, connected:boolean, captureReady:boolean,
            due:string, statusText, repoUrl,
-           members:[{regno, status:'missing'|'joined'|'pending', canConnect:boolean}] },  // canConnect: this student, not yet connected
+           members:[{regno, status:'missing'|'joined'|'pending', canConnect:boolean, isMe:boolean}] },  // canConnect: this student, not yet connected; isMe: this student's own row
   title:{ locked:boolean, state:'locked'|'active'|'waiting'|'done', statusText, currentTitle, note,
           intake:{url,label}|null, due:{date,overdue}|null },
   assessments:{ reviews:[{key,label}], guideEvaluationLabel } }

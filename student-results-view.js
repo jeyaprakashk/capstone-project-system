@@ -32,7 +32,7 @@ function studentResultsViewBrowser_(bridge, getUi) {
       }).join('');
   }
   function identity(result) {
-    return (result.identity ? p(esc(result.identity.name + ' (' + result.identity.register + ')')) : '') +
+    return (result.identity ? p(esc(result.identity.name + ' (' + result.identity.register + ') (You)')) : '') +
       (result.underCorrection ? '<p role="status" class="mt-1 text-sm text-warning">Under correction. These are the last published results.</p>' : '');
   }
   function summary(result, body) {

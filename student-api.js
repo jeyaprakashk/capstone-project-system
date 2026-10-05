@@ -18,7 +18,7 @@ function studentGithubDto_(d, email) {
       const member = members.find(item => emailsMatch_(item.email, student.email));
       const missing = !member || !member.githubId;
       const joined = !missing && member.status === 'valid' && member.access === 'active';
-      return {regno:String(student.regno || ''), status:missing ? 'missing' : joined ? 'joined' : 'pending', canConnect:missing && !connected && emailsMatch_(student.email, email)};
+      return {regno:String(student.regno || ''), status:missing ? 'missing' : joined ? 'joined' : 'pending', canConnect:missing && !connected && emailsMatch_(student.email, email), isMe:emailsMatch_(student.email, email)};
     }),
     repoUrl:String(d.repoUrl || '')
   };
