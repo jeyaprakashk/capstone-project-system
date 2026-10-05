@@ -10,7 +10,7 @@
 function studentViewBrowser_(bridge, getUi) {
   'use strict';
   const delegated = new WeakSet();
-  const state = {dto:null, host:null, tab:null};
+  const state = {dto:null, host:null, tab:null, loaded:{}};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
   const icon = (name, label, className) => getUi().renderIcon(name, label, className);
@@ -115,7 +115,7 @@ function studentViewBrowser_(bridge, getUi) {
   }
 
   function render(host, dto) {
-    state.host = host; state.dto = dto;
+    state.host = host; state.dto = dto; state.loaded = {};
     if (!state.tab) state.tab = dto.titleApproved ? 'weeks' : 'project';
     const ui = getUi();
     host.innerHTML = '<div class="min-w-0">' +
@@ -127,12 +127,21 @@ function studentViewBrowser_(bridge, getUi) {
       if (!delegated.has(side)) { delegated.add(side); side.addEventListener('click', onNavClick); side.addEventListener('keydown', onKeydown); }
     }
   }
+  /** Each screen fetches its own data the first time it is shown; a re-render starts clean. */
+  function activate() {
+    const key = state.tab, ui = getUi();
+    if (!state.dto || state.loaded[key]) return;
+    state.loaded[key] = true;
+    if (key === 'weeks' && state.dto.titleApproved) ui.loadWeeklyProgress();
+    else if (key === 'assessments') ui.loadStudentResults();
+  }
   function showTab(key) {
     state.tab = key;
     document.querySelectorAll('#studentSideNav [data-student-tab]').forEach(tab => {
       if (tab.getAttribute('data-student-tab') === key) tab.setAttribute('aria-current', 'page'); else tab.removeAttribute('aria-current');
     });
     state.host.querySelectorAll('[data-student-panel]').forEach(panel => { panel.hidden = panel.getAttribute('data-student-panel') !== key; });
+    activate();
   }
 
   function onNavClick(event) {
@@ -161,5 +170,5 @@ function studentViewBrowser_(bridge, getUi) {
 
   function load() { return bridge.read('role:student', 'API_student_getDashboard', []); }
 
-  return {load, render, state};
+  return {load, render, activate, state};
 }

@@ -10,13 +10,13 @@ const dtoFor = (name, options) => { const s = studentFixture(name, options); ret
 
 function setup(dto) {
   const { document, window } = parseHTML('<html><body><nav id="studentSideNav"></nav><div id="studentContent"></div></body></html>');
-  const calls = { jump: [], refresh: 0, weekly: 0, logs: [], preview: [] };
+  const calls = { jump: [], refresh: 0, weekly: 0, results: 0, logs: [], preview: [] };
   const c = loadSources(['data-bridge-client.js', 'student-view.js'], { document, Promise, JSON });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   bridge.useFixtures({ API_student_getDashboard: () => dto });
   const ui = {
     renderIcon: (name) => '<svg class="lucide-icon lucide-' + name + '"></svg>', renderSkeleton: (v, label) => '<span data-skeleton>' + String(label).replace(/[&<>"']/g, ch => '&#' + ch.charCodeAt(0) + ';') + '</span>',
-    focusGithubAccountForm: b => calls.jump.push(b), refreshGithubStatus: b => calls.refresh++, loadWeeklyProgress: () => calls.weekly++,
+    focusGithubAccountForm: b => calls.jump.push(b), refreshGithubStatus: b => calls.refresh++, loadWeeklyProgress: () => calls.weekly++, loadStudentResults: () => calls.results++,
     openWeeklyActivity: t => calls.logs.push(t), previewGithubAccount: (e, form) => calls.preview.push([e, form])
   };
   vm.runInContext('globalThis.__make = ' + c.studentViewBrowser_.toString(), c);
@@ -200,4 +200,26 @@ test('the sidebar links use only utilities', () => {
   assert.equal(nav.querySelectorAll('[style]').length, 0);
   const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
   assert.deepEqual(missingClasses(renderedClasses(nav).filter(c => !c.startsWith('lucide'))), []);
+});
+
+test('each screen loads its own data the first time it is shown, and only once per render', () => {
+  const f = setup(dtoFor('approved')), tab = key => f.document.querySelector('#studentSideNav [data-student-tab="' + key + '"]');
+  assert.deepEqual([f.calls.weekly, f.calls.results], [0, 0]);
+  f.view.activate(); f.view.activate();
+  assert.deepEqual([f.calls.weekly, f.calls.results], [1, 0]);
+  f.click(tab('assessments')); f.click(tab('weeks')); f.click(tab('assessments'));
+  assert.deepEqual([f.calls.weekly, f.calls.results], [1, 1]);
+  f.click(tab('project'));
+  assert.deepEqual([f.calls.weekly, f.calls.results], [1, 1]);
+  f.view.render(f.host, dtoFor('approved'));
+  f.view.activate(); f.click(tab('weeks'));
+  assert.deepEqual([f.calls.weekly, f.calls.results], [2, 1]);
+});
+
+test('a student whose title is not approved loads no weekly or assessment data until asked', () => {
+  const f = setup(dtoFor('notSubmitted')), tab = key => f.document.querySelector('#studentSideNav [data-student-tab="' + key + '"]');
+  f.view.activate(); f.click(tab('weeks'));
+  assert.deepEqual([f.calls.weekly, f.calls.results], [0, 0]);
+  f.click(tab('assessments'));
+  assert.deepEqual([f.calls.weekly, f.calls.results], [0, 1]);
 });

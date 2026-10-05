@@ -52,11 +52,14 @@ function getStudentDashboardData_(email, teamId, teamStatusRow) {
     { name: r[TS.S4_NAME], email: r[TS.S4_EMAIL], regno: r[TS.S4_REGNO] },
   ].filter(s => s.email);
 
+  perfLap = studentPerfLog_('Roster and title state', perfLap);
   const github = getStudentGithubState_(email, teamId, rosterSlots, repoUrl);
+  perfLap = studentPerfLog_('GitHub state (getStudentGithubState_)', perfLap);
   const { githubAccount, githubCaptureReady, githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup } = github;
 
   const schedule = getProjectSchedule_();
   const clock = getProjectClock_(schedule);
+  perfLap = studentPerfLog_('Schedule and clock', perfLap);
 
   studentPerfLog_('getStudentDashboardData_ TOTAL', perfStart);
 

@@ -405,14 +405,14 @@ test('failed roles advance once; clicking ahead keeps earlier queued roles',asyn
  f.click('guide');assert.equal(lastRole(),'guide');
 });
 
-test('Student background results finish before the next role and are not repeated on click',async()=>{
+test('Student background screen load finishes before the next role and is not repeated on click',async()=>{
  const f=fixture(),doc=f.c.document,query=doc.querySelector,queryAll=doc.querySelectorAll;
  const student={...doc.body,innerHTML:'',getAttribute:()=> 'student'};
  doc.querySelector=selector=>selector.includes('data-role-content="student"')?student:query(selector);
  doc.querySelectorAll=selector=>selector==='[data-role-content]'?[queryAll(selector)[0],student,queryAll(selector)[1]]:
   selector==='[data-review-result]'?[{dataset:{reviewResult:'review1'}}]:queryAll(selector);
  const ui=vm.runInContext('DashboardUI',f.c);
- vm.runInContext("StudentResults.all=()=>{DashboardUI.run().withSuccessHandler(()=>{}).loadPublishedGuideEvaluation_();DashboardUI.run().withSuccessHandler(()=>{}).loadPublishedReviewEvaluation_('review1');}",f.c);
+ vm.runInContext("StudentView.activate=()=>{DashboardUI.run().withSuccessHandler(()=>{}).loadPublishedGuideEvaluation_();DashboardUI.run().withSuccessHandler(()=>{}).loadPublishedReviewEvaluation_('review1');}",f.c);
  f.click('guide');f.done('loadDashboardRoleContent');await f.settle();f.tick();
  f.done('loadDashboardRoleContent');await f.settle();f.tick();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,2);

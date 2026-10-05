@@ -236,7 +236,7 @@ const DashboardUI = (function() {
     if (!loadedRoleTabs[key] || activatedRoles[key]) return;
     activatedRoles[key] = true;
     if (key === 'guide' && typeof GuideWeekly !== 'undefined') GuideWeekly.load();
-    if (key === 'student') { StudentWeekly.load(); StudentResults.all(); }
+    if (key === 'student') StudentView.activate();
   }
 
   let sharedSchedule = null;
@@ -672,6 +672,7 @@ const DashboardUI = (function() {
   return {
     notify: dialogs.notify, ask: dialogs.ask, confirmDialog: dialogs.confirmDialog, requestText: dialogs.requestText,
     loadWeeklyProgress: function() { StudentWeekly.load(); },
+    loadStudentResults: function() { StudentResults.all(); },
     openContentDrawer,
     refreshGithubStatus: function(button, message) { StudentGithub.refreshGithubStatus(button, message); },
     retryGithubSetup: function(button) { StudentGithub.retryGithubSetup(button); },
