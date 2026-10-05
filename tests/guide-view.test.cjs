@@ -14,16 +14,17 @@ function dtoFromServer(options) {
 
 function setup(dto = dtoFromServer()) {
   const { document, window } = parseHTML('<html><body><div id="guideContent"></div></body></html>');
-  const calls = { weekly: [], loads: 0, refresh: 0, writes: [], toggles: [] };
+  const calls = { reads: [], weekly: [], loads: 0, refresh: 0, writes: [], toggles: [] };
   const c = loadSources(['data-bridge-client.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const s = { dto, writeError: null, readError: null };
   bridge.useTransport(async (method, args) => {
     if (method === 'API_guide_getDashboard') return s.readError ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: s.readError } }) : JSON.stringify({ ok: true, data: s.dto });
+    if (method === 'API_guide_getCommits') { calls.reads.push(args[0]); return JSON.stringify({ ok: true, data: s.commits || { teamId: args[0], state: 'unavailable', message: 'Commit history is not available yet.', members: [] } }); }
     calls.writes.push([method, args]);
     return s.writeError ? JSON.stringify({ ok: false, error: { code: 'REJECTED', message: s.writeError } }) : JSON.stringify({ ok: true, data: { message: 'Saved' } });
   });
-  const ui = { renderIcon: () => '', renderSkeleton: (v, label) => '<span data-skeleton>' + label + '</span>', refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => () => {} };
+  const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: () => '', renderSkeleton: (v, label) => '<span data-skeleton>' + label + '</span>', refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => () => {} };
   const weekly = { selectTeam: (t) => calls.weekly.push(['team', t]), selectView: (v) => calls.weekly.push(['view', v]), load: () => calls.loads++, positionTitleInfo: (e, el) => calls.toggles.push(el.id) };
   vm.runInContext('globalThis.__make = ' + c.guideViewBrowser_.toString(), c);
   const view = c.__make(bridge, () => ui, () => weekly);
@@ -47,12 +48,14 @@ test('renders the workspace contract GuideWeekly and GuideEvaluation depend on',
   assert.equal(byAttr(f, 'data-guide-select', 'T2').getAttribute('data-documents-attention'), '2');
   assert.equal(byAttr(f, 'data-guide-select', 'T2').getAttribute('aria-pressed'), 'true');
   assert.equal(byAttr(f, 'data-guide-select', 'T1').getAttribute('aria-pressed'), 'false');
-  assert(byAttr(f, 'data-guide-select', 'T2').querySelector('[data-team-attention]'));
-  assert.deepEqual(Array.from(root.querySelectorAll('[data-guide-tab]')).map(n => n.getAttribute('data-guide-tab')), ['title', 'weekly', 'documents', 'evaluation']);
+  assert.equal(byAttr(f, 'data-guide-select', 'T2').querySelector('[data-team-attention]'), null);
+  assert.deepEqual(Array.from(root.querySelectorAll('[data-guide-tab]')).map(n => n.getAttribute('data-guide-tab')), ['github', 'title', 'weekly', 'documents', 'evaluation']);
   assert.equal(byAttr(f, 'data-guide-tab', 'title').getAttribute('aria-pressed'), 'true');
   assert(byAttr(f, 'data-guide-tab', 'title').querySelector('strong'), 'GuideWeekly appends attention badges into the tab strong element');
-  assert.equal(byAttr(f, 'data-guide-tab', 'evaluation').disabled, true);
-  assert.match(byAttr(f, 'data-guide-tab', 'evaluation').getAttribute('title'), /Available from/);
+  const evalTab = byAttr(f, 'data-guide-tab', 'evaluation');
+  assert.equal(evalTab.disabled, false); assert.equal(evalTab.hasAttribute('data-evaluation-locked'), true);
+  assert.equal(evalTab.getAttribute('title'), null); assert.doesNotMatch(evalTab.textContent, /Available/);
+  assert.match(f.host.querySelector('#guideEvaluationEditor [data-evaluation-locked-card]').textContent, /Available from/);
   const weekly = f.host.querySelector('#guideWeeklyProgress');
   assert(weekly.hasAttribute('hidden'));
   assert.deepEqual(JSON.parse(weekly.getAttribute('data-guide-weeks')).map(w => w.weekId), ['W1', 'W2']);
@@ -72,20 +75,20 @@ test('each title-approval state shows its own content', () => {
   assert.match(card('T4'), /You approved — awaiting Reviewer\./);
   assert.match(card('T5'), /Your note: Too broad/); assert.match(card('T5'), /Waiting on the team to resubmit\./);
   assert.match(card('T6'), /Reviewer's note: Narrow it/); assert.match(card('T6'), /nothing for you to do/);
-  assert.match(card('T1'), /Approved by: rev@example\.com/); assert.match(card('T1'), /Reviewer comment: Solid scope/);
-  assert.match(card('T1'), /Approved on: Date unavailable Timing unavailable/);
+  const side = byAttr(f, 'data-guide-team', 'T1').querySelector('[data-guide-view="title"]').textContent.replace(/\s+/g, ' ');
+  assert.match(side, /Approved by\s*rev@example\.com/); assert.match(side, /Reviewer comment\s*Solid scope/); assert.match(side, /Scope\s*Not recorded separately\./);
+  assert.match(card('T1'), /Approved on date unavailable\s*Timing unavailable/);
   assert.equal(byAttr(f, 'data-guide-team', 'T4').querySelector('#title-T4'), null);
   assert.match(byAttr(f, 'data-guide-team', 'T3').textContent, /Team T3 · Not Submitted/);
   assert.match(byAttr(f, 'data-guide-heading', 'T3').textContent, /No title submitted yet/);
 });
 
-test('github status shows member states, timing tooltips and the repository', () => {
+test('github status shows member states, timing labels and the repository', () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
   const t1 = byAttr(f, 'data-guide-team', 'T1');
   assert.deepEqual(Array.from(t1.querySelectorAll('[data-member-status]')).map(n => n.getAttribute('data-member-status')), ['joined', 'joined']);
-  const tips = Array.from(t1.querySelectorAll('[role="tooltip"]')).map(n => n.textContent);
-  assert.equal(tips.length, 2); assert.match(tips[1], /1 day after the deadline/);
-  assert.match(t1.textContent, /1 day late/); assert.match(t1.textContent, /On time/);
+  assert.equal(t1.querySelectorAll('[role="tooltip"], [title*="deadline"]').length, 0, 'timing is shown in the pill, not a tooltip');
+  assert.match(t1.textContent, /1 day late/); assert.match(t1.textContent, /1 day earlier/);
   assert.equal(t1.querySelector('aside a').getAttribute('href'), 'https://github.com/org/team1');
   assert.match(byAttr(f, 'data-guide-team', 'T3').textContent, /Submit GitHub Account/);
   assert.match(byAttr(f, 'data-guide-team', 'T2').textContent, /Accept Invitation Email/);
@@ -122,14 +125,7 @@ test('uses only Tailwind utilities and every one is compiled into the stylesheet
 test('team and tab buttons delegate to GuideWeekly', () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
   f.click(byAttr(f, 'data-guide-select', 'T1')); f.click(byAttr(f, 'data-guide-tab', 'documents')); f.click(byAttr(f, 'data-guide-tab', 'evaluation'));
-  assert.deepEqual(f.calls.weekly, [['team', 'T1'], ['view', 'documents']]);
-});
-
-test('the title timing popover is positioned through GuideWeekly when it opens', () => {
-  const f = setup(); f.view.render(f.host, f.s.dto);
-  const popover = f.host.querySelector('[popover]');
-  assert(popover && f.host.querySelector('[popovertarget="' + popover.id + '"]'));
-  assert.equal(popover.hasAttribute('ontoggle'), false);
+  assert.deepEqual(f.calls.weekly, [['team', 'T1'], ['view', 'documents'], ['view', 'evaluation']]);
 });
 
 test('Reject needs a note and sends nothing without one', async () => {
@@ -145,7 +141,7 @@ test('approve sends the edited title once, re-reads, re-renders and restarts wee
   const next = JSON.parse(JSON.stringify(f.s.dto)); next.teams[0].status = { key: 'AWAITING_REVIEWER', text: 'Awaiting Reviewer', tone: 'blue' }; next.teams[0].titleDue = null; f.s.dto = next;
   const button = f.host.querySelector('[data-decision="Approved"]');
   f.click(button); f.click(button);
-  assert.equal(button.disabled, true); assert.equal(f.host.querySelector('#status-T2').textContent, 'Submitting...');
+  assert.equal(button.disabled, true); assert(f.host.querySelector('#status-T2 [data-skeleton]')); assert.match(f.host.querySelector('#status-T2').textContent, /Submitting…/);
   await f.settle();
   assert.deepEqual(JSON.parse(JSON.stringify(f.calls.writes)), [['API_guide_submitDecision', ['T2', 'Approved', 'ok', 'Edited title']]]);
   assert.equal(f.calls.loads, 1);
@@ -176,7 +172,7 @@ test('a failed re-read after a saved decision reports it and leaves the content'
 
 test('the real GuideWeekly module drives the rendered workspace (team and tab selection)', () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
-  const c = loadSources(['guide-weekly-client.js'], { document: f.document, Date, JSON, DashboardUI: { renderSkeleton: () => '', beginContentLoading: () => () => {}, guideRun: () => ({}) } });
+  const c = loadSources(['guide-weekly-client.js'], { document: f.document, Date, JSON, DashboardUI: { busy:require('./busy-fixture.cjs')(), renderSkeleton: () => '', beginContentLoading: () => () => {}, guideRun: () => ({}) } });
   const api = c.guideWeeklyBrowser_();
   api.selectTeam('T1');
   assert.equal(byAttr(f, 'data-guide-select', 'T1').getAttribute('aria-pressed'), 'true');
@@ -188,11 +184,43 @@ test('the real GuideWeekly module drives the rendered workspace (team and tab se
   assert.equal(byAttr(f, 'data-guide-tab', 'documents').getAttribute('aria-pressed'), 'true');
   assert.equal(byAttr(f, 'data-guide-team', 'T1').querySelector('[data-guide-view="documents"]').hasAttribute('hidden'), false);
   assert.equal(byAttr(f, 'data-guide-team', 'T1').querySelector('[data-guide-view="title"]').hasAttribute('hidden'), true);
-  // Once the weekly read has finished the attention pill shows its action count with Tailwind classes.
+  // Once the weekly read has finished the team pill carries its action count as an accessible description (no visible badge).
   f.host.querySelector('#guideWeeklyProgress').data = { entries: [], weeks: [] };
   api.selectTeam('T2');
-  const pill = byAttr(f, 'data-guide-select', 'T2').querySelector('[data-team-attention]');
-  assert.equal(pill.textContent, 'Title review · 1');
-  assert.match(pill.className, /inline-flex/);
+  assert.equal(byAttr(f, 'data-guide-select', 'T2').querySelector('[data-team-attention]'), null);
+  assert.match(byAttr(f, 'data-guide-select', 'T2').getAttribute('aria-description'), /Title review · 1/);
   assert.equal(byAttr(f, 'data-guide-select', 'T1').className.includes('tile--selected'), false);
+});
+
+test('commit history is read only when a GitHub status tab is shown, then counts and the latest commits fill in', async () => {
+  const f = setup();
+  f.s.commits = { teamId: 'T1', state: 'available', message: '', repositoryUrl: 'https://github.com/org/team1', members: [
+    { regno: '001', username: 'one', count: 12, commits: [{ sha: 'a'.repeat(40), shortSha: 'aaaaaaa', message: 'Add <b>sensor</b>', timestamp: '2026-01-05T10:00:00.000Z', url: 'https://github.com/org/team1/commit/' + 'a'.repeat(40) }] },
+    { regno: '002', username: 'two', count: 0, commits: [] }] };
+  f.view.render(f.host, f.s.dto);
+  const t1 = () => byAttr(f, 'data-guide-team', 'T1'), row = r => t1().querySelector('[data-github-member="' + r + '"]');
+  f.click(byAttr(f, 'data-guide-tab', 'title')); await f.settle();
+  assert.deepEqual(f.calls.reads, [], 'nothing is requested until the GitHub tab is shown');
+  f.host.querySelectorAll('[data-guide-team]').forEach(el => el.setAttribute('hidden', ''));
+  t1().removeAttribute('hidden'); t1().querySelector('[data-guide-view="github"]').removeAttribute('hidden');
+  f.click(byAttr(f, 'data-guide-tab', 'github')); await f.settle();
+  assert.deepEqual(f.calls.reads, ['T1']);
+  assert.equal(row('001').querySelector('[data-commit-count]').textContent, '12 commits');
+  assert.equal(row('002').querySelector('[data-commit-count]').textContent, '0 commits');
+  assert.match(row('001').querySelector('[data-commit-list]').textContent, /Add <b>sensor<\/b>/);
+  assert.equal(row('001').querySelector('[data-commit-list] script, [data-commit-list] b'), null, 'commit messages are escaped');
+  assert.match(row('001').querySelector('[data-commit-list] a[href$="/commits?author=one"]').textContent, /View all on GitHub/);
+  assert.match(row('002').querySelector('[data-commit-list]').textContent, /No commits yet/);
+  f.click(byAttr(f, 'data-guide-tab', 'github')); await f.settle();
+  assert.deepEqual(f.calls.reads, ['T1'], 'a team is read once per dashboard render');
+  assert(row('001').querySelector('details').hasAttribute('open') === false, 'commit details start collapsed');
+});
+
+test('the approval timing pill says how many days early or late the title was approved', () => {
+  const label = days => { const dto = JSON.parse(JSON.stringify(dtoFromServer())); const t = dto.teams.find(x => x.teamId === 'T1'); t.approval.timing = { state: days > 0 ? 'late' : 'on-time', explanation: 'x', days };
+    const f = setup(dto); f.view.render(f.host, f.s.dto); const pill = byAttr(f, 'data-guide-team', 'T1').querySelector('[data-guide-view="title"] span[class*="ring-1"]'); return { text: pill.textContent, title: pill.getAttribute('title') }; };
+  assert.deepEqual(label(-3), { text: '3 days earlier', title: null });
+  assert.equal(label(-1).text, '1 day earlier');
+  assert.equal(label(0).text, 'On time');
+  assert.equal(label(2).text, '2 days late');
 });

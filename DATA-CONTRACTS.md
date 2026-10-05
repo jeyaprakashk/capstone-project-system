@@ -40,6 +40,7 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_student_getReviewResult(key)` / `API_student_getGuideResult()` | Student | assessment key | the published result (`config, identity, total, weighted, scores, assessment, underCorrection`) or `null` when nothing is published | `loadPublishedReviewEvaluation_` / `loadPublishedGuideEvaluation_` called directly |
 | `API_student_getDashboard()` | Student | none | `StudentDashboard` (below) | `buildStudentContent` (removed) |
 | `API_guide_getDashboard()` | Guide | none | `GuideDashboard` (below) | `buildDashboardContent` (removed) |
+| `API_guide_getCommits(teamId)` | Guide (own team only) | team ID | `{teamId, state:'available'|'unavailable', message, repositoryUrl?, members:[{regno, username, count:number|null, commits:[{sha, shortSha, message, timestamp, url}]}]}`; `count` is every collected commit by that member in the team repository (all time, bootstrap commit excluded) and `commits` the latest 3; read when the GitHub status tab is first shown | `buildGuideCommitsDto_` over `readCollectedCommits_` |
 | `API_guide_submitDecision(teamId, decision, notes, editedTitle)` | Guide | `decision` is `Approved` or `Rejected`; notes required for `Rejected` | `{message}` | `decide` in the old client |
 | `API_reviewer_getDashboard()` | Reviewer | none | `ReviewerDashboard` (below) | `buildReviewerContent` (removed) |
 | `API_reviewer_submitDecision(teamId, decision, notes)` | Reviewer | `decision` is `Approved` or `Revise`; notes required for `Revise` | `{message}` | `reviewerDecide` in the old client |
@@ -160,9 +161,9 @@ captured from the removed HTML for eight states).
            registerNumbers:[string], repoUrl, problem, documents:[{label,url}], lastDocumentSubmission,
            overdueLogs:number, titleDue:{date,overdue}|null, titleTiming:{state,explanation}|null,
            similarityFlag, guideNotes, reviewerNotes,
-           approval:{approvedBy, approvedOn, timing:{state,explanation}}|null,          // APPROVED only
+           approval:{approvedBy, approvedOn, timing:{state,explanation,days:number|null}}|null,          // APPROVED only
            github:{ tone, members:[{name,regno,state:'missing'|'joined'|'pending',
-                    timing:{state,explanation,date,daysLate}|null}] }|null }],          // null = status unavailable
+                    timing:{state,explanation,date,daysLate,days:number|null}|null}] }|null }],          // null = status unavailable
   githubDue:string|null,
   evaluation:{enabled:boolean, notice:string},
   weeks:[{weekId, opensAt, deadlineAt}] }       // epoch ms; consumed by GuideWeekly

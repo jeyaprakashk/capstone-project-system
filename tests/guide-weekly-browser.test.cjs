@@ -9,7 +9,7 @@ function fixture() {
   const {Sync}=require('./sync-promise.cjs');
   const bridge={read:(key,method,args)=>{const p=new Sync();requests.push({method:method==='API_guide_getEvaluation'?'loadGuideEvaluation_':'loadGuideWeeklyProgress_',args:args||[],success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;},
     write:(method,args)=>{const p=new Sync();requests.push({method:'submitWeeklyGuideSignoff_',args,success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;}};
-  const c=vm.createContext({document,Date,setTimeout:(fn,delay)=>{assert.equal(delay,5000);timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),DashboardUI:{renderSkeleton:()=>'<span>Skeleton</span>',beginContentLoading:(target,label,options)=>{
+  const c=vm.createContext({document,Date,setTimeout:(fn,delay)=>{assert.equal(delay,5000);timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),DashboardUI:{busy:require('./busy-fixture.cjs')(),renderSkeleton:()=>'<span>Skeleton</span>',renderIcon:name=>'<i data-icon="'+name+'"></i>',beginContentLoading:(target,label,options)=>{
     starts++;assert.equal(options.compact,true);target.setAttribute('aria-busy','true');let done=false;
     return()=>{if(!done){done=true;finishes++;target.removeAttribute('aria-busy');}};
   },guideRun:()=>{const request={};const runner=new Proxy({withSuccessHandler(fn){request.success=fn;return runner;},withFailureHandler(fn){request.failure=fn;return runner;}},{get(target,key){return target[key]||((...args)=>{request.method=key;request.args=args;requests.push(request);});}});return runner;}}});
@@ -24,12 +24,12 @@ function fixture() {
 test('guide list defaults latest week, escapes content, renders absent score and uses shared buttons',()=>{
   const f=fixture();f.api.load();f.api.load();assert.equal(f.requests.length,1);f.reply();
   assert.equal(f.host.week,'W2');assert.equal(f.host.querySelectorAll('[data-entry]').length,1);
-  assert.match(f.host.textContent,/—/);assert.equal(f.host.querySelector('[data-decision-status]'),null);assert.equal(f.host.querySelector('script'),null);
+  assert.equal(f.host.querySelector("[data-weekly-student-header]").textContent.includes("AI Quality"),false);assert.equal(f.host.querySelector('[data-decision-status]'),null);assert.equal(f.host.querySelector('script'),null);
   assert.equal(f.host.querySelector('[data-entry] b'),null);
   f.host.querySelectorAll('[data-sign],[data-details]').forEach(button=>assert.match(button.className,/\btext-xs\b.*\bpx-2\b|\bpx-2\b.*\btext-xs\b/));
   f.host.querySelector('[data-week-step="1"]').click();
   assert(f.host.querySelector('[data-weekly-student-header] > [data-weekly-deadline]'));
-  assert.match(f.host.textContent,/0\/10/);assert.equal(f.host.querySelector('[data-sign="DISCUSSED"]').getAttribute('aria-pressed'),'true');
+  assert.equal(f.host.querySelector('[data-sign="DISCUSSED"]').getAttribute('aria-pressed'),'true');
   assert.deepEqual(f.counts(),[1,1]);
 });
 
@@ -91,17 +91,6 @@ test('sticky decision bars reserve their measured height only on tall cards',()=
   contentHeight=300;measure();assert.equal(card.dataset.actionReserve,'0');
 });
 
-test('AI quality handles blank scores and explains the actual rating calculation',()=>{
-  for(const value of [null,undefined,'','  ',NaN,'invalid',-1,11,0,'0',7]) {
-    const f=fixture();f.data.entries[0].score=value;f.api.load();f.reply();
-    const score=f.host.querySelector('[data-ai-quality]');
-    assert.equal(score.textContent,value===0 || value==='0'?'0/10':value===7?'7/10':'—');
-    assert.match(score.title,/technical substance, specificity, outcome, next action, and GitHub support/);
-    assert.match(score.title,/High \(2\), Medium \(1\), or Low \(0\)/);
-    assert.equal(f.host.querySelector('[data-details]'),null);
-  }
-});
-
 test('refresh failure retains successful DOM, settles controls, and retries cleanly',()=>{
   const f=fixture();f.api.load();f.reply();const row=f.host.querySelector('[data-entry]');
   f.api.load();assert.equal(f.host.querySelector('[data-week-step]').disabled,true);f.requests.at(-1).failure(Error('offline'));
@@ -142,7 +131,7 @@ test('full answers, AI ratings and commit date/message/SHA are visible without d
   const sha='4fa79515b076b1fc2ca764338761bb347e4f547c',url='https://github.com/org/team/commit/'+sha;
   Object.assign(f.data.entries[0],{score:7,workCompleted:'<img src=x>',guideDiscussion:'Decision\nNext …',blockers:'None',nextAction:'Measure',analysis:{score:7,comment:'Concrete work',technical_substance:'HIGH',specificity:'HIGH',outcome:'MEDIUM',next_action:'HIGH',github_support:'LOW'},evidence:{state:'available',commits:[{timestamp:'2026-01-02T12:00:00Z',message:'Added plots',sha,shortSha:sha.slice(0,7),url}]}});
   f.api.load();f.reply();
-  assert.equal(f.host.querySelector('img'),null);assert.match(f.host.textContent,/7\/10/);assert.match(f.host.textContent,/Technical substance/);
+  assert.equal(f.host.querySelector('img'),null);assert.match(f.host.textContent,/Technical substance/);
   assert.match(f.host.textContent,/Added plots/);assert.match(f.host.textContent,/2026/);assert.deepEqual(f.counts(),[1,1]);
   assert.equal(f.host.querySelectorAll('[data-answer] > strong').length,4);
   assert(!f.host.querySelector('[data-answer="guideDiscussion"]').textContent.includes('Next …'));
@@ -348,7 +337,7 @@ test('team attention combines only guide actions, updates after decisions and di
   f.document.body.appendChild(root);root.appendChild(f.host);
   const pill=id=>root.querySelector('[data-guide-select="'+id+'"] [data-team-attention]');
   f.api.load();assert.match(pill('A').textContent,/Skeleton/);assert.equal(pill('B').hidden,false);assert.equal(pill('A').getAttribute('aria-busy'),'true');
-  f.reply();assert.equal(pill('A').textContent,'Title review · 1');assert.equal(pill('A').hasAttribute('aria-busy'),false);assert.equal(pill('A').hasAttribute('title'),false);assert.equal(root.querySelector('[data-guide-select="A"]').hasAttribute('title'),false);assert.equal(pill('B').hidden,true);assert.equal(f.requests.length,1);
+  f.reply();assert.equal(pill('A').textContent,'Title review · 1');assert.equal(pill('A').getAttribute('aria-busy'),'false');assert.equal(pill('A').hasAttribute('title'),false);assert.equal(root.querySelector('[data-guide-select="A"]').hasAttribute('title'),false);assert.equal(pill('B').hidden,true);assert.equal(f.requests.length,1);
   const tabBadge=key=>root.querySelector('[data-guide-tab="'+key+'"] [data-guide-tab-attention]');
   assert.equal(tabBadge('weekly').textContent,'1');assert.equal(tabBadge('documents').textContent,'2');
   assert.equal(root.querySelector('[data-guide-tab="title"]').getAttribute('aria-pressed'),'true');
@@ -366,7 +355,7 @@ test('team attention combines only guide actions, updates after decisions and di
   const count=f.requests.length;f.api.selectView('documents');f.api.selectView('weekly');assert.equal(f.requests.length,count);
   root.querySelector('[data-guide-tab="evaluation"]').disabled=true;
   f.api.load();assert.match(pill('A').textContent,/Skeleton/);f.requests.at(-1).failure('offline');
-  assert.equal(pill('A').textContent,'Title review · 1');assert.equal(pill('A').hasAttribute('aria-busy'),false);
+  assert.equal(pill('A').textContent,'Title review · 1');assert.equal(pill('A').getAttribute('aria-busy'),'false');
 });
 
 test('weekly setup card uses compiled Tailwind utilities and no legacy classes', () => {
@@ -378,4 +367,34 @@ test('weekly setup card uses compiled Tailwind utilities and no legacy classes',
   const src = fs.readFileSync('guide-weekly-client.js', 'utf8');
   assert.doesNotMatch(f.c.weeklyPhase2SetupBrowser_.toString(), /guideRun|google.script/);
   assert.deepEqual(missingClasses([...src.matchAll(/(?:PRIMARY|LINE)='([^']+)'/g)].flatMap(m => m[1].split(/\s+/))), []);
+});
+
+test('required students without a submission list as Not submitted with no decision buttons',()=>{
+  const f=fixture();f.data.requiredByWeek=[{weekId:'W2',regNos:['001','002']},{weekId:'W1',regNos:['001']}];
+  const team=f.document.createElement('section');team.dataset.guideTeam='T1';team.dataset.guideStudents='["001","002"]';
+  team.dataset.guideMembers=JSON.stringify([{name:'Student',regno:'001'},{name:'Absent <b>One</b>',regno:'002'}]);
+  const root=f.document.createElement('div');root.dataset.guideWorkspace='';root.appendChild(team);f.document.body.appendChild(root);
+  f.api.load();f.reply();f.api.selectTeam('T1',true);
+  const missing=f.host.querySelectorAll('[data-weekly-missing]');
+  assert.equal(missing.length,1);assert.equal(missing[0].dataset.weeklyMissing,'002');
+  assert.match(missing[0].textContent,/Absent .*One.*Not submitted/);assert.equal(missing[0].querySelector('b'),null);
+  assert.equal(missing[0].querySelector('button'),null);
+  f.host.querySelector('[data-week-step="1"]').click();assert.equal(f.host.querySelectorAll('[data-weekly-missing]').length,0);
+  const ineligible=f.host.querySelectorAll('[data-weekly-ineligible]');
+  assert.equal(ineligible.length,1);assert.equal(ineligible[0].dataset.weeklyIneligible,'002');
+  assert.match(ineligible[0].textContent,/Not eligible this week/);assert.equal(ineligible[0].querySelector('button'),null);
+});
+
+test('answers sit in a two-column grid, clamp with a Show more toggle, and the card body is bordered',()=>{
+  const f=fixture();f.data.entries[0].workCompleted='word '.repeat(200);f.api.load();f.reply();
+  assert.equal(f.host.querySelectorAll('[data-answer]').length,4);
+  assert.match(f.host.querySelector('[data-answer]').parentElement.className,/\bgrid-cols-2\b.*\bmax-\[640px\]:grid-cols-1\b/);
+  assert.match(f.host.querySelector('[data-weekly-summary]').className,/\bborder-t\b/);
+  assert.match(f.host.querySelector('[data-weekly-actions]').className,/\bborder-t\b/);
+  const block=f.host.querySelector('[data-answer="workCompleted"]'),text=block.querySelector('[data-answer-text]'),toggle=block.querySelector('[data-answer-toggle]');
+  assert.match(text.className,/\bline-clamp-3\b/);assert.equal(toggle.getAttribute('aria-expanded'),'false');
+  toggle.click();
+  assert.doesNotMatch(text.className,/\bline-clamp-3\b/);assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(toggle.textContent,'Show less');
+  toggle.click();
+  assert.match(text.className,/\bline-clamp-3\b/);assert.equal(toggle.textContent,'Show more');
 });

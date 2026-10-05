@@ -275,8 +275,8 @@ function studentWeeklyViewBrowser_(bridge, getUi) {
     host.weeklySaving = true;
     Array.from(form.elements).forEach(el => { el.disabled = true; });
     const status = host.querySelector('[data-weekly-status]');
-    status.textContent = 'Saving weekly progress...';
-    function settle() { host.weeklySaving = false; Array.from(form.elements).forEach(el => { el.disabled = false; }); }
+    const stopBusy = getUi().busy.write(status, 'Saving weekly progress…');
+    function settle() { stopBusy(); host.weeklySaving = false; Array.from(form.elements).forEach(el => { el.disabled = false; }); }
     bridge.write('API_student_submitWeekly', [input]).then(function(result) {
       settle();
       if (!host.isConnected) return;

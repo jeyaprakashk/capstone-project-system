@@ -689,11 +689,11 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   }
   function sendAcademic(method,input) {
     const signature=JSON.stringify({method,input});if(!pending || pending.signature!==signature)pending={signature,id:requestId()};
-    input.requestId=pending.id;setBusy(true);message('Saving assessment…');
+    input.requestId=pending.id;setBusy(true);const done=DashboardUI.busy.write(drawer.querySelector('[data-message]'),'Saving assessment…');
     bridge.write('API_review_save',[SAVE_KINDS[method],input]).then(result=>{
-      busy=false;dirty=false;pending=null;targeted=null;correctionIndex=null;model.revision=result.revision;model.status=result.status;model.evaluation=result.evaluation;
+      done();busy=false;dirty=false;pending=null;targeted=null;correctionIndex=null;model.revision=result.revision;model.status=result.status;model.evaluation=result.evaluation;
       render();message('Assessment saved. Changed results require publication.');refreshTable();
-    },error=>{setBusy(false);message(error.message+' Your entries are retained.');});
+    },error=>{done();setBusy(false);message(error.message+' Your entries are retained.');});
   }
   function setBusy(value) {
     busy=value;drawer.querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=value);
@@ -732,13 +732,13 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if(submit && !await DashboardUI.ask('Submit '+reviewLabel+' for the entire team? Normal scores will lock; documented pending cases can be assessed separately.'))return;
     const method=submit?'submitReviewEvaluation_':'saveReviewEvaluationDraft_', signature=JSON.stringify({method,payload});
     if(!pending || pending.signature!==signature)pending={signature,id:requestId()};
-    payload.requestId=pending.id;setBusy(true);message('Saving '+reviewLabel+'…');
+    payload.requestId=pending.id;setBusy(true);const done=DashboardUI.busy.write(drawer.querySelector('[data-message]'),'Saving '+reviewLabel+'…');
     bridge.write('API_review_save',[SAVE_KINDS[method],{...payload,assessmentId:reviewKey}]).then(result=>{
       dirty=false;pending=null;model.revision=result.revision;model.status=result.status;
       model.evaluation=result.evaluation || {...payload,status:result.status,submittedAt:result.submittedAt,submittedDay:result.submittedDay,late:result.late};model.availability.editable=result.status==='Draft';
       if(result.timing)model.availability.timing=result.timing;
-      busy=false;render();message(result.status==='Draft'?'Draft saved.':reviewLabel+' submitted.');refreshTable();
-    },error=>{setBusy(false);message(error.message+' Your entries are retained. Retry uses the same request ID until you edit.');});
+      done();busy=false;render();message(result.status==='Draft'?'Draft saved.':reviewLabel+' submitted.');refreshTable();
+    },error=>{done();setBusy(false);message(error.message+' Your entries are retained. Retry uses the same request ID until you edit.');});
   }
   function refreshTable() {
     ReviewerView.refresh().then(refreshed=>{if(!refreshed&&drawer.open)message('Evaluation saved. The assigned-team table could not refresh; reload to retry.');});

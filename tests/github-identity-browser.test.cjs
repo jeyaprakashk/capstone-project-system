@@ -10,13 +10,13 @@ function fixture() {
   const form=document.querySelector('form'),input=form.querySelector('input'),requests=[],refreshes=[];
   form.elements={profileUrl:input};form.reportValidity=()=>true;
   const source=fs.readFileSync('dashboard-client-scripts.js','utf8').replace(/\r\n/g,'\n');
-  const context=vm.createContext({document,renderSkeleton:()=>'<span>Skeleton</span>',
+  const context=vm.createContext({document,busy:require('./busy-fixture.cjs')(),renderSkeleton:()=>'<span>Skeleton</span>',
     escapeClientHtml:v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))});
   vm.runInContext(source.slice(source.indexOf('  function byId('),source.indexOf('  // Session-only diagnostics:')),context);
   vm.runInContext(fs.readFileSync('student-github-actions.js','utf8'),context);
   const bridge={write:(endpoint,args)=>{const p=new Sync(),req={endpoint,method:LEGACY[endpoint],args,success:v=>p.resolve(v),failure:e=>p.reject(e)};requests.push(req);return p;}};
   // The dashboard refresh is DashboardUI's; settling it shows the status message the flow passed along.
-  const ui={renderSkeleton:context.renderSkeleton,beginContentLoading:context.beginContentLoading,
+  const ui={busy:context.busy,renderSkeleton:context.renderSkeleton,beginContentLoading:context.beginContentLoading,
     reloadRole:(key,onLoaded)=>{onLoaded();refreshes.push(document.getElementById('githubSubmitStatus').textContent);}};
   const github=context.studentGithubBrowser_(bridge,()=>ui);
   context.focusGithubAccountForm=github.focusGithubAccountForm;

@@ -24,7 +24,7 @@ function setup() {
     write: (method, args) => { const p = new Sync(); requests.push({ kind: 'write', method, input: args[0], ok: v => p.resolve(v), fail: e => p.reject(e) }); return p; }
   };
   const ctx = vm.createContext({ document, window: { addEventListener() {} }, crypto: { randomUUID: (() => { let n = 0; return () => 'req-' + (++n) + '-uuid'; })() }, Date, JSON,
-    DashboardUI: { renderSkeleton: () => '<span data-skeleton></span>', ask: async text => { asked.push(text); return confirm; } },
+    DashboardUI: { busy: require('./busy-fixture.cjs')(), renderSkeleton: () => '<span data-skeleton></span>', ask: async text => { asked.push(text); return confirm; } },
     GuideWeekly: { selectView: v => events.weekly.push(['view', v]), evaluationStatus: (t, s) => events.weekly.push(['status', t, s]) } });
   vm.runInContext(fs.readFileSync('guide-evaluation-client.js', 'utf8'), ctx);
   const api = ctx.guideEvaluationBrowser_(bridge);

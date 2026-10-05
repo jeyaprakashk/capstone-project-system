@@ -5,13 +5,17 @@ function guideWeeklyBrowser_(bridge) {
   const ATTENTION_BADGE='inline-flex items-center rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/20';
   const BADGE='inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ';
   const badgeClass = tone=>BADGE+({green:'bg-success-tint text-success ring-success/20',orange:'bg-warning-tint text-warning ring-warning/20',blue:'bg-info-tint text-info ring-info/20',red:'bg-danger-tint text-danger ring-danger/20',gray:'bg-soft text-ink-2 ring-control/20'}[tone] || 'bg-soft text-ink-2 ring-control/20');
-  const SMALL='border-0 rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50',SMALL_PRIMARY='border-0 rounded-md bg-primary px-2 py-1 text-xs font-semibold text-paper hover:bg-primary-hover disabled:opacity-50',NAV_BUTTON='border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
+  const SMALL='border-0 rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50',SMALL_PRIMARY='border-0 rounded-md bg-primary px-2 py-1 text-xs font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
+  const NAV_ICON='inline-flex size-10 items-center justify-center rounded-lg border border-edge bg-paper p-0 text-ink hover:bg-tint disabled:opacity-50';
+  const MORE='mt-2 border-0 bg-transparent p-0 text-xs font-semibold text-primary underline';
   const message = error=>typeof error === 'string' ? error : error?.message || 'Request failed.';
   function current(node) { return node.isConnected && host() === node; }
   function controls(node,disabled) {
-    node.querySelectorAll('button,select').forEach(control=>{control.disabled=disabled || control.dataset.weekBoundary==='true';});
+    node.querySelectorAll('button:not([data-answer-toggle]),select').forEach(control=>{control.disabled=disabled || control.dataset.weekBoundary==='true';});
   }
   let selectedTeam = '', selectedView = 'title';
+  // A locked Guide Evaluation tab stays clickable; it shows the availability card instead of opening the editor.
+  function evaluationOpen(root) { const tab=root.querySelector('[data-guide-tab="evaluation"]'); return !!tab && !tab.disabled && !tab.hasAttribute('data-evaluation-locked'); }
   function workspace() { return document.querySelector('[data-guide-workspace]'); }
   function teamActions(team) {
     const root=workspace(),node=host();if(!root || !node)return [];
@@ -22,24 +26,30 @@ function guideWeeklyBrowser_(bridge) {
     if(button?.dataset.titleAttention==='true')actions.push({key:'title',label:'Title review',count:1});
     const pending=node.data?.entries.filter(entry=>entry.status==='PENDING' && node.data.weeks.includes(entry.weekId) && students.includes(String(entry.regNo).trim().toLowerCase())).length || 0;
     if(pending)actions.push({key:'weekly',label:'Weekly progress',count:pending});
-    if(root.querySelector('[data-guide-tab="evaluation"]')?.disabled===false && root.evaluationAttention?.[team])actions.push({key:'evaluation',label:'Guide Evaluation',count:root.evaluationCounts?.[team] || 1});
+    if(evaluationOpen(root) && root.evaluationAttention?.[team])actions.push({key:'evaluation',label:'Guide Evaluation',count:root.evaluationCounts?.[team] || 1});
     if(button?.dataset.titleAttention==='true' && Number(button.dataset.documentsAttention)>0)actions.push({key:'documents',label:'Documents',count:Number(button.dataset.documentsAttention)});
     return actions;
   }
   function updateAttention() {
     const root=workspace(),node=host();if(!root || !node)return;
     root.querySelectorAll('[data-guide-select]').forEach(button=>{
-      const pill=button.querySelector('[data-team-attention]');if(!pill)return;
+      const pill=button.querySelector('[data-team-attention]');
+      const label=button.querySelector('[data-team-label]'),spinner=button.querySelector('[data-team-spinner]');
       const actions=teamActions(button.dataset.guideSelect),first=actions[0];
-      const unknown=!node.data || (root.querySelector('[data-guide-tab="evaluation"]')?.disabled===false && typeof root.evaluationAttention?.[button.dataset.guideSelect]!=='boolean');
+      const unknown=!node.data || (evaluationOpen(root) && typeof root.evaluationAttention?.[button.dataset.guideSelect]!=='boolean');
       const loading=node.attentionLoading || (!node.data && !node.attentionReadFailed) || root.evaluationLoading?.[button.dataset.guideSelect];
+      if(label)label.hidden=!!loading;
+      if(spinner){spinner.hidden=!loading;if(loading)spinner.innerHTML=DashboardUI.renderSkeleton('inline','Checking team actions');}
       if(loading){
-        pill.hidden=false;pill.className='';pill.setAttribute('aria-busy','true');
+        if(!pill)return;
+        pill.hidden=false;pill.className='';DashboardUI.busy.mark(pill,true);
         pill.innerHTML=DashboardUI.renderSkeleton('inline','Checking team actions');return;
       }
-      pill.removeAttribute('aria-busy');
-      pill.hidden=!first;pill.className=ATTENTION_BADGE;
-      pill.textContent=first?first.label+' · '+first.count:'';
+      if(pill){
+        DashboardUI.busy.mark(pill,false);
+        pill.hidden=!first;pill.className=ATTENTION_BADGE;
+        pill.textContent=first?first.label+' · '+first.count:'';
+      }
       button.setAttribute('aria-description',actions.map(action=>action.label+' · '+action.count).join(', ')+(unknown?' · Some action statuses could not be checked.':''));
     });
     const actions=teamActions(selectedTeam);
@@ -65,7 +75,7 @@ function guideWeeklyBrowser_(bridge) {
     if(root.attentionLandingTeam===team && selectedTeam===team && teamActions(team)[0]?.key==='evaluation')selectView('evaluation',false,true);
   }
   function readEvaluationAttention() {
-    const root=workspace();if(!root || root.querySelector('[data-guide-tab="evaluation"]')?.disabled!==false)return;
+    const root=workspace();if(!root || !evaluationOpen(root))return;
     root.evaluationAttention = root.evaluationAttention || {};root.evaluationVersions = root.evaluationVersions || {};root.evaluationLoading=root.evaluationLoading || {};
     root.querySelectorAll('[data-guide-select]').forEach(button=>{
       const team=button.dataset.guideSelect;
@@ -85,6 +95,20 @@ function guideWeeklyBrowser_(bridge) {
   function teamStudents() {
     const team=Array.from(workspace()?.querySelectorAll('[data-guide-team]') || []).find(panel=>panel.dataset.guideTeam===selectedTeam);
     return team?JSON.parse(team.dataset.guideStudents).map(value=>String(value).trim().toLowerCase()):null;
+  }
+  function teamMembers() {
+    const team=Array.from(workspace()?.querySelectorAll('[data-guide-team]') || []).find(panel=>panel.dataset.guideTeam===selectedTeam);
+    try { return team?.dataset.guideMembers ? JSON.parse(team.dataset.guideMembers) : []; } catch(error) { return []; }
+  }
+  function missingRows(required,entries) {
+    if(!required)return '';
+    const submitted=new Set(entries.map(entry=>String(entry.regNo).trim().toLowerCase()));
+    const members=teamMembers(),names=new Map(members.map(member=>[String(member.regno).trim().toLowerCase(),member.name]));
+    const regs=new Set([...required,...members.map(member=>String(member.regno).trim().toLowerCase()).filter(Boolean)]);
+    return Array.from(regs).filter(reg=>!submitted.has(reg)).map(reg=>{
+      const eligible=required.has(reg);
+      return '<div class="grid grid-cols-[1fr_auto_1fr] items-center gap-x-4 gap-y-1 px-2 py-3 max-[640px]:grid-cols-1" '+(eligible?'data-weekly-missing="':'data-weekly-ineligible="')+esc(reg)+'"><div class="flex min-w-0 flex-col"><strong>'+esc(names.get(reg) || reg)+'</strong><small class="font-mono text-xs text-muted">'+esc(reg)+'</small></div><span aria-hidden="true"></span><span class="justify-self-end text-sm text-muted max-[640px]:justify-self-start" data-guide-decision'+(eligible?'':' title="Not eligible for weekly progress in this week"')+'>'+(eligible?'Not submitted':'Not eligible this week')+'</span></div>';
+    }).join('');
   }
   function selectDefaultWeek(node) {
     const students=teamStudents();
@@ -112,8 +136,9 @@ function guideWeeklyBrowser_(bridge) {
     const editor=document.getElementById('guideEvaluationEditor');
     if(view==='evaluation') {
       const tab=root.querySelector('[data-guide-tab="evaluation"]');
-      if(!tab || tab.disabled || !editor)return;
-      if(!evaluationReady && editor.dataset.team!==selectedTeam){GuideEvaluation.open(selectedTeam);return;}
+      if(!tab || !editor)return;
+      if(!evaluationOpen(root)) { /* locked: the editor section already holds the availability card */ }
+      else if(!evaluationReady && editor.dataset.team!==selectedTeam){GuideEvaluation.open(selectedTeam);return;}
     }
     if(editor)editor.hidden=view!=='evaluation';
     selectedView=view;
@@ -166,13 +191,7 @@ function guideWeeklyBrowser_(bridge) {
     const date=Number.isFinite(week?.deadlineAt)?new Date(week.deadlineAt):null;
     const label=date?date.toLocaleDateString('en-GB',{timeZone:node.data.timezone,day:'numeric',month:'short',year:'numeric'}).replace(/\bSept\b/g,'Sep'):'Date unavailable';
     const full=date?date.toLocaleString('en-IN',{timeZone:node.data.timezone,timeZoneName:'short',hour12:true}):'Submission deadline unavailable';
-    return '<div data-weekly-deadline>'+submissionBadge(entry.timeliness,entry.firstSubmittedAt,week?.deadlineAt,node.data.timezone)+'<small class="ml-2 text-xs text-muted" title="'+esc(full)+'">Due: '+esc(label)+'</small></div>';
-  }
-  function qualityScore(value) {
-    const score=(typeof value==='number' || (typeof value==='string' && value.trim()!==''))?Number(value):NaN;
-    const label=Number.isInteger(score) && score>=0 && score<=10?score+'/10':'—';
-    const explanation='Based on the weekly log and GitHub commit messages: technical substance, specificity, outcome, next action, and GitHub support. Each is rated High (2), Medium (1), or Low (0), summed out of 10. A dash means not scored yet.';
-    return '<strong data-ai-quality tabindex="0" title="'+explanation+'" aria-label="AI Quality: '+(label==='—'?'Not scored yet':label)+'. '+explanation+'">'+label+'</strong>';
+    return '<div data-weekly-deadline class="flex flex-wrap items-center justify-center max-[640px]:justify-start">'+submissionBadge(entry.timeliness,entry.firstSubmittedAt,week?.deadlineAt,node.data.timezone)+'<small class="ml-2 text-xs text-muted" title="'+esc(full)+'">Due '+esc(label)+'</small></div>';
   }
   function lastTeamSubmission(node,students) {
     const entries=node.data.entries.filter(entry=>!students || students.includes(String(entry.regNo).trim().toLowerCase()));
@@ -189,11 +208,23 @@ function guideWeeklyBrowser_(bridge) {
     return (start.toLocaleDateString('en-GB',options)+' – '+end.toLocaleDateString('en-GB',options)).replace(/\bSept\b/g,'Sep');
   }
   function weeklyAnswers(entry) {
-    return '<div class="mt-3">'+[['workCompleted','Work completed'],['guideDiscussion','Guide discussion / decision'],['blockers','Problems / blockers'],['nextAction','Next week plan']].map(([key,label])=>{
+    return '<div class="grid grid-cols-2 gap-3 max-[640px]:grid-cols-1">'+[['workCompleted','Work completed'],['guideDiscussion','Guide discussion / decision'],['blockers','Problems / blockers'],['nextAction','Next week plan']].map(([key,label])=>{
       const answer=String(entry[key] || '').replace(/\r\n?/g,'\n').trim().replace(/(?:^|\s)Next\s*(?:…|\.{3})\s*$/i,'').trim()
         .split(/\n\s*\n/).map(paragraph=>paragraph.split('\n').reduce((text,line)=>text+(text ? (/^\s*(?:[-*•]|\d+[.)])\s/.test(line)?'\n':' ') : '')+line.trim(),'')).join('\n\n');
-      return '<p data-answer="'+key+'" class="mt-2 whitespace-pre-line break-words text-sm text-ink-2"><strong class="block text-ink">'+label+'</strong>'+esc(answer || 'No response recorded.')+'</p>';
+      return '<div data-answer="'+key+'" class="min-w-0 rounded-md bg-canvas p-3"><strong class="block text-sm text-ink">'+label+'</strong><p data-answer-text class="m-0 mt-1 line-clamp-3 whitespace-pre-line break-words text-sm text-ink-2">'+esc(answer || 'No response recorded.')+'</p><button type="button" class="'+MORE+'" data-answer-toggle aria-expanded="false" hidden>Show more</button></div>';
     }).join('')+'</div>';
+  }
+  /** The toggle only appears when the clamped text actually overflows; open cards are measured because closed ones have no layout. */
+  function measureAnswers(node) {
+    node.querySelectorAll('[data-weekly-card][open] [data-answer]').forEach(block=>{
+      const text=block.querySelector('[data-answer-text]'),button=block.querySelector('[data-answer-toggle]');
+      if(!text || !button || button.getAttribute('aria-expanded')==='true' || !Number.isFinite(text.scrollHeight) || !Number.isFinite(text.clientHeight))return;
+      button.hidden=text.scrollHeight<=text.clientHeight+1;
+    });
+  }
+  function toggleAnswer(button) {
+    const text=button.parentElement.querySelector('[data-answer-text]'),open=button.getAttribute('aria-expanded')==='true';
+    text.classList.toggle('line-clamp-3',open);button.setAttribute('aria-expanded',String(!open));button.textContent=open?'Show more':'Show less';
   }
   function weeklyEvidence(entry,timeZone) {
     const evidence=entry.evidence,commits=Array.isArray(evidence?.commits)?evidence.commits:[];
@@ -230,6 +261,16 @@ function guideWeeklyBrowser_(bridge) {
     cards.forEach(card=>{actionBarObserver.observe(card.querySelector('[data-weekly-actions]'));actionBarObserver.observe(card.querySelector('[data-weekly-summary]'));});
     resizeActionBars=update;window.addEventListener('resize',update);document.addEventListener('scroll',update,true);update();
   }
+  function studentRow(node,entry,open) {
+    const decision=entry.status==='DISCUSSED' ? '<span class="inline-flex items-center gap-1 text-sm font-semibold text-success" data-guide-decision>'+DashboardUI.renderIcon('check')+'Discussed</span>'
+      : entry.status==='NOT_DISCUSSED' ? '<span class="inline-flex items-center gap-1 text-sm text-muted" data-guide-decision>'+DashboardUI.renderIcon('x')+'Not discussed</span>'
+      : '<span class="inline-flex items-center gap-1 text-sm font-medium text-warning" data-guide-decision>Decision pending</span>';
+    return '<details class="group relative" data-weekly-card data-card-entry="'+esc(entry.entryId)+'"'+(open?' open':'')+'>'+
+      '<summary data-weekly-student-header class="grid cursor-pointer list-none grid-cols-[1fr_auto_1fr] items-center gap-x-4 gap-y-1 px-2 py-3 hover:bg-tint max-[640px]:grid-cols-1 [&::-webkit-details-marker]:hidden"><div class="flex min-w-0 flex-col"><strong>'+esc(entry.student)+'</strong><small class="font-mono text-xs text-muted">'+esc(entry.regNo)+'</small></div>'+
+      submissionDeadline(node,entry)+'<span class="flex items-center gap-2 justify-self-end max-[640px]:justify-self-start">'+decision+'<span class="text-muted transition-transform group-open:rotate-180" aria-hidden="true">'+DashboardUI.renderIcon('chevron-down')+'</span></span></summary>'+
+      '<div class="mt-0 border-t border-edge px-2 pb-3 pt-3" data-entry="'+esc(entry.entryId)+'" data-weekly-summary>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div>'+
+      '<div class="relative bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-edge bg-paper px-2 py-3 group-data-[sticky-decision=true]:sticky" data-weekly-actions data-sign-entry="'+esc(entry.entryId)+'"><span class="text-sm">Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="'+(status==='DISCUSSED'?SMALL_PRIMARY:SMALL)+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></details>';
+  }
   function render(node) {
     const target=node.querySelector('[data-guide-weekly-read]');
     if(!node.data.weeks.length){target.innerHTML='<p>No weekly submissions available. Weekly navigation starts when the first configured week opens.</p><p>'+esc(lastTeamSubmission(node,teamStudents()))+'</p>';return;}
@@ -241,25 +282,25 @@ function guideWeeklyBrowser_(bridge) {
     const total=required ? required.size : null;
     const completed=required ? new Set(entries.map(entry=>String(entry.regNo).trim().toLowerCase()).filter(reg=>required.has(reg))).size : submitted;
     const pending=entries.filter(entry=>entry.status==='PENDING').length;
-    const weekStatus=!submitted ? {tone:'gray',label:'No submissions'}
-      : pending ? {tone:'orange',label:pending+' pending'}
-      : total !== null && completed===total ? {tone:'green',label:total ? 'All required submitted' : 'No required submissions'}
-      : {tone:'blue',label:total === null ? 'Submitted' : completed+'/'+total+' required submitted'};
+    const absent=missingRows(required,entries);
     const weekSummary=(total === null ? submitted+' submitted' : completed+'/'+total+' required submitted')+' · '+pending+' awaiting decision';
     const weekIndex=node.data.weeks.indexOf(node.week);
-    target.innerHTML='<nav aria-label="Select weekly progress week" class="mt-3 flex flex-wrap items-center gap-3">'+
-      '<button type="button" class="'+NAV_BUTTON+'" data-week-step="1" data-week-boundary="'+(weekIndex===node.data.weeks.length-1)+'" '+(weekIndex===node.data.weeks.length-1?'disabled':'')+' title="'+(weekIndex===node.data.weeks.length-1?'First project week. No more previous weeks':'Previous week')+'" aria-label="Previous week">&#8249; Previous</button>'+
-      '<span aria-live="polite" class="text-sm font-semibold text-ink-2">'+esc(weekDateRange(node))+'</span>'+
-      '<button type="button" class="'+NAV_BUTTON+'" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' title="'+(weekIndex===0?'Latest available project week. No more next weeks':'Next week')+'" aria-label="Next week">Next &#8250;</button>'+
-      '<span class="'+badgeClass(weekStatus.tone)+'" data-week-status role="status" title="'+esc(weekSummary)+'">'+weekStatus.label+'</span></nav>'+
-      (entries.length ? entries.map(entry=>'<article class="group relative mt-3 rounded-lg border border-edge bg-paper p-4" data-weekly-card><div data-entry="'+esc(entry.entryId)+'" data-weekly-summary><header data-weekly-student-header class="flex flex-wrap items-center justify-between gap-3"><div class="flex flex-col"><strong>'+esc(entry.student)+'</strong><small class="text-xs text-muted">'+esc(entry.regNo)+'</small></div><span class="text-sm">AI Quality '+qualityScore(entry.score)+'</span>'+submissionDeadline(node,entry)+'</header>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div><div class="relative bottom-0 z-10 mt-3 flex flex-wrap items-center gap-2 bg-paper py-2 group-data-[sticky-decision=true]:sticky" data-weekly-actions data-sign-entry="'+esc(entry.entryId)+'"><span class="text-sm">Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="'+(status==='DISCUSSED'?SMALL_PRIMARY:SMALL)+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></article>').join(''):'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
+    const openCards=new Set(Array.from(node.querySelectorAll('[data-weekly-card][open]')).map(card=>card.dataset.cardEntry));
+    target.innerHTML='<nav aria-label="Select weekly progress week" class="mt-3 flex items-center gap-3">'+
+      '<button type="button" class="'+NAV_ICON+'" data-week-step="1" data-week-boundary="'+(weekIndex===node.data.weeks.length-1)+'" '+(weekIndex===node.data.weeks.length-1?'disabled':'')+' title="'+(weekIndex===node.data.weeks.length-1?'First project week. No more previous weeks':'Previous week')+'" aria-label="Previous week">'+DashboardUI.renderIcon('chevron-left')+'</button>'+
+      '<span aria-live="polite" class="text-sm font-semibold text-ink">'+esc(weekDateRange(node))+'</span>'+
+      '<button type="button" class="'+NAV_ICON+'" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' title="'+(weekIndex===0?'Latest available project week. No more next weeks':'Next week')+'" aria-label="Next week">'+DashboardUI.renderIcon('chevron-right')+'</button>'+
+      '<span class="'+badgeClass('orange')+' ml-auto empty:hidden" data-week-status role="status" title="'+esc(weekSummary)+'">'+(pending?pending+' pending':'')+'</span></nav>'+
+      (entries.length || absent ? '<div class="mt-3 divide-y divide-edge border-y border-edge">'+entries.map(entry=>studentRow(node,entry,openCards.has(entry.entryId))).join('')+absent+'</div>':'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
     attachActions(node);
+    measureAnswers(node);
     reserveActionBarSpace(node);
   }
   /** One delegated click listener per host: week navigation, sign-off and its Undo. */
   function attachActions(node) {
     if(node.actionsAttached)return;
     node.actionsAttached=true;
+    node.addEventListener('toggle',()=>measureAnswers(node),true);
     node.addEventListener('click',event=>{
       const button=event.target.closest && event.target.closest('button');
       if(!button || !node.contains(button))return;
@@ -269,6 +310,7 @@ function guideWeeklyBrowser_(bridge) {
         if(next){node.week=next;render(node);}
       } else if(button.hasAttribute('data-sign'))sign(node,button);
       else if(button.hasAttribute('data-sign-undo') && node.undoSign)node.undoSign();
+      else if(button.hasAttribute('data-answer-toggle'))toggleAnswer(button);
     });
   }
   function sign(node,button) {
@@ -284,8 +326,7 @@ function guideWeeklyBrowser_(bridge) {
     const timer=setTimeout(()=>{
       node.undoSign=null;
       if(!current(node)){node.busy=false;return;}
-      output.textContent='Saving guide confirmation…';
-      saveSignoff(node,entryId,status,output);
+      saveSignoff(node,entryId,status,output,DashboardUI.busy.write(output,'Saving guide confirmation…'));
     },5000);
     node.undoSign=()=>{
       node.undoSign=null;clearTimeout(timer);node.busy=false;controls(node,false);
@@ -294,12 +335,12 @@ function guideWeeklyBrowser_(bridge) {
     };
     undo.focus();
   }
-  function saveSignoff(node,entryId,status,output) {
+  function saveSignoff(node,entryId,status,output,done) {
     bridge.write('API_guide_signWeekly',[entryId,status]).then(result=>{
-      node.busy=false;controls(node,false);if(!current(node))return;
+      done();node.busy=false;controls(node,false);if(!current(node))return;
       node.data.entries.find(entry=>entry.entryId===entryId).status=result.status;
       render(node);updateAttention();output.textContent=result.message;
-    },error=>{node.busy=false;controls(node,false);if(current(node))output.textContent='Could not save confirmation: '+message(error);});
+    },error=>{done();node.busy=false;controls(node,false);if(current(node))output.textContent='Could not save confirmation: '+message(error);});
   }
   function positionTitleInfo(event,popup) {
     if(popup.dismissListeners){popup.dismissListeners();popup.dismissListeners=null;}
@@ -357,8 +398,8 @@ function weeklyPhase2SetupBrowser_(bridge) {
   function setup(node,kind) {
     if(node.busy || !current(node))return;
     node.busy=true;controls(node,true);
-    const status=node.querySelector('[data-weekly-setup-status]');status.textContent='Preparing weekly '+(kind==='storage'?'progress storage':'AI schedule')+'…';
-    function settle(message){node.busy=false;controls(node,false);if(!current(node))return;status.textContent=message;load();}
+    const done=DashboardUI.busy.write(node.querySelector('[data-weekly-setup-status]'),'Preparing weekly '+(kind==='storage'?'progress storage':'AI schedule')+'…');
+    function settle(message){node.busy=false;controls(node,false);if(!current(node)){done();return;}done(message);load();}
     bridge.write('API_coordinator_setupWeekly',[kind]).then(()=>settle('Weekly '+(kind==='storage'?'progress storage':'AI schedule')+' is ready.'),error=>settle('Setup stopped: '+(error?.message || String(error))));
   }
   return {load};

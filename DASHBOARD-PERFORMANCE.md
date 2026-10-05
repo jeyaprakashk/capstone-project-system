@@ -97,7 +97,7 @@ After checks, update the versioned web-app deployment to the tested version.
 Keep the prior deployment version recorded for rollback. Local tests cannot verify
 Google account identity, live service latency or deployment permissions.
 
-Role tabs load on demand or through sequential preloading (described below), and reuse their rendered content while the page remains
+Role tabs load on demand (sequential preloading exists but ships disabled; see below), and reuse their rendered content while the page remains
 open. Each server request authorizes the requested role again.
 
 ## Shared timeline UI

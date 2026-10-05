@@ -15,7 +15,7 @@ function setup() {
   const c = loadSources(['data-bridge-client.js', 'system-status-view.js', 'system-status-actions.js'], { document, Promise, JSON, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const record = name => () => calls.push(name);
-  const ui = { renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton>' + l + '</span>', recheckTeamFolders: record('recheck'), createTeamFolders: record('create') };
+  const ui = { busy:require('./busy-fixture.cjs')(), renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton>' + l + '</span>', recheckTeamFolders: record('recheck'), createTeamFolders: record('create') };
   vm.runInContext('globalThis.__view = ' + c.systemStatusViewBrowser_.toString(), c);
   const view = c.__view(bridge, () => ui, () => null);
   const host = document.getElementById('systemStatusContent');
@@ -79,7 +79,7 @@ function actionsSetup({ confirmed = true, read = () => FOLDERS, write = () => ({
     read: (key, name) => { log.push(['read', name]); try { return Promise.resolve(read()); } catch (error) { return Promise.reject(error); } },
     write: (name, args) => { log.push(['write', name, ...args]); try { return Promise.resolve(write(args[0])); } catch (error) { return Promise.reject(error); } }
   };
-  const ui = { beginContentLoading: () => () => log.push('loaded'), confirmDialog: options => { log.push(['confirm', options.body]); return Promise.resolve(confirmed); } };
+  const ui = { busy:require('./busy-fixture.cjs')(), beginContentLoading: () => () => log.push('loaded'), confirmDialog: options => { log.push(['confirm', options.body]); return Promise.resolve(confirmed); } };
   vm.runInContext('globalThis.__actions = ' + f.c.systemStatusActionsBrowser_.toString(), f.c);
   const actions = f.c.__actions(bridge, () => ui);
   const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setTimeout(resolve, 0)); };

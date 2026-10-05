@@ -76,12 +76,12 @@ function guideEvaluationBrowser_(bridge) {
       scores[field.dataset.pi]={level:level===''?null:Number(level),marks:field.querySelector('[data-marks]').value,remark:field.querySelector('[data-remark]').value};
     });
     if(!pending || pending.method!==method)pending={method,input:{team:current.roster.team,student:current.student.register,revision:current.revision,token:current.token,scores,requestId:requestId()}};
-    setBusy(true);message('Saving…');
+    setBusy(true);const done=DashboardUI.busy.write(el('guideEvalMessage'),'Saving…');
     bridge.write(submit?'API_guide_submitEvaluation':'API_guide_saveEvaluationDraft',[pending.input]).then(result=>{
-      setBusy(false);dirty=false;pending=null;
+      done();setBusy(false);dirty=false;pending=null;
       const team=current.roster.team,student=current.student.register;
       open(team,student);
-    },err=>{setBusy(false);message(err.message+' Retry uses the same request ID unless you change the form.');});
+    },err=>{done();setBusy(false);message(err.message+' Retry uses the same request ID unless you change the form.');});
   }
   window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
   return {open};

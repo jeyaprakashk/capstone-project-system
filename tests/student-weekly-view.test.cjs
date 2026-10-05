@@ -15,7 +15,7 @@ function fixture() {
   read:(key,method)=>{const p=new Sync();requests.push({method:'load',success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;},
   write:(method,args)=>{const p=new Sync();requests.push({method:'save',input:args[0],success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;}
  };
- const ui={ask:async()=>true,openContentDrawer(){},renderIcon:name=>'<svg data-icon="'+name+'" aria-hidden="true"></svg>',
+ const ui={busy:require('./busy-fixture.cjs')(),ask:async()=>true,openContentDrawer(){},renderIcon:name=>'<svg data-icon="'+name+'" aria-hidden="true"></svg>',
   beginContentLoading:(target,label,options)=>{assert.equal(target,host);assert.equal(options.compact,true);starts++;target.setAttribute('aria-busy','true');let done=false;return()=>{if(!done){finishes++;done=true;target.setAttribute('aria-busy','false');}};}};
  const context=vm.createContext({document,Date,Intl,crypto:{randomUUID}});
  vm.runInContext(fs.readFileSync('student-weekly-view.js','utf8'),context);
@@ -368,7 +368,7 @@ test('reads and saves use the bridge endpoints with the request identity the ser
  vm.runInContext(fs.readFileSync('student-weekly-view.js','utf8'),context);
  const bridge={read:(key,method,args,options)=>{calls.push(['read',key,method,options]);return Promise.resolve({ready:false,weeks:[],actions:[],history:[],evidence:[],timezone:'Asia/Kolkata',message:'Not ready'});},
   write:(method,args)=>{calls.push(['write',method,args[0]]);return Promise.resolve({});}};
- const api=context.studentWeeklyViewBrowser_(bridge,()=>({beginContentLoading:()=>()=>{},renderIcon:()=>'',ask:async()=>true,openContentDrawer(){}}));
+ const api=context.studentWeeklyViewBrowser_(bridge,()=>({busy:require('./busy-fixture.cjs')(),beginContentLoading:()=>()=>{},renderIcon:()=>'',ask:async()=>true,openContentDrawer(){}}));
  api.load();await new Promise(r=>setImmediate(r));
  assert.deepEqual(calls[0].slice(0,3),['read','student-weekly','API_student_getWeekly']);
  assert.equal(calls[0][3].timeoutMs,60000);

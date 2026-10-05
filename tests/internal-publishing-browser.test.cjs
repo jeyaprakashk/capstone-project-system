@@ -26,7 +26,7 @@ function fixture(key='review1') {
   function runner(ok,fail){return new Proxy({withSuccessHandler:fn=>runner(fn,fail),withFailureHandler:fn=>runner(ok,fn)},{get(target,name){return target[name]||((...args)=>calls.push({method:name,args,ok,fail}));}});}
   const c=vm.createContext({document,window:{crypto},Map,Set,setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),DashboardUI:{
     guideRun:()=>runner(),ask:async text=>{questions.push(text);return approve;},requestText:async text=>{questions.push(text);return approve?'Correction':null;},
-    beginContentLoading:host=>{loading.begun++;host.setAttribute('aria-busy','true');let done=false;return ()=>{if(done)return;done=true;loading.settled++;host.removeAttribute('aria-busy');};}
+    busy:require('./busy-fixture.cjs')(),beginContentLoading:host=>{loading.begun++;host.setAttribute('aria-busy','true');let done=false;return ()=>{if(done)return;done=true;loading.settled++;host.removeAttribute('aria-busy');};}
   }});
   for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js','internal-assessment-publishing-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);c.DashboardUI.renderIcon=c.renderLucideIcon_;c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;const { Sync } = require('./sync-promise.cjs');
   const record = (method, args) => { const p = new Sync(); calls.push({ method, args, ok: v => p.resolve(v), fail: e => p.reject(e) }); return p; };

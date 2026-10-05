@@ -92,7 +92,7 @@ function browser() {
   Object.defineProperty(document.getElementById('studentInvitationsPageSize'),'value',{value:'10',writable:true});
   vm.runInContext(fs.readFileSync('system-status-actions.js','utf8'),c);
   const bridge={write:(method,args)=>{const p=new Sync(),r={method,cursor:args[0],success:v=>p.resolve(v),failure:e=>p.reject(e)};requests.push(r);return p;}};
-  const actions=c.systemStatusActionsBrowser_(bridge,()=>({beginContentLoading:()=>()=>{},notify:()=>{},renderIcon:()=>''}));
+  const actions=c.systemStatusActionsBrowser_(bridge,()=>({busy:require('./busy-fixture.cjs')(),beginContentLoading:()=>()=>{},notify:()=>{},renderIcon:()=>''}));
   return {document,requests,run:()=>actions.runStudentInvitationResend(),resize:value=>actions.changeTeamPageSize('invitations',value),host:document.getElementById('studentInvitationResend')};
 }
 test('browser blocks duplicate clicks, accumulates batches, preserves results on failure and retries cursor',()=>{

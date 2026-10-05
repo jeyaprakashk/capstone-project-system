@@ -100,6 +100,7 @@ function getDashboardClientScript_() {
 const DashboardUI = (function() {
   'use strict';
   const renderSkeleton = ${getSkeletonMarkup_.toString()};
+  const busy = (${busyStateBrowser_.toString()})(renderSkeleton, function(target, label, options) { return beginContentLoading(target, label, options); });
   const dialogs = (${dashboardDialogsBrowser_.toString()})();
   const renderExpandableText = ${renderExpandableText_.toString()};
   const renderAssessmentHistory = ${renderAssessmentHistory_.toString()};
@@ -124,7 +125,7 @@ const DashboardUI = (function() {
     overlay.innerHTML = renderSkeleton(options && options.variant || (!compact && height > 0 && height < 120 ? 'inline' : 'panel'), label);
     const children = Array.from(target.children).map(function(child) { return {node:child, inert:child.inert}; });
     children.forEach(function(child) { child.node.inert = true; });
-    target.setAttribute('aria-busy', 'true');
+    busy.mark(target, true);
     LOADING_CLASSES.forEach(function(name) { target.classList.add(name); });
     if (compact) { target.setAttribute('data-loading-compact', ''); LOADING_COMPACT_CLASSES.forEach(function(name) { target.classList.add(name); }); }
     target.appendChild(overlay);
@@ -134,7 +135,7 @@ const DashboardUI = (function() {
       finished = true;
       overlay.remove();
       children.forEach(function(child) { child.node.inert = child.inert; });
-      target.setAttribute('aria-busy', 'false');
+      busy.mark(target, false);
       LOADING_CLASSES.forEach(function(name) { target.classList.remove(name); });
       if (compact) { target.removeAttribute('data-loading-compact'); LOADING_COMPACT_CLASSES.forEach(function(name) { target.classList.remove(name); }); }
     };
@@ -168,7 +169,7 @@ const DashboardUI = (function() {
       window.DashboardPerformance.preloading = !!enabled;
       schedulePreload();
     },
-    preloading: true
+    preloading: false
   };
   function schedulePreload() {
     clearTimeout(preloadTimer);
@@ -246,7 +247,7 @@ const DashboardUI = (function() {
     if (timelineRequest) return timelineRequest;
     const target = byId('sharedProjectTimeline');
     if (target) {
-      target.setAttribute('aria-busy', 'true');
+      busy.mark(target, true);
       target.innerHTML = renderSkeleton('timeline', 'Loading project timeline');
     }
     timelineRequest = new Promise(function(resolve, reject) {
@@ -259,14 +260,14 @@ const DashboardUI = (function() {
             Object.freeze(data.milestones);
             if (target) SharedTimelineView.render(target, data);
             sharedSchedule = Object.freeze(data);
-            if (target) target.setAttribute('aria-busy', 'false');
+            if (target) busy.mark(target, false);
             resolve(sharedSchedule);
           } catch (err) { failed(err); }
         }, failed);
       function failed(err) {
         timelineRequest = null;
         if (target) {
-          target.setAttribute('aria-busy', 'false');
+          busy.mark(target, false);
           SharedTimelineView.renderError(target, function() { loadSharedTimeline().catch(function() {}); });
         }
         reject(err);
@@ -287,20 +288,20 @@ const DashboardUI = (function() {
     if (rubricsRequest) return rubricsRequest;
     const target = byId('sharedRubricsContent'), section = byId('sharedRubrics');
     if (!target || !section) return Promise.resolve(null);
-    section.setAttribute('aria-busy', 'true');
+    busy.mark(section, true);
     target.innerHTML = renderSkeleton('panel', 'Loading assessment rubrics');
     rubricsRequest = new Promise(function(resolve, reject) {
       DataBridge.read('shared-rubrics','API_shared_getRubrics',[],{timeoutMs:120000}).then(function(data) {
         try {
           SharedRubricsView.render(target, data, openRubricDrawer);
           sharedRubrics = data;
-          section.setAttribute('aria-busy', 'false');
+          busy.mark(section, false);
           resolve(data);
         } catch (err) { reject(err); }
       }, reject);
     }).catch(function(err) {
       rubricsRequest = null;
-      section.setAttribute('aria-busy', 'false');
+      busy.mark(section, false);
       SharedRubricsView.renderError(target, function() { loadSharedRubrics_().catch(function() {}); });
       throw err;
     });
@@ -511,7 +512,7 @@ const DashboardUI = (function() {
     buttons.forEach(function(item) { item.el.disabled = true; });
     const cards = Array.from(target.querySelectorAll('[data-status-primary] > *, [data-status-cards] > section'));
     const finishCards = (cards.length ? cards : [target]).map(function(card) { return beginContentLoading(card, 'Loading system status'); });
-    target.setAttribute('aria-busy', 'true');
+    busy.mark(target, true);
     setText('systemStatusMessage', '');
     SystemStatusView.load().then(function(dto) { inUtilityLane(function() {
       finishCards.forEach(function(finish) { finish(); });
@@ -519,7 +520,7 @@ const DashboardUI = (function() {
       SystemStatusView.render(target, dto);
       systemStatusState.loading = false;
       systemStatusState.loaded = true;
-      target.setAttribute('aria-busy', 'false');
+      busy.mark(target, false);
       if (button) { button.disabled = false; button.innerHTML = renderLucideIcon_('refresh-cw') + 'Refresh'; }
       setText('systemStatusMessage', '');
       setText('systemStatusUpdated', updatedLabel());
@@ -532,7 +533,7 @@ const DashboardUI = (function() {
       finishCards.forEach(function(finish) { finish(); });
       systemStatusState.loading = false;
       syncShellRefresh();
-      target.setAttribute('aria-busy', 'false');
+      busy.mark(target, false);
       if (button) { button.disabled = false; button.innerHTML = renderLucideIcon_('refresh-cw') + 'Refresh'; }
       buttons.forEach(function(item) { item.el.disabled = item.disabled; });
       if (!systemStatusState.loaded) target.textContent = 'System status is unavailable.';
@@ -675,6 +676,7 @@ const DashboardUI = (function() {
     renderAssessmentHistory: renderAssessmentHistory,
     renderSkeleton: renderSkeleton,
     beginContentLoading: beginContentLoading,
+    busy: busy,
     refreshRoleDashboard,
     refreshSystemStatus: function() { ensureSystemStatusLoaded(true); },
     loadSharedTimeline,

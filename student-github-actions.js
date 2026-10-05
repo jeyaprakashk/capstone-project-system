@@ -94,8 +94,9 @@ function studentGithubBrowser_(bridge, getUi) {
   function confirmGithubAccount(form) {
     if (form.githubBusy || !form.githubToken) return;
     form.githubBusy = true; setButtonsDisabled(form,true);
-    setText('githubSubmitStatus','Connecting GitHub account...');
+    const stopBusy = getUi().busy.write(byId('githubSubmitStatus'), 'Connecting GitHub account…');
     bridge.write('API_student_confirmGithub',[form.githubToken]).then(function(result) {
+      stopBusy();
       form.githubBusy = false;
       if (!form.isConnected) return;
       form.hidden = true; form.githubToken = null;
@@ -103,6 +104,7 @@ function studentGithubBrowser_(bridge, getUi) {
       bridge.write('API_student_completeGithubSetup',[]).then(function(setup) { refreshGithubStatus(null,result.message + ' ' + (setup.message || '')); },
         function(error) { refreshGithubStatus(null,'GitHub account connected. Repository access is pending: ' + errorMessage(error)); });
     }, function(error) {
+      stopBusy();
       form.githubBusy = false; setButtonsDisabled(form,false);
       if (form.isConnected) setText('githubSubmitStatus',errorMessage(error));
     });

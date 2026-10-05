@@ -93,7 +93,7 @@ test('reviewer decision keeps the existing business rules and messages', () => {
 
 test('dashboard shell compiles, defines the bridge before the dashboard script and includes the Tailwind build', () => {
   const fs = require('node:fs');
-  const files = ['common-styles.js', 'common-constants.js', 'common-helpers.js', 'guide-dashboard.js', 'coordinator-dashboard.js', 'student-dashboard.js', 'reviewer-dashboard.js',
+  const files = ['common-styles.js', 'busy-state.js', 'common-constants.js', 'common-helpers.js', 'guide-dashboard.js', 'coordinator-dashboard.js', 'student-dashboard.js', 'reviewer-dashboard.js',
     'lucide-icons.js', 'icon-renderer.js', 'review-evaluation-client.js', 'internal-assessment-publishing-client.js', 'guide-evaluation-client.js', 'guide-weekly-client.js',
     'assessment-history-view.js','dashboard-client-scripts.js', 'review-academic-policy.js', 'data-bridge-client.js', 'reviewer-view.js', 'guide-view.js', 'student-view.js', 'coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js', 'system-status-view.js', 'student-weekly-view.js', 'student-results-view.js', 'student-api.js', 'coordinator-api.js', 'dashboard-router.js'];
   const c = loadSources(files, { PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }) },

@@ -22,7 +22,7 @@ function setup(data = { basic: BASIC, progress: PROGRESS, activity: ACTIVITY }) 
     const section = args[1];
     return Promise.resolve(JSON.stringify(fail[section] ? { ok: false, error: { code: 'UNAVAILABLE', message: fail[section] } } : { ok: true, data: data[section] }));
   });
-  const ui = { renderSkeleton: (v, l) => '<span data-skeleton aria-label="' + l + '">…</span>', renderExpandableText: t => '<details data-expandable>' + String(t).slice(0, 10) + '</details>' };
+  const ui = { busy:require('./busy-fixture.cjs')(), renderSkeleton: (v, l) => '<span data-skeleton aria-label="' + l + '">…</span>', renderExpandableText: t => '<details data-expandable>' + String(t).slice(0, 10) + '</details>' };
   vm.runInContext('globalThis.__make = ' + c.teamDrawerViewBrowser_.toString(), c);
   const view = c.__make(bridge, () => ui);
   const host = document.getElementById('content');

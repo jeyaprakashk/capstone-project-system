@@ -6,7 +6,7 @@ const { weeklyFixture } = require('./weekly-progress-fixture.cjs');
 function coordinatorFixture({ reviewsConfigured = true, progressFails = false } = {}) {
   const f = weeklyFixture(), c = f.c;
   for (const file of ['milestone-config.js', 'assessment-registry.js', 'rubric-config.js', 'deadline-events.js', 'lucide-icons.js', 'icon-renderer.js', 'assessment-history-view.js','dashboard-client-scripts.js',
-    'coordinator-dashboard.js', 'api-envelope.js', 'coordinator-api.js', 'common-styles.js']) vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
+    'coordinator-dashboard.js', 'api-envelope.js', 'coordinator-api.js', 'common-styles.js', 'busy-state.js']) vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
   const day = Math.floor(Date.parse('2026-01-10') / 86400000);
   const reviews = [{ key: 'review1', label: 'Review 1' }, { key: 'review2', label: 'Review 2' }];
   c.getProjectSchedule_ = () => ({ formation: day - 30, git: day - 20, title: day - 10, timezone: 'Asia/Kolkata', assessments: [], milestones: [], reviews: reviews.map((r, i) => ({ ...r, day: day - 3 + i * 13 })) });

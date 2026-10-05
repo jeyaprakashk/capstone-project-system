@@ -112,7 +112,7 @@ test('Reviewer dashboard opens the shared Review UI directly for arbitrary asses
  const button={};vm.runInContext('DashboardUI',f.c).openReviewerMarks('T1','design_gate',button);
  assert.deepEqual(calls,[['T1','design_gate',button]]);assert.equal(f.requests.length,0);
 });
-function fixture(system=false) {
+function fixture(system=false,shipped=false) {
  const loadingNode=()=>({attrs:{},children:[],inert:false,addEventListener(){},querySelector(){return null;},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},classList:{add(){},remove(){},toggle(){}},appendChild(node){this.children.push(node);node.remove=()=>{this.children=this.children.filter(child=>child!==node);};}});
  const requests=[], timers=new Map(), listeners={}; let id=0;
  const panels=['guide','reviewer','coord'].map(key=>({...loadingNode(),innerHTML:'',getAttribute:()=>key}));
@@ -131,9 +131,11 @@ function fixture(system=false) {
   return requests.push({key,args,success,failure});}}); }
  const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:(fn,delay)=>{timers.set(++id,Object.assign(()=>fn(),{delay}));return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
  for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c);
+ vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c); vm.runInContext(fs.readFileSync('busy-state.js','utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js','system-status-view.js','student-weekly-view.js','student-results-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=SystemStatusView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript_(),c);
+ // Preloading ships disabled; the queue tests opt in so the machinery stays covered.
+ if(!shipped)c.window.DashboardPerformance.preloading=true;
  return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>vm.runInContext('DashboardUI',c).showRoleTab(key),tick:()=>{ /* bridge read timeouts (30s+) are not part of idle/preload timing */ const entries=[...timers.entries()].filter(([,fn])=>!(fn.delay>=10000));entries.forEach(([key])=>timers.delete(key));entries.forEach(([,fn])=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
 }
 
@@ -187,7 +189,7 @@ test('student rubric tab reuses shared content and switching back restores My Te
 
 test('shell selects the common theme before scripts or fonts load',async()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
- for(const file of ['common-styles.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+ for(const file of ['common-styles.js','busy-state.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
  for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_']) c[name]=()=>'';
  for(const key of ['student','guide','reviewer','coord']) {
   const html=c.buildDashboardShell_('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
@@ -463,9 +465,9 @@ test('hidden preloaded panels use full skeletons while visible short controls st
   assert.equal(overlay.querySelectorAll('.sr-only').length,1);
   assert.equal(overlay.querySelector('.sr-only').textContent,'Loading');
   assert.equal(overlay.querySelector('.app-skeleton').getAttribute('aria-busy'),'true');
-  assert(overlay.querySelector(variant==='inline'?'.app-skeleton--inline [aria-hidden="true"]':'[data-skeleton]'));
+  assert.equal(overlay.querySelectorAll('[data-skeleton]').length,1);assert.match(overlay.querySelector('[data-skeleton]').className,/animate-\[spin_/);
   assert.equal(button.inert,true);
-  if(initialHeight===0){height=180;assert.equal(overlay.querySelectorAll('.app-skeleton-lines > span').length,3);}
+  
   finish();finish();assert.equal(host.children.length,1);assert.equal(host.firstElementChild,button);
   assert.equal(button.inert,undefined);assert.equal(host.getAttribute('aria-busy'),'false');
  }
@@ -477,8 +479,7 @@ test('compact refresh uses the initial skeleton and restores the original conten
  const host=document.querySelector('section'),button=host.firstElementChild;
  Object.defineProperty(host,'clientHeight',{value:716});
  const finish=vm.runInContext('DashboardUI',f.c).beginContentLoading(host,'Refreshing assigned teams',{compact:true});
- const rows=host.querySelectorAll('.app-skeleton-lines > span');
- assert.equal(rows.length,3);
+ assert.equal(host.querySelectorAll('[data-skeleton]').length,1);
  assert(host.hasAttribute('data-loading-compact'));
  assert.equal(host.firstElementChild,button);assert.equal(button.inert,true);
  finish();finish();
@@ -498,7 +499,7 @@ test('GitHub status refresh uses compact student loading and restores content af
  ui.refreshGithubStatus();ui.refreshGithubStatus();
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
  assert(host.hasAttribute('data-loading-compact'));
- assert.equal(host.querySelectorAll('.app-skeleton-lines > span').length,3);
+ assert.equal(host.querySelectorAll('[data-skeleton]').length,1);
  assert.equal(button.inert,true);
  const request=f.requests.at(-1);request.done=true;request.failure(new Error('offline'));await f.settle();
  assert.equal(host.firstElementChild,button);assert(!button.inert);
@@ -719,4 +720,27 @@ test('the shell markup has no inline handlers and no legacy component classes; a
   assert.doesNotMatch(router,/class="(?:[^"]*\s)?(tab|tabs|tabpanel|card|drawer|drawer-header|drawer-body|drawer-footer|drawer-scrim)(?:\s[^"]*)?"/);
   for(const hook of ["closest('[data-role-tab]')","closest('#roleMenuToggle')","closest('#rubricDrawerClose')","closest('[data-shell-refresh-active]')"])assert(client.includes(hook),hook);
   assert(router.includes('id="shellRefresh"') && router.includes('data-shell-refresh-active'));
+});
+
+test('the shared spinner is the only loading animation in the project',()=>{
+  const spin=/animate-(?:spin|pulse|bounce|ping)\b|animate-\[(?:spin|pulse|shimmer|bounce|ping)_|app-skeleton-(?:bar|lines|title)|@keyframes (?:shimmer|pulse|bounce)/;
+  const sources=fs.readdirSync('.').filter(name=>/\.(js|css)$/.test(name)&&name!=='common-styles.js'&&name!=='busy-state.js'&&name!=='lucide-icons.js')
+    .concat(fs.readdirSync('scripts').filter(name=>name.endsWith('.css')).map(name=>'scripts/'+name));
+  for(const name of sources)assert.doesNotMatch(fs.readFileSync(name,'utf8'),spin,name+' defines its own loading animation');
+  const html=getSkeletonMarkup_Source();
+  for(const variant of ['panel','drawer','inline','status','timeline']){
+    const markup=html(variant,'Loading x');
+    assert.equal((markup.match(/data-skeleton/g)||[]).length,1,variant);
+    assert.match(markup,/animate-\[spin_/,variant);
+    assert.doesNotMatch(markup,/shimmer/,variant);
+  }
+});
+function getSkeletonMarkup_Source(){return vm.runInNewContext(fs.readFileSync('common-styles.js','utf8')+';getSkeletonMarkup_');}
+
+test('dashboards are not loaded in the background: only the viewed one is requested',async()=>{
+ const f=fixture(false,true);f.click('guide');vm.runInContext('DashboardUI.initializeLoading()',f.c);
+ f.done('loadDashboardRoleContent');await f.settle();f.tick();f.tick();
+ assert.equal(f.c.window.DashboardPerformance.preloading,false);
+ assert.deepEqual(f.requests.map(r=>r.key),['loadDashboardRoleContent']);
+ assert.equal(f.requests.filter(r=>r.key==='loadCoordinatorSystemStatus').length,0);
 });

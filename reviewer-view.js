@@ -156,9 +156,9 @@ function reviewerViewBrowser_(bridge, getUi) {
   }
 
   function setStatus(team, text) { const el = document.getElementById('reviewer-status-' + team); if (el) el.textContent = text; }
-  function setBusy(team, busy) {
+  function decisionButtons(team) {
     const row = document.getElementById('reviewer-decision-' + team);
-    if (row) row.querySelectorAll('button').forEach(b => { b.disabled = busy; });
+    return row ? Array.from(row.querySelectorAll('button')) : [];
   }
   function load() { return bridge.read('role:reviewer', 'API_reviewer_getDashboard', []); }
 
@@ -176,15 +176,14 @@ function reviewerViewBrowser_(bridge, getUi) {
     const notes = notesEl ? notesEl.value : '';
     if (decision === 'Revise' && !notes.trim()) { setStatus(team, 'Note required.'); return; }
     state.busyTeam = team;
-    setBusy(team, true);
-    setStatus(team, 'Submitting…');
+    const done = getUi().busy.write(document.getElementById('reviewer-status-' + team), 'Submitting…', decisionButtons(team));
     bridge.write('API_reviewer_submitDecision', [team, decision, notes]).then(
       () => {
         const host = state.host, finish = getUi().beginContentLoading(host, 'Refreshing assigned teams', {compact:true});
         return load().then(dto => { finish(); state.busyTeam = null; render(host, dto); },
-          error => { finish(); state.busyTeam = null; setStatus(team, 'Refresh failed: ' + error.message); setBusy(team, false); });
+          error => { finish(); state.busyTeam = null; done('Refresh failed: ' + error.message); });
       },
-      error => { state.busyTeam = null; setStatus(team, error.message || 'Unable to submit decision.'); setBusy(team, false); });
+      error => { state.busyTeam = null; done(error.message || 'Unable to submit decision.'); });
   }
 
   return {load, render, refresh, decide, state};

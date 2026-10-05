@@ -6,7 +6,7 @@ const { weeklyFixture } = require('./weekly-progress-fixture.cjs');
 function guideFixture({ github = 'default' } = {}) {
   const f = weeklyFixture(), c = f.c;
   for (const file of ['milestone-config.js', 'assessment-registry.js', 'rubric-config.js', 'deadline-events.js', 'lucide-icons.js', 'icon-renderer.js', 'student-dashboard.js',
-    'api-envelope.js', 'guide-api.js', 'common-styles.js']) vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
+    'api-envelope.js', 'guide-api.js', 'common-styles.js', 'busy-state.js']) vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
   f.user('guide@example.com');
   const day = Math.floor(Date.parse('2026-01-10') / 86400000);
   const state = { schedule: { title: day, git: day - 2, timezone: 'Asia/Kolkata', assessments: [{ key: 'guide_eval', type: 'GUIDE_EVALUATION', opens: day + 5 }], milestones: [] }, today: day + 1 };

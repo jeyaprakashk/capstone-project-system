@@ -9,7 +9,7 @@
 function guideViewBrowser_(bridge, getUi, getWeekly) {
   'use strict';
   const delegated = new WeakSet();
-  const state = {dto:null, host:null, busyTeam:null};
+  const state = {dto:null, host:null, busyTeam:null, commits:{}};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
   const icon = (name, label) => getUi().renderIcon(name, label);
@@ -29,34 +29,43 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   const PRIMARY = 'border-0 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
   const PILL = 'flex items-center gap-2 border-0 rounded-lg bg-transparent px-3 py-1.5 text-sm text-ink-2 aria-pressed:bg-paper aria-pressed:text-primary aria-pressed:shadow-selected';
   const STEP = 'flex w-full flex-col gap-0.5 border-0 rounded-lg bg-transparent px-3 py-2 text-left text-sm hover:bg-tint aria-pressed:bg-tint disabled:opacity-60';
+  const TAB = 'flex items-center gap-1 border-0 border-b-2 border-b-transparent bg-transparent px-4 py-3 text-sm text-ink hover:bg-tint aria-pressed:border-b-primary aria-pressed:text-primary disabled:text-muted disabled:hover:bg-transparent';
+  const LINK = 'border-0 bg-transparent p-0 text-sm font-semibold text-primary underline';
   const TILE ='flex w-full flex-col gap-1 rounded-card border border-edge border-l-4 shadow-card border-l-transparent bg-paper p-3 text-left text-sm hover:bg-tint aria-pressed:border-l-primary aria-pressed:bg-tint disabled:opacity-60';
 
   const timingBadge = (state, label) => '<span class="' + TONE[(TIMING[state] || TIMING.unknown)[0]] + '">' + escape(label || (TIMING[state] || TIMING.unknown)[1]) + '</span>';
-  let tooltipSequence = 0;
 
+  /** "2 days earlier" / "On time" / "2 days late" from the signed day difference to the deadline. */
+  function timingLabel(timing) {
+    const days = timing.days;
+    if (!Number.isFinite(days) || timing.state === 'unknown') return undefined;
+    return days < 0 ? plural(-days, 'day') + ' earlier' : days > 0 ? plural(days, 'day') + ' late' : 'On time';
+  }
   function memberTiming(timing) {
     if (!timing) return '';
-    const id = 'guideTimingTooltip' + (++tooltipSequence);
-    const label = timing.daysLate > 0 ? plural(timing.daysLate, 'day') + ' late' : '';
-    return '<span class="group relative"><span tabindex="0" aria-describedby="' + id + '" class="inline-flex items-center gap-1">' +
-      (timing.date ? '<small class="text-xs text-muted">' + escape(timing.date) + '</small>' : '') + timingBadge(timing.state, label) + '</span>' +
-      '<span id="' + id + '" role="tooltip" class="absolute left-0 top-full z-10 mt-1 hidden w-64 rounded-md bg-ink p-2 text-xs text-paper group-hover:block group-focus-within:block">' + escape(timing.explanation) + '</span></span>';
+    return '<span class="inline-flex items-center gap-1">' + (timing.date ? '<small class="text-xs text-muted">' + escape(timing.date) + '</small>' : '') + timingBadge(timing.state, timingLabel(timing)) + '</span>';
   }
+  const commitCountText = n => n === null ? 'Commits unavailable' : n + (n === 1 ? ' commit' : ' commits');
   function githubMemberMarkup(m) {
-    const status = m.state === 'missing' ? ['Submit GitHub Account', 'triangle-alert'] : m.state === 'joined' ? ['Repository joined', 'check'] : ['Accept Invitation Email', 'clock'];
-    return '<li data-member-status="' + m.state + '" class="flex flex-wrap items-center gap-x-2 gap-y-1 py-1 text-sm"><span data-member-register class="min-w-24">' + (m.name ? '<strong>' + escape(m.name) + '</strong><br>' : '') + escape(m.regno) + '</span>' +
-      '<span data-member-state class="inline-flex items-center gap-1">' + icon(status[1]) + '<span>' + status[0] + '</span></span>' + (m.timing ? '<span>' + memberTiming(m.timing) + '</span>' : '') + '</li>';
+    const status = m.state === 'missing' ? ['Submit GitHub Account', 'triangle-alert'] : m.state === 'joined' ? ['Joined', 'check'] : ['Accept Invitation Email', 'clock'];
+    const regno = escape(m.regno);
+    return '<li data-member-status="' + m.state + '" data-github-member="' + regno + '" class="border-t border-edge first:border-t-0"><details class="group">' +
+      '<summary class="grid cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 py-3 sm:grid-cols-[1fr_1fr_auto] [&::-webkit-details-marker]:hidden">' +
+        '<span data-member-register class="min-w-0"><strong class="block font-semibold capitalize text-ink">' + escape(String(m.name || '').toLowerCase()) + '</strong><span class="font-mono text-xs text-muted">' + regno + '</span></span>' +
+        '<span data-member-state class="order-last col-span-2 inline-flex flex-wrap items-center gap-2 text-sm text-ink-2 sm:order-none sm:col-span-1">' + icon(status[1]) + '<span>' + status[0] + '</span>' + (m.timing ? memberTiming(m.timing) : '') + '</span>' +
+        '<span class="inline-flex items-center gap-2 text-sm text-ink-2"><span data-commit-count aria-live="polite"></span><span class="inline-flex group-open:rotate-180">' + icon('chevron-down') + '</span></span>' +
+      '</summary><div data-commit-list class="pb-3"></div></details></li>';
   }
   function repositoryLine(repoUrl) {
     const match = String(repoUrl || '').match(/^https:\/\/github\.com\/([^/]+)\/([^/?#]+)/i);
-    if (!match) return '<div class="mt-3 text-sm text-muted">' + icon('git-branch', 'Team repository') + ' Not available</div>';
-    return '<div class="mt-3 text-sm">' + icon('git-branch', 'Team repository') + ' <a class="text-primary underline" href="' + escape(safeUrl(repoUrl)) + '" title="' + escape(match[1]) + '" target="_blank" rel="noopener">' + escape(match[2]) + ' ' + icon('external-link') + '</a></div>';
+    if (!match) return '<span class="text-sm text-muted">' + icon('git-branch', 'Team repository') + ' Repository not available</span>';
+    return '<span class="text-sm">' + icon('git-branch', 'Team repository') + ' <a class="font-mono text-primary underline" href="' + escape(safeUrl(repoUrl)) + '" title="' + escape(match[1]) + '" target="_blank" rel="noopener">' + escape(match[2]) + ' ' + icon('external-link') + '</a></span>';
   }
   function githubCard(team, githubDue) {
     const g = team.github;
-    return '<aside class="rounded-card border border-edge border-l-4 bg-paper shadow-card p-4 ' + (g ? CARD_EDGE[g.tone] || CARD_EDGE.gray : CARD_EDGE.gray) + '"><div><h3 class="text-base font-semibold text-ink">GitHub status</h3><p class="text-sm text-muted">Due: ' + escape(githubDue || 'Date unavailable') + '</p></div>' +
-      (g ? '<ul aria-label="Team GitHub status" class="mt-2 divide-y divide-edge">' + g.members.map(githubMemberMarkup).join('') + '</ul>' : '<p role="status" class="mt-2 text-sm text-muted">GitHub status unavailable. Refresh the dashboard to retry.</p>') +
-      repositoryLine(team.repoUrl) + '</aside>';
+    return '<aside class="rounded-card border border-edge bg-paper p-4"><div class="flex flex-wrap items-center justify-between gap-2 border-b border-edge pb-3">' + repositoryLine(team.repoUrl) +
+      '<span class="text-sm text-muted">Due ' + escape(githubDue || 'date unavailable') + '</span></div>' +
+      (g ? '<ul aria-label="Team GitHub status" class="m-0 list-none p-0">' + g.members.map(githubMemberMarkup).join('') + '</ul>' : '<p role="status" class="mt-2 text-sm text-muted">GitHub status unavailable. Refresh the dashboard to retry.</p>') + '</aside>';
   }
   function expandable(text, max) {
     if (text.length <= max) return escape(text);
@@ -68,17 +77,22 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   }
   const p = (html, extra) => '<p class="mt-2 text-sm ' + (extra || 'text-ink-2') + '">' + html + '</p>';
 
-  function approvalDetails(team) {
-    const a = team.approval, wbs = team.documents.find(d => d.label === 'Work Breakdown');
-    const timing = a.timing;
-    return '<div class="mt-3 rounded-md bg-canvas p-3">' +
-      p('<strong>Approved title:</strong> ' + escape(team.title)) +
-      p('<strong>Scope:</strong> Not recorded separately.' + (wbs ? ' See <a class="text-primary underline" href="' + escape(safeUrl(wbs.url)) + '" target="_blank" rel="noopener">Work Breakdown</a>.' : '')) +
-      p('<strong>Approved by:</strong> ' + escape(a.approvedBy || 'Not recorded')) +
-      p('<strong>Approved on:</strong> ' + escape(a.approvedOn || 'Date unavailable') + ' ' + timingBadge(timing.state) +
-        ' <button type="button" class="' + BUTTON + '" popovertarget="guideTitleTiming-' + escape(encodeURIComponent(team.teamId.toLowerCase())) + '" aria-controls="guideTitleTiming-' + escape(encodeURIComponent(team.teamId.toLowerCase())) + '" aria-label="Explain title approval timing">' + icon('circle-help') + '</button>' +
-        '<span id="guideTitleTiming-' + escape(encodeURIComponent(team.teamId.toLowerCase())) + '" popover="auto" role="note" aria-label="Title approval timing" class="m-0 right-auto bottom-auto max-w-xs rounded-md border border-edge bg-paper p-3 text-sm shadow-lg">' + escape(timing.explanation) + '</span>') +
-      p('<strong>Reviewer comment:</strong> ' + escape(team.reviewerNotes || 'No comment recorded')) + '</div>';
+  const wbsLink = team => { const w = team.documents.find(d => d.label === 'Work Breakdown'); return w ? ' <a class="font-semibold text-primary underline" href="' + escape(safeUrl(w.url)) + '" target="_blank" rel="noopener">See Work Breakdown</a>' : ''; };
+  function approvedMain(team) {
+    const a = team.approval, timing = a.timing, problem = team.problem || '';
+    return '<div class="flex flex-wrap items-center gap-3 text-success">' + icon('check') +
+      '<strong class="font-semibold">Approved on ' + escape(a.approvedOn || 'date unavailable') + '</strong>' +
+      timingBadge(timing.state, timingLabel(timing)) + '</div>' +
+      (problem ? '<h4 class="mt-5 text-xs font-semibold uppercase tracking-wide text-muted">Problem statement</h4>' +
+        '<p data-problem-text class="mt-2 line-clamp-4 text-base leading-7 text-ink-2">' + escape(problem) + '</p>' +
+        '<button type="button" class="mt-3 ' + LINK + '" data-action="toggle-problem" aria-expanded="false" hidden>Show more</button>' : '');
+  }
+  function approvalSide(team) {
+    const row = (label, value) => '<div class="px-4 py-3"><dt class="text-muted">' + label + '</dt><dd class="m-0 mt-1 text-ink">' + value + '</dd></div>';
+    return '<dl class="m-0 divide-y divide-edge rounded-card border border-edge bg-paper text-sm">' +
+      row('Approved by', '<strong class="font-semibold">' + escape(team.approval.approvedBy || 'Not recorded') + '</strong>') +
+      row('Scope', 'Not recorded separately.' + wbsLink(team)) +
+      row('Reviewer comment', team.reviewerNotes ? escape(team.reviewerNotes) : '<em class="text-muted">No comment recorded</em>') + '</dl>';
   }
   function decisionForm(team) {
     const id = escape(team.teamId);
@@ -91,6 +105,10 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
       '<button type="button" class="' + PRIMARY + '" data-action="decide" data-decision="Approved" data-team="' + id + '">Approve</button></div>';
   }
   function titleCard(team) {
+    if (team.status.key === 'APPROVED') {
+      return '<div id="card-' + escape(team.teamId) + '">' + (team.overdueLogs ? p(team.overdueLogs + ' student weekly log(s) overdue', 'mb-3 text-danger') : '') +
+        (team.titleDue ? p('Title approval due ' + escape(team.titleDue.date) + (team.titleDue.overdue ? ' · Overdue' : ''), 'mb-3 ' + (team.titleDue.overdue ? 'text-danger' : 'text-ink-2')) : '') + approvedMain(team) + '</div>';
+    }
     const status = team.status, key = status.key, id = escape(team.teamId);
     let body = '';
     if (key === 'NEEDS_REVIEW') body = decisionForm(team);
@@ -118,50 +136,78 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   function selectorMarkup(team, index) {
     const id = escape(team.teamId), attention = team.status.key === 'NEEDS_REVIEW';
     return '<button type="button" class="' + PILL + '" data-guide-select="' + id + '" data-title-attention="' + attention + '" data-documents-attention="' + team.documents.length + '" aria-pressed="' + (index === 0) + '" title="' + escape(team.title || 'No title submitted yet') + '">' +
-      '<strong>' + id + '</strong><span data-team-attention role="status">' + (attention ? '<span class="' + TONE.orange + '">1</span>' : getUi().renderSkeleton('inline', 'Checking team actions')) + '</span></button>';
+      '<strong data-team-label hidden>' + id + '</strong><span data-team-spinner role="status">' + getUi().renderSkeleton('inline', 'Checking team actions') + '</span></button>';
   }
-  const memberNames = team => team.members.map(m => m.regno ? escape(m.name) + ' (' + escape(m.regno) + ')' : escape(m.name)).join(', ');
+  const initials = name => String(name || '?').trim().split(/\s+/).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('');
+  const AVATAR = ['bg-info-tint text-primary', 'bg-success-tint text-success', 'bg-warning-tint text-warning', 'bg-danger-tint text-danger'];
+  const memberChip = (m, index) => '<li class="inline-flex items-center gap-2 text-sm"><span aria-hidden="true" class="inline-flex size-8 items-center justify-center rounded-full text-xs font-semibold ' + AVATAR[index % AVATAR.length] + '">' + escape(initials(m.name)) + '</span>' +
+    '<strong class="font-semibold capitalize text-ink">' + escape(String(m.name || '').toLowerCase()) + '</strong>' + (m.regno ? '<span class="font-mono text-xs text-muted">' + escape(m.regno) + '</span>' : '') + '</li>';
+  const memberChips = team => '<ul aria-label="Team members" class="m-0 flex list-none flex-wrap items-center gap-x-6 gap-y-2 p-0">' + team.members.map(memberChip).join('') + '</ul>';
   function headingMarkup(team, index) {
     return '<header data-guide-heading="' + escape(team.teamId) + '"' + (index ? ' hidden' : '') + '><h3 class="text-lg font-semibold text-ink">' + escape(team.title || 'No title submitted yet') + '</h3>' +
-      '<div class="mt-1 flex flex-wrap items-center justify-between gap-2"><span class="inline-flex items-center gap-1 text-sm text-muted">' + icon('users') + memberNames(team) + '</span>' +
+      '<div class="mt-3 flex flex-wrap items-center justify-between gap-3">' + memberChips(team) +
       '<a class="' + BUTTON + '" href="mailto:' + escape(team.memberEmails.join(',')) + '?subject=' + escape(encodeURIComponent('Team ' + team.teamId + ' — Capstone Project')) + '">Email Team</a></div></header>';
   }
   function panelMarkup(team, index, githubDue) {
-    return '<section data-guide-team="' + escape(team.teamId) + '" data-guide-students="' + escape(JSON.stringify(team.registerNumbers)) + '"' + (index ? ' hidden' : '') + '>' +
-      '<div data-guide-view="title"><div class="grid gap-4 lg:grid-cols-3"><div class="lg:order-last">' + githubCard(team, githubDue) + '</div><div class="lg:col-span-2">' + titleCard(team) + '</div></div></div>' +
+    return '<section data-guide-team="' + escape(team.teamId) + '" data-guide-students="' + escape(JSON.stringify(team.registerNumbers)) + '" data-guide-members="' + escape(JSON.stringify(team.members)) + '"' + (index ? ' hidden' : '') + '>' +
+      '<div data-guide-view="github" hidden>' + githubCard(team, githubDue) + '</div>' +
+      '<div data-guide-view="title">' + (team.status.key === 'APPROVED'
+        ? '<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">' + titleCard(team) + '</div><div>' + approvalSide(team) + '</div></div>'
+        : titleCard(team)) + '</div>' +
       '<div data-guide-view="documents" hidden class="rounded-card border border-edge bg-paper shadow-card p-4">' + documentsView(team) + '</div></section>';
   }
-  function tabMarkup(view, iconName, title, subtitle, selected, disabled) {
-    return '<button type="button" class="' + STEP + '" data-guide-tab="' + view + '" aria-pressed="' + selected + '"' + (disabled ? ' disabled title="' + escape(subtitle) + '"' : '') + '><strong class="flex items-center gap-1">' + icon(iconName) + title + '</strong><span class="text-xs text-muted">' + escape(disabled ? subtitle : subtitle) + '</span></button>';
+  function tabMarkup(view, iconName, title, selected, locked) {
+    return '<button type="button" class="' + TAB + '" data-guide-tab="' + view + '" aria-pressed="' + selected + '"' + (locked ? ' data-evaluation-locked' : '') + '><strong class="flex items-center gap-2 font-semibold">' + icon(iconName) + title + '</strong></button>';
   }
-  function headerMarkup(updated) {
-    return '<h2 class="text-xl font-semibold text-ink">Guide Dashboard</h2>' +
-      '<p id="guideRefreshStatus" class="mt-1 text-sm text-muted" data-refresh-status role="status" aria-live="polite"></p>';
+  function headerMarkup(teams) {
+    return '<div class="flex flex-wrap items-center justify-between gap-4"><div><h2 class="text-xl font-semibold text-ink">Guide Dashboard</h2>' +
+      '<p class="mt-1 text-sm text-muted">Pick a team to review its progress.</p>' +
+      '<p id="guideRefreshStatus" class="mt-1 text-sm text-muted empty:hidden" data-refresh-status role="status" aria-live="polite"></p></div>' +
+      '<div class="inline-flex flex-wrap gap-1 rounded-xl bg-tint p-1" aria-label="My teams">' + teams.map(selectorMarkup).join('') + '</div></div>';
   }
   const updatedLabel = () => 'Last updated: ' + new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true}) + ' IST';
+
+  const lockedEvaluationMarkup = notice => '<div data-evaluation-locked-card class="flex items-center gap-3 text-ink-2">' + icon('lock-keyhole') +
+    '<div><h3 class="text-base font-semibold text-ink">Guide Evaluation</h3><p class="m-0 text-sm text-muted">' + escape(notice) + '</p></div></div>';
 
   function workspaceMarkup(dto) {
     const teams = dto.teams, ui = getUi();
     const evaluation = dto.evaluation;
-    return '<div data-guide-workspace class="mt-4 flex flex-col gap-4">' +
-      '<aside aria-label="My teams"><h3 class="text-base font-semibold text-ink">My Teams</h3><p class="text-sm text-muted">Pick a team to review its progress.</p>' +
-      '<div class="mt-3 inline-flex flex-wrap gap-1 rounded-xl bg-tint p-1">' + teams.map(selectorMarkup).join('') + '</div></aside>' +
-      '<div class="grid rounded-card border border-edge bg-paper shadow-card lg:grid-cols-3"><div class="p-5 lg:col-span-2">' + teams.map(headingMarkup).join('') + '</div>' +
-      '<nav class="flex flex-col gap-1 border-t border-edge p-3 lg:border-l lg:border-t-0" aria-label="Team workspace">' +
-        tabMarkup('title', 'tag', 'Title review', 'Submission & decision', true) + tabMarkup('weekly', 'trending-up', 'Weekly progress', 'Student updates & discussion', false) +
-        tabMarkup('documents', 'file-text', 'Documents', 'Submitted files', false) +
-        (evaluation.enabled ? tabMarkup('evaluation', 'graduation-cap', 'Guide Evaluation', 'Individual assessment', false) : tabMarkup('evaluation', 'lock-keyhole', 'Guide Evaluation', evaluation.notice, false, true)) + '</nav></div>' +
-      '<div class="mt-3">' + teams.map((t, i) => panelMarkup(t, i, dto.githubDue)).join('') + '</div>' +
+    return '<div data-guide-workspace class="flex flex-col gap-4">' + headerMarkup(teams) +
+      '<div class="rounded-card border border-edge bg-paper p-5 shadow-card">' + teams.map(headingMarkup).join('') + '</div>' +
+      '<div class="rounded-card border border-edge bg-paper shadow-card"><nav class="flex flex-wrap items-center gap-1 border-b border-edge px-4" aria-label="Team workspace">' +
+        tabMarkup('github', 'git-branch', 'GitHub status', false) + tabMarkup('title', 'tag', 'Title review', true) + tabMarkup('weekly', 'trending-up', 'Weekly progress', false) +
+        tabMarkup('documents', 'file-text', 'Documents', false) +
+        tabMarkup('evaluation', 'graduation-cap', 'Guide Evaluation', false, !evaluation.enabled) + '</nav>' +
+      '<div class="p-5">' + teams.map((t, i) => panelMarkup(t, i, dto.githubDue)).join('') +
       '<section id="guideWeeklyProgress" data-guide-weeks="' + escape(JSON.stringify(dto.weeks)) + '" class="mt-3 rounded-card border border-edge bg-paper shadow-card p-4" hidden aria-label="Weekly progress confirmation">' +
         '<div><h2 class="text-xl font-semibold text-ink">Weekly Progress</h2></div><p data-guide-weekly-status role="status" class="text-sm text-muted"></p>' +
         '<div data-guide-weekly-read>' + ui.renderSkeleton('panel', 'Reading weekly progress') + '</div></section>' +
-      '<section id="guideEvaluationEditor" class="mt-3 rounded-card border border-edge bg-paper shadow-card p-4" hidden aria-label="Guide evaluation editor"></section>' +
-      '</div>';
+      '<section id="guideEvaluationEditor" class="mt-3 rounded-card border border-edge bg-paper shadow-card p-4" hidden aria-label="Guide evaluation editor">' + (evaluation.enabled ? '' : lockedEvaluationMarkup(evaluation.notice)) + '</section>' +
+      '</div></div></div>';
+  }
+
+  /** "Show more" only appears while the clamped problem statement is actually cut off. */
+  let problemObserver = null;
+  function syncProblemToggle(text) {
+    const button = text.parentElement && text.parentElement.querySelector('[data-action="toggle-problem"]');
+    if (!button || !text.clientHeight || button.getAttribute('aria-expanded') === 'true') return;
+    button.hidden = text.scrollHeight <= text.clientHeight + 1;
+  }
+  function watchProblems(host) {
+    if (problemObserver) problemObserver.disconnect();
+    problemObserver = null;
+    const texts = host.querySelectorAll('[data-problem-text]');
+    if (typeof ResizeObserver !== 'function' || !texts.length) return;
+    // Fires when a hidden tab becomes visible and when the width (so the line count) changes.
+    problemObserver = new ResizeObserver(entries => entries.forEach(entry => syncProblemToggle(entry.target)));
+    texts.forEach(text => problemObserver.observe(text));
   }
 
   function render(host, dto) {
-    state.host = host; state.dto = dto;
-    host.innerHTML = headerMarkup(updatedLabel()) + (dto.teams.length ? workspaceMarkup(dto) : '<p class="mt-4 text-sm text-muted">You have no teams assigned.</p>');
+    state.host = host; state.dto = dto; state.commits = {};
+    host.innerHTML = (dto.teams.length ? workspaceMarkup(dto) : headerMarkup([]) + '<p class="mt-4 text-sm text-muted">You have no teams assigned.</p>');
+    watchProblems(host);
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); }
     if (!host.guideToggleBound) {
       host.guideToggleBound = true;
@@ -170,19 +216,56 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
     }
   }
 
+  const commitTime = iso => new Date(iso).toLocaleString('en-IN', {timeZone:'Asia/Kolkata', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:false});
+  const teamSection = teamId => Array.from(state.host.querySelectorAll('[data-guide-team]')).find(el => el.getAttribute('data-guide-team') === teamId);
+  function commitListMarkup(member, repoUrl) {
+    const rows = member.commits.map(c => '<li class="flex flex-wrap items-baseline justify-between gap-x-4 border-t border-edge px-4 py-2 text-sm first:border-t-0"><span class="min-w-0 break-words text-ink">' + escape(c.message || '(no message)') + '</span>' +
+      '<span class="inline-flex items-baseline gap-3"><a class="font-mono text-xs font-semibold text-primary underline" href="' + escape(safeUrl(c.url)) + '" target="_blank" rel="noopener">' + escape(c.shortSha) + '</a><span class="text-xs text-muted">' + escape(commitTime(c.timestamp)) + '</span></span></li>').join('');
+    const all = member.username ? '<a class="inline-flex items-center gap-1 text-sm font-semibold text-primary underline" href="' + escape(safeUrl(repoUrl + '/commits?author=' + encodeURIComponent(member.username))) + '" target="_blank" rel="noopener">View all on GitHub ' + icon('external-link') + '</a>' : '';
+    return '<div class="rounded-md bg-canvas"><ul class="m-0 list-none p-0">' + (rows || '<li class="px-4 py-3 text-sm text-muted">No commits yet.</li>') + '</ul>' + (all ? '<div class="border-t border-edge px-4 py-3">' + all + '</div>' : '') + '</div>';
+  }
+  function showCommits(teamId, dto) {
+    const section = teamSection(teamId); if (!section) return;
+    section.querySelectorAll('[data-github-member]').forEach(row => {
+      const member = dto && dto.state === 'available' && dto.members.find(m => String(m.regno) === row.getAttribute('data-github-member'));
+      const count = row.querySelector('[data-commit-count]'), list = row.querySelector('[data-commit-list]');
+      count.textContent = member ? commitCountText(member.count) : 'Commits unavailable';
+      list.innerHTML = member && member.count !== null ? commitListMarkup(member, dto.repositoryUrl) : '<p class="m-0 px-1 text-sm text-muted">' + escape((dto && dto.message) || 'Commit history is unavailable for this member.') + '</p>';
+    });
+  }
+  /** Commit history is read the first time a team's GitHub status tab is shown, never in the background. */
+  function ensureCommits(teamId) {
+    if (state.commits[teamId] || !teamSection(teamId)) return;
+    state.commits[teamId] = 'loading';
+    teamSection(teamId).querySelectorAll('[data-commit-count]').forEach(el => { el.innerHTML = getUi().renderSkeleton('inline', 'Reading commits'); });
+    bridge.read('guide-commits:' + teamId, 'API_guide_getCommits', [teamId]).then(
+      dto => { state.commits[teamId] = 'done'; showCommits(teamId, dto); },
+      () => { delete state.commits[teamId]; showCommits(teamId, null); });
+  }
+  function syncCommits() {
+    if (!state.host) return;
+    const visible = Array.from(state.host.querySelectorAll('[data-guide-team]')).find(el => !el.hasAttribute('hidden'));
+    const github = visible && visible.querySelector('[data-guide-view="github"]');
+    if (github && !github.hasAttribute('hidden')) ensureCommits(visible.getAttribute('data-guide-team'));
+  }
+
   function onClick(event) {
     const target = event.target.closest ? event.target.closest('[data-action],[data-guide-select],[data-guide-tab]') : null;
     if (!target || target.disabled) return;
     const weekly = getWeekly();
-    if (target.dataset.action === 'decide') decide(target.dataset.team, target.dataset.decision);
+    if (target.dataset.action === 'toggle-problem') {
+      const text = target.parentElement.querySelector('[data-problem-text]'), open = target.getAttribute('aria-expanded') === 'true';
+      text.classList.toggle('line-clamp-4', open); target.setAttribute('aria-expanded', String(!open)); target.textContent = open ? 'Show more' : 'Show less';
+    } else if (target.dataset.action === 'decide') decide(target.dataset.team, target.dataset.decision);
     else if (target.hasAttribute('data-guide-select') && weekly) weekly.selectTeam(target.dataset.guideSelect);
     else if (target.hasAttribute('data-guide-tab') && weekly) weekly.selectView(target.dataset.guideTab);
+    syncCommits();
   }
 
-  function load() { return bridge.read('role:guide', 'API_guide_getDashboard', []); }
+  function load() { return bridge.read('role:guide', 'API_guide_getDashboard', [], {timeoutMs:120000}); }
 
   function setStatus(team, text) { const el = document.getElementById('status-' + team); if (el) el.textContent = text; }
-  function setBusy(team, busy) { const card = document.getElementById('card-' + team); if (card) card.querySelectorAll('button').forEach(b => { b.disabled = busy; }); }
+  function cardButtons(team) { const card = document.getElementById('card-' + team); return card ? Array.from(card.querySelectorAll('button')) : []; }
 
   /** Rejection needs a note; success re-reads the dashboard and restarts weekly progress. */
   function decide(team, decision) {
@@ -191,15 +274,14 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
     const notes = notesEl ? notesEl.value : '', editedTitle = titleEl ? titleEl.value : '';
     if (decision === 'Rejected' && !notes.trim()) { setStatus(team, 'Please add a note explaining the rejection.'); return; }
     state.busyTeam = team;
-    setBusy(team, true);
-    setStatus(team, 'Submitting...');
+    const done = getUi().busy.write(document.getElementById('status-' + team), 'Submitting…', cardButtons(team));
     bridge.write('API_guide_submitDecision', [team, decision, notes, editedTitle]).then(
       () => load().then(dto => {
         state.busyTeam = null; render(state.host, dto);
         const weekly = getWeekly(); if (weekly) weekly.load();
-      }, error => { state.busyTeam = null; setStatus(team, 'Refresh failed: ' + error.message); setBusy(team, false); }),
-      error => { state.busyTeam = null; setStatus(team, error.message || 'Unable to submit decision.'); setBusy(team, false); });
+      }, error => { state.busyTeam = null; done('Refresh failed: ' + error.message); }),
+      error => { state.busyTeam = null; done(error.message || 'Unable to submit decision.'); });
   }
 
-  return {load, render, decide, state};
+  return {load, render, decide, ensureCommits, state};
 }

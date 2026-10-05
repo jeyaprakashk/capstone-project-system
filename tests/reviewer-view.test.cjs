@@ -25,7 +25,7 @@ function setup(dto) {
     calls.writes.push([method, args]);
     return state.writeError ? JSON.stringify({ ok: false, error: { code: 'REJECTED', message: state.writeError } }) : JSON.stringify({ ok: true, data: state.writeResult });
   });
-  const ui = { renderIcon: () => '', openReviewerMarks: (...a) => calls.marks.push(a), refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
+  const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: () => '', openReviewerMarks: (...a) => calls.marks.push(a), refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
   vm.runInContext('globalThis.__make = ' + c.reviewerViewBrowser_.toString(), c);
   const view = c.__make(bridge, () => ui);
   const host = document.getElementById('reviewerContent');

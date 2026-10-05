@@ -17,15 +17,18 @@ function guideTimingExplanation_(state, timestamp, deadline, schedule, action) {
   return explanation;
 }
 
-/** Title approval timing: {state: on-time|late|overdue|pending|unknown, explanation}. */
+/** Title approval timing: {state: on-time|late|overdue|pending|unknown, explanation, days}; days is approval day minus deadline (negative = early), null unless approved. */
 function guideTitleTimingDto_(status, approvedAt, schedule, clock) {
-  let state = 'unknown';
+  let state = 'unknown', days = null;
   if (schedule && clock) {
     if (status === 'APPROVED') {
-      if (Number.isFinite(approvedAt) && approvedAt <= new Date(clock.now).getTime()) state = projectDay_(new Date(approvedAt), schedule.timezone) > schedule.title ? 'late' : 'on-time';
+      if (Number.isFinite(approvedAt) && approvedAt <= new Date(clock.now).getTime()) {
+        days = projectDay_(new Date(approvedAt), schedule.timezone) - schedule.title;
+        state = days > 0 ? 'late' : 'on-time';
+      }
     } else state = clock.today > schedule.title ? 'overdue' : 'pending';
   }
-  return {state, explanation:guideTimingExplanation_(state, approvedAt, schedule && schedule.title, schedule, 'Title approved')};
+  return {state, explanation:guideTimingExplanation_(state, approvedAt, schedule && schedule.title, schedule, 'Title approved'), days};
 }
 
 /** GitHub account submission timing for a joined student; null when it does not apply. */
@@ -38,8 +41,9 @@ function guideGithubTimingDto_(member, schedule, clock) {
   let state = 'unknown';
   if (member.status === 'valid' && Number.isFinite(timestamp) && timestamp <= new Date(clock.now).getTime()) state = projectDay_(new Date(timestamp), schedule.timezone) > schedule.git ? 'late' : 'on-time';
   const date = Number.isFinite(timestamp) ? new Date(timestamp).toLocaleDateString('en-GB', {timeZone:schedule.timezone, day:'numeric', month:'short'}).replace(/\bSept\b/g, 'Sep') : '';
-  const daysLate = state === 'late' && Number.isFinite(timestamp) ? projectDay_(new Date(timestamp), schedule.timezone) - schedule.git : 0;
-  return {state, explanation:guideTimingExplanation_(state, timestamp, schedule.git, schedule, 'GitHub account submitted'), date, daysLate};
+  const days = state !== 'unknown' && Number.isFinite(timestamp) ? projectDay_(new Date(timestamp), schedule.timezone) - schedule.git : null;
+  const daysLate = state === 'late' && days !== null ? days : 0;
+  return {state, explanation:guideTimingExplanation_(state, timestamp, schedule.git, schedule, 'GitHub account submitted'), date, daysLate, days};
 }
 
 function guideGithubDto_(github, roster, repoUrl, data) {
@@ -129,6 +133,30 @@ function guideAccessOrThrow_() {
 
 function API_guide_getDashboard() {
   return apiHandle_(() => withDashboardRead_(() => buildGuideDto_(getGuideDashboardData_(guideAccessOrThrow_()))));
+}
+
+/** Commits per mapped member, read from the collected-commit log (all time, template bootstrap excluded). */
+function buildGuideCommitsDto_(teamId, setup, collected, collectionOk) {
+  const repo = weeklyEvidenceRepo_(setup.repoUrl);
+  if (!repo || !collectionOk) return {teamId, state:'unavailable', message:'Commit history is not available yet.', members:[]};
+  const own = collected.filter(row => weeklyStudentCommit_(row) && textEquals_(row.teamId, teamId) && String(weeklyEvidenceRepo_(row.repositoryUrl) || '').toLowerCase() === repo.toLowerCase() && commitIdentity_(row.sha));
+  return {teamId, state:'available', message:'', repositoryUrl:repo, members:setup.members.map(m => {
+    if (m.status !== 'valid' || !githubId_(m.githubId)) return {regno:m.label, username:m.username, count:null, commits:[]};
+    const mine = own.filter(row => githubAuthorMatches_(m.githubId, row.authorId)).sort((x, y) => new Date(y.timestamp) - new Date(x.timestamp));
+    return {regno:m.label, username:m.username, count:mine.length, commits:mine.slice(0, 3).map(row => {
+      const sha = commitIdentity_(row.sha);
+      return {sha, shortSha:sha.slice(0, 7), message:String(row.message || ''), timestamp:new Date(row.timestamp).toISOString(), url:repo + '/commit/' + sha};
+    })};
+  })};
+}
+
+function API_guide_getCommits(teamId) {
+  return apiHandle_(() => {
+    const email = guideAccessOrThrow_(), id = String(teamId || '');
+    const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+    if (!getSheetRows_(SHEET_NAMES.TEAM_STATUS).some(r => textEquals_(r[TS.TEAM_ID], id) && emailsMatch_(r[TS.GUIDE_EMAIL], email))) throw apiFail_('UNAUTHORIZED', 'You do not have access to this team.');
+    return buildGuideCommitsDto_(id, weeklyStoredGithubMapping_(id), readCollectedCommits_(id), readCommitCollectionStatus_(id) === 'ok');
+  });
 }
 
 function API_guide_submitDecision(teamId, decision, notes, editedTitle) {

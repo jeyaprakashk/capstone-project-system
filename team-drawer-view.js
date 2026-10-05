@@ -85,7 +85,7 @@ function teamDrawerViewBrowser_(bridge, getUi) {
       const target = sectionHost(section);
       if (request !== generation || pending.has(section) || !target) return;
       pending.add(section);
-      target.setAttribute('aria-busy', 'true');
+      getUi().busy.mark(target, true);
       const retry = target.querySelector('[data-action="drawer-retry"]');
       if (retry) retry.disabled = true;
       const current = () => request === generation && isOpen() && target === sectionHost(section);
@@ -96,13 +96,13 @@ function teamDrawerViewBrowser_(bridge, getUi) {
         if (!current()) return;
         pending.delete(section);
         target.innerHTML = sectionMarkup(section, data);
-        target.setAttribute('aria-busy', 'false');
+        getUi().busy.mark(target, false);
         if (section === 'progress' && (data.reviews || []).some(review => review.available === false)) showRetry('Some review data is unavailable.');
       }, error => {
         if (!current()) return;
         pending.delete(section);
         target.innerHTML = '';
-        target.setAttribute('aria-busy', 'false');
+        getUi().busy.mark(target, false);
         showRetry('Unable to load ' + section + ': ' + (error && error.message || 'The server did not provide error details') + '.');
       });
     }

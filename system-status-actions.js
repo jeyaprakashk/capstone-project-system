@@ -90,7 +90,7 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     function finish(report,error){
       finishLoading();
       if(byId('committeeConfigurationCard')!==card)return;
-      checkingCommitteeConfiguration=false;button.disabled=false;card.setAttribute('aria-busy','false');
+      checkingCommitteeConfiguration=false;button.disabled=false;getUi().busy.mark(card, false);
       card.setAttribute('data-state',error?'error':report.state);
       const messages=error?[{message:'Unable to check review committees: '+error+'. Try Recheck.'}]:report.issues;
       SystemStatusView.renderIssues(byId('committeeConfigurationIssues'),messages.map(issue=>issue.message));
@@ -117,13 +117,13 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     const recheck = byId('teamFoldersRecheck'), create = byId('teamFoldersCreate');
     recheck.disabled = true;
     create.disabled = true;
-    card.setAttribute('aria-busy', 'true');
+    getUi().busy.mark(card, true);
     function finish(report, error) {
       finishLoading();
       if (byId('teamFoldersCard') !== card) return;
       checkingTeamFolders = false;
       recheck.disabled = false;
-      card.setAttribute('aria-busy', 'false');
+      getUi().busy.mark(card, false);
       if (error) {
         create.disabled = !teamFoldersReport || !teamFoldersReport.canCreate;
         SystemStatusView.renderIssues(byId('teamFoldersIssues'), ['Unable to check team folders: ' + error + '. Try Recheck.']);
@@ -153,18 +153,20 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     creatingTeamFolders = true;
     button.disabled = true;
     recheck.disabled = true;
-    card.setAttribute('aria-busy', 'true');
+    getUi().busy.mark(card, true);
     const created = [], failed = [];
+    let stopBusy = null;
     function finish(message) {
       creatingTeamFolders = false;
+      if (stopBusy) stopBusy();
       if (byId('teamFoldersCard') !== card) return;
       recheck.disabled = false;
-      card.setAttribute('aria-busy', 'false');
+      getUi().busy.mark(card, false);
       setText('teamFoldersStatus', message);
       recheckTeamFolders();
     }
     function batch(cursor) {
-      setText('teamFoldersStatus', 'Creating team folders… ' + created.length + ' created so far.');
+      stopBusy = getUi().busy.write(byId('teamFoldersStatus'), 'Creating team folders… ' + created.length + ' created so far.');
       bridge.write('API_coordinator_createTeamFolders', [cursor]).then(result => {
         created.push(...result.created);
         failed.push(...result.failed);
@@ -187,7 +189,7 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     checkingReviewConfiguration = true;
     const finishLoading = beginContentLoading(card, 'Checking assessment readiness');
     reviewConfigurationValid = false;
-    card.setAttribute('aria-busy', 'true');
+    getUi().busy.mark(card, true);
     card.setAttribute('data-state', 'checking');
     byId('reviewConfigurationRecheck').disabled = true;
     byId('initializeAssessmentStorageButton').disabled = true;
@@ -201,7 +203,7 @@ function systemStatusActionsBrowser_(bridge, getUi) {
       assessmentStorageAvailable = reviewConfigurationValid && report.canInitializeStorage !== false;
       definitionsBootstrapAvailable = !error && report.canBootstrap === true;
       if(createButton){createButton.hidden=!definitionsBootstrapAvailable;createButton.disabled=!definitionsBootstrapAvailable;}
-      card.setAttribute('aria-busy', 'false');
+      getUi().busy.mark(card, false);
       card.setAttribute('data-state', error ? 'error' : report.state);
       byId('reviewConfigurationRecheck').disabled = false;
       byId('initializeAssessmentStorageButton').disabled = !assessmentStorageAvailable || initializingAssessmentStorage;
@@ -233,8 +235,9 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     const finishLoading=beginContentLoading(card,'Creating assessment definitions schema');
     button.disabled=true;
     byId('reviewConfigurationRecheck').disabled=true;
-    setText('assessmentStorageStatus','Creating assessment definitions schema…');
+    const stopBusy=getUi().busy.write(byId('assessmentStorageStatus'),'Creating assessment definitions schema…');
     function finish(message){
+      stopBusy();
       finishLoading();
       bootstrappingDefinitions=false;
       setText('assessmentStorageStatus',message);
@@ -254,8 +257,9 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     const button=byId('initializeAssessmentStorageButton'),results=byId('assessmentStorageResults');
     if(button)button.disabled=true;
     if(results)results.textContent='';
-    setText('assessmentStorageStatus','Preparing assessment storage…');
+    const stopBusy=getUi().busy.write(byId('assessmentStorageStatus'),'Preparing assessment storage…');
     function finish(message){
+      stopBusy();
       initializingAssessmentStorage=false;
       if(button)button.disabled=!assessmentStorageAvailable;
       setText('assessmentStorageStatus',message);
@@ -274,10 +278,7 @@ function systemStatusActionsBrowser_(bridge, getUi) {
   function runGithubSync() {
     const btn = document.getElementById('githubSyncButton');
 
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Syncing...';
-    }
+    const stopBusy = btn ? getUi().busy.write(btn, 'Syncing…', [btn]) : function() {};
 
     bridge.write('API_coordinator_syncGithub',[])
       .then(function(result) {
@@ -302,10 +303,7 @@ function systemStatusActionsBrowser_(bridge, getUi) {
 
         getUi().notify(message, result.failedCount ? 'warning' : 'success');
 
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Run Sync';
-        }
+        stopBusy('Run Sync');
       }, function(error) {
 
         getUi().notify(
@@ -315,10 +313,7 @@ function systemStatusActionsBrowser_(bridge, getUi) {
             : 'Unknown error')
         );
 
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Run Sync';
-        }
+        stopBusy('Run Sync');
       });
   }
 
@@ -333,8 +328,9 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     host.resendResults = results;
     host.resendPagination = host.resendPagination || {page:1, size:10};
     studentInvitationResendBusy = true;
+    let stopBusy = null;
     button.disabled = true;
-    host.setAttribute('aria-busy', 'true');
+    getUi().busy.mark(host, true);
     function render() {
       const rows = Array.from(results.values());
       host.querySelector('[data-resend-log]').hidden = !rows.length;
@@ -346,12 +342,13 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     function finish(message, retry) {
       studentInvitationResendBusy = false;
       button.disabled = false;
-      host.setAttribute('aria-busy', 'false');
+      getUi().busy.mark(host, false);
       button.textContent = retry ? 'Retry remaining invitations' : 'Resend expired student invitations';
+      if (stopBusy) stopBusy();
       status.textContent = message + ' ' + render();
     }
     function batch(cursor) {
-      status.textContent = 'Processing student invitations. Completed results remain below.';
+      stopBusy = getUi().busy.write(status, 'Processing student invitations. Completed results remain below.');
       bridge.write('API_coordinator_resendInvitations',[cursor]).then(function(result) {
         result.results.forEach(row => results.set(row.teamId + ':' + row.email, row));
         render();

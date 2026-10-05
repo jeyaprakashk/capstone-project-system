@@ -146,8 +146,12 @@ function internalAssessmentPublishingBrowser_(bridge) {
     return s.requests.get(signature);
   }
   async function execute(key,section,s,team,jobs,verb) {
-    notice(section,verb+'…');
-    const results=await runSequence(jobs,rpc,done=>{if(section.isConnected)notice(section,verb+': '+done.length+'/'+jobs.length+' requests settled.');});
+    const noticeNode=()=>section.querySelector('[data-notice]');
+    let stop=DashboardUI.busy.write(noticeNode(),verb+'…');
+    let results;
+    try {
+      results=await runSequence(jobs,rpc,done=>{if(section.isConnected){stop();stop=DashboardUI.busy.write(noticeNode(),verb+': '+done.length+'/'+jobs.length+' requests settled.');}});
+    } finally { stop(); }
     s.outcomes.set(team.team,results);if(results.some(r=>r.outcome!=='success'))s.open.add(team.team);
     s.busy=false;if(section.isConnected){disable(section,false);await refresh(key);if(section.isConnected){const node=section.querySelector('[data-notice]');const summary=document.createElement('div');summary.innerHTML=verb==='Reopening'?(results.every(r=>r.outcome==='success')?'Evaluation reopened.':outcomeText(results)):outcomeText(s.outcomes.get(team.team));node.appendChild(summary);}}
   }

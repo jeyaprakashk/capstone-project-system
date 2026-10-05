@@ -62,3 +62,25 @@ test('an unavailable GitHub status is reported as unavailable, never as missing 
   const { dto } = build({ github: 'throw' });
   assert(dto.teams.every(t => t.github === null));
 });
+
+test('guide commits DTO counts every collected commit per mapped member and skips the template bootstrap', () => {
+  const { g } = build();
+  const sha = n => String(n).padStart(40, 'a');
+  const row = (n, authorId, message, day) => ({ teamId: 'T1', timestamp: new Date('2026-01-' + day + 'T10:00:00Z'), username: 'u' + authorId, sha: sha(n), message, repositoryUrl: 'https://github.com/org/team1', authorId, authorResolution: 'resolved' });
+  const collected = [row(1, '1', 'first', '02'), row(2, '1', 'second', '03'), row(3, '1', 'third', '04'), row(4, '1', 'fourth', '05'), row(5, '2', 'other', '06'),
+    { ...row(6, '1', 'Initial commit: Capstone project for Team T1', '01'), username: 'system' }, { ...row(7, '1', 'elsewhere', '07'), repositoryUrl: 'https://github.com/org/other' }];
+  const setup = { repoUrl: 'https://github.com/org/team1', members: [{ label: '001', username: 'one', githubId: '1', status: 'valid' }, { label: '002', username: 'two', githubId: '2', status: 'valid' }, { label: '003', username: '', githubId: '', status: 'unavailable' }] };
+  const dto = JSON.parse(JSON.stringify(g.c.buildGuideCommitsDto_('T1', setup, collected, true)));
+  assert.equal(dto.state, 'available');
+  assert.deepEqual(dto.members.map(m => [m.regno, m.count, m.commits.length]), [['001', 4, 3], ['002', 1, 1], ['003', null, 0]]);
+  assert.deepEqual(dto.members[0].commits.map(c => c.message), ['fourth', 'third', 'second']);
+  assert.equal(dto.members[0].commits[0].url, 'https://github.com/org/team1/commit/' + sha(4));
+  assert.equal(g.c.buildGuideCommitsDto_('T1', setup, collected, false).state, 'unavailable');
+  assert.equal(g.c.buildGuideCommitsDto_('T1', { ...setup, repoUrl: '' }, collected, true).state, 'unavailable');
+});
+
+test('guide commits endpoint refuses a team that belongs to another guide', () => {
+  const { g } = build();
+  const frame = JSON.parse(g.c.API_guide_getCommits('NOT-MY-TEAM'));
+  assert.equal(frame.ok, false); assert.equal(frame.error.code, 'UNAUTHORIZED');
+});
