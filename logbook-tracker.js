@@ -37,12 +37,13 @@ function commitApiError_(slug, response) {
 }
 
 function fetchCommitsForTeam_(repoOwner, repoName, hours) {
-  hours = hours || 2;
-  const sinceDate = new Date(Date.now() - hours * 60 * 60 * 1000);
+  // Without hours, read the full default-branch history. A rolling window loses commits pushed
+  // after a missed run or with an older committer date; SHA de-duplication makes re-reads safe.
+  const since = hours ? '&since=' + encodeURIComponent(new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()) : '';
   const slug = encodeURIComponent(repoOwner) + '/' + encodeURIComponent(repoName);
   const commits = [];
   for (let page = 1; ; page++) {
-    const response = makeGithubRequest_('GET', '/repos/' + slug + '/commits?since=' + encodeURIComponent(sinceDate.toISOString()) + '&per_page=100&page=' + page);
+    const response = makeGithubRequest_('GET', '/repos/' + slug + '/commits?per_page=100' + since + '&page=' + page);
     if (response.status === 409 && response.body && /repository is empty/i.test(response.body.message || '')) return [];
     if (response.status !== 200) throw commitApiError_(slug,response);
     if (!Array.isArray(response.body)) throw new Error('Invalid commit response for ' + slug + ': expected an array.');
@@ -221,7 +222,7 @@ function collectAllCommits_() {
     try {
       const repo = parseGithubRepoUrl_(repoUrl);
       if (!repo) throw new Error('Invalid recorded GitHub repository URL for ' + teamId + '; URL was not changed.');
-      const commits = fetchCommitsForTeam_(repo.owner,repo.repo,2);
+      const commits = fetchCommitsForTeam_(repo.owner,repo.repo);
       processed.push({teamId,...appendCollectedCommits_(commitSheet,teamId,commits,repoUrl)});
       writeCommitCollectionStatus_(teamId, 'ok');
     } catch (error) {

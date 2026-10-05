@@ -17,16 +17,16 @@ function fixture() {
  return {...f,calls,logs,response:fn=>{response=fn;},commits:()=>f.sheets.get('Commits').rows};
 }
 
-test('collection uses an exact rolling two-hour lookback across midnight without saved cursor state',()=>{
+test('collection reads full history with no rolling window and saves no cursor state',()=>{
  const f=fixture();f.time('2026-01-03T00:30:45Z');
  const properties=Array.from(f.properties.entries()),triggers=f.triggers.slice();
  f.c.fetchAllCommits();
- assert.equal(new URL(f.calls[0].url).searchParams.get('since'),'2026-01-02T22:30:45.000Z');
+ assert.equal(new URL(f.calls[0].url).searchParams.has('since'),false);
  assert.deepEqual(Array.from(f.properties.entries()),properties);
  assert.deepEqual(f.triggers,triggers);
 });
 
-test('successive hourly windows overlap, skip existing SHA and append newly visible SHA',()=>{
+test('successive runs skip existing SHA and append newly visible SHA',()=>{
  const f=fixture();
  const at=(n,date)=>commit(n,{commit:{...commit(n).commit,committer:{date}}});
  const first=at(1,'2026-01-02T11:30:00Z'),second=at(2,'2026-01-02T12:30:00Z');
@@ -35,8 +35,7 @@ test('successive hourly windows overlap, skip existing SHA and append newly visi
  f.time('2026-01-02T13:00:00Z');f.response(()=>({status:200,body:[first,second]}));
  const result=f.c.fetchAllCommits()[0];
  assert.equal(result.count,1);assert.equal(result.skipped,1);assert.equal(result.fetched,2);
- assert.deepEqual(f.calls.map(call=>new URL(call.url).searchParams.get('since')),
-  ['2026-01-02T10:00:00.000Z','2026-01-02T11:00:00.000Z']);
+ assert.deepEqual(f.calls.map(call=>new URL(call.url).searchParams.get('since')),[null,null]);
  assert.deepEqual(f.commits().slice(1).map(row=>row[5]),[sha(1),sha(2)]);
 });
 
