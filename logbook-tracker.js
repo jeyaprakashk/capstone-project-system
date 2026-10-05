@@ -315,23 +315,6 @@ function weeklyStudents_(capture) {
   return roster;
 }
 
-/**
- * Request-local timing of the weekly read steps. The steps are always logged; they are also returned to the
- * browser as `perfTrace` only while the Script Property WEEKLY_PERF_TRACE is 'on' (a temporary diagnostic).
- */
-let WEEKLY_PERF_STEPS_ = [];
-function weeklyPerfStart_() { WEEKLY_PERF_STEPS_ = []; }
-function weeklyPerfLap_(label, startMs) {
-  const now = Date.now();
-  WEEKLY_PERF_STEPS_.push({step:label, ms:now - startMs});
-  if (typeof console !== 'undefined') console.log('[WEEKLY PERF] ' + label + ': ' + (now - startMs) + ' ms');
-  return now;
-}
-function weeklyPerfTrace_() {
-  try { return PropertiesService.getScriptProperties().getProperty('WEEKLY_PERF_TRACE') === 'on' ? WEEKLY_PERF_STEPS_.slice() : null; }
-  catch (error) { return null; }
-}
-
 /** `students` is the validated roster when the caller already read it in this request. */
 function authorizeWeeklyStudent_(students) {
   const email = normalizeEmail_(Session.getActiveUser().getEmail());
@@ -460,26 +443,18 @@ function submitWeeklyProgress_(input) {
 }
 
 function loadStudentWeeklyProgress_() {
-  const perfStart = Date.now();
-  let lap = perfStart;
   // The roster is read once and shared with the GitHub mapping below; the windows once and shared with eligibility and evidence.
   const rosterRead = {};
   const students = weeklyStudents_(rosterRead);
-  lap = weeklyPerfLap_('roster (TeamRoster + TeamStatus)', lap);
   const student = authorizeWeeklyStudent_(students), team = weeklyTeam_(student.teamId, rosterRead.status);
-  lap = weeklyPerfLap_('team row', lap);
   const windows = getWeeklySubmissionWindows_();
-  lap = weeklyPerfLap_('weekly windows', lap);
   const eligibility = progressStudentEligibility_(student, undefined, windows);
-  lap = weeklyPerfLap_('progress eligibility', lap);
   const now = new Date();
   const eligibleFrom = eligibility.eligibleFrom, enforcedFrom = eligibility.enforcedFrom;
   const ready = !!eligibleFrom && getTeamStatus_(team.row) === 'APPROVED';
   const records = readLogEntries_(null,student.regNo);
-  lap = weeklyPerfLap_('log entries (LogEntries search)', lap);
   const allowed = eligibleWeeklyWindows_(eligibleFrom,windows);
   const signedIds = weeklySignedEntryIds_();
-  lap = weeklyPerfLap_('guide sign-offs', lap);
   const weeks = allowed.filter(w=>now.getTime() >= w.opens_at).map(w=>{
     const {state,editable} = weeklySubmissionState_(w,records,now);
     const guideFrozen = weeklyGuideFrozen_(records,w.weekId,signedIds);
@@ -495,8 +470,6 @@ function loadStudentWeeklyProgress_() {
   const repoColumn = rosterRead.status ? rosterRead.status.headers.findIndex(h => String(h || '').trim().toLowerCase() === 'repo url') : -1;
   const repoUrl = rosterRead.status ? (repoColumn >= 0 ? String(team.row[repoColumn] || '').trim() : '') : undefined;
   const evidence = readStudentWeeklyEvidence_(student,windows.filter(w=>now.getTime() >= w.opens_at),{logs:records,students,repoUrl});
-  lap = weeklyPerfLap_('GitHub mapping and commit evidence', lap);
-  weeklyPerfLap_('TOTAL (excluding the final response build)', perfStart);
   return {checkedAt:now.toISOString(),eligibleFrom,enforcedFrom,eligibilityStatus:eligibility.status,ready,complete:!!eligibleFrom && windows.every(w=>now.getTime() > w.late_until) && getLogWeekSummary_(records,enforcedFrom,student.regNo,now,windows).missing === 0,weeks,actions,history:serial,timezone:getSpreadsheet_().getSpreadsheetTimeZone(),
     allWeeks:windows.map(w=>({weekId:w.weekId,opens:new Date(w.opens_at).toISOString(),deadline:new Date(w.deadline_at).toISOString()})),
     evidence,

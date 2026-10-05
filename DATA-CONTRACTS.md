@@ -56,8 +56,6 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_shared_getTimeline()` / `API_shared_getRubrics()` | Any dashboard role | none | the existing project timeline (`schedule, milestones …`) / shared rubrics (`assessments …`) | `loadSharedProjectTimeline_` / `loadSharedRubrics_` called directly |
 | `API_coordinator_getTeamDrawer(teamId, section)` | Coordinator | `section` is `basic`, `progress` or `activity` | the existing team detail for that section, rendered by `TeamDrawerView` (`team-drawer-view.js`) | `loadCoordinatorDrawerSection_` called directly |
 
-Diagnostic (temporary): while the Script Property `WEEKLY_PERF_TRACE` is `on`, `API_student_getWeekly` adds `perfTrace:[{step, ms}]` to its response so step timings can be read without Cloud Logging. It is absent by default and the view ignores it.
-
 For each endpoint record: required role, request fields and validation, the exact
 `data` fields and types, and which server HTML builder it replaces. Each endpoint has
 a contract test that checks its output against this shape, and a golden-master

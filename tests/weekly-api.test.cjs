@@ -96,23 +96,6 @@ test('the weekly read gets the same answer while reading the roster and the week
   assert.deepEqual(counts, { students: 1, windows: 1 });
 });
 
-test('the weekly step timings are returned only while the temporary trace property is on', () => {
-  const f = setup(); f.time('2026-01-02T12:00:00Z'); f.user('one@example.com');
-  let value = null;
-  f.c.PropertiesService = { getScriptProperties: () => ({ getProperty: key => key === 'WEEKLY_PERF_TRACE' ? value : null }) };
-  const off = JSON.parse(f.c.API_student_getWeekly()).data;
-  assert.equal('perfTrace' in off, false);
-  value = 'on';
-  const on = JSON.parse(f.c.API_student_getWeekly()).data;
-  assert(Array.isArray(on.perfTrace) && on.perfTrace.length >= 6);
-  assert(on.perfTrace.every(item => typeof item.step === 'string' && Number.isFinite(item.ms)));
-  assert(on.perfTrace.some(item => /roster/.test(item.step)) && on.perfTrace.some(item => /^TOTAL/.test(item.step)));
-  const { perfTrace, ...rest } = on;
-  assert.deepEqual(JSON.parse(JSON.stringify(rest)), JSON.parse(JSON.stringify(off)));
-  f.c.PropertiesService = undefined;
-  assert.equal('perfTrace' in JSON.parse(f.c.API_student_getWeekly()).data, false);
-});
-
 test('the weekly read takes the team row and repository URL from the one TeamStatus read it already made', () => {
   const f = setup(); f.time('2026-01-02T12:00:00Z'); f.user('one@example.com');
   const baseline = JSON.parse(JSON.stringify(f.c.loadStudentWeeklyProgress_()));
