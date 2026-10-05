@@ -98,7 +98,12 @@ function API_student_getProject() {
 
 /** Weekly progress: existing rules and messages; the browser module renders and saves through the bridge. */
 function API_student_getWeekly() {
-  return apiHandle_(() => loadStudentWeeklyProgress_());
+  return apiHandle_(() => {
+    weeklyPerfStart_();
+    const data = loadStudentWeeklyProgress_();
+    const trace = weeklyPerfTrace_(); // null unless the temporary WEEKLY_PERF_TRACE property is 'on'
+    return trace ? Object.assign({}, data, {perfTrace:trace}) : data;
+  });
 }
 
 function API_student_submitWeekly(input) {

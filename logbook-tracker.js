@@ -308,11 +308,21 @@ function weeklyStudents_() {
   return roster;
 }
 
-/** Request-local timing of one weekly read step (see the [WEEKLY PERF] lines in the execution log). */
+/**
+ * Request-local timing of the weekly read steps. The steps are always logged; they are also returned to the
+ * browser as `perfTrace` only while the Script Property WEEKLY_PERF_TRACE is 'on' (a temporary diagnostic).
+ */
+let WEEKLY_PERF_STEPS_ = [];
+function weeklyPerfStart_() { WEEKLY_PERF_STEPS_ = []; }
 function weeklyPerfLap_(label, startMs) {
   const now = Date.now();
+  WEEKLY_PERF_STEPS_.push({step:label, ms:now - startMs});
   if (typeof console !== 'undefined') console.log('[WEEKLY PERF] ' + label + ': ' + (now - startMs) + ' ms');
   return now;
+}
+function weeklyPerfTrace_() {
+  try { return PropertiesService.getScriptProperties().getProperty('WEEKLY_PERF_TRACE') === 'on' ? WEEKLY_PERF_STEPS_.slice() : null; }
+  catch (error) { return null; }
 }
 
 /** `students` is the validated roster when the caller already read it in this request. */
@@ -475,6 +485,7 @@ function loadStudentWeeklyProgress_() {
     firstSubmittedAt:r.firstSubmittedAt ? new Date(r.firstSubmittedAt).toISOString() : ''}));
   const evidence = readStudentWeeklyEvidence_(student,windows.filter(w=>now.getTime() >= w.opens_at),{logs:records,students});
   lap = weeklyPerfLap_('GitHub mapping and commit evidence', lap);
+  weeklyPerfLap_('TOTAL (excluding the final response build)', perfStart);
   return {checkedAt:now.toISOString(),eligibleFrom,enforcedFrom,eligibilityStatus:eligibility.status,ready,complete:!!eligibleFrom && windows.every(w=>now.getTime() > w.late_until) && getLogWeekSummary_(records,enforcedFrom,student.regNo,now,windows).missing === 0,weeks,actions,history:serial,timezone:getSpreadsheet_().getSpreadsheetTimeZone(),
     allWeeks:windows.map(w=>({weekId:w.weekId,opens:new Date(w.opens_at).toISOString(),deadline:new Date(w.deadline_at).toISOString()})),
     evidence,
