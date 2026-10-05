@@ -112,3 +112,19 @@ test('the weekly step timings are returned only while the temporary trace proper
   f.c.PropertiesService = undefined;
   assert.equal('perfTrace' in JSON.parse(f.c.API_student_getWeekly()).data, false);
 });
+
+test('the weekly read takes the team row and repository URL from the one TeamStatus read it already made', () => {
+  const f = setup(); f.time('2026-01-02T12:00:00Z'); f.user('one@example.com');
+  const baseline = JSON.parse(JSON.stringify(f.c.loadStudentWeeklyProgress_()));
+  // Without the shared read (the previous path: separate team and repository lookups) the answer is the same.
+  const roster = f.c.weeklyStudents_; f.c.weeklyStudents_ = () => roster();
+  assert.deepEqual(JSON.parse(JSON.stringify(f.c.loadStudentWeeklyProgress_())), baseline);
+  f.c.weeklyStudents_ = roster;
+  const counts = { repoLookups: 0, teamReads: 0 };
+  const repo = f.c.getRepoUrlForTeam_, team = f.c.weeklyTeam_;
+  f.c.getRepoUrlForTeam_ = (...args) => { counts.repoLookups++; return repo(...args); };
+  f.c.weeklyTeam_ = (id, known) => { if (!known) counts.teamReads++; return team(id, known); };
+  const again = JSON.parse(JSON.stringify(f.c.loadStudentWeeklyProgress_()));
+  assert.deepEqual(again, baseline);
+  assert.deepEqual(counts, { repoLookups: 0, teamReads: 0 });
+});

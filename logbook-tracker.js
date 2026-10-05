@@ -272,20 +272,26 @@ function weeklyLock_(run) {
   try { return run(); } finally { if (!owned) lock.releaseLock(); }
 }
 
-function weeklyTeam_(teamId) {
-  const sheet = getSheet_(SHEET_NAMES.TEAM_STATUS);
-  const columns = buildColumnMap_(sheet, FIELD_DEFINITIONS.TEAM_STATUS);
-  const matches = readSheetRows_(sheet, 2).map((row,index) => ({row,rowNumber:index+2}))
+/** `known` is the TeamStatus read ({sheet, columns, rows}) a caller already made in this request. */
+function weeklyTeam_(teamId, known) {
+  const sheet = known ? known.sheet : getSheet_(SHEET_NAMES.TEAM_STATUS);
+  const columns = known ? known.columns : buildColumnMap_(sheet, FIELD_DEFINITIONS.TEAM_STATUS);
+  const matches = (known ? known.rows : readSheetRows_(sheet, 2)).map((row,index) => ({row,rowNumber:index+2}))
     .filter(item => textEquals_(item.row[columns.TEAM_ID], teamId));
   if (matches.length !== 1) throw new Error('Team is missing or ambiguous.');
   return {...matches[0], sheet, columns, teamId:String(matches[0].row[columns.TEAM_ID])};
 }
 
-/** Validated current roster; no duplicated identity registry. */
-function weeklyStudents_() {
+/**
+ * Validated current roster; no duplicated identity registry. A caller that also needs the TeamStatus rows
+ * passes an object as `capture`; it receives `status` = {sheet, headers, columns, rows} from the same read.
+ */
+function weeklyStudents_(capture) {
+  const sources = {};
   const collect = (name, definitions) => {
-    const sheet = getSheet_(name), columns = buildColumnMap_(sheet, definitions);
+    const sheet = getSheet_(name), headers = readSheetRows_(sheet, 1, 1)[0] || [], columns = buildColumnMap_(sheet, definitions, headers);
     const rows = readSheetRows_(sheet, 2), students = [], teams = new Set();
+    sources[name] = {sheet, headers, columns, rows};
     rows.forEach(row => {
       const teamId = String(row[columns.TEAM_ID] || '').trim();
       if (!teamId) return;
@@ -304,6 +310,7 @@ function weeklyStudents_() {
   };
   const roster = collect(SHEET_NAMES.TEAM_ROSTER, FIELD_DEFINITIONS.TEAM_ROSTER);
   const status = collect(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  if (capture) capture.status = sources[SHEET_NAMES.TEAM_STATUS];
   if (roster.length !== status.length || roster.some(student => !status.some(s => s.email === student.email && textEquals_(s.regNo,student.regNo) && textEquals_(s.teamId,student.teamId)))) throw new Error('Roster and TeamStatus membership differ. Synchronize the roster first.');
   return roster;
 }
@@ -456,9 +463,10 @@ function loadStudentWeeklyProgress_() {
   const perfStart = Date.now();
   let lap = perfStart;
   // The roster is read once and shared with the GitHub mapping below; the windows once and shared with eligibility and evidence.
-  const students = weeklyStudents_();
+  const rosterRead = {};
+  const students = weeklyStudents_(rosterRead);
   lap = weeklyPerfLap_('roster (TeamRoster + TeamStatus)', lap);
-  const student = authorizeWeeklyStudent_(students), team = weeklyTeam_(student.teamId);
+  const student = authorizeWeeklyStudent_(students), team = weeklyTeam_(student.teamId, rosterRead.status);
   lap = weeklyPerfLap_('team row', lap);
   const windows = getWeeklySubmissionWindows_();
   lap = weeklyPerfLap_('weekly windows', lap);
@@ -483,7 +491,10 @@ function loadStudentWeeklyProgress_() {
   const serial = records.map(r=>({...r, recordedAt:new Date(r.recordedAt).toISOString(),
     submittedAt:r.submittedAt ? new Date(r.submittedAt).toISOString() : '',
     firstSubmittedAt:r.firstSubmittedAt ? new Date(r.firstSubmittedAt).toISOString() : ''}));
-  const evidence = readStudentWeeklyEvidence_(student,windows.filter(w=>now.getTime() >= w.opens_at),{logs:records,students});
+  // The team's repository URL sits on the TeamStatus row already read; no separate lookup is needed.
+  const repoColumn = rosterRead.status ? rosterRead.status.headers.findIndex(h => String(h || '').trim().toLowerCase() === 'repo url') : -1;
+  const repoUrl = rosterRead.status ? (repoColumn >= 0 ? String(team.row[repoColumn] || '').trim() : '') : undefined;
+  const evidence = readStudentWeeklyEvidence_(student,windows.filter(w=>now.getTime() >= w.opens_at),{logs:records,students,repoUrl});
   lap = weeklyPerfLap_('GitHub mapping and commit evidence', lap);
   weeklyPerfLap_('TOTAL (excluding the final response build)', perfStart);
   return {checkedAt:now.toISOString(),eligibleFrom,enforcedFrom,eligibilityStatus:eligibility.status,ready,complete:!!eligibleFrom && windows.every(w=>now.getTime() > w.late_until) && getLogWeekSummary_(records,enforcedFrom,student.regNo,now,windows).missing === 0,weeks,actions,history:serial,timezone:getSpreadsheet_().getSpreadsheetTimeZone(),
