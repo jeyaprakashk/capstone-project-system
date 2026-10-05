@@ -136,8 +136,8 @@ function buildDashboardShell_(email, views) {
 ${HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent()}
 </head>
 <body class="min-h-screen bg-canvas md:pl-60${topBar ? ' max-md:pt-14' : ''}">
-<header class="border-b border-edge bg-paper px-4 py-3 md:fixed md:inset-y-0 md:left-0 md:w-60 md:overflow-y-auto md:border-b-0 md:border-r">
-<h1 class="m-0 mb-3 text-base font-semibold text-ink">Dashboard</h1>
+<header class="border-b border-edge bg-paper px-4 py-3${topBar ? ' max-md:border-b-0 max-md:p-0' : ''} md:fixed md:inset-y-0 md:left-0 md:w-60 md:overflow-y-auto md:border-b-0 md:border-r">
+<h1 class="m-0 mb-3 text-base font-semibold text-ink${topBar ? ' max-md:sr-only' : ''}">Dashboard</h1>
 <nav class="${navClass}" id="dashboardNavigation" aria-label="Dashboard sections">
 ${menuToggle}
 <div class="${itemsClass}" id="roleMenuItems" role="tablist" aria-label="Dashboard sections">${roleButtons}<div class="${separatorClass}" role="separator" aria-orientation="horizontal"></div>${rubricsButton}${systemButton}</div>
