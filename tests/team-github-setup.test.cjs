@@ -247,3 +247,14 @@ test('strict intake unlocks after acceptance; outsiders cannot email the team',(
   intake.namedValues['Email Address']=['one@example.com'];f.permissions.set('two','write');f.invitations.length=0;
   f.c.onTeamIntakeSubmit(intake);assert.equal(f.writes[0].TITLE,'NEW PROJECT');
 });
+
+test('account metadata is rewritten only when a stored value would change, so reads skip the locked sheet scan',()=>{
+  const f=fixture();let refreshes=0;f.c.refreshGithubAccountMetadata_=()=>{refreshes++;};
+  f.usernames[0][5]='Stale display name';
+  f.state();assert(refreshes>0);
+  const members=f.state().members;
+  f.usernames.forEach((row,i)=>{row[3]=members[i].username;row[5]=members[i].displayName;row[6]=members[i].profileUrl;});
+  refreshes=0;f.state();assert.equal(refreshes,0);
+  f.usernames[1][6]='https://github.com/old-url';
+  f.state();assert(refreshes>0);
+});

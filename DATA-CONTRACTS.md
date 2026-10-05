@@ -38,7 +38,6 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_guide_getEvaluation(teamId, register)` | Guide | register optional | the existing `loadGuideEvaluation_` object (`roster, student, statuses, config, evaluation, repository, revision, token, overdue`) | `loadGuideEvaluation_` called directly |
 | `API_guide_saveEvaluationDraft(input)` / `API_guide_submitEvaluation(input)` | Guide | `{team, student, revision, token, scores, requestId}`; the request ID makes a retry safe | `{status, …}` as before | `saveGuideEvaluationDraft_` / `submitGuideEvaluation_` called directly |
 | `API_student_getReviewResult(key)` / `API_student_getGuideResult()` | Student | assessment key | the published result (`config, identity, total, weighted, scores, assessment, underCorrection`) or `null` when nothing is published | `loadPublishedReviewEvaluation_` / `loadPublishedGuideEvaluation_` called directly |
-| `API_student_getDashboard()` | Student | none | `StudentDashboard` (below) | `buildStudentContent` (removed) |
 | `API_student_getCore()` | Student | none | `StudentCore` (below): team, roster, `titleApproved`, assessment labels; sheet data only, no GitHub calls | `getStudentBaseData_` + `buildStudentCoreDto_` |
 | `API_student_getProject()` | Student | none | `StudentProject` (below): setup, GitHub and title cards (the GitHub checks) | `getStudentDashboardData_` + `buildStudentProjectDto_` |
 | `API_guide_getDashboard()` | Guide | none | `GuideDashboard` (below) | `buildDashboardContent` (removed) |
@@ -138,7 +137,7 @@ confirmation, naming the parent folder, before the write. Contract tests: `tests
 
 ### StudentCore and StudentProject
 
-The browser loads the student dashboard in two parts: `API_student_getCore` first (it renders the Weeks and Assessments screens and the Project heading and roster), and `API_student_getProject` the first time the Project screen is shown, or when a GitHub action refreshes it. `StudentDashboard` below is their union; `API_student_getDashboard` stays as that reference and `tests/student-migration.test.cjs` asserts `{...core, ...project}` equals it for every scenario.
+The browser loads the student dashboard in two parts: `API_student_getCore` first (it renders the Weeks and Assessments screens and the Project heading and roster), and `API_student_getProject` the first time the Project screen is shown, or when a GitHub action refreshes it. `StudentDashboard` below is their union, the shape the page shows once both parts have loaded. The former combined `API_student_getDashboard` was removed after the split was verified live; `tests/student-migration.test.cjs` still freezes the facts of the union for every scenario.
 
 - `StudentCore` = `{teamId, titleApproved, roster, assessments}`.
 - `StudentProject` = `{setup, github, title}`.

@@ -69,7 +69,7 @@ function getDashboardRoleViews_(email) {
   return views;
 }
 
-// Role dashboards load as data: API_student_getDashboard, API_reviewer_getDashboard, API_guide_getDashboard and
+// Role dashboards load as data: API_student_getCore (plus API_student_getProject on demand), API_reviewer_getDashboard, API_guide_getDashboard and
 // API_coordinator_* (see DATA-CONTRACTS.md). Each re-checks authorization on the server. The shell below is the
 // static page frame only: tabs, empty panels and loading placeholders; it carries no dashboard data.
 const SYSTEM_STATUS_HEADER = '<h2>System Status</h2><p id="systemStatusRefreshStatus" class="empty:hidden" data-refresh-status role="status" aria-live="polite"></p>';

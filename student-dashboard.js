@@ -58,7 +58,7 @@ function getStudentBaseData_(teamId, teamStatusRow) {
   perfLap = studentPerfLog_('Roster and title state', perfLap);
 
   studentPerfLog_('getStudentBaseData_ TOTAL', perfStart);
-  return { teamId, title: r[TS.TITLE], problem: r[TS.PROBLEM], titleStatus, note, repoUrl, rosterSlots };
+  return { teamId, title: r[TS.TITLE], problem: r[TS.PROBLEM], titleStatus, note, repoUrl, rosterSlots, row: r };
 }
 
 function getStudentDashboardData_(email, teamId, teamStatusRow) {
@@ -66,7 +66,7 @@ function getStudentDashboardData_(email, teamId, teamStatusRow) {
   let perfLap = perfStart;
   const base = getStudentBaseData_(teamId, teamStatusRow);
 
-  const github = getStudentGithubState_(email, teamId, base.rosterSlots, base.repoUrl);
+  const github = getStudentGithubState_(email, teamId, base.rosterSlots, base.repoUrl, base.row);
   perfLap = studentPerfLog_('GitHub state (getStudentGithubState_)', perfLap);
   const { githubAccount, githubCaptureReady, githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup } = github;
 

@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parseHTML } = require('linkedom');
 const { expectGolden } = require('./invariants/golden.cjs');
-const { studentFixture, SCENARIOS } = require('./student-fixture.cjs');
+const { studentFixture, studentDto, SCENARIOS } = require('./student-fixture.cjs');
 
 const BADGE = { done: 'Done', waiting: 'Waiting', locked: 'Locked', active: 'Action needed' };
 const MEMBER_TEXT = { missing: 'Submit GitHub Account', joined: 'Repository joined', pending: 'Accept Invitation Email' };
@@ -75,7 +75,7 @@ function legacyFacts(html) {
 
 function build(name, options) {
   const s = studentFixture(name, options);
-  return { s, dto: JSON.parse(s.c.API_student_getDashboard()).data };
+  return { s, dto: studentDto(name, options) };
 }
 const normalize = facts => JSON.parse(JSON.stringify(facts));
 
@@ -92,18 +92,16 @@ test('assessment placeholders follow the configured definitions', () => {
   assert.equal(dto.assessments.guideEvaluationLabel, 'Guide Evaluation');
 });
 
-test('the split endpoints carry exactly the full dashboard, in every state, and the core never touches GitHub', () => {
+test('the core endpoint never touches GitHub and the two parts carry disjoint fields, in every state', () => {
   for (const name of Object.keys(SCENARIOS)) {
-    const s = studentFixture(name), call = method => JSON.parse(s.c[method]()).data;
-    const full = call('API_student_getDashboard');
+    const s = studentFixture(name);
     s.c.getStudentGithubState_ = () => { throw new Error('the core must not read GitHub state'); };
     s.c.getTeamGithubSetup_ = s.c.getStudentGithubState_;
-    const core = call('API_student_getCore');
+    s.c.getTeamsGithubSetup_ = s.c.getStudentGithubState_;
+    const core = JSON.parse(s.c.API_student_getCore()).data;
     assert.deepEqual(Object.keys(core).sort(), ['assessments', 'roster', 'teamId', 'titleApproved'], name);
-    const github = studentFixture(name);
-    const project = JSON.parse(github.c.API_student_getProject()).data;
+    const project = JSON.parse(studentFixture(name).c.API_student_getProject()).data;
     assert.deepEqual(Object.keys(project).sort(), ['github', 'setup', 'title'], name);
-    assert.deepEqual({ ...core, ...project }, full, name);
   }
 });
 

@@ -137,3 +137,15 @@ test('coordinator access sync reads and deduplicates TeamStatus repository URLs'
   assert.deepEqual(checked,['org/one','org/two']);
   assert.equal(f.locked(),false);
 });
+
+test('with the team row the student check runs through the batched reader; without it the serial reader is used', () => {
+  const f = fixture(), seen = [];
+  f.c.normalizeText_ = value => String(value || '').trim().toLowerCase();
+  f.c.getTeamsGithubSetup_ = (rows, columns, repos, accounts) => { seen.push([rows.length, repos, accounts.length]); return { t1: { members: [], ready: true, message: 'Batched', usernamesComplete: true } }; };
+  f.c.getTeamGithubSetup_ = () => { seen.push('serial'); return { members: [], ready: false, message: 'Serial' }; };
+  const batched = f.c.getStudentGithubState_('one@example.com', 'T1', f.roster, 'https://github.com/org/repo', f.team);
+  assert.equal(batched.githubText, 'Batched'); assert.equal(batched.githubReady, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(seen)), [[1, { t1: 'https://github.com/org/repo' }, 0]]);
+  const serial = f.c.getStudentGithubState_('one@example.com', 'T1', f.roster, '');
+  assert.equal(serial.githubText, 'Serial'); assert.equal(seen.at(-1), 'serial');
+});

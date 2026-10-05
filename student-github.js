@@ -1,6 +1,13 @@
 /** Student GitHub account connection and separate repository setup. */
-function getStudentGithubState_(email, teamId, roster, repoUrl) {
-  const setup = getTeamGithubSetup_(teamId, { repoUrl });
+/** Same live verification as getTeamGithubSetup_, with the GitHub reads in parallel batches (the guide dashboard's path). */
+function getStudentTeamGithubSetup_(teamId, row, repoUrl) {
+  const columns = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const key = normalizeText_(teamId);
+  return getTeamsGithubSetup_([row], columns, {[key]: repoUrl}, getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS))[key];
+}
+
+function getStudentGithubState_(email, teamId, roster, repoUrl, teamStatusRow) {
+  const setup = teamStatusRow ? getStudentTeamGithubSetup_(teamId, teamStatusRow, repoUrl) : getTeamGithubSetup_(teamId, { repoUrl });
   const mine = setup.members.find(member => emailsMatch_(member.email, email));
   const githubNeedsUsername = !!mine && !mine.githubId && !mine.username;
   const githubAccount = mine ? {githubId:mine.githubId || '',username:mine.username || '',displayName:mine.displayName || '',profileUrl:mine.profileUrl || ''} : null;

@@ -31,7 +31,6 @@ const REQUEST = { requestId: 'request_123456789', revision: 0, team: TEAM, stude
 // endpoint -> [arguments, users that must be rejected]
 const OUTSIDER = ['', 'outsider@example.com'];
 const ENDPOINTS = {
-  API_student_getDashboard: [[], [...OUTSIDER, 'guide@example.com']],
   API_student_getCore: [[], [...OUTSIDER, 'guide@example.com']],
   API_student_getProject: [[], [...OUTSIDER, 'guide@example.com']],
   API_student_getWeekly: [[], [...OUTSIDER, 'guide@example.com']],

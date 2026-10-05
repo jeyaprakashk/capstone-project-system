@@ -28,7 +28,13 @@ function studentFixture(name = 'approved', { review = true } = {}) {
   f.set('Reviewer Notes', s.reviewerNotes || ''); f.set('Guide Notes', s.guideNotes || '');
   const members = s.members || [{ email: 'one@example.com', label: '001', username: 'alice', githubId: '101', status: 'valid', access: 'active' }, { email: 'two@example.com', label: '002', username: 'bob', githubId: '102', status: 'valid', access: 'active' }];
   c.getTeamGithubSetup_ = () => ({ repoUrl: 'https://github.com/org/team', members, ready: s.ready, message: s.message || 'Ready', usernamesComplete: s.usernamesComplete !== false, completedAt: s.completedAt ?? Date.parse('2026-01-05T00:00:00Z') });
+  c.getTeamsGithubSetup_ = (rows, columns, repos) => Object.fromEntries(rows.map(row => [c.normalizeText_(row[columns.TEAM_ID]), c.getTeamGithubSetup_(row[columns.TEAM_ID], { repoUrl: repos[c.normalizeText_(row[columns.TEAM_ID])] })]));
   c.githubCaptureReady_ = () => name !== 'githubActive' || true;
   return { f, c, name };
 }
-module.exports = { studentFixture, SCENARIOS };
+/** The union of the two endpoints: what the page shows once both parts have loaded. */
+function studentDto(name, options) {
+  const s = studentFixture(name, options), call = method => JSON.parse(s.c[method]()).data;
+  return { ...call('API_student_getCore'), ...call('API_student_getProject') };
+}
+module.exports = { studentFixture, studentDto, SCENARIOS };

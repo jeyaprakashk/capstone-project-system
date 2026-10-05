@@ -68,11 +68,6 @@ function buildStudentProjectDto_(email, teamId, d) {
   };
 }
 
-/** The complete StudentDashboard (core plus project): the reference the split endpoints are verified against. */
-function buildStudentDto_(email, teamId, d) {
-  return Object.assign({}, buildStudentCoreDto_(email, teamId, d), buildStudentProjectDto_(email, teamId, d));
-}
-
 function studentAccessOrThrow_() {
   const email = Session.getActiveUser().getEmail();
   if (!email) throw apiFail_('UNAUTHENTICATED', 'Could not identify your account.');
@@ -98,14 +93,6 @@ function API_student_getProject() {
     const student = studentAccessOrThrow_();
     studentPerfReset_();
     return buildStudentProjectDto_(student.email, student.teamId, getStudentDashboardData_(student.email, student.teamId, student.row));
-  }));
-}
-
-function API_student_getDashboard() {
-  return apiHandle_(() => withDashboardRead_(() => {
-    const student = studentAccessOrThrow_();
-    studentPerfReset_();
-    return buildStudentDto_(student.email, student.teamId, getStudentDashboardData_(student.email, student.teamId, student.row));
   }));
 }
 

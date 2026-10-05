@@ -161,7 +161,7 @@ test('common theme applies to all tabs immediately, cached content and late resp
 });
 
 test('project timeline appears only in Timeline and Rubrics across tab switches',async()=>{
- const f=fixture(),timeline={hidden:false},original=f.c.document.getElementById;
+ const f=fixture(),timeline={hidden:false,setAttribute(){},removeAttribute(){},getAttribute:()=>null,children:[]},original=f.c.document.getElementById;
  f.c.document.getElementById=id=>id==='sharedProjectTimeline'?timeline:original(id);
  for(const role of ['student','guide','reviewer','coord']) {
   f.click(role);assert.equal(timeline.hidden,true);
@@ -263,11 +263,14 @@ function rubricClientFixture() {
  return {...f,nodes,ui,data,retry};
 }
 
-test('rubrics start alongside pending role and timeline, deduplicate and survive role switches',async()=>{
+test('timeline and rubrics load only when their tab opens, deduplicate and survive role switches',async()=>{
  const f=rubricClientFixture();const query=f.c.document.querySelector;
  f.c.document.querySelector=selector=>selector==='[data-role-panel]:not([hidden])'?{getAttribute:()=> 'guide'}:query(selector);
  f.c.initializeFirstRoleTab_();
- for(const key of ['loadDashboardRoleContent','loadSharedProjectTimeline_','loadSharedRubrics_']) assert(f.requests.some(r=>r.key===key),key);
+ assert(f.requests.some(r=>r.key==='loadDashboardRoleContent'));
+ for(const key of ['loadSharedProjectTimeline_','loadSharedRubrics_']) assert(!f.requests.some(r=>r.key===key),key+' must wait for its tab');
+ f.click('rubrics');
+ for(const key of ['loadSharedProjectTimeline_','loadSharedRubrics_']) assert.equal(f.requests.filter(r=>r.key===key).length,1,key);
  const promise=f.ui.loadSharedRubrics_();assert.equal(f.ui.loadSharedRubrics_(),promise);
  f.done('loadSharedRubrics_',f.data);await promise;
  f.click('reviewer');await f.ui.loadSharedRubrics_();

@@ -640,7 +640,8 @@ const DashboardUI = (function() {
     if (menuToggle) setRoleMenuOpen(false, menuToggle.getAttribute('aria-expanded') === 'true');
     syncShellRefresh();
     if (activeKey === 'rubrics') {
-      loadSharedRubrics_();
+      loadSharedTimeline().catch(function() {});
+      loadSharedRubrics_().catch(function() {});
     } else if (activeKey === 'system-status') {
       ensureSystemStatusLoaded();
     } else {
@@ -727,8 +728,7 @@ function initializeFirstRoleTab_() {
     DashboardUI.showRoleTab(activePanel.getAttribute('data-role-panel'));
   }
   DashboardUI.initializeLoading();
-  DashboardSchedule.ready().catch(function() {});
-  DashboardUI.loadSharedRubrics_().catch(function() {});
+  // The timeline and rubrics load when the Timeline & Rubrics tab is opened, so they never compete with a role's first load.
 }
 
 if (document.readyState === 'loading') {

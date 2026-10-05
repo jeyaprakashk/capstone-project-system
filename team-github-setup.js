@@ -92,7 +92,11 @@ function getTeamGithubSetup_(teamId, options) {
         if (check.githubId) {
           const metadataKey = 'metadata:' + normalizeText_(teamId) + ':' + normalizeEmail_(email) + ':' + check.githubId;
           if (!validationCache.has(metadataKey)) {
-            refreshGithubAccountMetadata_(submission,check);
+            // Same predicate refreshGithubAccountMetadata_ applies, on the rows already in memory: no write is needed
+            // (and so no locked full-sheet scan) unless a stored value would change.
+            const stale = identityRows.some(item => emailsMatch_(item[1],submission[1]) && textEquals_(item[2],submission[2]) && githubId_(item[accountColumns.ID]) === check.githubId &&
+              (item[3] !== check.username || item[accountColumns.NAME] !== check.displayName || item[accountColumns.URL] !== check.profileUrl));
+            if (stale) refreshGithubAccountMetadata_(submission,check);
             validationCache.set(metadataKey,true);
           }
         }

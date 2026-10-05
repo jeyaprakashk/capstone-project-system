@@ -4,9 +4,9 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { parseHTML } = require('linkedom');
 const { loadSources } = require('./invariants/golden.cjs');
-const { studentFixture, SCENARIOS } = require('./student-fixture.cjs');
+const { studentFixture, studentDto, SCENARIOS } = require('./student-fixture.cjs');
 
-const dtoFor = (name, options) => { const s = studentFixture(name, options); return JSON.parse(s.c.API_student_getDashboard()).data; };
+const dtoFor = (name, options) => studentDto(name, options);
 
 async function setup(dto, options = {}) {
   const { document, window } = parseHTML('<html><body><nav id="studentSideNav"></nav><div id="studentContent"></div></body></html>');
@@ -157,12 +157,12 @@ test('every Tailwind class the view renders is compiled into the stylesheet', as
 test('the endpoint authorizes on the server and returns safe errors', async () => {
   const s = studentFixture('approved');
   s.f.user('stranger@example.com');
-  assert.deepEqual(JSON.parse(s.c.API_student_getDashboard()), { ok: false, error: { code: 'NOT_FOUND', message: 'Student team was not found.' } });
+  assert.deepEqual(JSON.parse(s.c.API_student_getCore()), { ok: false, error: { code: 'NOT_FOUND', message: 'Student team was not found.' } });
   s.f.user('');
-  assert.equal(JSON.parse(s.c.API_student_getDashboard()).error.code, 'UNAUTHENTICATED');
+  assert.equal(JSON.parse(s.c.API_student_getCore()).error.code, 'UNAUTHENTICATED');
   const broken = studentFixture('approved');
-  broken.c.getStudentDashboardData_ = () => { throw new TypeError('column 9 undefined'); };
-  const failure = JSON.parse(broken.c.API_student_getDashboard());
+  broken.c.getStudentBaseData_ = () => { throw new TypeError('column 9 undefined'); };
+  const failure = JSON.parse(broken.c.API_student_getCore());
   assert.equal(failure.error.code, 'INTERNAL'); assert.doesNotMatch(failure.error.message, /column/);
 });
 

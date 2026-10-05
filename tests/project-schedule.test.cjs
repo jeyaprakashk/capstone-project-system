@@ -445,9 +445,9 @@ function timelineBrowser() {
 
 test('timeline is single-flight and never blocks either role dashboard',async()=>{
   const f=timelineBrowser(); f.initialize();
-  assert.deepEqual(f.requests.map(r=>r.type),['role','timeline']);
+  assert.deepEqual(f.requests.map(r=>r.type),['role']); // the timeline waits for its tab or the first caller
   const ready=vm.runInContext('DashboardSchedule.ready()',f.browser);
-  assert.equal(f.requests.length,2);
+  assert.deepEqual(f.requests.map(r=>r.type),['role','timeline']);
   f.requests[0].success('Guide loaded while timeline pending');
   await new Promise(resolve => setImmediate(resolve));
   assert(f.guide.innerHTML.includes('Guide loaded'));
