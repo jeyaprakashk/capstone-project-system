@@ -24,7 +24,6 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
     gray:BADGE_BASE + 'bg-soft text-ink-2 ring-control/20'
   };
   const TIMING = {'on-time':['green', 'On time'], late:['red', 'Late'], overdue:['red', 'Overdue'], pending:['gray', 'Pending'], unknown:['gray', 'Timing unavailable']};
-  const CARD_EDGE = {green:'border-l-success', orange:'border-l-accent', red:'border-l-danger', gray:'border-l-control'};
   const BUTTON = 'border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const PRIMARY = 'border-0 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
   const PILL = 'flex items-center gap-2 border-0 rounded-lg bg-transparent px-3 py-1.5 text-sm text-ink-2 aria-pressed:bg-paper aria-pressed:text-primary aria-pressed:shadow-selected';
@@ -63,7 +62,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   }
   function githubCard(team, githubDue) {
     const g = team.github;
-    return '<aside class="rounded-card border border-edge bg-paper p-4"><div class="flex flex-wrap items-center justify-between gap-2 border-b border-edge pb-3">' + repositoryLine(team.repoUrl) +
+    return '<aside><div class="flex flex-wrap items-center justify-between gap-2 border-b border-edge pb-3">' + repositoryLine(team.repoUrl) +
       '<span class="text-sm text-muted">Due ' + escape(githubDue || 'date unavailable') + '</span></div>' +
       (g ? '<ul aria-label="Team GitHub status" class="m-0 list-none p-0">' + g.members.map(githubMemberMarkup).join('') + '</ul>' : '<p role="status" class="mt-2 text-sm text-muted">GitHub status unavailable. Refresh the dashboard to retry.</p>') + '</aside>';
   }
@@ -119,16 +118,16 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
       else if (key === 'REJECTED_BY_GUIDE') body += p('<strong>Your note:</strong> ' + escape(team.guideNotes || '(none)')) + p('Waiting on the team to resubmit.');
       else if (key === 'REVISE_AWAITING_STUDENT') body += p('<strong>Reviewer\'s note:</strong> ' + escape(team.reviewerNotes || '(none)')) + p('Waiting for the team to resubmit — nothing for you to do until they do.');
     }
-    return '<div id="card-' + id + '" class="rounded-card border border-edge border-l-4 bg-paper shadow-card p-4 ' + (CARD_EDGE[status.tone] || CARD_EDGE.gray) + '">' +
-      '<div class="flex flex-wrap items-center gap-2"><h3 class="text-base font-semibold text-ink">Title approval</h3><span class="' + (TONE[status.tone] || TONE.gray) + '">Team ' + id + ' · ' + escape(status.text) + '</span>' +
+    return '<div id="card-' + id + '">' +
+      '<div class="flex flex-wrap items-center gap-2"><span class="' + (TONE[status.tone] || TONE.gray) + '">Team ' + id + ' · ' + escape(status.text) + '</span>' +
       (team.titleTiming ? '<span class="inline-flex items-center gap-2">' + timingBadge(team.titleTiming.state) + '<small class="text-xs text-muted">' + escape(team.titleTiming.explanation) + '</small></span>' : '') + '</div>' +
       (team.overdueLogs ? p(team.overdueLogs + ' student weekly log(s) overdue', 'text-danger') : '') +
       (team.titleDue ? p('Title approval due ' + escape(team.titleDue.date) + (team.titleDue.overdue ? ' · Overdue' : ''), team.titleDue.overdue ? 'text-danger' : 'text-ink-2') : '') +
       body + '</div>';
   }
   function documentsView(team) {
-    return '<h3 class="text-base font-semibold text-ink">Team documents</h3>' + (team.documents.length
-      ? '<ul class="mt-2 divide-y divide-edge">' + team.documents.map(d => '<li class="flex items-center justify-between gap-3 py-2 text-sm"><strong>' + escape(d.label) + '</strong><a class="' + BUTTON + '" href="' + escape(safeUrl(d.url)) + '" target="_blank" rel="noopener">Open document</a></li>').join('') + '</ul>'
+    return (team.documents.length
+      ? '<ul class="m-0 list-none p-0 divide-y divide-edge">' + team.documents.map(d => '<li class="flex items-center justify-between gap-3 py-2 text-sm"><strong>' + escape(d.label) + '</strong><a class="' + BUTTON + '" href="' + escape(safeUrl(d.url)) + '" target="_blank" rel="noopener">Open document</a></li>').join('') + '</ul>'
       : p('No documents submitted yet.') + p('Last document submission: ' + escape(team.lastDocumentSubmission || 'None recorded'))) +
       p('Open the submitted files to review the team’s work.');
   }
@@ -154,7 +153,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
       '<div data-guide-view="title">' + (team.status.key === 'APPROVED'
         ? '<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">' + titleCard(team) + '</div><div>' + approvalSide(team) + '</div></div>'
         : titleCard(team)) + '</div>' +
-      '<div data-guide-view="documents" hidden class="rounded-card border border-edge bg-paper shadow-card p-4">' + documentsView(team) + '</div></section>';
+      '<div data-guide-view="documents" hidden>' + documentsView(team) + '</div></section>';
   }
   function tabMarkup(view, iconName, title, selected, locked) {
     return '<button type="button" class="' + TAB + '" data-guide-tab="' + view + '" aria-pressed="' + selected + '"' + (locked ? ' data-evaluation-locked' : '') + '><strong class="flex items-center gap-2 font-semibold">' + icon(iconName) + title + '</strong></button>';
@@ -168,7 +167,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   const updatedLabel = () => 'Last updated: ' + new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true}) + ' IST';
 
   const lockedEvaluationMarkup = notice => '<div data-evaluation-locked-card class="flex items-center gap-3 text-ink-2">' + icon('lock-keyhole') +
-    '<div><h3 class="text-base font-semibold text-ink">Guide Evaluation</h3><p class="m-0 text-sm text-muted">' + escape(notice) + '</p></div></div>';
+    '<p class="m-0 text-sm text-muted">' + escape(notice) + '</p></div>';
 
   function workspaceMarkup(dto) {
     const teams = dto.teams, ui = getUi();
@@ -180,10 +179,10 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
         tabMarkup('documents', 'file-text', 'Documents', false) +
         tabMarkup('evaluation', 'graduation-cap', 'Guide Evaluation', false, !evaluation.enabled) + '</nav>' +
       '<div class="p-5">' + teams.map((t, i) => panelMarkup(t, i, dto.githubDue)).join('') +
-      '<section id="guideWeeklyProgress" data-guide-weeks="' + escape(JSON.stringify(dto.weeks)) + '" class="mt-3 rounded-card border border-edge bg-paper shadow-card p-4" hidden aria-label="Weekly progress confirmation">' +
-        '<div><h2 class="text-xl font-semibold text-ink">Weekly Progress</h2></div><p data-guide-weekly-status role="status" class="text-sm text-muted"></p>' +
+      '<section id="guideWeeklyProgress" data-guide-weeks="' + escape(JSON.stringify(dto.weeks)) + '" hidden aria-label="Weekly progress confirmation">' +
+        '<p data-guide-weekly-status role="status" class="m-0 text-sm text-muted empty:hidden"></p>' +
         '<div data-guide-weekly-read>' + ui.renderSkeleton('panel', 'Reading weekly progress') + '</div></section>' +
-      '<section id="guideEvaluationEditor" class="mt-3 rounded-card border border-edge bg-paper shadow-card p-4" hidden aria-label="Guide evaluation editor">' + (evaluation.enabled ? '' : lockedEvaluationMarkup(evaluation.notice)) + '</section>' +
+      '<section id="guideEvaluationEditor" hidden aria-label="Guide evaluation editor">' + (evaluation.enabled ? '' : lockedEvaluationMarkup(evaluation.notice)) + '</section>' +
       '</div></div></div>';
   }
 

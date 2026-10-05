@@ -49,7 +49,7 @@ test('opening reads through the bridge, shows the editor and reports statuses to
   assert.deepEqual(f.events.weekly[0], ['view', 'evaluation']);
   assert.equal(f.events.weekly.at(-1)[0], 'status');
   assert.equal(f.host.querySelectorAll('fieldset').length, 2);
-  assert.match(f.host.textContent, /Guide Evaluation · T1/); assert.match(f.host.textContent, /Not started/);
+  assert.equal(f.host.querySelector('h2, h3'), null); assert.match(f.host.textContent, /Not started/);
   assert.equal(f.host.querySelector('a[href^="https://github.com/"]').textContent, 'Open team repository / commit history');
   assert.equal(f.host.querySelectorAll('#guideEvalStudent option').length, 2);
   assert.equal(f.host.querySelector('b'), null); assert.equal(f.host.querySelector('i'), null);
