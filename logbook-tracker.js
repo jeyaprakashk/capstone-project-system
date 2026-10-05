@@ -308,10 +308,18 @@ function weeklyStudents_() {
   return roster;
 }
 
-function authorizeWeeklyStudent_() {
+/** Request-local timing of one weekly read step (see the [WEEKLY PERF] lines in the execution log). */
+function weeklyPerfLap_(label, startMs) {
+  const now = Date.now();
+  if (typeof console !== 'undefined') console.log('[WEEKLY PERF] ' + label + ': ' + (now - startMs) + ' ms');
+  return now;
+}
+
+/** `students` is the validated roster when the caller already read it in this request. */
+function authorizeWeeklyStudent_(students) {
   const email = normalizeEmail_(Session.getActiveUser().getEmail());
   if (!email) throw new Error('Sign in with your institutional account.');
-  const student = weeklyStudents_().find(item => item.email === email);
+  const student = (students || weeklyStudents_()).find(item => item.email === email);
   if (!student) throw new Error('Student membership was not found.');
   return student;
 }
@@ -435,14 +443,25 @@ function submitWeeklyProgress_(input) {
 }
 
 function loadStudentWeeklyProgress_() {
-  const student = authorizeWeeklyStudent_(), team = weeklyTeam_(student.teamId);
-  const eligibility = progressStudentEligibility_(student);
-  const now = new Date(), windows = getWeeklySubmissionWindows_();
+  const perfStart = Date.now();
+  let lap = perfStart;
+  // The roster is read once and shared with the GitHub mapping below; the windows once and shared with eligibility and evidence.
+  const students = weeklyStudents_();
+  lap = weeklyPerfLap_('roster (TeamRoster + TeamStatus)', lap);
+  const student = authorizeWeeklyStudent_(students), team = weeklyTeam_(student.teamId);
+  lap = weeklyPerfLap_('team row', lap);
+  const windows = getWeeklySubmissionWindows_();
+  lap = weeklyPerfLap_('weekly windows', lap);
+  const eligibility = progressStudentEligibility_(student, undefined, windows);
+  lap = weeklyPerfLap_('progress eligibility', lap);
+  const now = new Date();
   const eligibleFrom = eligibility.eligibleFrom, enforcedFrom = eligibility.enforcedFrom;
   const ready = !!eligibleFrom && getTeamStatus_(team.row) === 'APPROVED';
   const records = readLogEntries_(null,student.regNo);
+  lap = weeklyPerfLap_('log entries (LogEntries search)', lap);
   const allowed = eligibleWeeklyWindows_(eligibleFrom,windows);
   const signedIds = weeklySignedEntryIds_();
+  lap = weeklyPerfLap_('guide sign-offs', lap);
   const weeks = allowed.filter(w=>now.getTime() >= w.opens_at).map(w=>{
     const {state,editable} = weeklySubmissionState_(w,records,now);
     const guideFrozen = weeklyGuideFrozen_(records,w.weekId,signedIds);
@@ -454,10 +473,12 @@ function loadStudentWeeklyProgress_() {
   const serial = records.map(r=>({...r, recordedAt:new Date(r.recordedAt).toISOString(),
     submittedAt:r.submittedAt ? new Date(r.submittedAt).toISOString() : '',
     firstSubmittedAt:r.firstSubmittedAt ? new Date(r.firstSubmittedAt).toISOString() : ''}));
-  return {checkedAt:now.toISOString(),eligibleFrom,enforcedFrom,eligibilityStatus:eligibility.status,ready,complete:!!eligibleFrom && windows.every(w=>now.getTime() > w.late_until) && getLogWeekSummary_(records,enforcedFrom,student.regNo,now).missing === 0,weeks,actions,history:serial,timezone:getSpreadsheet_().getSpreadsheetTimeZone(),
+  const evidence = readStudentWeeklyEvidence_(student,windows.filter(w=>now.getTime() >= w.opens_at),{logs:records,students});
+  lap = weeklyPerfLap_('GitHub mapping and commit evidence', lap);
+  return {checkedAt:now.toISOString(),eligibleFrom,enforcedFrom,eligibilityStatus:eligibility.status,ready,complete:!!eligibleFrom && windows.every(w=>now.getTime() > w.late_until) && getLogWeekSummary_(records,enforcedFrom,student.regNo,now,windows).missing === 0,weeks,actions,history:serial,timezone:getSpreadsheet_().getSpreadsheetTimeZone(),
     allWeeks:windows.map(w=>({weekId:w.weekId,opens:new Date(w.opens_at).toISOString(),deadline:new Date(w.deadline_at).toISOString()})),
-    evidence:readStudentWeeklyEvidence_(student,windows.filter(w=>now.getTime() >= w.opens_at),{logs:records}),
-    summary:getLogWeekSummary_(records,eligibleFrom ? enforcedFrom : '',student.regNo,now),
+    evidence,
+    summary:getLogWeekSummary_(records,eligibleFrom ? enforcedFrom : '',student.regNo,now,windows),
     message:ready ? (actions.length ? '' : 'No submission window is open.') : 'An approved title and fixed individual progress eligibility are required to submit.'};
 }
 

@@ -83,3 +83,15 @@ test('published result endpoints return null when nothing is published and keep 
   assert.deepEqual(JSON.parse(JSON.stringify(asked)), ['review1', 'review2', 'review2']);
   assert.deepEqual(JSON.parse(f.c.API_student_getGuideResult()).error, { code: 'REJECTED', message: 'Not a current student.' });
 });
+
+test('the weekly read gets the same answer while reading the roster and the weekly windows once per request', () => {
+  const f = setup(); f.time('2026-01-02T12:00:00Z'); f.user('one@example.com');
+  const baseline = f.c.loadStudentWeeklyProgress_();
+  const counts = { students: 0, windows: 0 };
+  const students = f.c.weeklyStudents_, windows = f.c.getWeeklySubmissionWindows_;
+  f.c.weeklyStudents_ = (...args) => { counts.students++; return students(...args); };
+  f.c.getWeeklySubmissionWindows_ = (...args) => { counts.windows++; return windows(...args); };
+  const again = f.c.loadStudentWeeklyProgress_();
+  assert.deepEqual(JSON.parse(JSON.stringify(again)), JSON.parse(JSON.stringify(baseline)));
+  assert.deepEqual(counts, { students: 1, windows: 1 });
+});

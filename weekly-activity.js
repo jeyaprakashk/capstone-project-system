@@ -91,7 +91,7 @@ function weeklyStudentCommit_(row) {
  */
 function readWeeklyProgressEvidence_(student, weekId, source) {
   source = source || weeklyEvidenceSource_(student);
-  const window = getWeeklySubmissionWindows_().find(w=>w.weekId === weekId);
+  const window = (source.windows || getWeeklySubmissionWindows_()).find(w=>w.weekId === weekId);
   if (!window) throw new Error('Unknown evidence Week ID.');
   const log = getEffectiveLogEntries_(source.logs.filter(r=>textEquals_(r.regNo,student.regNo) && textEquals_(r.teamId,student.teamId) && r.weekId === weekId))[0] || null;
   const result = {weekId,log,state:source.state,message:source.message || '',count:null,commits:[]};
@@ -116,9 +116,9 @@ function readWeeklyProgressEvidence_(student, weekId, source) {
 }
 
 /** Stored, previously verified identities only. Live profile checks belong to setup. */
-function weeklyStoredGithubMapping_(teamId) {
+function weeklyStoredGithubMapping_(teamId, knownStudents) {
   const sheet = getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS), columns = githubAccountColumns_(sheet);
-  const rows = readSheetRows_(sheet,2), students = weeklyStudents_();
+  const rows = readSheetRows_(sheet,2), students = knownStudents || weeklyStudents_();
   const members = students.filter(student=>textEquals_(student.teamId,teamId)).map(student=>{
     const identity = githubStudentIdentity_(student,rows,columns,students);
     const submission = rows.filter(row=>emailsMatch_(row[1],student.email) && textEquals_(row[2],teamId)).slice(-1)[0];
@@ -132,7 +132,7 @@ function weeklyEvidenceSource_(student, options) {
   options = options || {};
   const source = {logs:options.logs || readLogEntries_(student.teamId,student.regNo),state:'unmapped',commits:[]};
   try {
-    const setup = options.setup || weeklyStoredGithubMapping_(student.teamId);
+    const setup = options.setup || weeklyStoredGithubMapping_(student.teamId, options.students);
     const members = setup.members || [], mine = members.filter(m=>emailsMatch_(m.email,student.email) && textEquals_(m.label,student.regNo));
     if (mine.length !== 1 || mine[0].status !== 'valid' || !String(mine[0].username || '').trim() || !githubId_(mine[0].githubId) ||
         members.filter(m=>githubAuthorMatches_(mine[0].githubId,m.githubId)).length !== 1) {
@@ -150,6 +150,8 @@ function weeklyEvidenceSource_(student, options) {
 
 function readStudentWeeklyEvidence_(student, windows, options) {
   const source = weeklyEvidenceSource_(student,options);
+  // The windows this call already holds answer every per-week lookup; no need to re-read WeeklyWindows for each week.
+  source.windows = windows;
   return windows.map(window=>{
     try {
       const result = readWeeklyProgressEvidence_(student,window.weekId,source);

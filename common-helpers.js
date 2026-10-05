@@ -558,9 +558,10 @@ function getProjectClock_(schedule, now) {
     completedWeeks:today > schedule.end ? Math.ceil((schedule.end - schedule.week1 + 1) / 7) : Math.max(0, Math.floor((today - schedule.week1) / 7)) };
 }
 
-function getLogWeekSummary_(records, eligibleFrom, regNo, now) {
+/** `knownWindows` lets a caller that already read WeeklyWindows in this request share them. */
+function getLogWeekSummary_(records, eligibleFrom, regNo, now, knownWindows) {
   now = now || new Date();
-  const windows = eligibleWeeklyWindows_(eligibleFrom,getWeeklySubmissionWindows_());
+  const windows = eligibleWeeklyWindows_(eligibleFrom,knownWindows || getWeeklySubmissionWindows_());
   const expected = windows.filter(w=>w.opens_at <= now.getTime());
   const effective = getEffectiveLogEntries_(records).filter(r=>!regNo || textEquals_(r.regNo,regNo));
   const submitted = new Set(effective.filter(r=>r.entryStatus !== 'MISSED').map(r=>r.weekId));
