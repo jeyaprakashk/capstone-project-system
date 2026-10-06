@@ -233,7 +233,13 @@ Students are the users on slow connections, so they get the benefit first.
   in the shell sit inside functions a student page never calls. Every other user, including
   multi-role users with a student role, still gets the full bundle. Re-measure the same way as
   Stage 0 (phone on mobile data, Firefox at Good 3G).
-- **4b. All other combinations**, after the Coordinator step of Stage 3.
+  - **Done (6 Oct 2026).** `getDashboardPageScript_(roles)` (in `data-bridge-client.js`) is the
+    manifest: common modules, each included role's modules, then a start script that registers only
+    those roles. `buildDashboardShell_` passes `['student']` for student-only users and omits it for
+    everyone else. Student-only page: 43 KB compressed (174K characters) against 112 KB for a
+    student+guide page. The assembly test asserts each role's modules are present exactly when shipped.
+- **4b. All other combinations**, after the Coordinator step of Stage 3. Enabling it means passing
+  the page's role keys for every user in `buildDashboardShell_` and updating `SHIPPED` in the test.
 - Enable the manifest. Add inclusion and exclusion assertions for all 15 combinations.
 - Re-measure against Stage 0.
 - Verify focus, dialogs and layout in a real browser (linkedom cannot), including Chrome or Firefox on

@@ -122,6 +122,10 @@ function buildDashboardShell_(email, views, timings) {
   const systemButton = hasCoordinator ? `<button type="button" class="${TAB}" role="tab" id="roleTab-system-status" aria-controls="rolePanel-system-status" aria-selected="false" tabindex="-1" data-role-tab="system-status">${renderLucideIcon_('activity')}System Status</button>` : '';
   const systemPanel = hasCoordinator ? `<section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-system-status" role="tabpanel" aria-labelledby="roleTab-system-status" data-role-panel="system-status" hidden>${SYSTEM_STATUS_HEADER}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
 
+  // Role bundles (ROLE-BUNDLES-PLAN.md, Stage 4a): student-only pages ship only the student modules;
+  // every other page still ships every role's modules.
+  const scriptRoles = views.length === 1 && views[0].key === 'student' ? ['student'] : null;
+
   const rolePanels = views.map((view, index) =>
     `<section class="role-panel hidden [&.active]:block pt-4${index === 0 ? ' active' : ''}" id="rolePanel-${escapeHtml_(view.key)}" role="tabpanel" aria-labelledby="roleTab-${escapeHtml_(view.key)}" data-role-panel="${escapeHtml_(view.key)}"${index === 0 ? '' : ' hidden'}><div id="${escapeHtml_(view.contentId)}" data-role-content="${escapeHtml_(view.key)}">${getSkeletonMarkup_('panel', 'Loading ' + view.label)}</div></section>`
   ).join('');
@@ -163,14 +167,7 @@ ${systemPanel}
   <div class="flex justify-end gap-2 border-t border-edge px-5 py-3" hidden></div>
 </aside>
 <script>
-${getMigratedViewsClientScript_()}
-${getDashboardClientScript_()}
-${getInternalAssessmentPublishingClientScript_()}
-${getGuideEvaluationClientScript_()}
-${getGuideWeeklyClientScript_()}
-${getWeeklySetupClientScript_()}
-${getReviewEvaluationClientScript_()}
-${getDashboardStartScript_()}
+${getDashboardPageScript_(scriptRoles)}
 </script>
 </body>
 </html>`;

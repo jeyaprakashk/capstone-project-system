@@ -75,7 +75,9 @@ weekly setup; publication cards; the student GitHub connection; the Timeline and
 and the team drawer. Shared pieces: `api-envelope.js` (server) and `data-bridge-client.js` (browser).
 
 Browser modules are serialized into the shell by `getMigratedViewsClientScript_()` in
-`data-bridge-client.js`; a new module must be registered there and its test file added to the
+`data-bridge-client.js`, and `getDashboardPageScript_()` assembles the page script; a new module must be
+registered there under the role that uses it (role bundles: [ROLE-BUNDLES-PLAN.md](ROLE-BUNDLES-PLAN.md),
+checked by `tests/page-assembly.test.cjs`) and its test file added to the
 `test` and `test:migration` scripts in `package.json` (an unlisted test file never runs). `DashboardUI`
 (`dashboard-client-scripts.js`) only owns role loading, the shell, the shared drawers and the loading
 overlay; screens, card actions and flows live in their own module (for example `team-drawer-view.js`,

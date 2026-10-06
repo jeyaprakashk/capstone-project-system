@@ -707,13 +707,17 @@ const DashboardSchedule = Object.freeze({
 `;
 }
 
-/** Runs last in the page script: registers the role tabs and utility endpoints, then starts the dashboard once. */
-function getDashboardStartScript_() {
-  return `
-DashboardUI.registerRole('student', StudentView);
-DashboardUI.registerRole('guide', {load: GuideView.load, render: GuideView.render, activate: function() { GuideWeekly.load(); }});
-DashboardUI.registerRole('reviewer', ReviewerView);
-DashboardUI.registerRole('coord', CoordinatorView);
+/**
+ * Runs last in the page script: registers the page's role tabs and utility endpoints, then starts the
+ * dashboard once. `roles` as for getMigratedViewsClientScript_; omitted, every role registers.
+ */
+function getDashboardStartScript_(roles) {
+  const has = role => !roles || roles.indexOf(role) >= 0;
+  const registrations = {
+    student: `DashboardUI.registerRole('student', StudentView);`,
+    guide: `DashboardUI.registerRole('guide', {load: GuideView.load, render: GuideView.render, activate: function() { GuideWeekly.load(); }});`,
+    reviewer: `DashboardUI.registerRole('reviewer', ReviewerView);`,
+    coord: `DashboardUI.registerRole('coord', CoordinatorView);
 DashboardUI.registerUtility('system-status', {
   endpoints: ['API_coordinator_getSystemStatus', 'API_coordinator_getWeeklySetup'],
   load: function() { return SystemStatusView.load(); },
@@ -722,7 +726,10 @@ DashboardUI.registerUtility('system-status', {
     SystemStatusActions.recheckAll();
     target.querySelectorAll('[data-publishing]').forEach(function(section) { InternalAssessmentPublishing.refresh(section.dataset.publishing); });
   }
-});
+});`
+  };
+  return `
+${Object.keys(registrations).filter(has).map(role => registrations[role]).join('\n')}
 
 function initializeFirstRoleTab_() {
   DashboardUI.initializeRoleMenu();

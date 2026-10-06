@@ -186,7 +186,7 @@ test('student rubric tab reuses shared content and switching back restores My Te
 test('shell selects the common theme before scripts or fonts load',async()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
  for(const file of ['common-styles.js','busy-state.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getWeeklySetupClientScript_','getDashboardStartScript_']) c[name]=()=>'';
+ for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getWeeklySetupClientScript_','getDashboardStartScript_','getDashboardPageScript_']) c[name]=()=>'';
  for(const key of ['student','guide','reviewer','coord']) {
   const html=c.buildDashboardShell_('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
   assert.match(html,/<body class="[^"]*">/);
@@ -734,7 +734,7 @@ test('dashboards are not loaded in the background: only the viewed one is reques
 test('a student-only user gets a two-tab top bar on small screens instead of a Menu toggle',()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
  for(const file of ['common-styles.js','busy-state.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getWeeklySetupClientScript_','getDashboardStartScript_']) c[name]=()=>'';
+ for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getWeeklySetupClientScript_','getDashboardStartScript_','getDashboardPageScript_']) c[name]=()=>'';
  const page=views=>require('linkedom').parseHTML(c.buildDashboardShell_('a@example.test',views)).document;
  const student=page([{key:'student',label:'My Team',contentId:'s'}]);
  const tabs=Array.from(student.querySelectorAll('#roleMenuItems [role="tab"]'));
@@ -756,7 +756,7 @@ test('a student-only user gets a two-tab top bar on small screens instead of a M
 test('the student sidebar links slot follows the last menu item and only exists for student users',()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
  for(const file of ['common-styles.js','busy-state.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getWeeklySetupClientScript_','getDashboardStartScript_']) c[name]=()=>'';
+ for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getWeeklySetupClientScript_','getDashboardStartScript_','getDashboardPageScript_']) c[name]=()=>'';
  const page=views=>require('linkedom').parseHTML(c.buildDashboardShell_('a@example.test',views)).document;
  const both=page([{key:'student',label:'My Team',contentId:'s'},{key:'guide',label:'Guide',contentId:'g'}]);
  const nav=both.querySelector('#studentSideNav');

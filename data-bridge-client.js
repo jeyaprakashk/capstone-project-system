@@ -98,19 +98,44 @@ function dataBridgeBrowser_() {
   };
 }
 
-/** Browser globals for views migrated to DTOs; must precede the dashboard client script. */
-function getMigratedViewsClientScript_() {
-  return `const DataBridge = (${dataBridgeBrowser_.toString()})();
-const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations);
-const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => InternalAssessmentPublishing, () => SystemStatusActions);
+/**
+ * Browser globals for views migrated to DTOs; must precede the dashboard client script.
+ * `roles` lists the page's role keys (student, guide, reviewer, coord); a role's modules ship only
+ * when the page has that role. Omitted, every role's modules ship.
+ */
+function getMigratedViewsClientScript_(roles) {
+  const has = role => !roles || roles.indexOf(role) >= 0;
+  return [
+    `const DataBridge = (${dataBridgeBrowser_.toString()})();`,
+    has('reviewer') ? `const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations);` : '',
+    has('coord') ? `const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => InternalAssessmentPublishing, () => SystemStatusActions);
 const CoordinatorView = (${coordinatorViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TeamDrawerView);
-const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI);
-const SharedTimelineView = (${sharedTimelineViewBrowser_.toString()})(() => DashboardUI);
-const SharedRubricsView = (${sharedRubricsViewBrowser_.toString()})(() => DashboardUI);
-const SystemStatusActions = (${systemStatusActionsBrowser_.toString()})(DataBridge, () => DashboardUI);
-const StudentGithub = (${studentGithubBrowser_.toString()})(DataBridge, () => DashboardUI, () => StudentView);
+const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI);` : '',
+    `const SharedTimelineView = (${sharedTimelineViewBrowser_.toString()})(() => DashboardUI);
+const SharedRubricsView = (${sharedRubricsViewBrowser_.toString()})(() => DashboardUI);`,
+    has('coord') ? `const SystemStatusActions = (${systemStatusActionsBrowser_.toString()})(DataBridge, () => DashboardUI);` : '',
+    has('student') ? `const StudentGithub = (${studentGithubBrowser_.toString()})(DataBridge, () => DashboardUI, () => StudentView);
 const StudentResults = (${studentResultsViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentWeekly = (${studentWeeklyViewBrowser_.toString()})(DataBridge, () => DashboardUI);
-const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI, {weekly: StudentWeekly, results: StudentResults, github: StudentGithub});
-const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly);`;
+const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI, {weekly: StudentWeekly, results: StudentResults, github: StudentGithub});` : '',
+    has('guide') ? `const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly);` : ''
+  ].filter(Boolean).join('\n');
+}
+
+/**
+ * The whole page script: common modules, each included role's modules, then the start script, which
+ * registers only those roles. `roles` as for getMigratedViewsClientScript_; omitted, every role ships.
+ */
+function getDashboardPageScript_(roles) {
+  const has = role => !roles || roles.indexOf(role) >= 0;
+  return [
+    getMigratedViewsClientScript_(roles),
+    getDashboardClientScript_(),
+    has('coord') ? getInternalAssessmentPublishingClientScript_() : '',
+    has('guide') ? getGuideEvaluationClientScript_() : '',
+    has('guide') ? getGuideWeeklyClientScript_() : '',
+    has('coord') ? getWeeklySetupClientScript_() : '',
+    has('reviewer') ? getReviewEvaluationClientScript_() : '',
+    getDashboardStartScript_(roles)
+  ].filter(Boolean).join('\n');
 }

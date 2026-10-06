@@ -14,6 +14,15 @@ const VIEWS=[
  {key:'coord',label:'Coordinator',contentId:'coordinatorContent'}
 ];
 const ROLE_READS={student:'API_student_getCore',guide:'API_guide_getDashboard',reviewer:'API_reviewer_getDashboard',coord:'API_coordinator_getOverview'};
+// Every module a role's views or start-up registration use, by role.
+const ROLE_MODULES={
+ student:['StudentView','StudentWeekly','StudentResults','StudentGithub'],
+ guide:['GuideView','GuideWeekly','GuideEvaluation'],
+ reviewer:['ReviewerView','ReviewEvaluations'],
+ coord:['CoordinatorView','SystemStatusView','SystemStatusActions','TeamDrawerView','InternalAssessmentPublishing','WeeklyPhase2Setup']
+};
+// Stage 4a: only student-only pages are selective; every other page still ships every role.
+const SHIPPED=views=>views.length===1&&views[0].key==='student'?['student']:Object.keys(ROLE_MODULES);
 const COMBINATIONS=Array.from({length:15},(_,mask)=>VIEWS.filter((_,bit)=>(mask+1)&(1<<bit)));
 
 // Every root module with Apps Script services stubbed. The intake workflow reads the Config sheet at load and builds no page.
@@ -65,14 +74,14 @@ for(const views of COMBINATIONS) {
   complete.ui().showRoleTab('rubrics');
   assert.equal(activePanel(complete.document),'rubrics');
   assert(complete.calls.includes('API_shared_getTimeline')&&complete.calls.includes('API_shared_getRubrics'));
-  // Modules the role views call at run time exist on the page: the Review marking drawer and the guide workspace.
-  assert.equal(vm.runInContext('typeof ReviewEvaluations.open',complete.page),'function');
-  assert.equal(vm.runInContext('typeof GuideWeekly.load',complete.page),'function');
-  assert.equal(vm.runInContext('typeof GuideEvaluation.open',complete.page),'function');
+  // Each role's modules ship exactly when the page includes that role.
+  const shipped=SHIPPED(views);
+  for(const [role,modules] of Object.entries(ROLE_MODULES)) for(const module of modules) {
+   assert.equal(vm.runInContext('typeof '+module,complete.page),shipped.includes(role)?'object':'undefined',module+' on a '+name+' page');
+  }
   const coordinator=views.some(view=>view.key==='coord');
   assert.equal(!!complete.document.querySelector('[data-role-tab="system-status"]'),coordinator);
   if(coordinator) {
-   for(const used of ['TeamDrawerView.mount','SystemStatusActions.recheckAll','InternalAssessmentPublishing.refresh','WeeklyPhase2Setup.load']) assert.equal(vm.runInContext('typeof '+used,complete.page),'function',used);
    complete.ui().showRoleTab('system-status');
    assert.equal(activePanel(complete.document),'system-status');
    assert(complete.calls.includes('API_coordinator_getSystemStatus'));
