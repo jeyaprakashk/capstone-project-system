@@ -493,15 +493,13 @@ test('compact refresh uses the initial skeleton and restores the original conten
  assert(!host.hasAttribute('data-loading-compact'));
 });
 
-test('GitHub status refresh reloads only the student Project cards and leaves other roles on the full reload',async()=>{
- const f=fixture(),ui=vm.runInContext('DashboardUI',f.c),calls=[];
+test('GitHub status refresh reloads only the student Project cards, not the whole dashboard',async()=>{
+ const f=fixture();
  vm.runInContext('StudentView.reloadProject=(ok,fail)=>{globalThis.__reloads=(globalThis.__reloads||[]);globalThis.__reloads.push([ok,fail]);}',f.c);
- ui.refreshGithubStatus();
+ vm.runInContext('StudentGithub.refreshGithubStatus()',f.c);
  const reloads=vm.runInContext('globalThis.__reloads',f.c);
  assert.equal(reloads.length,1);assert.equal(typeof reloads[0][0],'function');assert.equal(typeof reloads[0][1],'function');
  assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,0);
- ui.reloadRole('guide',()=>{},()=>{});
- assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1);
 });
 
 test('shared loading preserves live children and restores interaction on repeated cleanup',async()=>{

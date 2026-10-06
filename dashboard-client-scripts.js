@@ -681,15 +681,7 @@ const DashboardUI = (function() {
   // before revealing complete cards; the tracker intentionally stays progressive.
   return {
     notify: dialogs.notify, ask: dialogs.ask, confirmDialog: dialogs.confirmDialog, requestText: dialogs.requestText,
-    loadWeeklyProgress: function() { StudentWeekly.load(); },
-    loadStudentResults: function() { StudentResults.all(); },
     openContentDrawer,
-    refreshGithubStatus: function(button, message) { StudentGithub.refreshGithubStatus(button, message); },
-    retryGithubSetup: function(button) { StudentGithub.retryGithubSetup(button); },
-    focusGithubAccountForm: function(button) { StudentGithub.focusGithubAccountForm(button); },
-    previewGithubAccount: function(event, form) { StudentGithub.previewGithubAccount(event, form); },
-    // The student's GitHub flows only change the Project cards, so they reload just that part.
-    reloadRole: function(key, onLoaded, onError) { if (key === 'student') StudentView.reloadProject(onLoaded, onError); else loadRoleContent(key, false, true, onLoaded, onError); },
     renderAssessmentHistory: renderAssessmentHistory,
     renderSkeleton: renderSkeleton,
     beginContentLoading: beginContentLoading,
@@ -699,7 +691,6 @@ const DashboardUI = (function() {
     loadSharedTimeline,
     loadSharedRubrics_,
     openRubricDrawer,
-    openWeeklyActivity: function(trigger) { StudentWeekly.openActivity(trigger); },
     closeRubricDrawer,
     getSharedSchedule: function() { return sharedSchedule; },
     showRoleTab,

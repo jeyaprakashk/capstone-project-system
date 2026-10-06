@@ -15,10 +15,10 @@ function fixture() {
   vm.runInContext(source.slice(source.indexOf('  function byId('),source.indexOf('  // Session-only diagnostics:')),context);
   vm.runInContext(fs.readFileSync('student-github-actions.js','utf8'),context);
   const bridge={write:(endpoint,args)=>{const p=new Sync(),req={endpoint,method:LEGACY[endpoint],args,success:v=>p.resolve(v),failure:e=>p.reject(e)};requests.push(req);return p;}};
-  // The dashboard refresh is DashboardUI's; settling it shows the status message the flow passed along.
-  const ui={busy:context.busy,renderSkeleton:context.renderSkeleton,beginContentLoading:context.beginContentLoading,
-    reloadRole:(key,onLoaded)=>{onLoaded();refreshes.push(document.getElementById('githubSubmitStatus').textContent);}};
-  const github=context.studentGithubBrowser_(bridge,()=>ui);
+  // The Project refresh is StudentView's; settling it shows the status message the flow passed along.
+  const ui={busy:context.busy,renderSkeleton:context.renderSkeleton,beginContentLoading:context.beginContentLoading};
+  const studentView={reloadProject:onLoaded=>{onLoaded();refreshes.push(document.getElementById('githubSubmitStatus').textContent);}};
+  const github=context.studentGithubBrowser_(bridge,()=>ui,()=>studentView);
   context.focusGithubAccountForm=github.focusGithubAccountForm;
   const preview=()=>github.previewGithubAccount({preventDefault(){}},form);
   const reply=()=>requests.at(-1).success({token:'test-token',account:{githubId:'101',username:'canonical',displayName:'<Student>',profileUrl:'https://github.com/canonical',avatarUrl:'https://avatars.githubusercontent.com/u/101'}});

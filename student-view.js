@@ -6,9 +6,10 @@
  * hooks the weekly-progress, assessment and GitHub-connection modules attach to
  * (#studentWeeklyProgress, #studentAssessment-*, #studentGuideEvaluation,
  * [data-step-card], #studentGithubProfile, #githubSubmitStatus, #githubStatusRefresh).
- * It never calls google.script.run; account-connection actions stay in DashboardUI.
+ * It never calls google.script.run. Its screens' actions come from the student modules passed in
+ * `actions` ({weekly, results, github}); getUi() supplies only shared UI services.
  */
-function studentViewBrowser_(bridge, getUi) {
+function studentViewBrowser_(bridge, getUi, actions) {
   'use strict';
   const delegated = new WeakSet();
   const state = {dto:null, host:null, tab:null, loaded:{}, project:null, projectBusy:false};
@@ -160,11 +161,11 @@ function studentViewBrowser_(bridge, getUi) {
   }
   /** Each screen fetches its own data the first time it is shown; a re-render starts clean. */
   function activate() {
-    const key = state.tab, ui = getUi();
+    const key = state.tab;
     if (!state.dto || state.loaded[key]) return;
     state.loaded[key] = true;
-    if (key === 'weeks' && state.dto.titleApproved) ui.loadWeeklyProgress();
-    else if (key === 'assessments') ui.loadStudentResults();
+    if (key === 'weeks' && state.dto.titleApproved) actions.weekly.load();
+    else if (key === 'assessments') actions.results.all();
     else if ((key === 'github' || key === 'title') && !state.loaded.project) loadProject();
   }
   function showTab(key) {
@@ -183,9 +184,9 @@ function studentViewBrowser_(bridge, getUi) {
   function onClick(event) {
     const target = event.target.closest ? event.target.closest('[data-action],[data-github-form-jump]') : null;
     if (!target || target.disabled) return;
-    const ui = getUi(), action = target.getAttribute('data-action');
-    if (target.hasAttribute('data-github-form-jump')) ui.focusGithubAccountForm(target);
-    else if (action === 'github-refresh') ui.refreshGithubStatus(target);
+    const action = target.getAttribute('data-action');
+    if (target.hasAttribute('data-github-form-jump')) actions.github.focusGithubAccountForm(target);
+    else if (action === 'github-refresh') actions.github.refreshGithubStatus(target);
     else if (action === 'project-retry') loadProject();
     else if (action === 'show-tab') showTab(target.getAttribute('data-tab'));
   }
@@ -199,7 +200,7 @@ function studentViewBrowser_(bridge, getUi) {
   }
   function onSubmit(event) {
     const form = event.target.closest ? event.target.closest('[data-github-form]') : null;
-    if (form) getUi().previewGithubAccount(event, form);
+    if (form) actions.github.previewGithubAccount(event, form);
   }
 
   function load() { return bridge.read('role:student', 'API_student_getCore', []); }

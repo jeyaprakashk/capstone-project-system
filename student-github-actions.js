@@ -1,10 +1,10 @@
 /**
  * STUDENT GITHUB ACTIONS — browser module serialized into the dashboard shell as `StudentGithub`.
  * The student's GitHub connection flow: refresh status, retry repository setup, preview the profile,
- * confirm the account. Server calls go through the bridge (API_student_*); the dashboard refresh and the
- * loading overlay come from DashboardUI. It never calls google.script.run.
+ * confirm the account. Server calls go through the bridge (API_student_*); the Project refresh comes from
+ * StudentView and the loading overlay from DashboardUI. It never calls google.script.run.
  */
-function studentGithubBrowser_(bridge, getUi) {
+function studentGithubBrowser_(bridge, getUi, getStudentView) {
   'use strict';
   const byId = id => document.getElementById(id);
   const setText = (id, text) => { const el = byId(id); if (el) el.textContent = text; };
@@ -17,13 +17,14 @@ function studentGithubBrowser_(bridge, getUi) {
     if (err && typeof err.message === 'string' && err.message.trim()) return err.message.trim();
     return 'The server did not provide error details';
   };
-  const loadRoleContent = (key, background, refresh, onLoaded, onError) => getUi().reloadRole(key, onLoaded, onError);
+  // GitHub flows only change the Project cards, so they reload just that part.
+  const reloadProject = (onLoaded, onError) => getStudentView().reloadProject(onLoaded, onError);
 
   function refreshGithubStatus(button, message) {
     const statusButton = byId('githubStatusRefresh');
     if (statusButton) { statusButton.hidden = false; statusButton.disabled = true; }
     setLoading('githubSubmitStatus', message || 'Refreshing GitHub status');
-    loadRoleContent('student', false, true, function() {
+    reloadProject(function() {
       setText('githubSubmitStatus', message || '');
     }, function(err) {
       if (statusButton) { statusButton.hidden = false; statusButton.disabled = false; }

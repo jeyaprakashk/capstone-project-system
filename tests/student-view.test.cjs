@@ -17,12 +17,15 @@ async function setup(dto, options = {}) {
   const core = { teamId: dto.teamId, roster: dto.roster, titleApproved: dto.titleApproved, assessments: dto.assessments }, project = { setup: dto.setup, github: dto.github, title: dto.title };
   bridge.useFixtures({ API_student_getCore: () => core, API_student_getProject: () => ctl.fail ? JSON.stringify({ ok: false, error: { code: 'INTERNAL', message: 'Project setup is unavailable.' } }) : project });
   const ui = {
-    beginContentLoading: () => () => {}, renderIcon: (name) => '<svg class="lucide-icon lucide-' + name + '"></svg>', renderSkeleton: (v, label) => '<span data-skeleton>' + String(label).replace(/[&<>"']/g, ch => '&#' + ch.charCodeAt(0) + ';') + '</span>',
-    focusGithubAccountForm: b => calls.jump.push(b), refreshGithubStatus: b => calls.refresh++, loadWeeklyProgress: () => calls.weekly++, loadStudentResults: () => calls.results++,
-    openWeeklyActivity: t => calls.logs.push(t), previewGithubAccount: (e, form) => calls.preview.push([e, form])
+    beginContentLoading: () => () => {}, renderIcon: (name) => '<svg class="lucide-icon lucide-' + name + '"></svg>', renderSkeleton: (v, label) => '<span data-skeleton>' + String(label).replace(/[&<>"']/g, ch => '&#' + ch.charCodeAt(0) + ';') + '</span>'
+  };
+  // The student modules StudentView drives, passed in as they are in the shell.
+  const actions = {
+    weekly: { load: () => calls.weekly++ }, results: { all: () => calls.results++ },
+    github: { focusGithubAccountForm: b => calls.jump.push(b), refreshGithubStatus: b => calls.refresh++, previewGithubAccount: (e, form) => calls.preview.push([e, form]) }
   };
   vm.runInContext('globalThis.__make = ' + c.studentViewBrowser_.toString(), c);
-  const view = c.__make(bridge, () => ui);
+  const view = c.__make(bridge, () => ui, actions);
   const host = document.getElementById('studentContent');
   view.render(host, core);
   const projectLoaded = () => new Promise(resolve => view.reloadProject(resolve));

@@ -108,9 +108,9 @@ const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => 
 const SharedTimelineView = (${sharedTimelineViewBrowser_.toString()})(() => DashboardUI);
 const SharedRubricsView = (${sharedRubricsViewBrowser_.toString()})(() => DashboardUI);
 const SystemStatusActions = (${systemStatusActionsBrowser_.toString()})(DataBridge, () => DashboardUI);
-const StudentGithub = (${studentGithubBrowser_.toString()})(DataBridge, () => DashboardUI);
+const StudentGithub = (${studentGithubBrowser_.toString()})(DataBridge, () => DashboardUI, () => StudentView);
 const StudentResults = (${studentResultsViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentWeekly = (${studentWeeklyViewBrowser_.toString()})(DataBridge, () => DashboardUI);
-const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI);
+const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI, {weekly: StudentWeekly, results: StudentResults, github: StudentGithub});
 const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => typeof GuideWeekly === 'undefined' ? null : GuideWeekly);`;
 }
