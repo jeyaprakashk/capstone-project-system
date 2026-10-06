@@ -6,10 +6,12 @@
  * browser behaviour exactly once.
  */
 function doGet(e) {
-  return withDashboardRead_(() => buildDashboardResponse_(e));
+  const started = Date.now(), timings = [];
+  try { return withDashboardRead_(() => buildDashboardResponse_(e, timings)); }
+  finally { logPhases_('shell_phases', 'doGet', timings, started); }
 }
 
-function buildDashboardResponse_(e) {
+function buildDashboardResponse_(e, timings) {
   const email = Session.getActiveUser().getEmail();
   if (!email) {
     return HtmlService.createHtmlOutput(
@@ -18,7 +20,7 @@ function buildDashboardResponse_(e) {
   }
 
   // IMPORTANT: only detect roles here. Do NOT build dashboard data in doGet().
-  const views = getDashboardRoleViews_(email);
+  const views = timedPhase_(timings, 'role_views', () => getDashboardRoleViews_(email, timings));
 
   if (views.length === 0) {
     return HtmlService.createHtmlOutput(
@@ -26,7 +28,7 @@ function buildDashboardResponse_(e) {
     );
   }
 
-  return HtmlService.createHtmlOutput(buildDashboardShell_(email, views))
+  return HtmlService.createHtmlOutput(timedPhase_(timings, 'shell_build', () => buildDashboardShell_(email, views, timings)))
     .setTitle(views.length === 1 ? views[0].label + ' Dashboard' : 'Dashboard')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
@@ -35,9 +37,9 @@ function buildDashboardResponse_(e) {
  * Lightweight role detection. TeamStatus and ReviewCommittee are each read
  * at most once in this Apps Script execution because getSheetRows_() is cached.
  */
-function getDashboardRoleViews_(email) {
+function getDashboardRoleViews_(email, timings) {
   const views = [];
-  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const TS = timedPhase_(timings, 'role_team_status', () => { const map = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS); getSheetRows_(SHEET_NAMES.TEAM_STATUS); return map; });
   const statusRows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r => r[TS.TEAM_ID]);
 
   const studentTeamId = statusRows.find(r =>
@@ -52,7 +54,7 @@ function getDashboardRoleViews_(email) {
   }
 
   // Reviewer role: inspect committee membership only; do not build reviewer data.
-  const reviewerCommittees = getCommitteeNumbersForReviewer_(email);
+  const reviewerCommittees = timedPhase_(timings, 'role_committee', () => getCommitteeNumbersForReviewer_(email));
   if (reviewerCommittees.length > 0) {
     const committeeSet = new Set(reviewerCommittees.map(normalizeText_));
     if (statusRows.some(r => committeeSet.has(normalizeText_(r[TS.COMMITTEE_NUMBER])))) {
@@ -60,8 +62,7 @@ function getDashboardRoleViews_(email) {
     }
   }
 
-  const coordinatorEmail = getCoordinatorEmail_();
-  const cellPdEmail = String(getConfig_('CELL_PD_EMAIL') || '').trim();
+  const [coordinatorEmail, cellPdEmail] = timedPhase_(timings, 'role_config', () => [getCoordinatorEmail_(), String(getConfig_('CELL_PD_EMAIL') || '').trim()]);
   if (emailsMatch_(email, coordinatorEmail) || (cellPdEmail && emailsMatch_(email, cellPdEmail))) {
     views.push({ key: 'coord', label: 'Coordinator', contentId: 'coordinatorContent' });
   }
@@ -94,7 +95,7 @@ function getDashboardUserName_(email) {
   return String(email).split('@')[0].split(/[._-]+/).filter(Boolean).map(p => p[0].toUpperCase() + p.slice(1)).join(' ') || String(email);
 }
 
-function buildDashboardShell_(email, views) {
+function buildDashboardShell_(email, views, timings) {
   const multiRole = views.length > 1;
 
   // Role tabs are followed by common utility tabs (Rubrics, System Status). They are not roles.
@@ -104,7 +105,8 @@ function buildDashboardShell_(email, views) {
   const topBar = views.length === 1 && views[0].key === 'student';
   const TOP_TAB = "border-0 flex w-full flex-col items-center justify-center gap-1 border-b-2 border-b-transparent bg-transparent px-1 py-2 text-xs text-ink-2 hover:bg-tint aria-selected:border-b-primary aria-selected:font-semibold aria-selected:text-primary disabled:opacity-50 md:flex-row md:justify-start md:gap-2 md:rounded-lg md:border-b-0 md:px-3 md:text-left md:text-sm md:aria-selected:bg-tint";
   const tabClass = topBar ? TOP_TAB : TAB;
-  const displayName = getDashboardUserName_(email);
+  const displayName = timedPhase_(timings, 'user_name', () => getDashboardUserName_(email));
+  const stylesheet = timedPhase_(timings, 'stylesheet_file', () => HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent());
   const initials = escapeHtml_(displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?');
   const roleButtons = views.map((view, index) =>
     `<button type="button" class="${tabClass}${index === 0 ? ' active' : ''}" role="tab" id="roleTab-${escapeHtml_(view.key)}" aria-controls="rolePanel-${escapeHtml_(view.key)}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}" data-role-tab="${escapeHtml_(view.key)}">${renderLucideIcon_(roleIcons[view.key])}${escapeHtml_(view.label)}</button>`
@@ -133,7 +135,7 @@ function buildDashboardShell_(email, views) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
-${HtmlService.createHtmlOutputFromFile('tailwind-styles').getContent()}
+${stylesheet}
 </head>
 <body class="min-h-screen bg-canvas md:pl-60 ${topBar ? 'max-md:pt-14' : ''}">
 <header class="border-b border-edge bg-paper px-4 py-3${topBar ? ' max-md:border-b-0 max-md:p-0' : ''} md:fixed md:inset-y-0 md:left-0 md:w-60 md:overflow-y-auto md:border-b-0 md:border-r">
