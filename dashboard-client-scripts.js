@@ -203,7 +203,7 @@ const DashboardUI = (function() {
         return function() {
           const started = performance.now();
           // Follow-up reads started by utility callbacks stay in the utility lane.
-          const utility = utilityRequestContext || method === 'API_coordinator_getSystemStatus' || method === 'API_coordinator_getWeeklySetup';
+          const utility = utilityRequestContext || !!utilityEndpoints[method];
           pendingRequests++;
           if (!utility) { pendingRoleRequests++; clearTimeout(preloadTimer); }
           let finished = false;
@@ -232,11 +232,22 @@ const DashboardUI = (function() {
     return wrap(google.script.run);
   }
   if (typeof DataBridge !== 'undefined') DataBridge.useRunner(dashboardRun);
+  // Filled by the start script before any request: role tabs (load() resolves a DTO, render() draws it,
+  // optional activate() runs once per successful load) and the endpoints of utility tabs.
+  const roleControllers = Object.create(null);
+  const utilityEndpoints = Object.create(null);
+  function registerRole(key, controller) {
+    if (roleControllers[key]) throw new Error('Dashboard role registered twice: ' + key);
+    if (!controller || typeof controller.load !== 'function' || typeof controller.render !== 'function' || (controller.activate && typeof controller.activate !== 'function')) {
+      throw new Error('Dashboard role ' + key + ' needs load and render functions.');
+    }
+    roleControllers[key] = controller;
+  }
+  function registerUtilityEndpoints(methods) { methods.forEach(function(method) { utilityEndpoints[method] = true; }); }
   function activateRole(key) {
     if (!loadedRoleTabs[key] || activatedRoles[key]) return;
     activatedRoles[key] = true;
-    if (key === 'guide' && typeof GuideWeekly !== 'undefined') GuideWeekly.load();
-    if (key === 'student') StudentView.activate();
+    if (roleControllers[key] && roleControllers[key].activate) roleControllers[key].activate();
   }
 
   let sharedSchedule = null;
@@ -398,7 +409,7 @@ const DashboardUI = (function() {
     const button = byId('shellRefresh');
     if (!button) return;
     const key = activeRole;
-    const refreshable = key !== 'rubrics' && (key === 'system-status' || !!migratedRoles[key]);
+    const refreshable = key !== 'rubrics' && (key === 'system-status' || !!roleControllers[key]);
     const stamp = shellUpdatedAt[key] || '';
     const label = byId('shellUpdated');
     if (label) { label.textContent = refreshable ? stamp : ''; }
@@ -407,7 +418,7 @@ const DashboardUI = (function() {
   function refreshActiveTab() {
     const key = activeRole;
     if (key === 'system-status') { ensureSystemStatusLoaded(true); return; }
-    if (!migratedRoles[key]) return;
+    if (!roleControllers[key]) return;
     if (pendingRequests) { setText('shellUpdated', 'Please wait for the current operation to finish, then refresh.'); return; }
     loadRoleContent(key, false, true);
   }
@@ -419,8 +430,6 @@ const DashboardUI = (function() {
     }
     loadRoleContent(key, false, true);
   }
-  // Roles already on the DTO + view architecture: load() resolves a DTO, render() draws it.
-  const migratedRoles = { reviewer: ReviewerView, guide: GuideView, student: StudentView, coord: CoordinatorView };
   function loadRoleContent(activeKey, background, refresh, onLoaded, onError) {
     if ((!refresh && loadedRoleTabs[activeKey]) || loadingRoleTabs[activeKey]) {
       if (onError) onError(new Error('A dashboard refresh is already in progress. Please retry shortly.'));
@@ -443,7 +452,7 @@ const DashboardUI = (function() {
     attemptedRoles[activeKey] = true;
     const requestStarted = Date.now();
 
-    const migrated = migratedRoles[activeKey];
+    const migrated = roleControllers[activeKey];
     function onRoleLoaded(html) {
         finishLoading();
         if (migrated) migrated.render(target, html); else target.innerHTML = html;
@@ -477,7 +486,7 @@ const DashboardUI = (function() {
     }
     // Bridge promises settle after the runner hook, so resume queued preloads once handled.
     if (migrated) migrated.load().then(onRoleLoaded).catch(onRoleFailed).then(schedulePreload);
-    else Promise.resolve().then(function() { throw new Error('Unknown dashboard role.'); }).catch(onRoleFailed).then(schedulePreload);
+    else Promise.resolve().then(function() { throw new Error('This dashboard could not initialize. Reload the page.'); }).catch(onRoleFailed).then(schedulePreload);
   }
 
   function escapeClientHtml(value) {
@@ -700,6 +709,8 @@ const DashboardUI = (function() {
     renderExpandableText,
     renderIcon: renderLucideIcon_,
     run: dashboardRun,
+    registerRole,
+    registerUtilityEndpoints,
     openReviewerMarks: function(team, review, button) { ReviewEvaluations.open(team, review, button); },
     changeTeamPageSize: function(key, value) { SystemStatusActions.changeTeamPageSize(key, value); },
     focusCoordinatorTeam,
@@ -720,6 +731,17 @@ const DashboardSchedule = Object.freeze({
   get current() { return DashboardUI.getSharedSchedule(); },
   ready: function() { return DashboardUI.loadSharedTimeline(); }
 });
+`;
+}
+
+/** Runs last in the page script: registers the role tabs and utility endpoints, then starts the dashboard once. */
+function getDashboardStartScript_() {
+  return `
+DashboardUI.registerRole('student', StudentView);
+DashboardUI.registerRole('guide', {load: GuideView.load, render: GuideView.render, activate: function() { GuideWeekly.load(); }});
+DashboardUI.registerRole('reviewer', ReviewerView);
+DashboardUI.registerRole('coord', CoordinatorView);
+DashboardUI.registerUtilityEndpoints(['API_coordinator_getSystemStatus', 'API_coordinator_getWeeklySetup']);
 
 function initializeFirstRoleTab_() {
   DashboardUI.initializeRoleMenu();

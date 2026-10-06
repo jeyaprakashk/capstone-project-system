@@ -187,6 +187,20 @@ Measured with a temporary `?bundle=full|student` page on the test deployment, Fi
 - Add the controller registry, factories, shell refresh sequence and endpoint registration described
   above.
 - Behaviour must be identical.
+- **Done (6 Oct 2026), kept deliberately small:**
+  - `getDashboardStartScript_()` (in `dashboard-client-scripts.js`) runs last in the page script. It
+    registers the four role controllers and the utility endpoints, then starts the dashboard. Startup
+    can no longer run before `GuideWeekly` and the other later modules exist.
+  - `DashboardUI.registerRole(key, controller)` replaces the eager `migratedRoles` object and the guide
+    and student special cases in `activateRole`. It rejects duplicates and controllers without
+    `load`/`render`. Guide activation now calls `GuideWeekly.load()` without a `typeof` guard.
+  - `DashboardUI.registerUtilityEndpoints([...])` replaces the hardcoded endpoint names in
+    `dashboardRun`, with the same either/or rule.
+  - An unregistered tab shows "This dashboard could not initialize. Reload the page." through the
+    existing failure path, which settles loading.
+- **Simplified from the plan:** no per-group construction factories. Construction errors are code
+  bugs, and the Stage 1 assembly tests construct every combination. The System Status refresh
+  sequence moves with the Coordinator step of Stage 3, together with its actions.
 
 ### Stage 3: move domain actions, one role per release (still the full bundle)
 

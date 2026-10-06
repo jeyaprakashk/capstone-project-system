@@ -28,8 +28,8 @@ function server() {
 const c=server();
 
 // Runs the page's inline script against its own markup. Server calls are recorded and never answered.
-function start(views,readyState) {
- const html=c.buildDashboardShell_('user@example.test',views);
+function start(views,readyState,edit=html=>html) {
+ const html=edit(c.buildDashboardShell_('user@example.test',views));
  const {window,document}=parseHTML(html);
  const scripts=Array.from(document.querySelectorAll('script'));
  assert.equal(scripts.length,1,'one inline script');
@@ -74,6 +74,23 @@ for(const views of COMBINATIONS) {
   }
  });
 }
+
+test('role registration rejects duplicates and controllers without load and render',()=>{
+ const {ui,page}=start(VIEWS,'complete');
+ assert.throws(()=>ui().registerRole('student',vm.runInContext('StudentView',page)),/registered twice: student/);
+ assert.throws(()=>ui().registerRole('extra',{load(){}}),/needs load and render/);
+ assert.throws(()=>ui().registerRole('extra',{load(){},render(){},activate:true}),/needs load and render/);
+});
+
+test('a tab whose role never registered shows a reload message and settles loading',async()=>{
+ const f=start(VIEWS.slice(0,2),'complete',html=>html.replace(/^DashboardUI\.registerRole\('guide'.*$/m,''));
+ f.ui().showRoleTab('guide');
+ await new Promise(resolve=>setImmediate(resolve));
+ const content=f.document.querySelector('[data-role-content="guide"]');
+ assert.match(content.textContent,/This dashboard could not initialize\. Reload the page\./);
+ assert.equal(content.querySelector('[data-loading-overlay]'),null);
+ assert(!f.calls.includes('API_guide_getDashboard'));
+});
 
 test('review-policy rules ship to the browser unchanged',()=>{
  const {html}=start(VIEWS,'complete');
