@@ -240,6 +240,10 @@ Students are the users on slow connections, so they get the benefit first.
     student+guide page. The assembly test asserts each role's modules are present exactly when shipped.
 - **4b. All other combinations**, after the Coordinator step of Stage 3. Enabling it means passing
   the page's role keys for every user in `buildDashboardShell_` and updating `SHIPPED` in the test.
+  - **Done (6 Oct 2026), after Stage 4a was confirmed with a student account.** Every page ships
+    only its own roles' modules. Page size, compressed: student 43 KB, guide 48 KB, reviewer 51 KB,
+    coordinator 58 KB, guide+reviewer+coordinator 99 KB, all four roles 113 KB (unchanged from the
+    full bundle).
 - Enable the manifest. Add inclusion and exclusion assertions for all 15 combinations.
 - Re-measure against Stage 0.
 - Verify focus, dialogs and layout in a real browser (linkedom cannot), including Chrome or Firefox on

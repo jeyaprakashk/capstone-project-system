@@ -21,8 +21,8 @@ const ROLE_MODULES={
  reviewer:['ReviewerView','ReviewEvaluations'],
  coord:['CoordinatorView','SystemStatusView','SystemStatusActions','TeamDrawerView','InternalAssessmentPublishing','WeeklyPhase2Setup']
 };
-// Stage 4a: only student-only pages are selective; every other page still ships every role.
-const SHIPPED=views=>views.length===1&&views[0].key==='student'?['student']:Object.keys(ROLE_MODULES);
+// Each page ships the modules of its own roles only.
+const SHIPPED=views=>views.map(view=>view.key);
 const COMBINATIONS=Array.from({length:15},(_,mask)=>VIEWS.filter((_,bit)=>(mask+1)&(1<<bit)));
 
 // Every root module with Apps Script services stubbed. The intake workflow reads the Config sheet at load and builds no page.
