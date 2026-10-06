@@ -42,8 +42,8 @@ function guardContext(active, effective, coordinators = ['coord@x']) {
     activityIsCoordinator_: email => coordinators.includes(email)
   });
   const source = fs.readFileSync('common-helpers.js', 'utf8');
-  const start = source.indexOf('function requireTriggerOrOperator_(');
-  vm.runInContext(source.slice(start, source.indexOf('\n}\n', start) + 3), c);
+  // Windows checkouts use CRLF, so match the closing brace with either line ending.
+  vm.runInContext(source.match(/^function requireTriggerOrOperator_\([\s\S]*?\r?\n\}\r?\n/m)[0], c);
   return c;
 }
 

@@ -112,7 +112,7 @@ function buildGuideDto_(data, timings) {
     teams:teams.map(t => guideTeamDto_(t, TS, data)),
     githubDue:Number.isFinite(data.schedule && data.schedule.git) ? formatProjectDay_(data.schedule.git) : null,
     evaluation:guideEvaluationDto_(data.schedule, data.clock),
-    weeks:teams.length ? timedPhase_(timings, 'weekly_windows', () => data.windows || getWeeklySubmissionWindows_()).map(w => ({weekId:w.weekId, opensAt:w.opens_at, deadlineAt:w.deadline_at})) : []
+    weeks:teams.length ? timedPhase_(timings, 'weekly_windows', () => data.windows || getWeeklySubmissionWindows_()).map(w => ({weekId:w.weekId, opensAt:w.opens_at, deadlineAt:w.deadline_at, lateUntil:w.late_until})) : []
   };
 }
 

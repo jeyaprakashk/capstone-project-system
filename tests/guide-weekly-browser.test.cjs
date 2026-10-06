@@ -28,7 +28,7 @@ test('guide list defaults latest week, escapes content, renders absent score and
   assert.equal(f.host.querySelector('[data-entry] b'),null);
   f.host.querySelectorAll('[data-sign],[data-details]').forEach(button=>assert.match(button.className,/\btext-xs\b.*\bpx-2\b|\bpx-2\b.*\btext-xs\b/));
   f.host.querySelector('[data-week-step="1"]').click();
-  assert(f.host.querySelector('[data-weekly-student-header] > [data-weekly-deadline]'));
+  assert(f.host.querySelector('[data-weekly-student-header] > [data-weekly-timing]'));
   assert.equal(f.host.querySelector('[data-sign="DISCUSSED"]').getAttribute('aria-pressed'),'true');
   assert.deepEqual(f.counts(),[1,1]);
 });
@@ -55,6 +55,19 @@ test('late badge counts calendar days from first submission rather than a later 
   f.api.load();f.reply();assert.equal(f.host.querySelector('[data-submission-timing]').textContent,'2 days late');
   f.data.entries[0].firstSubmittedAt='2026-01-07T10:00:00Z';f.api.load();f.reply();
   assert.equal(f.host.querySelector('[data-submission-timing]').textContent,'1 day late');
+});
+
+test('due and late cutoffs show once per week, not on each student row',()=>{
+  const f=fixture(),day=86400000,deadlineAt=Date.parse('2026-01-06T18:29:59Z');
+  f.host.dataset.guideWeeks=JSON.stringify([{weekId:'W2',opensAt:deadlineAt-7*day+1,deadlineAt,lateUntil:deadlineAt+3*day}]);
+  f.data.entries.push({...f.data.entries[0],entryId:'e3',regNo:'002',student:'Second'});
+  f.api.load();f.reply();
+  assert.equal(f.host.querySelectorAll('[data-week-deadlines]').length,1);
+  assert.equal(f.host.querySelector('[data-weekly-card] [data-week-due]'),null);
+  assert.doesNotMatch(f.host.querySelector('[data-weekly-student-header]').textContent,/Due/);
+  assert.match(f.host.querySelector('[data-week-due]').textContent,/Due\s*Tue 6 Jan, 11:59 pm/);
+  assert.match(f.host.querySelector('[data-week-late-until]').textContent,/Late submissions until\s*Fri 9 Jan, 11:59 pm/);
+  assert.equal(f.host.querySelector('[data-week-phase]').textContent,'Late window open');
 });
 
 test('title explanation positions beside its button and stays inside a narrow viewport',()=>{

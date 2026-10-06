@@ -174,7 +174,7 @@ captured from the removed HTML for eight states).
            approval:{approvedBy, approvedOn:string|null, timing:{state,explanation,days:number|null}|null}|null }],   // APPROVED only; approvedOn and timing are null until API_guide_getApprovals answers
   githubDue:string|null,
   evaluation:{enabled:boolean, notice:string},
-  weeks:[{weekId, opensAt, deadlineAt}] }       // epoch ms; consumed by GuideWeekly
+  weeks:[{weekId, opensAt, deadlineAt, lateUntil}] }   // epoch ms; consumed by GuideWeekly
 
 GuideGithub   // one team's entry in API_guide_getGithub().teams
 { tone, members:[{name,regno,state:'missing'|'joined'|'pending',

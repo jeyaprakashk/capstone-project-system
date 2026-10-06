@@ -186,12 +186,23 @@ function guideWeeklyBrowser_(bridge) {
     }
     return '<span class="'+badgeClass(state[0])+'" data-submission-timing>'+state[1]+'</span>';
   }
-  function submissionDeadline(node,entry) {
+  function submissionTiming(node,entry) {
     const week=JSON.parse(node.dataset.guideWeeks || '[]').find(week=>week.weekId===entry.weekId);
-    const date=Number.isFinite(week?.deadlineAt)?new Date(week.deadlineAt):null;
-    const label=date?date.toLocaleDateString('en-GB',{timeZone:node.data.timezone,day:'numeric',month:'short',year:'numeric'}).replace(/\bSept\b/g,'Sep'):'Date unavailable';
-    const full=date?date.toLocaleString('en-IN',{timeZone:node.data.timezone,timeZoneName:'short',hour12:true}):'Submission deadline unavailable';
-    return '<div data-weekly-deadline class="flex flex-wrap items-center justify-center max-[640px]:justify-start">'+submissionBadge(entry.timeliness,entry.firstSubmittedAt,week?.deadlineAt,node.data.timezone)+'<small class="ml-2 text-xs text-muted" title="'+esc(full)+'">Due '+esc(label)+'</small></div>';
+    return '<div data-weekly-timing class="flex justify-center max-[640px]:justify-start">'+submissionBadge(entry.timeliness,entry.firstSubmittedAt,week?.deadlineAt,node.data.timezone)+'</div>';
+  }
+  /** The due and late cutoffs are the same for every student, so they are shown once per week. */
+  function weekDeadlines(node) {
+    const week=JSON.parse(node.dataset.guideWeeks || '[]').find(week=>week.weekId===node.week);
+    if(!week || !Number.isFinite(week.deadlineAt))return '';
+    const timeZone=node.data.timezone,now=new Date(node.data.checkedAt).getTime();
+    const when=at=>new Date(at).toLocaleString('en-GB',{timeZone,weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true}).replace(/\bSept\b/g,'Sep');
+    const full=at=>new Date(at).toLocaleString('en-IN',{timeZone,timeZoneName:'short',hour12:true});
+    const late=Number.isFinite(week.lateUntil) && week.lateUntil>week.deadlineAt;
+    const phase=!Number.isFinite(now) ? null : now<=week.deadlineAt ? ['blue','Open'] : late && now<=week.lateUntil ? ['orange','Late window open'] : ['gray','Closed'];
+    const item=(label,at,key)=>'<span class="inline-flex items-baseline gap-1" data-week-'+key+'><span class="text-muted">'+label+'</span><time class="font-semibold text-ink" datetime="'+esc(new Date(at).toISOString())+'" title="'+esc(full(at))+'">'+esc(when(at))+'</time></span>';
+    return '<div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" data-week-deadlines>'+item('Due',week.deadlineAt,'due')+
+      (late?'<span class="text-edge" aria-hidden="true">|</span>'+item('Late submissions until',week.lateUntil,'late-until'):'')+
+      (phase?'<span class="'+badgeClass(phase[0])+'" data-week-phase>'+phase[1]+'</span>':'')+'</div>';
   }
   function lastTeamSubmission(node,students) {
     const entries=node.data.entries.filter(entry=>!students || students.includes(String(entry.regNo).trim().toLowerCase()));
@@ -267,7 +278,7 @@ function guideWeeklyBrowser_(bridge) {
       : '<span class="inline-flex items-center gap-1 text-sm font-medium text-warning" data-guide-decision>Decision pending</span>';
     return '<details class="group relative" data-weekly-card data-card-entry="'+esc(entry.entryId)+'"'+(open?' open':'')+'>'+
       '<summary data-weekly-student-header class="grid cursor-pointer list-none grid-cols-[1fr_auto_1fr] items-center gap-x-4 gap-y-1 px-2 py-3 hover:bg-tint max-[640px]:grid-cols-1 [&::-webkit-details-marker]:hidden"><div class="flex min-w-0 flex-col"><strong>'+esc(entry.student)+'</strong><small class="font-mono text-xs text-muted">'+esc(entry.regNo)+'</small></div>'+
-      submissionDeadline(node,entry)+'<span class="flex items-center gap-2 justify-self-end max-[640px]:justify-self-start">'+decision+'<span class="text-muted transition-transform group-open:rotate-180" aria-hidden="true">'+DashboardUI.renderIcon('chevron-down')+'</span></span></summary>'+
+      submissionTiming(node,entry)+'<span class="flex items-center gap-2 justify-self-end max-[640px]:justify-self-start">'+decision+'<span class="text-muted transition-transform group-open:rotate-180" aria-hidden="true">'+DashboardUI.renderIcon('chevron-down')+'</span></span></summary>'+
       '<div class="mt-0 border-t border-edge px-2 pb-3 pt-3" data-entry="'+esc(entry.entryId)+'" data-weekly-summary>'+weeklyAnswers(entry)+weeklyEvidence(entry,node.data.timezone)+'</div>'+
       '<div class="relative bottom-0 max-md:bottom-16 z-10 flex flex-wrap items-center gap-2 border-t border-edge bg-paper px-2 py-3 group-data-[sticky-decision=true]:sticky" data-weekly-actions data-sign-entry="'+esc(entry.entryId)+'"><span class="text-sm">Did you discuss this update with the student?</span>'+['NOT_DISCUSSED','DISCUSSED'].map(status=>'<button type="button" class="'+(status==='DISCUSSED'?SMALL_PRIMARY:SMALL)+'" data-sign="'+status+'" aria-pressed="'+(entry.status===status)+'">'+(status==='DISCUSSED'?'Discussed':'Not Discussed')+'</button>').join('')+'</div></details>';
   }
@@ -290,7 +301,7 @@ function guideWeeklyBrowser_(bridge) {
       '<button type="button" class="'+NAV_ICON+'" data-week-step="1" data-week-boundary="'+(weekIndex===node.data.weeks.length-1)+'" '+(weekIndex===node.data.weeks.length-1?'disabled':'')+' title="'+(weekIndex===node.data.weeks.length-1?'First project week. No more previous weeks':'Previous week')+'" aria-label="Previous week">'+DashboardUI.renderIcon('chevron-left')+'</button>'+
       '<span aria-live="polite" class="text-sm font-semibold text-ink">'+esc(weekDateRange(node))+'</span>'+
       '<button type="button" class="'+NAV_ICON+'" data-week-step="-1" data-week-boundary="'+(weekIndex===0)+'" '+(weekIndex===0?'disabled':'')+' title="'+(weekIndex===0?'Latest available project week. No more next weeks':'Next week')+'" aria-label="Next week">'+DashboardUI.renderIcon('chevron-right')+'</button>'+
-      '<span class="'+badgeClass('orange')+' ml-auto empty:hidden" data-week-status role="status" title="'+esc(weekSummary)+'">'+(pending?pending+' pending':'')+'</span></nav>'+
+      '<span class="'+badgeClass('orange')+' ml-auto empty:hidden" data-week-status role="status" title="'+esc(weekSummary)+'">'+(pending?pending+' pending':'')+'</span></nav>'+weekDeadlines(node)+
       (entries.length || absent ? '<div class="mt-3 divide-y divide-edge border-y border-edge">'+entries.map(entry=>studentRow(node,entry,openCards.has(entry.entryId))).join('')+absent+'</div>':'<p>No weekly submissions for this team in the selected week.</p><p>'+esc(lastTeamSubmission(node,students))+'</p>');
     attachActions(node);
     measureAnswers(node);
