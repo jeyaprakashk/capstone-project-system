@@ -74,7 +74,6 @@ function guideTeamDto_(t, TS, data) {
     {label:'Need Analysis', url:r[TS.NEED_ANALYSIS_LINK]},
     {label:'Chapter 1 (LaTeX)', url:r[TS.CHAPTER1_LATEX_LINK]}
   ].filter(d => d.url).map(d => ({label:d.label, url:String(d.url)}));
-  const approvedAt = data.approvalTimes && data.approvalTimes[key];
   return {
     teamId:String(r[TS.TEAM_ID]),
     title:String(r[TS.TITLE] || ''),
@@ -88,15 +87,12 @@ function guideTeamDto_(t, TS, data) {
     lastDocumentSubmission:String(data.documentSubmissions && data.documentSubmissions[key] || ''),
     overdueLogs:t.logWeeks && t.logWeeks.missing ? t.logWeeks.missing : 0,
     titleDue:status === 'APPROVED' ? null : {date:formatProjectDay_(data.schedule.title), overdue:data.clock.today > data.schedule.title},
-    titleTiming:status === 'APPROVED' ? null : guideTitleTimingDto_(status, approvedAt, data.schedule, data.clock),
+    titleTiming:status === 'APPROVED' ? null : guideTitleTimingDto_(status, undefined, data.schedule, data.clock),
     similarityFlag:String(r[TS.SIMILARITY_FLAG] || ''),
     guideNotes:String(r[TS.GUIDE_NOTES] || ''),
     reviewerNotes:String(r[TS.REVIEWER_NOTES] || ''),
-    approval:status === 'APPROVED' ? {
-      approvedBy:String(r[TS.TITLE_APPROVED_BY] || ''),
-      approvedOn:String(data.approvals && data.approvals[key] || ''),
-      timing:guideTitleTimingDto_('APPROVED', approvedAt, data.schedule, data.clock)
-    } : null
+    // approvedOn and timing are null until API_guide_getApprovals answers (the registry read is slow and variable).
+    approval:status === 'APPROVED' ? {approvedBy:String(r[TS.TITLE_APPROVED_BY] || ''), approvedOn:null, timing:null} : null
   };
 }
 
@@ -151,6 +147,31 @@ function buildGuideGithubDto_(email, timings) {
     teams[String(r[TS.TEAM_ID])] = guideGithubDto_(githubByTeam && githubByTeam[key], guideStatusRoster_(r, TS), repoUrlMap[key] || '', data);
   });
   return {teams};
+}
+
+/** Approval date and timing for each approved team, keyed by team ID. Unreadable dates are empty strings with unknown timing, never an error. */
+function buildGuideApprovalsDto_(email, timings) {
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const approvedRows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r => emailsMatch_(r[TS.GUIDE_EMAIL], email) && getTeamStatus_(r) === 'APPROVED');
+  const teams = {};
+  if (!approvedRows.length) return {teams};
+  const schedule = getProjectSchedule_(), clock = getProjectClock_(schedule);
+  const {approvals, approvalTimes} = readGuideApprovals_(approvedRows, TS, timings);
+  approvedRows.forEach(r => {
+    const key = normalizeText_(r[TS.TEAM_ID]);
+    teams[String(r[TS.TEAM_ID])] = {approvedOn:String(approvals[key] || ''), timing:guideTitleTimingDto_('APPROVED', approvalTimes[key], schedule, clock)};
+  });
+  return {teams};
+}
+
+function API_guide_getApprovals() {
+  const started = Date.now(), timings = [];
+  try {
+    return apiHandle_(() => withDashboardRead_(() => {
+      const email = timedPhase_(timings, 'access', () => guideAccessOrThrow_());
+      return buildGuideApprovalsDto_(email, timings);
+    }));
+  } finally { logPhases_('guide_phases', 'approvals', timings, started); }
 }
 
 function API_guide_getGithub() {

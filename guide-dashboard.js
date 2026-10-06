@@ -25,9 +25,8 @@ function getGuideDashboardData_(email, timings) {
   const counts = { NOT_SUBMITTED: 0, NEEDS_REVIEW: 0, REVISE_AWAITING_STUDENT: 0, AWAITING_REVIEWER: 0, APPROVED: 0, REJECTED_BY_GUIDE: 0 };
   teams.forEach(t => counts[t.status]++);
 
-  // The approval date and time are shown, and used for timing, only for approved teams; skip the second spreadsheet otherwise.
-  const approvals = teams.some(t => t.status === 'APPROVED');
-  return { teams, counts, schedule, clock, windows:sharedLogReads.windows, ...readGuideRecordContext_(myRows, TS, timings, {approvals}) };
+  // Approval dates live in a second spreadsheet whose open time varies widely; API_guide_getApprovals reads them after first paint.
+  return { teams, counts, schedule, clock, windows:sharedLogReads.windows, ...readGuideRecordContext_(myRows, TS, timings, {approvals:false}) };
 }
 
 function guideRecordDate_(value) {
@@ -35,12 +34,13 @@ function guideRecordDate_(value) {
   return date && Number.isFinite(date.getTime()) ? date.toLocaleString('en-GB',{timeZone:getSpreadsheet_().getSpreadsheetTimeZone(),day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
 }
 
-function readGuideRecordContext_(rows, TS, timings, options) {
-  const approvals={},approvalTimes={},documentSubmissions={};
+/** Approval date and time for the given teams, from the hub registry; empty when it cannot be read. */
+function readGuideApprovals_(rows, TS, timings) {
+  const approvals={},approvalTimes={};
   const owned=new Map(rows.map(row=>[normalizeText_(row[TS.TEAM_ID]),row]));
   // The registry writer appends year, semester, team, guide, title, repo,
   // members, approval date and approving reviewer, in that order.
-  if (!options || options.approvals !== false) try {
+  try {
     timedPhase_(timings,'hub_registry',()=>readSheetRows_(getHubRegistrySheet_(),2)).forEach(record=>{
       const key=normalizeText_(record[2]),row=owned.get(key);
       if(!row || !textEquals_(record[0],getAcademicYear_()) || !textEquals_(record[1],row[TS.SEMESTER]) ||
@@ -49,6 +49,13 @@ function readGuideRecordContext_(rows, TS, timings, options) {
       const date=guideRecordDate_(record[7]);if(date){approvals[key]=date;approvalTimes[key]=new Date(record[7]).getTime();}
     });
   } catch(error) { /* Approval stays authoritative even when its date cannot be read. */ }
+  return {approvals,approvalTimes};
+}
+
+function readGuideRecordContext_(rows, TS, timings, options) {
+  const documentSubmissions={};
+  const owned=new Map(rows.map(row=>[normalizeText_(row[TS.TEAM_ID]),row]));
+  const {approvals,approvalTimes}=options && options.approvals===false ? {approvals:{},approvalTimes:{}} : readGuideApprovals_(rows,TS,timings);
   try {
     const sheet=getSheet_(SHEET_NAMES.TEAM_INTAKE_RAW);
     if(!sheet)throw new Error('Intake history unavailable');

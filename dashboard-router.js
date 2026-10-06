@@ -6,6 +6,9 @@
  * browser behaviour exactly once.
  */
 function doGet(e) {
+  // TEMPORARY diagnostic: compare this execution's duration with a normal doGet to separate fixed web-app overhead from
+  // page-size cost. Static text, no data read. Remove once the comparison is recorded.
+  if (e && e.parameter && e.parameter.probe === 'empty') return HtmlService.createHtmlOutput('<p>ok</p>');
   const started = Date.now(), timings = [];
   try { return withDashboardRead_(() => buildDashboardResponse_(e, timings)); }
   finally { logPhases_('shell_phases', 'doGet', timings, started); }
