@@ -69,7 +69,7 @@ function guideScore_(criteria, scores, complete, weight) {
       if (!blankMarks) throw new Error(c.pi + ': select a level before marks.');
       clean[c.pi] = {level:blankLevel ? null : value.level, marks:null, remark}; return;
     }
-    if (!Number.isInteger(value.level) || value.level < 0 || value.level > 5 || typeof value.marks === 'boolean' || !/^\d+(\.\d{1,2})?$/.test(String(value.marks))) throw new Error(c.pi + ': use level 0â€“5 and marks with at most two decimals.');
+    if (!Number.isInteger(value.level) || value.level < 0 || value.level > 5 || typeof value.marks === 'boolean' || !/^\d+(\.\d{1,2})?$/.test(String(value.marks))) throw new Error(c.pi + ': use level 0–5 and marks with at most two decimals.');
     const marks = Number(value.marks), scaled = Math.round(marks * 100);
     const lower = GUIDE_EVAL_BANDS_[value.level] * c.maxMarks;
     const upper = GUIDE_EVAL_BANDS_[value.level+1] * c.maxMarks;

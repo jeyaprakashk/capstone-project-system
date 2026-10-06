@@ -569,7 +569,7 @@ function processWeeklySubmissionSchedule() {
         if (reminders.has(key)) return;
         const due = Utilities.formatDate(new Date(window.deadline_at),getSpreadsheet_().getSpreadsheetTimeZone(),'dd MMM yyyy HH:mm z');
         try {
-          MailApp.sendEmail(student.email,'Weekly progress reminder â€” ' + window.weekId,
+          MailApp.sendEmail(student.email,'Weekly progress reminder — ' + window.weekId,
             'Submit your weekly progress by ' + due + '.\n\nOpen your Student Dashboard:\n' + getDashboardUrl_());
           const rowNumber = reminderSheet.getLastRow()+1;
           if (rowNumber > reminderSheet.getMaxRows()) reminderSheet.insertRowsAfter(reminderSheet.getMaxRows(),1);
