@@ -326,6 +326,9 @@ The response payload is unchanged. Phases contain names and durations only.
 - dashboard: `access`, `team_status_read`, `repository_map`, `schedule`, `log_entries_read`,
   `team_log_summaries`, `hub_registry`, `intake_history`, `dto_total` (includes `weekly_windows`),
   `teams` (count only).
+- approvals (`API_guide_getApprovals`, read after first paint, only when a team is approved): `access`,
+  `hub_registry`. The registry is a second spreadsheet; its open time varied from 0.7 s to about 20 s in
+  measurements, so it is kept off the dashboard's critical path.
 - github (`API_guide_getGithub`, read after the dashboard renders): `access`, `github_setup`. Live GitHub
   calls live here so they never delay first paint.
 - commits (`API_guide_getCommits`, read when a team's GitHub tab is first shown): `access`, `mapping`

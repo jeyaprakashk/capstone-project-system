@@ -85,9 +85,10 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
   const wbsLink = team => { const w = team.documents.find(d => d.label === 'Work Breakdown'); return w ? ' <a class="font-semibold text-primary underline" href="' + escape(safeUrl(w.url)) + '" target="_blank" rel="noopener">See Work Breakdown</a>' : ''; };
   function approvedMain(team) {
     const a = team.approval, timing = a.timing, problem = team.problem || '';
-    return '<div class="flex flex-wrap items-center gap-3 text-success">' + icon('check') +
-      '<strong class="font-semibold">Approved on ' + escape(a.approvedOn || 'date unavailable') + '</strong>' +
-      timingBadge(timing.state, timingLabel(timing)) + '</div>' +
+    // approvedOn and timing are null until API_guide_getApprovals answers.
+    const dated = timing ? '<strong class="font-semibold">Approved on ' + escape(a.approvedOn || 'date unavailable') + '</strong>' + timingBadge(timing.state, timingLabel(timing))
+      : '<strong class="font-semibold">Approved</strong><span data-approval-loading role="status">' + getUi().renderSkeleton('inline', 'Reading approval date') + '</span>';
+    return '<div class="flex flex-wrap items-center gap-3 text-success">' + icon('check') + dated + '</div>' +
       (problem ? '<h4 class="mt-5 text-xs font-semibold uppercase tracking-wide text-muted">Problem statement</h4>' +
         '<p data-problem-text class="mt-2 line-clamp-4 text-base leading-7 text-ink-2">' + escape(problem) + '</p>' +
         '<button type="button" class="mt-3 ' + LINK + '" data-action="toggle-problem" aria-expanded="false" hidden>Show more</button>' : '');
@@ -153,12 +154,13 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
       '<div class="mt-3 flex flex-wrap items-center justify-between gap-3">' + memberChips(team) +
       '<a class="' + BUTTON + '" href="mailto:' + escape(team.memberEmails.join(',')) + '?subject=' + escape(encodeURIComponent('Team ' + team.teamId + ' — Capstone Project')) + '">Email Team</a></div></header>';
   }
+  const titleViewMarkup = team => team.status.key === 'APPROVED'
+    ? '<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">' + titleCard(team) + '</div><div>' + approvalSide(team) + '</div></div>'
+    : titleCard(team);
   function panelMarkup(team, index, githubDue) {
     return '<section data-guide-team="' + escape(team.teamId) + '" data-guide-students="' + escape(JSON.stringify(team.registerNumbers)) + '" data-guide-members="' + escape(JSON.stringify(team.members)) + '"' + (index ? ' hidden' : '') + '>' +
       '<div data-guide-view="github" hidden>' + githubCard(team, githubDue) + '</div>' +
-      '<div data-guide-view="title">' + (team.status.key === 'APPROVED'
-        ? '<div class="grid gap-4 lg:grid-cols-3"><div class="lg:col-span-2">' + titleCard(team) + '</div><div>' + approvalSide(team) + '</div></div>'
-        : titleCard(team)) + '</div>' +
+      '<div data-guide-view="title">' + titleViewMarkup(team) + '</div>' +
       '<div data-guide-view="documents" hidden>' + documentsView(team) + '</div></section>';
   }
   function tabMarkup(view, iconName, title, selected, locked, short, sheet) {
@@ -216,6 +218,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
     host.innerHTML = (dto.teams.length ? workspaceMarkup(dto) : headerMarkup([]) + '<p class="mt-4 text-sm text-muted">You have no teams assigned.</p>');
     watchProblems(host);
     if (dto.teams.some(team => team.github === undefined)) loadGithub(dto);
+    if (dto.teams.some(approvalPending)) loadApprovals(dto);
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); }
     if (!host.guideToggleBound) {
       host.guideToggleBound = true;
@@ -253,6 +256,23 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
       syncCommits();
     };
     bridge.read('guide-github', 'API_guide_getGithub', [], {...GITHUB_READ, prefetched:true}).then(data => apply(data && data.teams), () => apply(null));
+  }
+
+  const approvalPending = team => !!team.approval && team.approval.timing === null;
+  /** Approval dates come from a second spreadsheet whose read is slow, so they fill in after first paint; a stale reply is ignored. */
+  function loadApprovals(dto) {
+    const unavailable = {approvedOn:'', timing:{state:'unknown', explanation:'Recorded date unavailable.', days:null}};
+    const apply = byTeam => {
+      if (state.dto !== dto || !state.host) return;
+      dto.teams.filter(approvalPending).forEach(team => {
+        const value = byTeam && byTeam[team.teamId] || unavailable;
+        team.approval.approvedOn = String(value.approvedOn || ''); team.approval.timing = value.timing || unavailable.timing;
+        const section = teamSection(team.teamId), view = section && section.querySelector('[data-guide-view="title"]');
+        if (view) view.innerHTML = titleViewMarkup(team);
+      });
+      watchProblems(state.host);
+    };
+    bridge.read('guide-approvals', 'API_guide_getApprovals', [], {timeoutMs:120000}).then(data => apply(data && data.teams), () => apply(null));
   }
 
   /** Commit history is read the first time a team's GitHub status tab is shown, never in the background. */

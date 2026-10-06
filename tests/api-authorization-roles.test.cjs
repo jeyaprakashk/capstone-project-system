@@ -42,6 +42,7 @@ const ENDPOINTS = {
   API_student_completeGithubSetup: [[], [...OUTSIDER, 'guide@example.com']],
   API_guide_getDashboard: [[], [...OUTSIDER, 'one@example.com']],
   API_guide_getGithub: [[], [...OUTSIDER, 'one@example.com']],
+  API_guide_getApprovals: [[], [...OUTSIDER, 'one@example.com']],
   API_guide_submitDecision: [[TEAM, 'Approved', '', ''], [...OUTSIDER, 'one@example.com']],
   API_guide_getCommits: [[TEAM], [...OUTSIDER, 'one@example.com']],
   API_guide_getWeekly: [[], [...OUTSIDER, 'one@example.com']],

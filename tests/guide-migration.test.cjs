@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { expectGolden } = require('./invariants/golden.cjs');
-const { guideFixture, guideDtoWithGithub } = require('./guide-fixture.cjs');
+const { guideFixture, guideFullDto } = require('./guide-fixture.cjs');
 
 const BADGE = { 'on-time': 'On time', late: 'Late', overdue: 'Overdue', pending: 'Pending', unknown: 'Timing unavailable' };
 const text = n => n.textContent.replace(/\s+/g, ' ').trim();
@@ -49,7 +49,7 @@ function dtoFacts(dto) {
 
 function build(options) {
   const g = guideFixture(options);
-  return { g, dto: guideDtoWithGithub(g) };
+  return { g, dto: guideFullDto(g) };
 }
 
 test('guide DTO carries the same facts the server-rendered dashboard showed', () => {
@@ -82,17 +82,28 @@ test('the GitHub endpoint reports every team unavailable, not an error, when Git
   assert(Object.values(frame.data.teams).length > 0 && Object.values(frame.data.teams).every(value => value === null));
 });
 
-test('the second (hub registry) spreadsheet is read only when one of the guide teams is approved', () => {
-  const read = g => { let reads = 0; g.c.getHubRegistrySheet_ = () => { reads++; return {}; }; const dto = JSON.parse(g.c.API_guide_getDashboard()).data; return { reads, dto }; };
-  const withApproved = read(guideFixture());
-  assert.equal(withApproved.reads, 1);
-  assert(withApproved.dto.teams.some(t => t.approval));
+test('the dashboard never reads the hub registry; approval details come from their own endpoint, which reads it only for approved teams', () => {
+  const run = g => {
+    let reads = 0; g.c.getHubRegistrySheet_ = () => { reads++; return {}; };
+    const dashboard = JSON.parse(g.c.API_guide_getDashboard()).data;
+    const afterDashboard = reads;
+    const approvals = JSON.parse(g.c.API_guide_getApprovals()).data;
+    return { dashboard, approvals, afterDashboard, total: reads };
+  };
+  const withApproved = run(guideFixture());
+  assert.equal(withApproved.afterDashboard, 0, 'first paint does not wait for the second spreadsheet');
+  assert.equal(withApproved.total, 1);
+  assert.deepEqual(withApproved.dashboard.teams.filter(t => t.approval).map(t => t.approval.timing), [null], 'pending until the approvals reply');
+  assert.deepEqual(withApproved.dashboard.teams.filter(t => t.approval).map(t => t.approval.approvedOn), [null]);
+  assert.deepEqual(Object.keys(withApproved.approvals.teams), ['T1']);
+  assert.equal(withApproved.approvals.teams.T1.approvedOn, '', 'an unreadable registry is an empty date, not an error');
+  assert.equal(withApproved.approvals.teams.T1.timing.state, 'unknown');
   const g = guideFixture(), decision = g.ts.indexOf('Reviewer Decision');
   g.f.status.rows.forEach((row, index) => { if (index) row[decision] = ''; });
-  const none = read(g);
-  assert.equal(none.reads, 0, 'no approved team, so no approval date is needed');
-  assert(none.dto.teams.every(t => t.approval === null));
-  assert.deepEqual(none.dto.teams.map(t => t.teamId).sort(), withApproved.dto.teams.map(t => t.teamId).sort());
+  const none = run(g);
+  assert.equal(none.total, 0, 'no approved team, so no registry read at all');
+  assert.deepEqual(none.approvals, { teams: {} });
+  assert(none.dashboard.teams.every(t => t.approval === null));
 });
 
 test('guide commits DTO counts every collected commit per mapped member and skips the template bootstrap', () => {

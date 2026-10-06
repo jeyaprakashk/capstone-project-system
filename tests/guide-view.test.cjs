@@ -5,16 +5,16 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const { parseHTML } = require('linkedom');
 const { loadSources } = require('./invariants/golden.cjs');
-const { guideFixture, guideDtoWithGithub } = require('./guide-fixture.cjs');
+const { guideFixture, guideFullDto } = require('./guide-fixture.cjs');
 
 /** The dashboard DTO once both reads have finished (github filled in). */
 function dtoFromServer(options) {
-  return guideDtoWithGithub(guideFixture(options));
+  return guideFullDto(guideFixture(options));
 }
 /** The dashboard DTO exactly as API_guide_getDashboard returns it, with the GitHub reply the server would give next. */
 function firstPaintFromServer(options) {
   const g = guideFixture(options);
-  return { dto: JSON.parse(g.c.API_guide_getDashboard()).data, github: JSON.parse(g.c.API_guide_getGithub()).data };
+  return { dto: JSON.parse(g.c.API_guide_getDashboard()).data, github: JSON.parse(g.c.API_guide_getGithub()).data, approvals: JSON.parse(g.c.API_guide_getApprovals()).data };
 }
 
 function setup(dto = dtoFromServer()) {
@@ -25,6 +25,7 @@ function setup(dto = dtoFromServer()) {
   const s = { dto, writeError: null, readError: null };
   bridge.useTransport(async (method, args) => {
     if (method === 'API_guide_getDashboard') return s.readError ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: s.readError } }) : JSON.stringify({ ok: true, data: s.dto });
+    if (method === 'API_guide_getApprovals') { calls.approvals = (calls.approvals || 0) + 1; if (s.approvalsGate) await s.approvalsGate; return s.approvalsError ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: s.approvalsError } }) : JSON.stringify({ ok: true, data: s.approvals || { teams: {} } }); }
     if (method === 'API_guide_getGithub') { calls.github++; if (s.githubGate) await s.githubGate; return s.githubError ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: s.githubError } }) : JSON.stringify({ ok: true, data: s.github }); }
     if (method === 'API_guide_getCommits') { calls.reads.push(args[0]); return JSON.stringify({ ok: true, data: s.commits || { teamId: args[0], state: 'unavailable', message: 'Commit history is not available yet.', members: [] } }); }
     calls.writes.push([method, args]);
@@ -172,6 +173,42 @@ test('a normal load starts the weekly and GitHub reads with the dashboard read; 
   sent.length = 0;
   await view.load(true);
   assert.deepEqual(sent, ['API_guide_getDashboard'], 'a re-read after a saved decision starts no early reads');
+});
+
+test('approval details show a placeholder at first paint, then the date and timing fill in for approved teams only', async () => {
+  const { dto } = firstPaintFromServer();
+  const f = setup(dto); f.s.approvals = { teams: { T1: { approvedOn: '29 Sep 2026, 17:30', timing: { state: 'on-time', explanation: 'Title approved 29 Sep 2026, on or before the deadline.', days: -2 } } } };
+  let release; f.s.approvalsGate = new Promise(resolve => { release = resolve; });
+  f.view.render(f.host, f.s.dto);
+  const title = id => byAttr(f, 'data-guide-team', id).querySelector('[data-guide-view="title"]');
+  assert(title('T1').querySelector('[data-approval-loading]'));
+  assert.match(title('T1').textContent, /Approved/); assert.doesNotMatch(title('T1').textContent, /Approved on/);
+  assert.match(title('T1').textContent, /Approved by\s*rev@example\.com/, 'the rest of the approved card is already there');
+  assert.equal(f.host.querySelectorAll('[data-guide-select]').length, 6);
+  assert.equal(f.calls.approvals, 1);
+  const other = title('T2').innerHTML;
+  release(); await f.settle(); await f.settle();
+  assert.equal(title('T1').querySelector('[data-approval-loading]'), null);
+  assert.match(title('T1').textContent, /Approved on 29 Sep 2026, 17:30/); assert.match(title('T1').textContent, /2 days earlier/);
+  assert.equal(title('T2').innerHTML, other, 'other cards are not re-rendered');
+  assert.equal(f.calls.approvals, 1, 'one read for all approved teams');
+});
+
+test('a failed approvals read leaves the card working with the date shown as unavailable', async () => {
+  const { dto } = firstPaintFromServer();
+  const f = setup(dto); f.s.approvalsError = 'Hub unavailable';
+  f.view.render(f.host, f.s.dto); await f.settle(); await f.settle();
+  const card = byAttr(f, 'data-guide-team', 'T1');
+  assert.equal(card.querySelector('[data-approval-loading]'), null);
+  const text = card.querySelector('[data-guide-view="title"]').textContent;
+  assert.match(text, /Approved on date unavailable/); assert.match(text, /Timing unavailable/);
+});
+
+test('a guide with no approved team makes no approvals request', async () => {
+  const { dto } = firstPaintFromServer();
+  dto.teams.forEach(team => { if (team.approval) { team.status = { key: 'AWAITING_REVIEWER', text: 'Awaiting Reviewer', tone: 'blue' }; team.approval = null; } });
+  const f = setup(dto); f.view.render(f.host, f.s.dto); await f.settle();
+  assert(!f.calls.approvals);
 });
 
 test('documents view lists links or reports that none were submitted', () => {
