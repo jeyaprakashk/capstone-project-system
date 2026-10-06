@@ -76,13 +76,32 @@ and the team drawer. Shared pieces: `api-envelope.js` (server) and `data-bridge-
 
 Browser modules are serialized into the shell by `getMigratedViewsClientScript_()` in
 `data-bridge-client.js`, and `getDashboardPageScript_()` assembles the page script; a new module must be
-registered there under the role that uses it (role bundles: [ROLE-BUNDLES-PLAN.md](ROLE-BUNDLES-PLAN.md),
-checked by `tests/page-assembly.test.cjs`) and its test file added to the
+registered there under the role that uses it (see Role bundles) and its test file added to the
 `test` and `test:migration` scripts in `package.json` (an unlisted test file never runs). `DashboardUI`
 (`dashboard-client-scripts.js`) only owns role loading, the shell, the shared drawers and the loading
 overlay; screens, card actions and flows live in their own module (for example `team-drawer-view.js`,
 `shared-timeline-view.js`, `shared-rubrics-view.js`, `system-status-actions.js`,
 `student-github-actions.js`, `assessment-history-view.js`).
+
+## Role bundles
+
+Each page ships only the browser modules of the roles `doGet` detected for that user. A student-only
+page is about 43 KB compressed instead of about 113 KB for all roles; on slow mobile data that saved
+about 0.44 s per load (measured at Regular 3G).
+
+- `getDashboardPageScript_(roles)` assembles the page: the shared modules (bridge, `DashboardUI`,
+  Timeline, Rubrics), each included role's modules, then `getDashboardStartScript_(roles)`, which
+  registers only those roles and starts the dashboard last. Roles come from the server's role
+  detection, never from the browser.
+- `DashboardUI` owns generic UI interactions and never names a role's module. Role tabs register with
+  `registerRole(key, {load, render, activate?})`; System Status registers with
+  `registerUtility(key, {endpoints, load, render, rendered?})`, whose endpoints use the utility lane.
+- Views receive their role's actions through their constructor (an object, or a getter for a module
+  serialized later); `getUi()` supplies only shared UI services. Do not guard a required module with
+  `typeof`: a missing module must fail, not silently disable a feature.
+- A new browser module goes under the role that uses it in `getMigratedViewsClientScript_` or
+  `getDashboardPageScript_`, and into `ROLE_MODULES` in `tests/page-assembly.test.cjs`, which builds all
+  15 role combinations and checks each role's modules ship exactly when that role does.
 
 ## Public surface
 

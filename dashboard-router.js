@@ -122,7 +122,7 @@ function buildDashboardShell_(email, views, timings) {
   const systemButton = hasCoordinator ? `<button type="button" class="${TAB}" role="tab" id="roleTab-system-status" aria-controls="rolePanel-system-status" aria-selected="false" tabindex="-1" data-role-tab="system-status">${renderLucideIcon_('activity')}System Status</button>` : '';
   const systemPanel = hasCoordinator ? `<section class="role-panel hidden [&.active]:block pt-4" id="rolePanel-system-status" role="tabpanel" aria-labelledby="roleTab-system-status" data-role-panel="system-status" hidden>${SYSTEM_STATUS_HEADER}<p id="systemStatusMessage" role="status" aria-live="polite"></p><div id="systemStatusContent">${getSkeletonMarkup_('panel', 'Loading system status')}</div></section>` : '';
 
-  // Role bundles (ROLE-BUNDLES-PLAN.md): the page ships only the modules of the roles detected above.
+  // Role bundles (AGENTS.md): the page ships only the modules of the roles detected above.
   const scriptRoles = views.map(view => view.key);
 
   const rolePanels = views.map((view, index) =>

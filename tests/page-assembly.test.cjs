@@ -1,5 +1,5 @@
 // The real dashboard page, assembled by the production serializers and started in a DOM.
-// Guards the inline script before role bundles change what each page contains (ROLE-BUNDLES-PLAN.md, Stage 1).
+// Guards the inline script and the role bundles each page contains (AGENTS.md, Role bundles).
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
