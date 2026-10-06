@@ -62,9 +62,13 @@ function guideGithubDto_(github, roster, repoUrl, data) {
   };
 }
 
-function guideTeamDto_(t, TS, data, githubByTeam, timingTeam) {
+function guideStatusRoster_(r, TS) {
+  return [1, 2, 3, 4].map(n => ({email:r[TS['S' + n + '_EMAIL']], regno:r[TS['S' + n + '_REGNO']], name:r[TS['S' + n + '_NAME']]}));
+}
+
+function guideTeamDto_(t, TS, data) {
   const r = t.row, key = normalizeText_(r[TS.TEAM_ID]), status = t.status, label = STATUS_LABEL[status];
-  const roster = [1, 2, 3, 4].map(n => ({email:r[TS['S' + n + '_EMAIL']], regno:r[TS['S' + n + '_REGNO']], name:r[TS['S' + n + '_NAME']]}));
+  const roster = guideStatusRoster_(r, TS);
   const documents = [
     {label:'Work Breakdown', url:r[TS.WORK_BREAKDOWN_LINK]},
     {label:'Need Analysis', url:r[TS.NEED_ANALYSIS_LINK]},
@@ -92,8 +96,7 @@ function guideTeamDto_(t, TS, data, githubByTeam, timingTeam) {
       approvedBy:String(r[TS.TITLE_APPROVED_BY] || ''),
       approvedOn:String(data.approvals && data.approvals[key] || ''),
       timing:guideTitleTimingDto_('APPROVED', approvedAt, data.schedule, data.clock)
-    } : null,
-    github:guideGithubDto_(githubByTeam && githubByTeam[key], roster, t.repoUrl || '', data)
+    } : null
   };
 }
 
@@ -108,18 +111,12 @@ function guideEvaluationDto_(schedule, clock) {
 function buildGuideDto_(data, timings) {
   const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const teams = data.teams;
-  let githubByTeam = null;
-  if (teams.length) {
-    try {
-      const repoUrls = Object.fromEntries(teams.map(t => [normalizeText_(t.row[TS.TEAM_ID]), t.repoUrl || '']));
-      githubByTeam = timedPhase_(timings, 'github_setup', () => getTeamsGithubSetup_(teams.map(t => t.row), TS, repoUrls, getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS)));
-    } catch (error) { /* A failed status read must not block title review or imply missing accounts. */ }
-  }
+  // GitHub status is live and slow; it is read by API_guide_getGithub after the dashboard has rendered.
   return {
-    teams:teams.map(t => guideTeamDto_(t, TS, data, githubByTeam)),
+    teams:teams.map(t => guideTeamDto_(t, TS, data)),
     githubDue:Number.isFinite(data.schedule && data.schedule.git) ? formatProjectDay_(data.schedule.git) : null,
     evaluation:guideEvaluationDto_(data.schedule, data.clock),
-    weeks:teams.length ? timedPhase_(timings, 'weekly_windows', () => getWeeklySubmissionWindows_()).map(w => ({weekId:w.weekId, opensAt:w.opens_at, deadlineAt:w.deadline_at})) : []
+    weeks:teams.length ? timedPhase_(timings, 'weekly_windows', () => data.windows || getWeeklySubmissionWindows_()).map(w => ({weekId:w.weekId, opensAt:w.opens_at, deadlineAt:w.deadline_at})) : []
   };
 }
 
@@ -129,6 +126,41 @@ function guideAccessOrThrow_() {
   const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   if (!getSheetRows_(SHEET_NAMES.TEAM_STATUS).some(r => r[TS.TEAM_ID] && emailsMatch_(r[TS.GUIDE_EMAIL], email))) throw apiFail_('UNAUTHORIZED', 'You do not have Guide access.');
   return email;
+}
+
+/**
+ * Live GitHub status for each of the guide's teams, keyed by team ID; null means the status could not be read.
+ * A failed read never becomes an error: title review must not depend on GitHub being reachable.
+ */
+function buildGuideGithubDto_(email, timings) {
+  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+  const rows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r => emailsMatch_(r[TS.GUIDE_EMAIL], email));
+  const repoUrlMap = getRepoUrlMap_();
+  const data = {schedule:getProjectSchedule_(), clock:null};
+  data.clock = getProjectClock_(data.schedule);
+  let githubByTeam = null;
+  if (rows.length) {
+    try {
+      const repoUrls = Object.fromEntries(rows.map(r => [normalizeText_(r[TS.TEAM_ID]), repoUrlMap[normalizeText_(r[TS.TEAM_ID])] || '']));
+      githubByTeam = timedPhase_(timings, 'github_setup', () => getTeamsGithubSetup_(rows, TS, repoUrls, getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS)));
+    } catch (error) { /* A failed status read must not imply missing accounts. */ }
+  }
+  const teams = {};
+  rows.forEach(r => {
+    const key = normalizeText_(r[TS.TEAM_ID]);
+    teams[String(r[TS.TEAM_ID])] = guideGithubDto_(githubByTeam && githubByTeam[key], guideStatusRoster_(r, TS), repoUrlMap[key] || '', data);
+  });
+  return {teams};
+}
+
+function API_guide_getGithub() {
+  const started = Date.now(), timings = [];
+  try {
+    return apiHandle_(() => withDashboardRead_(() => {
+      const email = timedPhase_(timings, 'access', () => guideAccessOrThrow_());
+      return buildGuideGithubDto_(email, timings);
+    }));
+  } finally { logPhases_('guide_phases', 'github', timings, started); }
 }
 
 function API_guide_getDashboard() {
@@ -179,7 +211,7 @@ function API_guide_submitDecision(teamId, decision, notes, editedTitle) {
 function API_guide_getWeekly() {
   const started = Date.now(), timings = [];
   try {
-    return apiHandle_(() => { timedPhase_(timings, 'access', () => guideAccessOrThrow_()); return loadGuideWeeklyProgress_(timings); });
+    return apiHandle_(() => withDashboardRead_(() => { timedPhase_(timings, 'access', () => guideAccessOrThrow_()); return loadGuideWeeklyProgress_(timings); }));
   } finally { logPhases_('guide_phases', 'weekly', timings, started); }
 }
 

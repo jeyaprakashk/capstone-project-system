@@ -41,6 +41,7 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_student_getCore()` | Student | none | `StudentCore` (below): team, roster, `titleApproved`, assessment labels; sheet data only, no GitHub calls | `getStudentBaseData_` + `buildStudentCoreDto_` |
 | `API_student_getProject()` | Student | none | `StudentProject` (below): setup, GitHub and title cards (the GitHub checks) | `getStudentDashboardData_` + `buildStudentProjectDto_` |
 | `API_guide_getDashboard()` | Guide | none | `GuideDashboard` (below) | `buildDashboardContent` (removed) |
+| `API_guide_getGithub()` | Guide | none | `{teams:{<teamId>: GuideGithub \| null}}` for the guide's own teams; `null` = status unavailable (a failed GitHub read is never an error) | `buildGuideGithubDto_` over `getTeamsGithubSetup_`; read once after the dashboard renders so first paint never waits on live GitHub calls |
 | `API_guide_getCommits(teamId)` | Guide (own team only) | team ID | `{teamId, state:'available'|'unavailable', message, repositoryUrl?, members:[{regno, username, count:number|null, commits:[{sha, shortSha, message, timestamp, url}]}]}`; `count` is every collected commit by that member in the team repository (all time, bootstrap commit excluded) and `commits` the latest 3; read when the GitHub status tab is first shown | `buildGuideCommitsDto_` over `readCollectedCommits_` |
 | `API_guide_submitDecision(teamId, decision, notes, editedTitle)` | Guide | `decision` is `Approved` or `Rejected`; notes required for `Rejected` | `{message}` | `decide` in the old client |
 | `API_reviewer_getDashboard()` | Reviewer | none | `ReviewerDashboard` (below) | `buildReviewerContent` (removed) |
@@ -169,13 +170,19 @@ captured from the removed HTML for eight states).
            registerNumbers:[string], repoUrl, problem, documents:[{label,url}], lastDocumentSubmission,
            overdueLogs:number, titleDue:{date,overdue}|null, titleTiming:{state,explanation}|null,
            similarityFlag, guideNotes, reviewerNotes,
-           approval:{approvedBy, approvedOn, timing:{state,explanation,days:number|null}}|null,          // APPROVED only
-           github:{ tone, members:[{name,regno,state:'missing'|'joined'|'pending',
-                    timing:{state,explanation,date,daysLate,days:number|null}|null}] }|null }],          // null = status unavailable
+           approval:{approvedBy, approvedOn, timing:{state,explanation,days:number|null}}|null }],       // APPROVED only
   githubDue:string|null,
   evaluation:{enabled:boolean, notice:string},
   weeks:[{weekId, opensAt, deadlineAt}] }       // epoch ms; consumed by GuideWeekly
+
+GuideGithub   // one team's entry in API_guide_getGithub().teams
+{ tone, members:[{name,regno,state:'missing'|'joined'|'pending',
+                  timing:{state,explanation,date,daysLate,days:number|null}|null}] }
 ```
+
+The dashboard has no `github` field. The view treats a team's `github` as `undefined` (placeholder) until
+`API_guide_getGithub` returns, then `GuideGithub` or `null` (unavailable). The golden-master test merges both
+responses, so `guide-legacy-facts.json` is unchanged.
 
 Teams are ordered by title-review priority. `state` is one of `on-time`, `late`, `overdue`, `pending`,
 `unknown`; the view maps it to a label and colour. Workflow rejections returned as `{ok:false,message}` by

@@ -5,21 +5,27 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const { parseHTML } = require('linkedom');
 const { loadSources } = require('./invariants/golden.cjs');
-const { guideFixture } = require('./guide-fixture.cjs');
+const { guideFixture, guideDtoWithGithub } = require('./guide-fixture.cjs');
 
+/** The dashboard DTO once both reads have finished (github filled in). */
 function dtoFromServer(options) {
+  return guideDtoWithGithub(guideFixture(options));
+}
+/** The dashboard DTO exactly as API_guide_getDashboard returns it, with the GitHub reply the server would give next. */
+function firstPaintFromServer(options) {
   const g = guideFixture(options);
-  return JSON.parse(g.c.API_guide_getDashboard()).data;
+  return { dto: JSON.parse(g.c.API_guide_getDashboard()).data, github: JSON.parse(g.c.API_guide_getGithub()).data };
 }
 
 function setup(dto = dtoFromServer()) {
   const { document, window } = parseHTML('<html><body><div id="guideContent"></div></body></html>');
-  const calls = { reads: [], weekly: [], loads: 0, refresh: 0, writes: [], toggles: [] };
+  const calls = { reads: [], weekly: [], loads: 0, refresh: 0, writes: [], toggles: [], github: 0 };
   const c = loadSources(['data-bridge-client.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const s = { dto, writeError: null, readError: null };
   bridge.useTransport(async (method, args) => {
     if (method === 'API_guide_getDashboard') return s.readError ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: s.readError } }) : JSON.stringify({ ok: true, data: s.dto });
+    if (method === 'API_guide_getGithub') { calls.github++; if (s.githubGate) await s.githubGate; return s.githubError ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: s.githubError } }) : JSON.stringify({ ok: true, data: s.github }); }
     if (method === 'API_guide_getCommits') { calls.reads.push(args[0]); return JSON.stringify({ ok: true, data: s.commits || { teamId: args[0], state: 'unavailable', message: 'Commit history is not available yet.', members: [] } }); }
     calls.writes.push([method, args]);
     return s.writeError ? JSON.stringify({ ok: false, error: { code: 'REJECTED', message: s.writeError } }) : JSON.stringify({ ok: true, data: { message: 'Saved' } });
@@ -94,6 +100,58 @@ test('github status shows member states, timing labels and the repository', () =
   assert.match(byAttr(f, 'data-guide-team', 'T2').textContent, /Accept Invitation Email/);
   const unavailable = setup(dtoFromServer({ github: 'throw' })); unavailable.view.render(unavailable.host, unavailable.s.dto);
   assert.match(unavailable.host.textContent, /GitHub status unavailable/); assert.equal(unavailable.host.querySelectorAll('[data-member-status]').length, 0);
+});
+
+test('first paint does not wait for GitHub: a placeholder shows, then each team card fills in from one read', async () => {
+  const { dto, github } = firstPaintFromServer();
+  const f = setup(dto); f.s.github = github;
+  let release; f.s.githubGate = new Promise(resolve => { release = resolve; });
+  f.view.render(f.host, f.s.dto);
+  const t1 = () => byAttr(f, 'data-guide-team', 'T1');
+  assert.equal(f.host.querySelectorAll('[data-guide-select]').length, 6, 'the dashboard is usable while GitHub is pending');
+  assert(t1().querySelector('[data-github-loading]'));
+  assert.doesNotMatch(f.host.textContent, /GitHub status unavailable/);
+  assert.equal(f.calls.github, 1);
+  release(); await f.settle(); await f.settle();
+  assert.equal(t1().querySelector('[data-github-loading]'), null);
+  assert.deepEqual(Array.from(t1().querySelectorAll('[data-member-status]')).map(n => n.getAttribute('data-member-status')), ['joined', 'joined']);
+  assert.match(byAttr(f, 'data-guide-team', 'T3').textContent, /Submit GitHub Account/);
+  assert.match(byAttr(f, 'data-guide-team', 'T4').textContent, /GitHub status unavailable/);
+  assert.equal(f.calls.github, 1, 'one batched read for all teams');
+});
+
+test('a failed GitHub read leaves the dashboard working and shows the status as unavailable', async () => {
+  const { dto } = firstPaintFromServer();
+  const f = setup(dto); f.s.githubError = 'GitHub down';
+  f.view.render(f.host, f.s.dto); await f.settle(); await f.settle();
+  assert.equal(f.host.querySelector('[data-github-loading]'), null);
+  assert.match(byAttr(f, 'data-guide-team', 'T1').textContent, /GitHub status unavailable/);
+  assert.equal(f.host.querySelectorAll('[data-guide-select]').length, 6);
+});
+
+test('a GitHub reply for a replaced render is ignored', async () => {
+  const first = firstPaintFromServer();
+  const f = setup(first.dto); f.s.github = first.github;
+  let release; f.s.githubGate = new Promise(resolve => { release = resolve; });
+  f.view.render(f.host, f.s.dto);
+  const next = firstPaintFromServer().dto; f.s.githubGate = null;
+  f.view.render(f.host, next); await f.settle(); await f.settle();
+  release(); await f.settle();
+  assert.equal(f.calls.github, 2);
+  assert.deepEqual(Array.from(byAttr(f, 'data-guide-team', 'T1').querySelectorAll('[data-member-status]')).map(n => n.getAttribute('data-member-status')), ['joined', 'joined']);
+});
+
+test('commit history waits for the GitHub card, then loads when its tab is shown', async () => {
+  const { dto, github } = firstPaintFromServer();
+  const f = setup(dto); f.s.github = github;
+  let release; f.s.githubGate = new Promise(resolve => { release = resolve; });
+  f.view.render(f.host, f.s.dto);
+  f.host.querySelectorAll('[data-guide-team]').forEach(el => el.setAttribute('hidden', ''));
+  const t1 = byAttr(f, 'data-guide-team', 'T1'); t1.removeAttribute('hidden'); t1.querySelector('[data-guide-view="github"]').removeAttribute('hidden');
+  f.click(byAttr(f, 'data-guide-tab', 'github')); await f.settle();
+  assert.deepEqual(f.calls.reads, [], 'no commit read while the GitHub card is still a placeholder');
+  release(); await f.settle(); await f.settle();
+  assert.deepEqual(f.calls.reads, ['T1']);
 });
 
 test('documents view lists links or reports that none were submitted', () => {

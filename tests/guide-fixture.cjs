@@ -35,4 +35,11 @@ function guideFixture({ github = 'default' } = {}) {
   c.getHubRegistrySheet_ = () => ({}); // approval date unavailable unless a test supplies a registry
   return { f, c, ts, state, members, header, user: 'guide@example.com', day };
 }
-module.exports = { guideFixture };
+/** The dashboard DTO with each team's `github` filled from API_guide_getGithub: the shape the view shows once both reads finish. */
+function guideDtoWithGithub(g) {
+  const dto = JSON.parse(g.c.API_guide_getDashboard()).data;
+  const github = JSON.parse(g.c.API_guide_getGithub()).data;
+  dto.teams.forEach(team => { team.github = github.teams[team.teamId] ?? null; });
+  return dto;
+}
+module.exports = { guideFixture, guideDtoWithGithub };

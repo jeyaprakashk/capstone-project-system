@@ -571,8 +571,8 @@ function getProjectClock_(schedule, now) {
     completedWeeks:today > schedule.end ? Math.ceil((schedule.end - schedule.week1 + 1) / 7) : Math.max(0, Math.floor((today - schedule.week1) / 7)) };
 }
 
-/** `knownWindows` lets a caller that already read WeeklyWindows in this request share them. */
-function getLogWeekSummary_(records, eligibleFrom, regNo, now, knownWindows) {
+/** `knownWindows` and `knownTimezone` let a caller that already read them in this request share them. */
+function getLogWeekSummary_(records, eligibleFrom, regNo, now, knownWindows, knownTimezone) {
   now = now || new Date();
   const windows = eligibleWeeklyWindows_(eligibleFrom,knownWindows || getWeeklySubmissionWindows_());
   const expected = windows.filter(w=>w.opens_at <= now.getTime());
@@ -580,7 +580,7 @@ function getLogWeekSummary_(records, eligibleFrom, regNo, now, knownWindows) {
   const submitted = new Set(effective.filter(r=>r.entryStatus !== 'MISSED').map(r=>r.weekId));
   const missing = expected.filter(w=>now.getTime() > w.late_until && !submitted.has(w.weekId));
   const current = expected.find(w=>now.getTime() <= w.deadline_at);
-  const timezone = getSpreadsheet_().getSpreadsheetTimeZone();
+  const timezone = knownTimezone || getSpreadsheet_().getSpreadsheetTimeZone();
   return {expectedWeeks:expected.length, missing:missing.length,
     firstMissingDue:missing.length ? projectDay_(new Date(missing[0].deadline_at),timezone) : null,
     currentLogged:!!current && submitted.has(current.weekId), active:!!current, week:current ? current.weekId : null,
@@ -596,7 +596,9 @@ function getTeamLogWeekSummary_(row, columns, logs, schedule, clock, shared) {
   const eligibility = shared.eligibility || (shared.eligibility = readProgressEligibility_());
   const summaries = registers.map(regNo=>{
     const record = progressStudentEligibility_({regNo,teamId:row[columns.TEAM_ID]},eligibility,shared.windows);
-    return getLogWeekSummary_(logs,record.eligibleFrom ? record.enforcedFrom : '',regNo,clock && clock.now,shared.windows || (shared.windows = getWeeklySubmissionWindows_()));
+    const windows = shared.windows || (shared.windows = getWeeklySubmissionWindows_());
+    const timezone = shared.timezone || (shared.timezone = getSpreadsheet_().getSpreadsheetTimeZone());
+    return getLogWeekSummary_(logs,record.eligibleFrom ? record.enforcedFrom : '',regNo,clock && clock.now,windows,timezone);
   });
   const dueDates = summaries.filter(s=>s.firstMissingDue !== null).map(s=>s.firstMissingDue);
   const active = summaries.filter(s=>s.active), current = active[0];

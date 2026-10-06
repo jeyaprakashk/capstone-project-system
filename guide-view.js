@@ -64,11 +64,13 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
     if (!match) return '<span class="text-sm text-muted">' + icon('git-branch', 'Team repository') + ' Repository not available</span>';
     return '<span class="text-sm">' + icon('git-branch', 'Team repository') + ' <a class="font-mono text-primary underline" href="' + escape(safeUrl(repoUrl)) + '" title="' + escape(match[1]) + '" target="_blank" rel="noopener">' + escape(match[2]) + ' ' + icon('external-link') + '</a></span>';
   }
+  /** `team.github` is undefined while the live status is still being read, null when it could not be read. */
   function githubCard(team, githubDue) {
     const g = team.github;
     return '<aside><div class="flex flex-wrap items-center justify-between gap-2 border-b border-edge pb-3">' + repositoryLine(team.repoUrl) +
       '<span class="text-sm text-muted">Due ' + escape(githubDue || 'date unavailable') + '</span></div>' +
-      (g ? '<ul aria-label="Team GitHub status" class="m-0 list-none p-0">' + g.members.map(githubMemberMarkup).join('') + '</ul>' : '<p role="status" class="mt-2 text-sm text-muted">GitHub status unavailable. Refresh the dashboard to retry.</p>') + '</aside>';
+      (g === undefined ? '<div data-github-loading role="status" class="mt-2">' + getUi().renderSkeleton('inline', 'Reading GitHub status') + '</div>'
+        : g ? '<ul aria-label="Team GitHub status" class="m-0 list-none p-0">' + g.members.map(githubMemberMarkup).join('') + '</ul>' : '<p role="status" class="mt-2 text-sm text-muted">GitHub status unavailable. Refresh the dashboard to retry.</p>') + '</aside>';
   }
   function expandable(text, max) {
     if (text.length <= max) return escape(text);
@@ -213,6 +215,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
     state.host = host; state.dto = dto; state.commits = {};
     host.innerHTML = (dto.teams.length ? workspaceMarkup(dto) : headerMarkup([]) + '<p class="mt-4 text-sm text-muted">You have no teams assigned.</p>');
     watchProblems(host);
+    if (dto.teams.some(team => team.github === undefined)) loadGithub(dto);
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); }
     if (!host.guideToggleBound) {
       host.guideToggleBound = true;
@@ -238,9 +241,24 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
       list.innerHTML = member && member.count !== null ? commitListMarkup(member, dto.repositoryUrl) : '<p class="m-0 px-1 text-sm text-muted">' + escape((dto && dto.message) || 'Commit history is unavailable for this member.') + '</p>';
     });
   }
+  /** Live GitHub status is read once after each render so first paint never waits on GitHub; a stale reply is ignored. */
+  function loadGithub(dto) {
+    const apply = byTeam => {
+      if (state.dto !== dto || !state.host) return;
+      dto.teams.forEach(team => {
+        team.github = byTeam && byTeam[team.teamId] ? byTeam[team.teamId] : null;
+        const section = teamSection(team.teamId), view = section && section.querySelector('[data-guide-view="github"]');
+        if (view) view.innerHTML = githubCard(team, dto.githubDue);
+      });
+      syncCommits();
+    };
+    bridge.read('guide-github', 'API_guide_getGithub', [], {timeoutMs:120000}).then(data => apply(data && data.teams), () => apply(null));
+  }
+
   /** Commit history is read the first time a team's GitHub status tab is shown, never in the background. */
   function ensureCommits(teamId) {
-    if (state.commits[teamId] || !teamSection(teamId)) return;
+    const team = state.dto && state.dto.teams.find(item => item.teamId === teamId);
+    if (state.commits[teamId] || !teamSection(teamId) || !team || team.github === undefined) return;
     state.commits[teamId] = 'loading';
     teamSection(teamId).querySelectorAll('[data-commit-count]').forEach(el => { el.innerHTML = getUi().renderSkeleton('inline', 'Reading commits'); });
     bridge.read('guide-commits:' + teamId, 'API_guide_getCommits', [teamId]).then(

@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { expectGolden } = require('./invariants/golden.cjs');
-const { guideFixture } = require('./guide-fixture.cjs');
+const { guideFixture, guideDtoWithGithub } = require('./guide-fixture.cjs');
 
 const BADGE = { 'on-time': 'On time', late: 'Late', overdue: 'Overdue', pending: 'Pending', unknown: 'Timing unavailable' };
 const text = n => n.textContent.replace(/\s+/g, ' ').trim();
@@ -49,7 +49,7 @@ function dtoFacts(dto) {
 
 function build(options) {
   const g = guideFixture(options);
-  return { g, dto: JSON.parse(g.c.API_guide_getDashboard()).data };
+  return { g, dto: guideDtoWithGithub(g) };
 }
 
 test('guide DTO carries the same facts the server-rendered dashboard showed', () => {
@@ -61,6 +61,25 @@ test('guide DTO carries the same facts the server-rendered dashboard showed', ()
 test('an unavailable GitHub status is reported as unavailable, never as missing accounts', () => {
   const { dto } = build({ github: 'throw' });
   assert(dto.teams.every(t => t.github === null));
+});
+
+test('the dashboard read never touches GitHub; the GitHub endpoint carries the status keyed by team', () => {
+  const g = guideFixture();
+  let calls = 0; const setup = g.c.getTeamsGithubSetup_; g.c.getTeamsGithubSetup_ = (...args) => { calls++; return setup(...args); };
+  const dashboard = JSON.parse(g.c.API_guide_getDashboard()).data;
+  assert.equal(calls, 0);
+  assert(dashboard.teams.every(t => !('github' in t)));
+  const github = JSON.parse(g.c.API_guide_getGithub()).data;
+  assert.equal(calls, 1, 'one batched GitHub read for every team');
+  assert.deepEqual(Object.keys(github.teams).sort(), dashboard.teams.map(t => t.teamId).sort());
+  assert.equal(github.teams.T4, null, 'a team without GitHub data is reported as unavailable, not as missing accounts');
+});
+
+test('the GitHub endpoint reports every team unavailable, not an error, when GitHub cannot be read', () => {
+  const g = guideFixture({ github: 'throw' });
+  const frame = JSON.parse(g.c.API_guide_getGithub());
+  assert.equal(frame.ok, true);
+  assert(Object.values(frame.data.teams).length > 0 && Object.values(frame.data.teams).every(value => value === null));
 });
 
 test('guide commits DTO counts every collected commit per mapped member and skips the template bootstrap', () => {

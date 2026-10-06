@@ -25,7 +25,7 @@ function getGuideDashboardData_(email, timings) {
   const counts = { NOT_SUBMITTED: 0, NEEDS_REVIEW: 0, REVISE_AWAITING_STUDENT: 0, AWAITING_REVIEWER: 0, APPROVED: 0, REJECTED_BY_GUIDE: 0 };
   teams.forEach(t => counts[t.status]++);
 
-  return { teams, counts, schedule, clock, ...readGuideRecordContext_(myRows, TS, timings) };
+  return { teams, counts, schedule, clock, windows:sharedLogReads.windows, ...readGuideRecordContext_(myRows, TS, timings) };
 }
 
 function guideRecordDate_(value) {

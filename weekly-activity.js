@@ -128,11 +128,26 @@ function weeklyStoredGithubMapping_(teamId, knownStudents, knownRepoUrl) {
   return {members,repoUrl:knownRepoUrl !== undefined ? knownRepoUrl : getRepoUrlForTeam_(teamId)};
 }
 
+/** Runs `read` at most once; a failure is remembered and rethrown to every later caller. */
+function memoizedRead_(read) {
+  let done = false, value, error = null;
+  return () => {
+    if (!done) { done = true; try { value = read(); } catch (caught) { error = caught; } }
+    if (error) throw error;
+    return value;
+  };
+}
+
+/**
+ * `options.setup`, `options.commits` and `options.collectionStatus` may be functions so a caller serving many
+ * students of one team can share one read per team (see loadGuideWeeklyProgress_); they run inside the same
+ * error handling as the direct reads, so a failure still yields an unavailable source.
+ */
 function weeklyEvidenceSource_(student, options) {
   options = options || {};
   const source = {logs:options.logs || readLogEntries_(student.teamId,student.regNo),state:'unmapped',commits:[]};
   try {
-    const setup = options.setup || weeklyStoredGithubMapping_(student.teamId, options.students, options.repoUrl);
+    const setup = typeof options.setup === 'function' ? options.setup() : options.setup || weeklyStoredGithubMapping_(student.teamId, options.students, options.repoUrl);
     const members = setup.members || [], mine = members.filter(m=>emailsMatch_(m.email,student.email) && textEquals_(m.label,student.regNo));
     if (mine.length !== 1 || mine[0].status !== 'valid' || !String(mine[0].username || '').trim() || !githubId_(mine[0].githubId) ||
         members.filter(m=>githubAuthorMatches_(mine[0].githubId,m.githubId)).length !== 1) {
@@ -141,8 +156,9 @@ function weeklyEvidenceSource_(student, options) {
     source.githubId = mine[0].githubId;
     source.repositoryUrl = weeklyEvidenceRepo_(setup.repoUrl);
     source.state = 'unavailable';
-    if (!source.repositoryUrl || readCommitCollectionStatus_(student.teamId) !== 'ok') return source;
-    source.commits = readCollectedCommits_(student.teamId);
+    if (!source.repositoryUrl) return source;
+    if ((options.collectionStatus ? options.collectionStatus() : readCommitCollectionStatus_(student.teamId)) !== 'ok') return source;
+    source.commits = options.commits ? options.commits() : readCollectedCommits_(student.teamId);
     source.state = 'available';
   } catch (error) { source.state = 'unavailable'; }
   return source;

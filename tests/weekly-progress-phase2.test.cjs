@@ -126,6 +126,20 @@ test('guide reads use stored mapping and commits with zero GitHub requests and u
   assert.equal(JSON.stringify([...f.sheets].map(([name,sheet])=>[name,sheet.rows])),before);
 });
 
+test('guide weekly read shares the roster, windows and each team\'s mapping, commits and collection status across students and entries',()=>{
+  const f=fixture();
+  f.c.submitWeeklyProgress_(f.input());f.user('two@example.com');f.c.submitWeeklyProgress_(f.input({guideDiscussion:'Second student'}));f.user('guide@example.com');
+  const reference=JSON.stringify(f.c.loadGuideWeeklyProgress_().entries.map(entry=>[entry.regNo,entry.evidence]));
+  const counts={};
+  for(const name of ['weeklyStudents_','weeklyStoredGithubMapping_','readCollectedCommits_','readCommitCollectionStatus_','getWeeklySubmissionWindows_','readLogEntries_']) {
+    const original=f.c[name];counts[name]=0;f.c[name]=(...args)=>{counts[name]++;return original(...args);};
+  }
+  const data=f.c.loadGuideWeeklyProgress_();
+  assert.equal(data.entries.length,2);
+  assert.equal(JSON.stringify(data.entries.map(entry=>[entry.regNo,entry.evidence])),reference,'evidence is unchanged');
+  assert.deepEqual(counts,{weeklyStudents_:1,weeklyStoredGithubMapping_:1,readCollectedCommits_:1,readCommitCollectionStatus_:1,getWeeklySubmissionWindows_:1,readLogEntries_:1});
+});
+
 test('stored guide evidence retains mapping conflicts and collection failures as unavailable',()=>{
   const cases=[
     f=>{f.sheets.get('GitHubAccounts').rows[1][4]='';},

@@ -324,8 +324,10 @@ Do not sum parent and child durations. No persistent caching is introduced.
 The response payload is unchanged. Phases contain names and durations only.
 
 - dashboard: `access`, `team_status_read`, `repository_map`, `schedule`, `log_entries_read`,
-  `team_log_summaries`, `hub_registry`, `intake_history`, `dto_total` (includes `github_setup` and
-  `weekly_windows`), `teams` (count only).
+  `team_log_summaries`, `hub_registry`, `intake_history`, `dto_total` (includes `weekly_windows`),
+  `teams` (count only).
+- github (`API_guide_getGithub`, read after the dashboard renders): `access`, `github_setup`. Live GitHub
+  calls live here so they never delay first paint.
 - weekly: `access`, `setup_and_signoffs`, `log_entries_read`, `entries_and_evidence` (includes
   `evidence_reads`, whose `count` is the number of per-student evidence sources built),
   `weekly_windows`, `eligibility_read`.

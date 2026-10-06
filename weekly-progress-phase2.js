@@ -81,6 +81,27 @@ function loadGuideWeeklyProgress_(timings) {
   const evidenceSources = new Map();
   let evidenceMs = 0, evidenceSourceReads = 0;
   const logRecords = timedPhase_(timings,'log_entries_read',()=>readLogEntries_());
+  // Each sheet is read once per request (once per team for team data), not once per student or entry. A failed read is
+  // remembered, so every dependent student still gets the same unavailable evidence as before.
+  const readWindows = memoizedRead_(()=>getWeeklySubmissionWindows_());
+  const readRoster = memoizedRead_(()=>weeklyStudents_());
+  const readRepoUrls = memoizedRead_(()=>getRepoUrlMap_());
+  const teamReads = new Map();
+  const teamRead = teamId=>{
+    const key = normalizeText_(teamId);
+    if (!teamReads.has(key)) teamReads.set(key,{
+      setup:memoizedRead_(()=>weeklyStoredGithubMapping_(teamId,readRoster(),readRepoUrls()[key] || '')),
+      commits:memoizedRead_(()=>readCollectedCommits_(teamId)),
+      collectionStatus:memoizedRead_(()=>readCommitCollectionStatus_(teamId))});
+    return teamReads.get(key);
+  };
+  const evidenceSource = identity=>{
+    // The log rows are already in memory; the per-student search would read the same rows again.
+    const logs = logRecords.filter(row=>textEquals_(row.teamId,identity.teamId) && textEquals_(row.regNo,identity.regNo));
+    const source = weeklyEvidenceSource_(identity,{logs,...teamRead(identity.teamId)});
+    source.windows = readWindows();
+    return source;
+  };
   const entriesStarted = Date.now();
   const entries = getEffectiveLogEntries_(logRecords).filter(row=>row.entryStatus !== 'MISSED').flatMap(entry=>{
     const team = teams.find(row=>textEquals_(row[columns.TEAM_ID],entry.teamId));
@@ -93,7 +114,7 @@ function loadGuideWeeklyProgress_(timings) {
     const evidenceStarted = Date.now();
     try {
       const key=normalizeEmail_(student.email);
-      if(!evidenceSources.has(key)){evidenceSources.set(key,weeklyEvidenceSource_(identity));evidenceSourceReads++;}
+      if(!evidenceSources.has(key)){evidenceSources.set(key,evidenceSource(identity));evidenceSourceReads++;}
       evidence=readWeeklyProgressEvidence_(identity,entry.weekId,evidenceSources.get(key));
     } catch(error) { evidence={state:'unavailable',message:'GitHub evidence could not be read. Use dashboard Refresh to retry.',commits:[]}; }
     evidenceMs += Date.now() - evidenceStarted;
@@ -106,7 +127,7 @@ function loadGuideWeeklyProgress_(timings) {
   if (timings) timings.push({phase:'entries_and_evidence',durationMs:Date.now() - entriesStarted,success:true,count:entries.length},
     {phase:'evidence_reads',durationMs:evidenceMs,success:true,count:evidenceSourceReads});
   // One windows read serves both the week list and the eligibility roll-up.
-  const windows = timedPhase_(timings,'weekly_windows',()=>getWeeklySubmissionWindows_());
+  const windows = timedPhase_(timings,'weekly_windows',()=>readWindows());
   const weeks = windows.filter(window=>entries.some(entry=>entry.weekId === window.weekId))
     .slice().sort((a,b)=>b.opens_at-a.opens_at).map(window=>window.weekId);
   const eligibility = timedPhase_(timings,'eligibility_read',()=>readProgressEligibility_());
