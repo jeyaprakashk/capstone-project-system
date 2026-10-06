@@ -192,12 +192,19 @@ function buildGuideCommitsDto_(teamId, setup, collected, collectionOk) {
 }
 
 function API_guide_getCommits(teamId) {
-  return apiHandle_(() => {
-    const email = guideAccessOrThrow_(), id = String(teamId || '');
-    const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-    if (!getSheetRows_(SHEET_NAMES.TEAM_STATUS).some(r => textEquals_(r[TS.TEAM_ID], id) && emailsMatch_(r[TS.GUIDE_EMAIL], email))) throw apiFail_('UNAUTHORIZED', 'You do not have access to this team.');
-    return buildGuideCommitsDto_(id, weeklyStoredGithubMapping_(id), readCollectedCommits_(id), readCommitCollectionStatus_(id) === 'ok');
-  });
+  const started = Date.now(), timings = [];
+  try {
+    return apiHandle_(() => withDashboardRead_(() => {
+      const email = timedPhase_(timings, 'access', () => guideAccessOrThrow_()), id = String(teamId || '');
+      const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+      if (!getSheetRows_(SHEET_NAMES.TEAM_STATUS).some(r => textEquals_(r[TS.TEAM_ID], id) && emailsMatch_(r[TS.GUIDE_EMAIL], email))) throw apiFail_('UNAUTHORIZED', 'You do not have access to this team.');
+      // The repository URL comes from the TeamStatus read this request already holds.
+      const setup = timedPhase_(timings, 'mapping', () => weeklyStoredGithubMapping_(id, undefined, getRepoUrlMap_()[normalizeText_(id)] || ''));
+      const commits = timedPhase_(timings, 'commits_read', () => readCollectedCommits_(id));
+      const collectionOk = timedPhase_(timings, 'collection_status', () => readCommitCollectionStatus_(id) === 'ok');
+      return buildGuideCommitsDto_(id, setup, commits, collectionOk);
+    }));
+  } finally { logPhases_('guide_phases', 'commits', timings, started); }
 }
 
 function API_guide_submitDecision(teamId, decision, notes, editedTitle) {

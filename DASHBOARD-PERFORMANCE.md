@@ -328,6 +328,8 @@ The response payload is unchanged. Phases contain names and durations only.
   `teams` (count only).
 - github (`API_guide_getGithub`, read after the dashboard renders): `access`, `github_setup`. Live GitHub
   calls live here so they never delay first paint.
+- commits (`API_guide_getCommits`, read when a team's GitHub tab is first shown): `access`, `mapping`
+  (includes the roster read), `commits_read`, `collection_status`.
 - weekly: `access`, `setup_and_signoffs`, `log_entries_read`, `entries_and_evidence` (includes
   `evidence_reads`, whose `count` is the number of per-student evidence sources built),
   `weekly_windows`, `eligibility_read`.
