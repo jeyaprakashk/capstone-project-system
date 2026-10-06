@@ -65,8 +65,10 @@ for(const views of COMBINATIONS) {
   complete.ui().showRoleTab('rubrics');
   assert.equal(activePanel(complete.document),'rubrics');
   assert(complete.calls.includes('API_shared_getTimeline')&&complete.calls.includes('API_shared_getRubrics'));
-  // The Review marking drawer that ReviewerView opens exists on the page.
+  // Modules the role views call at run time exist on the page: the Review marking drawer and the guide workspace.
   assert.equal(vm.runInContext('typeof ReviewEvaluations.open',complete.page),'function');
+  assert.equal(vm.runInContext('typeof GuideWeekly.load',complete.page),'function');
+  assert.equal(vm.runInContext('typeof GuideEvaluation.open',complete.page),'function');
   const coordinator=views.some(view=>view.key==='coord');
   assert.equal(!!complete.document.querySelector('[data-role-tab="system-status"]'),coordinator);
   if(coordinator) {

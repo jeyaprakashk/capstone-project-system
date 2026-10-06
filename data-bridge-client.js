@@ -112,5 +112,5 @@ const StudentGithub = (${studentGithubBrowser_.toString()})(DataBridge, () => Da
 const StudentResults = (${studentResultsViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentWeekly = (${studentWeeklyViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI, {weekly: StudentWeekly, results: StudentResults, github: StudentGithub});
-const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => typeof GuideWeekly === 'undefined' ? null : GuideWeekly);`;
+const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly);`;
 }
