@@ -593,11 +593,12 @@ function getTeamLogWeekSummary_(row, columns, logs, schedule, clock, shared) {
   if (registers.some(r=>!r) || new Set(registers.map(normalizeText_)).size !== registers.length) throw new Error('Student register numbers are missing or ambiguous.');
   // `shared` ({eligibility, windows}) lets a caller summarising many teams read each sheet once per request, not once per team or student.
   shared = shared || {};
-  const eligibility = shared.eligibility || (shared.eligibility = readProgressEligibility_());
+  // `shared.timings`, when present, receives one entry per one-time read below (names and durations only).
+  const eligibility = shared.eligibility || (shared.eligibility = timedPhase_(shared.timings,'summary_eligibility_read',()=>readProgressEligibility_()));
   const summaries = registers.map(regNo=>{
     const record = progressStudentEligibility_({regNo,teamId:row[columns.TEAM_ID]},eligibility,shared.windows);
-    const windows = shared.windows || (shared.windows = getWeeklySubmissionWindows_());
-    const timezone = shared.timezone || (shared.timezone = getSpreadsheet_().getSpreadsheetTimeZone());
+    const windows = shared.windows || (shared.windows = timedPhase_(shared.timings,'summary_windows_read',()=>getWeeklySubmissionWindows_()));
+    const timezone = shared.timezone || (shared.timezone = timedPhase_(shared.timings,'summary_timezone_read',()=>getSpreadsheet_().getSpreadsheetTimeZone()));
     return getLogWeekSummary_(logs,record.eligibleFrom ? record.enforcedFrom : '',regNo,clock && clock.now,windows,timezone);
   });
   const dueDates = summaries.filter(s=>s.firstMissingDue !== null).map(s=>s.firstMissingDue);

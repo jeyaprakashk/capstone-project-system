@@ -83,16 +83,17 @@ function loadGuideWeeklyProgress_(timings) {
   const logRecords = timedPhase_(timings,'log_entries_read',()=>readLogEntries_());
   // Each sheet is read once per request (once per team for team data), not once per student or entry. A failed read is
   // remembered, so every dependent student still gets the same unavailable evidence as before.
+  // Nested diagnostics: the evidence_* timings are included in evidence_reads, and evidence_mapping includes evidence_roster.
   const readWindows = memoizedRead_(()=>getWeeklySubmissionWindows_());
-  const readRoster = memoizedRead_(()=>weeklyStudents_());
-  const readRepoUrls = memoizedRead_(()=>getRepoUrlMap_());
+  const readRoster = memoizedRead_(()=>timedPhase_(timings,'evidence_roster',()=>weeklyStudents_()));
+  const readRepoUrls = memoizedRead_(()=>timedPhase_(timings,'evidence_repo_urls',()=>getRepoUrlMap_()));
   const teamReads = new Map();
   const teamRead = teamId=>{
     const key = normalizeText_(teamId);
     if (!teamReads.has(key)) teamReads.set(key,{
-      setup:memoizedRead_(()=>weeklyStoredGithubMapping_(teamId,readRoster(),readRepoUrls()[key] || '')),
-      commits:memoizedRead_(()=>readCollectedCommits_(teamId)),
-      collectionStatus:memoizedRead_(()=>readCommitCollectionStatus_(teamId))});
+      setup:memoizedRead_(()=>timedPhase_(timings,'evidence_mapping',()=>weeklyStoredGithubMapping_(teamId,readRoster(),readRepoUrls()[key] || ''))),
+      commits:memoizedRead_(()=>timedPhase_(timings,'evidence_commits',()=>readCollectedCommits_(teamId))),
+      collectionStatus:memoizedRead_(()=>timedPhase_(timings,'evidence_status',()=>readCommitCollectionStatus_(teamId)))});
     return teamReads.get(key);
   };
   const evidenceSource = identity=>{

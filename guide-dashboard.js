@@ -18,7 +18,7 @@ function getGuideDashboardData_(email, timings) {
     REVISE_AWAITING_STUDENT: 3, AWAITING_REVIEWER: 4, APPROVED: 5
   };
 
-  const sharedLogReads = {};
+  const sharedLogReads = {timings};
   const teams = timedPhase_(timings, 'team_log_summaries', () => myRows.map(r => ({ row: r, status: getTeamStatus_(r), repoUrl: repoUrlMap[normalizeText_(r[TS.TEAM_ID])] || '', logWeeks:getTeamLogWeekSummary_(r, TS, logsByTeam[normalizeText_(r[TS.TEAM_ID])] || [], schedule, clock, sharedLogReads) }))
     .sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]));
 
