@@ -4,7 +4,7 @@ const { loadSources } = require('./invariants/golden.cjs');
 const vm = require('node:vm');
 
 function bridge() {
-  const c = loadSources(['data-bridge-client.js'], { setTimeout, clearTimeout, Promise, JSON });
+  const c = loadSources(['data-bridge-client.js'], { setTimeout, clearTimeout, Promise, JSON, Date });
   return vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
 }
 const ok = data => JSON.stringify({ ok: true, data, generatedAt: '2026-01-01T00:00:00.000Z' });
@@ -96,4 +96,31 @@ test('fixture transport serves DTOs and function fixtures without a server', asy
   assert.deepEqual(JSON.parse(JSON.stringify(await b.call('list'))), { teams: [] });
   assert.deepEqual(JSON.parse(JSON.stringify(await b.call('echo', [7]))), { x: 7 });
   await assert.rejects(b.call('missing'), e => /No fixture/.test(e.message));
+});
+
+test('a prefetched read is taken over once by its consumer instead of being sent twice', async () => {
+  const b = bridge(), sent = [];
+  b.useTransport(async method => { sent.push(method); return ok(method + ' data'); });
+  b.prefetch('view', 'early', []);
+  assert.equal(await b.read('view', 'early', [], { prefetched: true }), 'early data');
+  assert.deepEqual(sent, ['early'], 'one request served both the prefetch and its consumer');
+  assert.equal(await b.read('view', 'early', [], { prefetched: true }), 'early data', 'a second read without a prefetch is a normal read');
+  assert.deepEqual(sent, ['early', 'early']);
+});
+
+test('a read that does not ask for the prefetch starts its own request, and an old or failed prefetch is not reused silently', async () => {
+  const b = bridge(), sent = [];
+  b.useTransport(async method => { sent.push(method); if (method === 'broken') return fail('UNAVAILABLE', 'down'); return ok('fresh'); });
+  b.prefetch('view', 'early', []);
+  assert.equal(await b.read('view', 'early', []), 'fresh');
+  assert.deepEqual(sent, ['early', 'early']);
+  b.prefetch('other', 'broken', []);
+  await assert.rejects(b.read('other', 'broken', [], { prefetched: true }), e => e.code === 'UNAVAILABLE', 'the consumer sees the prefetch failure');
+  const realNow = Date.now;
+  try {
+    b.prefetch('stale', 'early', []);
+    Date.now = () => realNow() + 61000;
+    assert.equal(await b.read('stale', 'early', [], { prefetched: true }), 'fresh');
+  } finally { Date.now = realNow; }
+  assert.equal(sent.filter(method => method === 'early').length, 4, 'the stale prefetch was ignored and a fresh read was sent');
 });

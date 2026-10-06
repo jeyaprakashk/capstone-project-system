@@ -5,9 +5,9 @@
  */
 function dataBridgeBrowser_() {
   'use strict';
-  const READ_TIMEOUT_MS = 30000;
+  const READ_TIMEOUT_MS = 30000, EARLY_READ_TTL_MS = 60000;
   let runnerFactory = null, transport = null;
-  const latest = Object.create(null), inFlightWrites = new Map();
+  const latest = Object.create(null), early = Object.create(null), inFlightWrites = new Map();
 
   class BridgeError extends Error {
     constructor(code, message) { super(message); this.name = 'BridgeError'; this.code = code; }
@@ -43,8 +43,26 @@ function dataBridgeBrowser_() {
     return Promise.race([send, timeout]).finally(function() { clearTimeout(timer); });
   }
 
+  /**
+   * Starts a read before the view that consumes it exists, so independent requests overlap instead of queueing.
+   * The consumer takes it over once with read(key, ..., {prefetched:true}); an unclaimed or old one is ignored.
+   */
+  function prefetch(key, method, args, options) {
+    const promise = read(key, method, args, options);
+    promise.catch(function() { /* The consumer handles the outcome; this only avoids an unhandled rejection. */ });
+    early[key] = {promise: promise, at: Date.now()};
+  }
+
+  function takeEarly(key) {
+    const entry = early[key];
+    delete early[key];
+    return entry && Date.now() - entry.at <= EARLY_READ_TTL_MS ? entry.promise : null;
+  }
+
   /** Read for a named view; a response superseded by a newer read of the same key is discarded. */
   function read(key, method, args, options) {
+    const taken = options && options.prefetched ? takeEarly(key) : null;
+    if (taken) return taken;
     const token = (latest[key] || 0) + 1;
     latest[key] = token;
     const superseded = function() { const error = new BridgeError('SUPERSEDED', 'A newer request replaced this one.'); error.superseded = true; return error; };
@@ -64,7 +82,7 @@ function dataBridgeBrowser_() {
 
   return {
     BridgeError: BridgeError,
-    call: call, read: read, write: write,
+    call: call, read: read, prefetch: prefetch, write: write,
     /** Use an instrumented Apps Script runner (same chaining as google.script.run). */
     useRunner: function(factory) { runnerFactory = factory; },
     /** Replace the transport, e.g. with fixtures: (method, args) => Promise<envelope string>. */

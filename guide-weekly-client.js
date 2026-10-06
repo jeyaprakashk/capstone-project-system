@@ -154,7 +154,7 @@ function guideWeeklyBrowser_(bridge) {
     node.busy=true;controls(node,true);
     const finish=DashboardUI.beginContentLoading(node.querySelector('[data-guide-weekly-read]'),'Reading weekly progress',{compact:true});
     const settle=()=>{finish();node.busy=false;node.attentionLoading=false;controls(node,false);};
-    bridge.read('guide-weekly','API_guide_getWeekly',[],{timeoutMs:60000}).then(data=>{
+    bridge.read('guide-weekly','API_guide_getWeekly',[],{timeoutMs:60000,prefetched:true}).then(data=>{
       settle();if(!current(node))return;
       if(node.dataset.guideWeeks) {
         data.weeks=JSON.parse(node.dataset.guideWeeks).filter(w=>w.opensAt<=new Date(data.checkedAt).getTime())

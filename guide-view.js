@@ -252,7 +252,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
       });
       syncCommits();
     };
-    bridge.read('guide-github', 'API_guide_getGithub', [], {timeoutMs:120000}).then(data => apply(data && data.teams), () => apply(null));
+    bridge.read('guide-github', 'API_guide_getGithub', [], {...GITHUB_READ, prefetched:true}).then(data => apply(data && data.teams), () => apply(null));
   }
 
   /** Commit history is read the first time a team's GitHub status tab is shown, never in the background. */
@@ -292,7 +292,19 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
     syncCommits();
   }
 
-  function load() { return bridge.read('role:guide', 'API_guide_getDashboard', [], {timeoutMs:120000}); }
+  /**
+   * The weekly and GitHub reads do not depend on the dashboard reply, so a normal load starts them with it and they
+   * overlap rather than queue behind first paint. GuideWeekly and loadGithub take them over (`prefetched`). A re-read
+   * after a saved decision passes `afterDecision` and gets fresh data from the consumers instead.
+   */
+  const WEEKLY_READ = {timeoutMs:60000}, GITHUB_READ = {timeoutMs:120000};
+  function load(afterDecision) {
+    if (afterDecision !== true && typeof bridge.prefetch === 'function') {
+      bridge.prefetch('guide-weekly', 'API_guide_getWeekly', [], WEEKLY_READ);
+      bridge.prefetch('guide-github', 'API_guide_getGithub', [], GITHUB_READ);
+    }
+    return bridge.read('role:guide', 'API_guide_getDashboard', [], {timeoutMs:120000});
+  }
 
   function setStatus(team, text) { const el = document.getElementById('status-' + team); if (el) el.textContent = text; }
   function cardButtons(team) { const card = document.getElementById('card-' + team); return card ? Array.from(card.querySelectorAll('button')) : []; }
@@ -306,7 +318,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly) {
     state.busyTeam = team;
     const done = getUi().busy.write(document.getElementById('status-' + team), 'Submitting…', cardButtons(team));
     bridge.write('API_guide_submitDecision', [team, decision, notes, editedTitle]).then(
-      () => load().then(dto => {
+      () => load(true).then(dto => {
         state.busyTeam = null; render(state.host, dto);
         const weekly = getWeekly(); if (weekly) weekly.load();
       }, error => { state.busyTeam = null; done('Refresh failed: ' + error.message); }),

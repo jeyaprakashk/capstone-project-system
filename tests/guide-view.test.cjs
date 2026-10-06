@@ -154,6 +154,26 @@ test('commit history waits for the GitHub card, then loads when its tab is shown
   assert.deepEqual(f.calls.reads, ['T1']);
 });
 
+test('a normal load starts the weekly and GitHub reads with the dashboard read; the consumers take them over without a second request', async () => {
+  const { dto, github } = firstPaintFromServer();
+  const f = setup(dto); f.s.github = github;
+  const sent = [];
+  const bridge = vm.runInContext('(' + f.c.dataBridgeBrowser_.toString() + ')()', f.c);
+  bridge.useTransport(async method => { sent.push(method); return JSON.stringify({ ok: true, data: method === 'API_guide_getGithub' ? github : method === 'API_guide_getDashboard' ? dto : { entries: [], weeks: [] } }); });
+  vm.runInContext('globalThis.__make2 = ' + f.c.guideViewBrowser_.toString(), f.c);
+  const view = f.c.__make2(bridge, () => f.ui, () => f.weekly);
+  const loaded = await view.load();
+  assert.deepEqual(sent.slice().sort(), ['API_guide_getDashboard', 'API_guide_getGithub', 'API_guide_getWeekly']);
+  view.render(f.host, loaded); await f.settle(); await f.settle();
+  assert.equal(sent.filter(method => method === 'API_guide_getGithub').length, 1, 'the card was filled from the early read');
+  assert.equal(f.host.querySelector('[data-github-loading]'), null);
+  assert.equal(await bridge.read('guide-weekly', 'API_guide_getWeekly', [], { prefetched: true }) !== undefined, true);
+  assert.equal(sent.filter(method => method === 'API_guide_getWeekly').length, 1, 'GuideWeekly takes the early read over');
+  sent.length = 0;
+  await view.load(true);
+  assert.deepEqual(sent, ['API_guide_getDashboard'], 'a re-read after a saved decision starts no early reads');
+});
+
 test('documents view lists links or reports that none were submitted', () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
   const docs = id => byAttr(f, 'data-guide-team', id).querySelector('[data-guide-view="documents"]');

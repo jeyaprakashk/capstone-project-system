@@ -114,7 +114,7 @@ test('Reviewer dashboard opens the shared Review UI directly for arbitrary asses
 });
 function fixture(system=false,shipped=false) {
  const loadingNode=()=>({attrs:{},children:[],inert:false,addEventListener(){},querySelector(){return null;},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},classList:{add(){},remove(){},toggle(){}},appendChild(node){this.children.push(node);node.remove=()=>{this.children=this.children.filter(child=>child!==node);};}});
- const requests=[], timers=new Map(), listeners={}; let id=0;
+ const requests=[], early=[], timers=new Map(), listeners={}; let id=0;
  const panels=['guide','reviewer','coord'].map(key=>({...loadingNode(),innerHTML:'',getAttribute:()=>key}));
  const systemContent={...loadingNode(),innerHTML:'',querySelectorAll:()=>[]};
  const systemMessage={textContent:''}, systemRefresh={disabled:false};
@@ -126,6 +126,8 @@ function fixture(system=false,shipped=false) {
   if(key==='API_coordinator_getSystemStatus')return requests.push({key:'loadCoordinatorSystemStatus',args,success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   const legacy={API_coordinator_getCommitteeConfiguration:'getCoordinatorCommitteeConfiguration_',API_coordinator_getReviewConfiguration:'getCoordinatorReviewConfiguration_',API_coordinator_createDefinitions:'createAssessmentDefinitions_',API_coordinator_prepareStorage:'prepareReviewAssessmentStorage_',API_coordinator_syncGithub:'syncCoordinatorGithubAccess_',API_coordinator_resendInvitations:'resendExpiredStudentInvitations_',API_shared_getTimeline:'loadSharedProjectTimeline_',API_shared_getRubrics:'loadSharedRubrics_',API_coordinator_getTeamDrawer:'loadCoordinatorDrawerSection_'}[key];
   if(legacy)return requests.push({key:legacy,args,success:value=>success(JSON.stringify({ok:true,data:value})),failure});
+  // The Guide role starts these two reads together with its dashboard read; they never block the role request.
+  if(key==='API_guide_getWeekly'||key==='API_guide_getGithub'){early.push(key);return Promise.resolve().then(()=>success(JSON.stringify({ok:true,data:null})));}
   const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getCore:'student',API_coordinator_getOverview:'coord'}[key];
   if(migrated)return requests.push({key:'loadDashboardRoleContent',args:[migrated],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   return requests.push({key,args,success,failure});}}); }
@@ -136,7 +138,7 @@ function fixture(system=false,shipped=false) {
  for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js','system-status-view.js','student-weekly-view.js','student-results-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=SystemStatusView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript_(),c);
  // Preloading ships disabled; the queue tests opt in so the machinery stays covered.
  if(!shipped)c.window.DashboardPerformance.preloading=true;
- return {c,requests,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>vm.runInContext('DashboardUI',c).showRoleTab(key),tick:()=>{ /* bridge read timeouts (30s+) are not part of idle/preload timing */ const entries=[...timers.entries()].filter(([,fn])=>!(fn.delay>=10000));entries.forEach(([key])=>timers.delete(key));entries.forEach(([,fn])=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
+ return {c,requests,early,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>vm.runInContext('DashboardUI',c).showRoleTab(key),tick:()=>{ /* bridge read timeouts (30s+) are not part of idle/preload timing */ const entries=[...timers.entries()].filter(([,fn])=>!(fn.delay>=10000));entries.forEach(([key])=>timers.delete(key));entries.forEach(([,fn])=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
 }
 
 test('common theme applies to all tabs immediately, cached content and late responses cannot change it',async()=>{
@@ -770,4 +772,14 @@ test('the student sidebar links slot follows the last menu item and only exists 
  assert.equal(nav.parentElement.tagName,'HEADER');assert.match(nav.className,/border-t/);assert.match(nav.className,/max-md|bottom-0/);
  assert.equal(page([{key:'guide',label:'Guide',contentId:'g'},{key:'student',label:'My Team',contentId:'s'}]).querySelector('#studentSideNav').hidden,true);
  assert.equal(page([{key:'guide',label:'Guide',contentId:'g'}]).querySelector('#studentSideNav'),null);
+});
+
+test('the Guide role starts its weekly and GitHub reads together with its dashboard read, and a refresh starts them again',async()=>{
+ const f=fixture();
+ f.click('guide');await f.settle();
+ assert.deepEqual(f.early,['API_guide_getWeekly','API_guide_getGithub']);
+ assert.equal(f.requests.filter(r=>r.key==='loadDashboardRoleContent').length,1,'the dashboard is still read once');
+ f.done('loadDashboardRoleContent','guide content');await f.settle();
+ f.click('reviewer');await f.settle();
+ assert.deepEqual(f.early,['API_guide_getWeekly','API_guide_getGithub'],'other roles start no Guide reads');
 });
