@@ -25,7 +25,9 @@ function getGuideDashboardData_(email, timings) {
   const counts = { NOT_SUBMITTED: 0, NEEDS_REVIEW: 0, REVISE_AWAITING_STUDENT: 0, AWAITING_REVIEWER: 0, APPROVED: 0, REJECTED_BY_GUIDE: 0 };
   teams.forEach(t => counts[t.status]++);
 
-  return { teams, counts, schedule, clock, windows:sharedLogReads.windows, ...readGuideRecordContext_(myRows, TS, timings) };
+  // The approval date and time are shown, and used for timing, only for approved teams; skip the second spreadsheet otherwise.
+  const approvals = teams.some(t => t.status === 'APPROVED');
+  return { teams, counts, schedule, clock, windows:sharedLogReads.windows, ...readGuideRecordContext_(myRows, TS, timings, {approvals}) };
 }
 
 function guideRecordDate_(value) {
@@ -33,12 +35,12 @@ function guideRecordDate_(value) {
   return date && Number.isFinite(date.getTime()) ? date.toLocaleString('en-GB',{timeZone:getSpreadsheet_().getSpreadsheetTimeZone(),day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
 }
 
-function readGuideRecordContext_(rows, TS, timings) {
+function readGuideRecordContext_(rows, TS, timings, options) {
   const approvals={},approvalTimes={},documentSubmissions={};
   const owned=new Map(rows.map(row=>[normalizeText_(row[TS.TEAM_ID]),row]));
   // The registry writer appends year, semester, team, guide, title, repo,
   // members, approval date and approving reviewer, in that order.
-  try {
+  if (!options || options.approvals !== false) try {
     timedPhase_(timings,'hub_registry',()=>readSheetRows_(getHubRegistrySheet_(),2)).forEach(record=>{
       const key=normalizeText_(record[2]),row=owned.get(key);
       if(!row || !textEquals_(record[0],getAcademicYear_()) || !textEquals_(record[1],row[TS.SEMESTER]) ||

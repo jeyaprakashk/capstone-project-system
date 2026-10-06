@@ -82,6 +82,19 @@ test('the GitHub endpoint reports every team unavailable, not an error, when Git
   assert(Object.values(frame.data.teams).length > 0 && Object.values(frame.data.teams).every(value => value === null));
 });
 
+test('the second (hub registry) spreadsheet is read only when one of the guide teams is approved', () => {
+  const read = g => { let reads = 0; g.c.getHubRegistrySheet_ = () => { reads++; return {}; }; const dto = JSON.parse(g.c.API_guide_getDashboard()).data; return { reads, dto }; };
+  const withApproved = read(guideFixture());
+  assert.equal(withApproved.reads, 1);
+  assert(withApproved.dto.teams.some(t => t.approval));
+  const g = guideFixture(), decision = g.ts.indexOf('Reviewer Decision');
+  g.f.status.rows.forEach((row, index) => { if (index) row[decision] = ''; });
+  const none = read(g);
+  assert.equal(none.reads, 0, 'no approved team, so no approval date is needed');
+  assert(none.dto.teams.every(t => t.approval === null));
+  assert.deepEqual(none.dto.teams.map(t => t.teamId).sort(), withApproved.dto.teams.map(t => t.teamId).sort());
+});
+
 test('guide commits DTO counts every collected commit per mapped member and skips the template bootstrap', () => {
   const { g } = build();
   const sha = n => String(n).padStart(40, 'a');
