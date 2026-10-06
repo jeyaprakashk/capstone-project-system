@@ -20,7 +20,6 @@ function context() {
   c.Utilities = { ...(c.Utilities || {}), DigestAlgorithm: { SHA_256: 'sha256' }, getUuid: () => crypto.randomUUID(),
     computeDigest: (algorithm, value) => Array.from(crypto.createHash(algorithm).update(value).digest()), base64EncodeWebSafe: bytes => Buffer.from(bytes).toString('base64url') };
   c.getCommitteeNumbersForReviewer_ = () => [];
-  c.getTeamDeadlineEvents_ = () => [];
   return { f, c };
 }
 

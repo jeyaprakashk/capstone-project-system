@@ -51,9 +51,7 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
       teams:o.teams.map(t => ({...t,
         reviews:Object.fromEntries(o.reviewColumns.map(c => [c.key, settled(state.reviews[c.key] ? state.reviews[c.key].teams : {}, t.teamId, reviewStatus(c.key))])),
         guideEvaluation:settled(g ? g.teams : {}, t.teamId, gs),
-        health:health ? (healthOf(t) ? healthOf(t).health : 'unavailable') : h === 'failed' ? 'unavailable' : 'loading',
-        pendingDeadlines:healthOf(t) ? healthOf(t).pendingDeadlines : []})),
-      deadlinePills:health ? health.deadlinePills : o.deadlinePills
+        health:health ? (healthOf(t) ? healthOf(t).health : 'unavailable') : h === 'failed' ? 'unavailable' : 'loading'}))
     };
   }
   const activityLabel = result => result.state === 'active' ? 'Logs / commit records this week' : result.state === 'not-started' ? 'Weekly logging has not started' : result.state === 'between' ? 'Next weekly window has not opened yet' : result.state === 'ended' ? 'Weekly logging has ended' : 'Activity unavailable: check project dates';
@@ -111,7 +109,6 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
       if (!search.includes(query)) return false;
       if (filter === 'attention') return t.health === 'attention';
       if (filter === 'ontrack') return t.health === 'ontrack';
-      if (filter.indexOf('deadline:') === 0) return t.pendingDeadlines.indexOf(filter.slice(9)) !== -1;
       return true;
     });
   }
@@ -182,8 +179,7 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
     const dto = effective(), teams = dto.teams, anyLoading = dto.healthStatus !== 'ready', failed = dto.healthStatus === 'failed';
     const count = (predicate, label) => anyLoading ? (failed ? 'Unavailable' : skeleton('Loading ' + label)) : teams.filter(predicate).length;
     const tab = (filter, html, disabled, title) => '<button type="button" class="border-0 rounded-md px-3 py-1.5 text-sm font-semibold text-ink-2 aria-pressed:bg-paper aria-pressed:text-primary aria-pressed:shadow-selected disabled:opacity-50" data-action="filter" data-filter="' + escape(filter) + '" aria-pressed="' + (state.filter === filter) + '"' + (disabled ? ' disabled' : '') + (title ? ' title="' + escape(title) + '"' : '') + '>' + html + '</button>';
-    return tab('all', 'All (' + teams.length + ')', false) + tab('attention', 'Attention (' + count(t => t.health === 'attention', 'attention count') + ')', anyLoading) + tab('ontrack', 'On Track (' + count(t => t.health === 'ontrack', 'on-track count') + ')', anyLoading) +
-      dto.deadlinePills.map(p => tab('deadline:' + p.key, escape(p.label) + ' (' + p.count + ')' + (p.overdue ? ' <span class="' + TONE.danger + '">Overdue</span>' : ''), false, 'Due ' + p.due)).join('');
+    return tab('all', 'All (' + teams.length + ')', false) + tab('attention', 'Attention (' + count(t => t.health === 'attention', 'attention count') + ')', anyLoading) + tab('ontrack', 'On Track (' + count(t => t.health === 'ontrack', 'on-track count') + ')', anyLoading);
   }
   function headMarkup(reviewColumns) {
     const sort = persistent.sort;
@@ -278,7 +274,7 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
     guide: () => ({read:readGuide, apply:dto => { state.guide = dto; state.guideError = null; refreshSections(); }, fail:error => { if (!state.guide) { state.guideError = error; refreshSections(); } }}),
     health: () => ({read:readHealth, apply:dto => {
       state.health = dto; state.healthError = null;
-      if (state.filter !== 'all' && !(state.filter.indexOf('deadline:') === 0 ? dto.deadlinePills.some(p => 'deadline:' + p.key === state.filter) : ['attention', 'ontrack'].includes(state.filter))) state.filter = 'all';
+      if (!['all', 'attention', 'ontrack'].includes(state.filter)) state.filter = 'all';
       refreshSections();
     }, fail:error => { if (!state.health) { state.healthError = error; refreshSections(); } }})
   };

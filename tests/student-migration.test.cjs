@@ -2,7 +2,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parseHTML } = require('linkedom');
-const { expectGolden } = require('./invariants/golden.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
 const { studentFixture, studentDto, SCENARIOS } = require('./student-fixture.cjs');
 
 const BADGE = { done: 'Done', waiting: 'Waiting', locked: 'Locked', active: 'Action needed' };
@@ -12,15 +13,10 @@ const MEMBER_TEXT = { missing: 'Submit GitHub Account', joined: 'Repository join
 function dtoFacts(dto) {
   const g = dto.github, t = dto.title;
   const titleBody = [];
-  if (t.locked) {
-    titleBody.push('Finish GitHub setup first.');
-    if (t.currentTitle) titleBody.push('Current title: ' + t.currentTitle, t.statusText);
-  } else {
-    titleBody.push(t.statusText);
-    if (t.currentTitle) titleBody.push('Current title: ' + t.currentTitle);
-    if (t.note) titleBody.push(t.note);
-    titleBody.push('Approval due ' + t.due.date + (t.due.overdue ? ' · Overdue' : ''));
-  }
+  titleBody.push(t.statusText);
+  if (t.currentTitle) titleBody.push('Current title: ' + t.currentTitle);
+  if (t.note) titleBody.push(t.note);
+  titleBody.push('Approval due ' + t.due.date + (t.due.overdue ? ' · Overdue' : ''));
   return {
     teamId: dto.teamId,
     roster: dto.roster.map(r => ({ initials: r.initials, name: r.name, regno: r.regno, you: r.isMe })),
@@ -79,11 +75,22 @@ function build(name, options) {
 }
 const normalize = facts => JSON.parse(JSON.stringify(facts));
 
-test('student DTO carries the same facts the server-rendered dashboard showed, in every state', () => {
+test('student DTO preserves legacy facts except the deliberately removed GitHub title prerequisite', () => {
   const frozen = {};
   for (const name of Object.keys(SCENARIOS)) frozen[name] = normalize(dtoFacts(build(name).dto));
-  // Captured from the legacy HTML (buildStudentContent) before it was removed; see git history.
-  expectGolden('student-legacy-facts', frozen);
+  // Keep the historical snapshot intact; explicitly describe the authorized workflow change.
+  const expected = JSON.parse(fs.readFileSync(path.join(__dirname, 'invariants/snapshots/student-legacy-facts.json'), 'utf8'));
+  for (const name of ['githubActive', 'githubWaiting']) {
+    expected[name].setup.pending = expected[name].setup.pending.map(text => text.replace('Finish GitHub setup first. ', ''));
+    expected[name].steps[1] = structuredClone(expected[name === 'githubActive' ? 'notSubmitted' : 'needsReview'].steps[1]);
+  }
+  assert.deepEqual(frozen, expected);
+  for (const name of Object.keys(SCENARIOS)) {
+    const dto = build(name).dto;
+    assert.equal(dto.title.locked, false, name);
+    assert.notEqual(dto.title.state, 'locked', name);
+    assert(dto.title.due, name);
+  }
 });
 
 test('assessment placeholders follow the configured definitions', () => {

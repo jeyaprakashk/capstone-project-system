@@ -70,9 +70,7 @@ function studentViewBrowser_(bridge, getUi, actions) {
   }
   function titleCard(dto) {
     const t = dto.title;
-    let body;
-    if (t.locked) body = p('Finish GitHub setup first.') + '<div class="mt-2"><button type="button" class="' + BUTTON + '" data-action="show-tab" data-tab="github">Open GitHub status</button></div>' + (t.currentTitle ? p('<strong>Current title:</strong> ' + escape(t.currentTitle)) + p(escape(t.statusText)) : '');
-    else body = p(escape(t.statusText)) + (t.currentTitle ? p('<strong>Current title:</strong> ' + escape(t.currentTitle)) : '') + (t.note ? p(escape(t.note)) : '') +
+    const body = p(escape(t.statusText)) + (t.currentTitle ? p('<strong>Current title:</strong> ' + escape(t.currentTitle)) : '') + (t.note ? p(escape(t.note)) : '') +
       p('Approval due ' + escape(t.due.date) + (t.due.overdue ? ' · Overdue' : ''), t.due.overdue ? 'text-danger' : 'text-ink-2');
     const cta = t.intake ? '<div class="mt-4"><a class="' + PRIMARY + ' inline-block no-underline" href="' + escape(safeUrl(t.intake.url)) + '" target="_blank" rel="noopener">' + escape(t.intake.label) + '</a></div>' : '';
     return stepCard('Project title', t.state, body, cta);

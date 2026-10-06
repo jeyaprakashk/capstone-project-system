@@ -1,7 +1,8 @@
 // Coordinator dashboard migration: the DTO must carry every fact the server-rendered stats and tracker showed.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { expectGolden } = require('./invariants/golden.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
 const { coordinatorFixture } = require('./coordinator-fixture.cjs');
 
 const text = n => n.textContent.replace(/\s+/g, ' ').trim();
@@ -43,15 +44,14 @@ function dtoFacts(dto) {
     filters: [
       { filter: 'all', text: 'All (' + dto.teams.length + ')', disabled: false },
       { filter: 'attention', text: 'Attention (' + (anyLoading ? LOADING : attention) + ')', disabled: anyLoading },
-      { filter: 'ontrack', text: 'On Track (' + (anyLoading ? LOADING : onTrack) + ')', disabled: anyLoading },
-      ...dto.deadlinePills.map(p => ({ filter: 'deadline:' + p.key, text: p.label + ' (' + p.count + ')' + (p.overdue ? ' Overdue' : ''), disabled: false, title: 'Due ' + p.due }))
+      { filter: 'ontrack', text: 'On Track (' + (anyLoading ? LOADING : onTrack) + ')', disabled: anyLoading }
     ],
     headers: ['Team', 'Guide', 'Repo', 'Title', 'Weekly Activity', ...dto.reviewColumns.map(r => r.label.replace(/^Review\s+(\d+)$/i, 'R$1')), 'Guide Eval', 'Health', 'Actions'],
     rows: dto.teams.map(t => {
       const health = t.health === 'loading' ? LOADING : HEALTH_LABEL[t.health] || 'Needs attention';
       const repoLabel = [t.repoStatus === 'ready' ? 'Repository URL recorded' : 'Pending', t.githubMessage, t.githubTiming, t.repoUrl ? 'Repository available' : ''].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' ? ');
       return {
-        teamId: t.teamId, search: [t.teamId, t.guide, ...t.registerNumbers].join(' ').toLowerCase(), deadlines: t.pendingDeadlines.join(' '), health: t.health, titleStatus: t.titleStatus, repoStatus: t.repoStatus,
+        teamId: t.teamId, search: [t.teamId, t.guide, ...t.registerNumbers].join(' ').toLowerCase(), health: t.health, titleStatus: t.titleStatus, repoStatus: t.repoStatus,
         team: t.teamId + (t.registerNumbers.length ? t.registerNumbers.join(', ') : '—'), guide: t.guide,
         repo: { text: t.repoStatus === 'ready' ? 'Ready' : 'Pending', label: repoLabel }, title: TITLE_BADGE[t.titleStatus] || 'Pending',
         activity: LOADING, reviews: dto.reviewColumns.map(r => t.health === 'loading' ? LOADING : completion(t.reviews[r.key])),
@@ -71,20 +71,29 @@ function progressFromSections(g) {
   return { ...overview, loading: false, partial: health.partial,
     stats: { ...overview.stats, needsAttention: health.needsAttention, guideEvaluation: { available: guide.available, completed: guide.completed },
       reviews: overview.stats.reviews.map(r => ({ ...r, completed: reviews[r.key].completed, unavailable: reviews[r.key].unavailable, known: true })) },
-    teams: overview.teams.map(t => ({ ...t, health: health.teams[t.teamId].health, pendingDeadlines: health.teams[t.teamId].pendingDeadlines, guideEvaluation: guide.teams[t.teamId],
-      reviews: Object.fromEntries(Object.keys(reviews).map(key => [key, reviews[key].teams[t.teamId]])) })),
-    deadlinePills: health.deadlinePills };
+    teams: overview.teams.map(t => ({ ...t, health: health.teams[t.teamId].health, guideEvaluation: guide.teams[t.teamId],
+      reviews: Object.fromEntries(Object.keys(reviews).map(key => [key, reviews[key].teams[t.teamId]])) })) };
 }
 function stage(g, name) {
   return { dto: name === 'overview' ? call(g, 'API_coordinator_getOverview') : progressFromSections(g) };
 }
 
-test('coordinator DTO carries the same facts the server-rendered stats and tracker showed', () => {
+test('coordinator DTO preserves legacy facts except the deliberately removed deadline alerts', () => {
   const frozen = {};
   for (const name of ['overview', 'progress']) frozen[name] = normalize(dtoFacts(stage(coordinatorFixture(), name).dto));
   frozen.noReviews = normalize(dtoFacts(stage(coordinatorFixture({ reviewsConfigured: false }), 'progress').dto));
-  // Captured from the legacy HTML (buildCoordinatorHeaderStats, buildTeamTrackerTable); see git history.
-  expectGolden('coordinator-legacy-facts', frozen);
+  // Keep the historical snapshot intact and explicitly remove only alert facts.
+  const expected = JSON.parse(fs.readFileSync(path.join(__dirname,'invariants/snapshots/coordinator-legacy-facts.json'),'utf8'));
+  for (const facts of Object.values(expected)) {
+    facts.filters = facts.filters.filter(item => !item.filter.startsWith('deadline:'));
+    facts.rows.forEach(row => { delete row.deadlines; });
+  }
+  assert.deepEqual(frozen,expected);
+  for (const name of ['overview','progress']) {
+    const dto = stage(coordinatorFixture(),name).dto;
+    assert.equal(Object.hasOwn(dto,'deadlinePills'),false);
+    assert(dto.teams.every(team => !Object.hasOwn(team,'pendingDeadlines')));
+  }
 });
 
 module.exports = { dtoFacts, stage, normalize };

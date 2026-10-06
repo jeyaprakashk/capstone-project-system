@@ -225,45 +225,6 @@ function githubSubmissionTiming_(setup, schedule, clock) {
   return day > schedule.git ? { state: 'late', text: 'All valid usernames submitted late.' } : { state: 'on-time', text: 'All valid usernames submitted on time.' };
 }
 
-/** Title intake requires accepted access; provisioning may still finish with invitations pending. */
-function githubAcceptedAccessMessage_(setup) {
-  if (!setup.usernamesComplete) return setup.message;
-  if (!setup.repoUrl) return 'Your team does not have a repository URL yet. Use Retry GitHub setup on the dashboard.';
-  if (!setup.repositoryAvailable) return setup.accessError || 'Your team repository could not be verified. Retry GitHub setup; contact your coordinator if this persists.';
-  if (setup.accessError || setup.members.some(member => member.access === 'unavailable' || member.access === 'unchecked')) {
-    return 'GitHub repository access could not be verified right now. Please try again later; contact your coordinator if this persists.';
-  }
-  const missing = setup.members.filter(member => member.access === 'missing');
-  const pending = setup.members.filter(member => member.access === 'invited');
-  const messages = [];
-  if (missing.length) messages.push('Required repository write access is missing for: ' + missing.map(member => member.label + ' (' + member.username + ')').join(', ') + '. Use Retry GitHub setup; contact your coordinator if access remains missing.');
-  if (pending.length) messages.push('Repository invitations must be accepted by: ' + pending.map(member => member.label + ' (' + member.username + ')').join(', ') + '. Sign in to the matching GitHub account and accept the invitation at ' + setup.repoUrl + '/invitations.');
-  return messages.join(' ') || (setup.members.length && setup.members.every(member => member.access === 'active')
-    ? '' : 'Every team member must have verified repository write access before submitting a title.');
-}
-
-function requireTeamGithubReady_(teamId, email, options) {
-  const setup = getTeamGithubSetup_(teamId);
-  if (!setup.members.some(member => emailsMatch_(member.email, email))) throw new Error('You are not a current member of this team.');
-  const message = options && options.requireAcceptedInvitations
-    ? githubAcceptedAccessMessage_(setup) : setup.ready ? '' : setup.message;
-  if (message) {
-    const error = new Error(message + ' Complete the GitHub step and submit again.');
-    // Only attach team recipients after authenticating the submitter's membership.
-    error.githubSetup = setup;
-    throw error;
-  }
-  return setup;
-}
-
-function notifyGithubIntakeRejection_(teamId, submitterEmail, error) {
-  const recipients = error.githubSetup
-    ? [...new Set(error.githubSetup.members.map(member => normalizeEmail_(member.email)).filter(Boolean))]
-    : [submitterEmail];
-  MailApp.sendEmail(recipients.join(','), `Title submission not applied — Team ${teamId}`,
-    error.message + '\n\nThe raw response was retained, but no title or approval records were changed. After resolving the issue, submit the title again.\n\nDashboard: ' + getDashboardUrl_());
-}
-
 function githubPermissionIdentityMatches_(body, expectedId) {
   return !expectedId || !(body && body.user && body.user.id != null) || githubAuthorMatches_(expectedId,body.user.id);
 }

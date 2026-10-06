@@ -28,7 +28,7 @@ function fixture(overrides = {}, runtime = {}) {
       return new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'short',year:'numeric'}).format(date);
     }}
   });
-  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js', 'busy-state.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','deadline-events.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','api-envelope.js','guide-api.js','student-api.js','coordinator-api.js','data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js','system-status-view.js','student-weekly-view.js','student-results-view.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','assessment-history-view.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
+  for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js', 'busy-state.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','api-envelope.js','guide-api.js','student-api.js','coordinator-api.js','data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js','system-status-view.js','student-weekly-view.js','student-results-view.js','data-bridge-client.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','assessment-history-view.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
   const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
@@ -69,26 +69,10 @@ test('guide evaluation tab uses configured opening in the schedule timezone',()=
  assert.match(missing.notice,/Guide Evaluation is not configured in AssessmentDefinitions/);
 });
 
-test('deadline pills open exactly five days before, stay overdue, and count only eligible incomplete teams',()=>{
+test('the hardcoded deadline event and alert builders are removed',()=>{
  const {c}=fixture();
- const events=[[{key:'custom-event',label:'Custom Pending',due:100,complete:false}],
-   [{key:'custom-event',label:'Custom Pending',due:110,complete:false}],
-   [{key:'custom-event',label:'Custom Pending',due:100,complete:true}]];
- assert.equal(c.buildDeadlinePills_(events,94).length,0);
- assert.equal(c.buildDeadlinePills_(events,95)[0].count,1);
- assert.equal(c.buildDeadlinePills_(events,100)[0].overdue,false);
- assert.equal(c.buildDeadlinePills_(events,101)[0].overdue,true);
- assert.equal(c.buildDeadlinePills_(events,105)[0].count,2);
- assert.equal(c.buildDeadlinePills_([[{key:'done',label:'Done',due:100,complete:true}]],105).length,0);
- assert.equal(c.buildDeadlinePills_([],105).length,0);
-});
-
-test('configured reviews automatically supply deadline pills in date order',()=>{
- const {c,schedule,clock}=fixture({reviewCount:3,review3:'30/11/2026'});
- const events=c.getTeamDeadlineEvents_([],{},'',[],{review1:{completed:false},review2:{completed:false},review3:{completed:false}},schedule,clock('2026-11-25'));
- const pills=c.buildDeadlinePills_([events],clock('2026-11-25').today);
- assert(pills.some(pill=>pill.key==='review3'));
- assert(pills.every((pill,i)=>i===0||pill.due>=pills[i-1].due));
+ assert.equal(c.getTeamDeadlineEvents_,undefined);
+ assert.equal(c.buildDeadlinePills_,undefined);
 });
 
 test('one and three configured reviews drive timeline, student marks and coordinator UI',()=>{
@@ -101,7 +85,7 @@ test('one and three configured reviews drive timeline, student marks and coordin
     f.c.Session={getActiveUser:()=>({getEmail:()=> 'student@example.com'})};
     assert.equal(f.c.loadStudentMarksSection,undefined); // Student results use authenticated publication snapshots only.
     const stats=Object.fromEntries(reviews.map(r=>[r.key,{completed:1,total:2,unavailable:0}]));
-    const dto=f.c.buildCoordinatorDto_({stats:{total:2,reviews:stats,reposReady:0,titleApproved:0,needsAttention:0,guideEvaluation:null},teamTrackerData:[],deadlinePills:[]});
+    const dto=f.c.buildCoordinatorDto_({stats:{total:2,reviews:stats,reposReady:0,titleApproved:0,needsAttention:0,guideEvaluation:null},teamTrackerData:[]});
     assert.equal(dto.reviewColumns.length,count);assert(dto.reviewColumns.some(r=>r.label==='Review '+count));assert(!dto.reviewColumns.some(r=>r.label==='Review '+(count+1)));
     if(count===3) {
       const status={REVIEWER_DECISION:0,S1_EMAIL:1,S1_REGNO:2};
@@ -127,32 +111,42 @@ test('DD/MM parsing, Date cells, invalid dates and missing config',()=>{
   assert(s.review2>s.end);
 });
 
-test('Monday strictly after title date, including a Monday title date',()=>{
-  for(const [title,expected] of [['16/09/2026','21 Sept 2026'],['20/09/2026','21 Sept 2026'],['21/09/2026','28 Sept 2026']]) {
-    const {c,schedule}=fixture({title:title});
-    assert.equal(c.formatProjectDay_(schedule.week1),expected);
+test('weekly logging starts from configured windows regardless of title date or report cutoff',()=>{
+  for(const title of ['16/09/2026','20/09/2026','21/09/2026','22/11/2026']) {
+    const {c,schedule}=fixture({title});
+    assert.equal(Object.hasOwn(schedule,'week1'),false);
+    const windows=c.getWeeklySubmissionWindows_();
+    assert.equal(c.formatProjectDay_(c.projectDay_(new Date(windows[0].opens_at),schedule.timezone)),'21 Sept 2026');
+    assert.equal(c.getSharedProjectTimelineData_().milestones.find(m=>m.key==='week1').date,'21 Sept 2026');
   }
+  assert.doesNotThrow(()=>fixture({title:'22/11/2026',report:'22/11/2026'}));
+  const {c,schedule}=fixture({report:'20/11/2026'});
+  assert.equal(c.getWeeklySubmissionWindows_().length,9);
+  assert.deepEqual(Object.keys(c.getProjectClock_(schedule)).sort(),['now','today']);
 });
 
-test('weeks start Monday, close Sunday and stop at project end',()=>{
-  const {clock}=fixture();
-  assert.equal(clock('2026-09-20').week,0);
-  assert.equal(clock('2026-09-21').week,1);
-  assert.equal(clock('2026-09-27').completedWeeks,0);
-  assert.equal(clock('2026-09-28').completedWeeks,1);
-  assert.equal(clock('2026-11-22').week,9);
-  assert.equal(clock('2026-11-22').completedWeeks,8);
-  assert.equal(clock('2026-11-23').completedWeeks,9);
-  assert.equal(clock('2026-11-23').active,false);
-  const partial=fixture({report:'20/11/2026'});
-  assert.equal(partial.clock('2026-11-21').completedWeeks,9);
-});
-
-test('timezone boundaries and future/invalid timestamps do not count',()=>{
+test('project clock preserves civil-day timezone boundaries without deriving logging weeks',()=>{
   const {c,schedule:s}=fixture();
   const before=c.getProjectClock_(s,new Date('2026-09-20T18:29:59Z'));
   const after=c.getProjectClock_(s,new Date('2026-09-20T18:30:00Z'));
-  assert.equal(before.active,false); assert.equal(after.week,1);
+  assert.equal(c.formatProjectDay_(before.today),'20 Sept 2026');
+  assert.equal(c.formatProjectDay_(after.today),'21 Sept 2026');
+  assert.equal(before.now.toISOString(),'2026-09-20T18:29:59.000Z');
+});
+
+test('timeline accepts non-Monday, irregular weekly windows without deriving boundaries',()=>{
+  const {c}=fixture({title:'22/11/2026'});
+  const windows=[
+    {weekId:'Sprint-A',opens_at:Date.parse('2026-09-15T10:00:00+05:30'),deadline_at:Date.parse('2026-09-18T16:00:00+05:30'),late_until:Date.parse('2026-09-19T16:00:00+05:30')},
+    {weekId:'Sprint-B',opens_at:Date.parse('2026-09-23T09:00:00+05:30'),deadline_at:Date.parse('2026-10-02T18:00:00+05:30'),late_until:Date.parse('2026-10-04T18:00:00+05:30')}
+  ];
+  const original=JSON.stringify(windows);
+  c.getWeeklySubmissionWindows_=()=>windows;
+  c.getProjectClock_=()=>({today:c.projectDay_('2026-09-24','Asia/Kolkata'),now:new Date('2026-09-24T12:00:00+05:30')});
+  const timeline=c.getSharedProjectTimelineData_();
+  assert.equal(timeline.milestones.find(m=>m.key==='week1').date,'15 Sept 2026');
+  assert.equal(timeline.week,'Sprint-B');assert.equal(timeline.active,true);
+  assert.equal(timeline.totalWeeks,2);assert.equal(JSON.stringify(windows),original);
 });
 
 test('missing logs use configured closed windows and effective student revisions',()=>{
@@ -255,7 +249,9 @@ test('coordinator statistics, attention list and tracker share one health result
   assert.equal(overview.stats.total,1);
   assert.equal(overview.teamTrackerData[0].health,'loading');
   assert.equal(overview.teamTrackerData[0].reviews.review1,'Loading…');
-  assert.equal(overview.teamTrackerData[0].deadlineEvents.length,0);
+  assert.equal(Object.hasOwn(overview.teamTrackerData[0],'deadlineEvents'),false);
+  assert.equal(Object.hasOwn(overview.teamTrackerData[0],'pendingDeadlines'),false);
+  assert.equal(Object.hasOwn(c.buildCoordinatorDto_(overview),'deadlinePills'),false);
   c.readActivityRows_=readActivity;c.getAllReviewCompletionStatus_=readReviews;
   c.getProjectSchedule_=()=>{throw Error('Missing review2');};
   c.getAllReviewCompletionStatus_=()=>{throw Error('Missing rubrics');};
@@ -281,7 +277,7 @@ test('coordinator endpoints authorize every request before reading protected dat
   c.console={log:value=>{try{logs.push(JSON.parse(value));}catch(e){}},error(){}};
   c.Session={getActiveUser:()=>({getEmail:()=>email})};
   c.activityIsCoordinator_=()=>allowed;
-  c.getCoordinatorDashboardData_=()=>{reads++;return {stats:{total:0,reviews:{},guideEvaluation:null},teamTrackerData:[],deadlinePills:[]};};
+  c.getCoordinatorDashboardData_=()=>{reads++;return {stats:{total:0,reviews:{},guideEvaluation:null},teamTrackerData:[]};};
   c.getCoordinatorTeamDetails_=()=>{reads++;return {};};
   c.loadAllTeamsWeeklyActivity_=()=>{reads++;return {state:'active',teams:{}};};
   c.buildSystemStatusDto_=()=>{reads++;return {github:{},publishing:{configured:false,items:[]}};};
@@ -308,8 +304,6 @@ test('unavailable reviews do not produce overdue review alerts or on-track healt
   c.getTeamLogWeekSummary_=()=>({missing:0,currentLogged:true});
   const health=c.assessProjectTeam_(row,columns,'repo',[],reviews,schedule,now);
   assert(!health.issue.includes('marks overdue'));
-  const events=c.getTeamDeadlineEvents_(row,columns,'repo',[],reviews,schedule,now);
-  assert(!events.some(event=>event.key==='review1'));
   row[1]='student@example.com';columns.S1_EMAIL=1;
   assert.equal(c.assessProjectTeam_(row,columns,'repo',[],reviews,schedule,now).health,'monitor');
 });
@@ -353,7 +347,9 @@ test('each schedule request reads live Milestones without accessing shared cache
   first.milestoneRows.find(row=>row[0]==='title')[2]='21/09/2026';
   const next=fixture({}, {cache,properties:first.properties,milestoneRows:first.milestoneRows});
   assert.equal(first.reads(),1);assert.equal(next.reads(),1);
-  assert.equal(next.c.formatProjectDay_(next.schedule.week1),'28 Sept 2026');
+  assert.equal(next.c.formatProjectDay_(next.schedule.title),'21 Sept 2026');
+  assert.equal(Object.hasOwn(next.schedule,'week1'),false);
+  assert.equal(next.c.getSharedProjectTimelineData_().milestones.find(m=>m.key==='week1').date,'21 Sept 2026');
   next.c.getProjectSchedule_();assert.equal(next.reads(),1);
 });
 
@@ -616,7 +612,7 @@ test('the legacy role route is gone; the overview endpoint reads no marks or log
   assert.equal(typeof c.loadDashboardRoleContent,'undefined');
   c.activityIsCoordinator_=()=>true;
   c.console={log(){},error(){}};
-  c.getCoordinatorDashboardData_=(defer)=>{if(!defer)throw Error('Overview must not aggregate progress');return {stats:{loading:true,total:0,reviews:{},guideEvaluation:null},teamTrackerData:[],deadlinePills:[]};};
+  c.getCoordinatorDashboardData_=(defer)=>{if(!defer)throw Error('Overview must not aggregate progress');return {stats:{loading:true,total:0,reviews:{},guideEvaluation:null},teamTrackerData:[]};};
   assert.equal(JSON.parse(c.API_coordinator_getOverview()).data.loading,true);
 });
 

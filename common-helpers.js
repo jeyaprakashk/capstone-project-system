@@ -511,8 +511,6 @@ let projectScheduleExecution_ = null;
 const PROJECT_DAY_MS_ = 86400000;
 function validateProjectSchedule_(schedule) {
   if (schedule.start > schedule.end || schedule.title > schedule.end) throw new Error('Milestones start/title must be on or before report submission.');
-  const weekday = new Date(schedule.title * PROJECT_DAY_MS_).getUTCDay();
-  if (schedule.week1 !== schedule.title + ((8 - weekday) % 7 || 7) || schedule.week1 > schedule.end) throw new Error('Report submission must allow at least one logging week after title approval.');
 }
 
 function projectDay_(value, timezone, key) {
@@ -550,8 +548,6 @@ function getProjectSchedule_() {
   });
   schedule.end = schedule.report;
   [...milestones,...assessments].forEach(item=>{ schedule[item.key] = item.day; });
-  const weekday = new Date(schedule.title * PROJECT_DAY_MS_).getUTCDay();
-  schedule.week1 = schedule.title + ((8 - weekday) % 7 || 7);
   validateProjectSchedule_(schedule);
   return (projectScheduleExecution_ = Object.freeze(schedule));
 }
@@ -564,11 +560,7 @@ function getProjectClock_(schedule, now) {
   schedule = schedule || getProjectSchedule_();
   now = now || new Date();
   const today = projectDay_(now, schedule.timezone);
-  const active = today >= schedule.week1 && today <= schedule.end;
-  const week = today < schedule.week1 ? 0 : Math.floor((Math.min(today, schedule.end) - schedule.week1) / 7) + 1;
-  const start = schedule.week1 + Math.max(0, week - 1) * 7;
-  return { today, now, active, week, start, end:Math.min(start + 6, schedule.end),
-    completedWeeks:today > schedule.end ? Math.ceil((schedule.end - schedule.week1 + 1) / 7) : Math.max(0, Math.floor((today - schedule.week1) / 7)) };
+  return { today, now };
 }
 
 /** `knownWindows` and `knownTimezone` let a caller that already read them in this request share them. */

@@ -187,8 +187,7 @@ test('filters, search and reset narrow the tracker; a vanished filter falls back
   const filter = name => f.click(f.host.querySelector('[data-filter="' + name + '"]'));
   filter('attention'); assert.deepEqual(rowIds(f).sort(), ['T2', 'T3', 'T4', 'T5']);
   filter('ontrack'); assert.deepEqual(rowIds(f), []); assert.match(norm(f.host.querySelector('#trackerBody')), /No teams match your search/);
-  filter('deadline:weekly-logs'); assert.deepEqual(rowIds(f), ['T1']);
-  assert.equal(f.host.querySelector('[data-filter="deadline:weekly-logs"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(f.host.querySelector('[data-filter^="deadline:"]'),null);
   filter('all');
   const box = f.host.querySelector('#trackerSearch');
   for (const [query, expected] of [['dr. c', ['T3']], ['005', ['T4']], ['t5', ['T5']], ['zzz', []]]) { box.value = query; f.fire(box, 'input'); assert.deepEqual(rowIds(f), expected, query); }
@@ -260,7 +259,6 @@ test('escapes every interpolated value, emits no inline handlers and uses only c
   const evil = '<img src=x onerror=alert(1)>"\'&';
   const bad = JSON.parse(JSON.stringify(sections()));
   Object.assign(bad.overview.teams[0], { teamId: evil, guide: evil, title: evil, registerNumbers: [evil], repoUrl: 'javascript:alert(1)', githubMessage: evil });
-  bad.health.deadlinePills = [{ key: evil, label: evil, count: 1, due: evil, overdue: true }];
   const f = setup({ data: bad }); await f.start();
   assert.equal(f.host.querySelectorAll('img').length, 0);
   assert.deepEqual(Array.from(f.host.querySelectorAll('*')).flatMap(n => Array.from(n.attributes).map(a => a.name)).filter(name => /^on/i.test(name)), []);

@@ -31,11 +31,6 @@ function onTeamIntakeSubmit(e) {
   const needAnalysisLink = driveFileUrl_(nv('Need Analysis Report'));
 
   const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  try { requireTeamGithubReady_(teamId, submitterEmail, { requireAcceptedInvitations: true }); }
-  catch (err) {
-    notifyGithubIntakeRejection_(teamId, submitterEmail, err);
-    return;
-  }
   const statusSheet = getSheet_(SHEET_NAMES.TEAM_STATUS);
   const statusRow = findTeamStatusRow_(statusSheet, teamId, TS);
 

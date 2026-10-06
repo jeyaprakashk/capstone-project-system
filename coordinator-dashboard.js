@@ -87,7 +87,6 @@ function getCoordinatorDashboardData_(deferAssessments, timings) {
       reviewCompletion[teamId] || {};
     const rosterRow = rosterByTeamId[normalizeText_(r[TS.TEAM_ID])] ? rosterByTeamId[normalizeText_(r[TS.TEAM_ID])][0] : null;
     const guide = rosterRow ? rosterRow[TR.GUIDE_NAME] : '—';
-    const deadlineEvents = deferAssessments ? [] : getTeamDeadlineEvents_(r, TS, repoUrlMap[teamId], logsByTeam[teamId] || [], teamReview, schedule, clock, logSummaryByTeam[teamId], githubByTeam[teamId]);
 
     return {
       teamId: r[TS.TEAM_ID],
@@ -100,8 +99,6 @@ function getCoordinatorDashboardData_(deferAssessments, timings) {
       githubMessage: githubByTeam[teamId].message,
       githubTiming: '',
       repoUrl: repoUrlMap[normalizeText_(r[TS.TEAM_ID])],
-      deadlineEvents,
-      pendingDeadlines:deadlineEvents.filter(event => !event.complete && clock && clock.today >= event.due - DEADLINE_PILL_LEAD_DAYS_).map(event => event.key),
       guideEvaluation:deferAssessments ? 'Loading…' : !guideEvaluation.available ? 'Unavailable' : guideEvaluation.teams[teamId] ? 'Completed' : 'Pending',
       reviews:Object.fromEntries(reviews.map(review => [review.key, deferAssessments ? 'Loading…' : !teamReview[review.key] || teamReview[review.key].available === false ? 'Unavailable' : teamReview[review.key].completed ? 'Completed' : 'Pending'])),
       health: healthByTeam[normalizeText_(r[TS.TEAM_ID])].health,
@@ -110,8 +107,7 @@ function getCoordinatorDashboardData_(deferAssessments, timings) {
 
   const result = {
     stats: { loading:!!deferAssessments, total, titleApproved, reposReady, reviews:reviewStats, needsAttention, guideEvaluation },
-    teamTrackerData,
-    deadlinePills:buildDeadlinePills_(teamTrackerData.map(team => team.deadlineEvents), clock ? clock.today : null)
+    teamTrackerData
   };
   if (timings) {
     const measuredMs = timings.reduce((sum, item) => sum + item.durationMs, 0);

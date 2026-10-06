@@ -1,6 +1,6 @@
 /**
  * STUDENT DASHBOARD API — JSON only. See DATA-CONTRACTS.md.
- * Same data, gating and authorization as the previous server-rendered dashboard.
+ * Title actions follow approval status independently of GitHub setup.
  */
 function studentGithubDto_(d, email) {
   const account = d.githubAccount || {};
@@ -24,17 +24,17 @@ function studentGithubDto_(d, email) {
   };
 }
 
-function studentTitleDto_(d, teamId, githubDone, titleApproved) {
+function studentTitleDto_(d, teamId, titleApproved) {
   const label = STUDENT_TITLE_LABEL[d.titleStatus];
   const active = label.state === 'active';
   return {
-    locked:!githubDone,
-    state:githubDone ? label.state : 'locked',
+    locked:false,
+    state:label.state,
     statusText:label.text,
     currentTitle:String(d.title || ''),
-    note:githubDone ? String(d.note || '') : '',
-    intake:githubDone && active ? {url:buildTeamIntakeLink_(teamId), label:d.title ? 'Resubmit title' : 'Submit title'} : null,
-    due:githubDone ? {date:formatProjectDay_(d.schedule.title), overdue:!titleApproved && d.clock.today > d.schedule.title} : null
+    note:String(d.note || ''),
+    intake:active ? {url:buildTeamIntakeLink_(teamId), label:d.title ? 'Resubmit title' : 'Submit title'} : null,
+    due:{date:formatProjectDay_(d.schedule.title), overdue:!titleApproved && d.clock.today > d.schedule.title}
   };
 }
 
@@ -58,13 +58,13 @@ function buildStudentProjectDto_(email, teamId, d) {
   const pendingSteps = [];
   if (!githubDone) pendingSteps.push('Step 1: ' + d.githubText);
   if (!titleApproved) {
-    pendingSteps.push('Step 2: ' + label.text + '. ' + (!githubDone ? 'Finish GitHub setup first. ' : '') +
+    pendingSteps.push('Step 2: ' + label.text + '. ' +
       (label.state === 'active' ? (d.title ? 'Your team must address the feedback below and resubmit the title.' : 'Your team must submit a project title for approval.') : 'Your team is waiting for approval; check the review status below.'));
   }
   return {
     setup:{complete:githubDone && titleApproved, pendingSteps},
     github:studentGithubDto_(d, email),
-    title:studentTitleDto_(d, teamId, githubDone, titleApproved)
+    title:studentTitleDto_(d, teamId, titleApproved)
   };
 }
 

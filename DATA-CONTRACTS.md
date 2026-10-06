@@ -30,7 +30,7 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_coordinator_getOverview()` | Coordinator | none | `CoordinatorDashboard` (below) with `loading:true`; assessment values are not read yet | `buildCoordinatorContent`, `loadCoordinatorSection` (removed) |
 | `API_coordinator_getReviewProgress(key)` | Coordinator | `key` is a configured Review key | `{key, label, total, completed, unavailable, teams:{<teamId>:'Completed'\|'Pending'\|'Unavailable'}}`; rejected for an unknown key | the Review completion read |
 | `API_coordinator_getGuideProgress()` | Coordinator | none | `{available, completed, teams:{<teamId>:'Completed'\|'Pending'\|'Unavailable'}}` | the Guide Evaluation completion read |
-| `API_coordinator_getHealth()` | Coordinator | none | `{needsAttention, partial, teams:{<teamId>:{health, pendingDeadlines}}, deadlinePills}` | the health and deadline read |
+| `API_coordinator_getHealth()` | Coordinator | none | `{needsAttention, partial, teams:{<teamId>:{health}}}` | the health read |
 | `API_coordinator_getActivity()` | Coordinator | none | `{state (`active`, `between` weeks, `not-started`, `ended`, `unavailable`), week, checkedAt, teams:{<teamId lower-case>:{logs,commits}}, totalTeams, activeTeams}` | `loadAllTeamsWeeklyActivity_` (wrapped) |
 | `API_coordinator_getSystemStatus()` | Coordinator | none | `SystemStatus` (below) | `loadCoordinatorSystemStatus` (removed) |
 | `API_student_getWeekly()` / `API_student_submitWeekly(input)` | Student | input: `{requestId, weekId, workCompleted, guideDiscussion, blockers, nextAction}` | the existing weekly-progress object (`ready, weeks, actions, history, evidence, allWeeks, timezone, checkedAt …`) / `{ok, entryId, weekId, entryStatus, timeliness, firstSubmittedAt, message}` | `loadStudentWeeklyProgress_` / `submitWeeklyProgress_` called directly |
@@ -88,8 +88,7 @@ Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invaria
   reviewColumns:[{key,label}], reviewConfigurationError:boolean, partial:boolean,
   teams:[{ teamId, guide, title, titleStatus, repoStatus:'ready'|'pending', githubMessage, githubTiming, repoUrl,
            registerNumbers:[string], emailRecipients:[string], health:'ontrack'|'monitor'|'attention'|'loading',
-           pendingDeadlines:[key], guideEvaluation:string, reviews:{<key>:'Completed'|'Pending'|'Unavailable'|'Loading…'} }],
-  deadlinePills:[{key,label,count,due:string,overdue:boolean}] }
+           guideEvaluation:string, reviews:{<key>:'Completed'|'Pending'|'Unavailable'|'Loading…'} }] }
 ```
 
 The overview renders first. Then one `getReviewProgress` per `reviewColumns` entry, `getGuideProgress`, `getHealth` and weekly
@@ -97,7 +96,14 @@ activity run in parallel and settle independently: each fills only its own card 
 timeout is isolated to that section, with its own message and Retry. Percentages, tones and badge labels are derived in the view.
 The team drawer is rendered by `TeamDrawerView` (three sections read independently; each fails and retries on its own); DashboardUI only opens, closes and focuses it. Contract tests: `tests/coordinator-migration.test.cjs`
 (snapshot `tests/invariants/snapshots/coordinator-legacy-facts.json`, captured from the removed HTML for the overview,
-progress and no-reviews cases).
+progress and no-reviews cases, with explicit expectations for the removed deadline alerts).
+
+The tracker offers All, Attention and On Track filters. Deadline alert pills and
+per-team pending deadline keys have been removed; team-health assessment remains separate.
+
+The shared timeline schedule contains configured milestone and assessment dates,
+without a derived `week1` field. Logging start, current week and week count come
+from `WeeklyWindows`, independently of the title deadline.
 
 ### SystemStatus
 
@@ -153,8 +159,8 @@ The browser loads the student dashboard in two parts: `API_student_getCore` firs
   github:{ state:'done'|'waiting'|'active'|'locked', text, connected:boolean, captureReady:boolean,
            due:string, statusText, repoUrl,
            members:[{regno, status:'missing'|'joined'|'pending', canConnect:boolean, isMe:boolean}] },  // canConnect: this student, not yet connected; isMe: this student's own row
-  title:{ locked:boolean, state:'locked'|'active'|'waiting'|'done', statusText, currentTitle, note,
-          intake:{url,label}|null, due:{date,overdue}|null },
+  title:{ locked:false, state:'active'|'waiting'|'done', statusText, currentTitle, note,
+          intake:{url,label}|null, due:{date,overdue} },         // independent of GitHub setup; intake follows title status
   assessments:{ reviews:[{key,label}], guideEvaluationLabel } }
 ```
 
@@ -162,7 +168,7 @@ The view lays the DTO out as five screens (Weeks, Assessments, Title, GitHub, Te
 placeholders in the view (`#studentWeeklyProgress`, `#studentAssessment-<key>`,
 `#studentGuideEvaluation`, `#studentGithubProfile`); the GitHub connection uses the endpoints above through the bridge.
 Contract tests: `tests/student-migration.test.cjs` (snapshot `tests/invariants/snapshots/student-legacy-facts.json`,
-captured from the removed HTML for eight states).
+captured from the removed HTML for eight states, with explicit expectations for the removed GitHub title prerequisite).
 
 ### GuideDashboard
 

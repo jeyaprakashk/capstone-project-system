@@ -68,17 +68,24 @@ test('Title and GitHub each show one step card; pending setup is listed on GitHu
   }
   const waiting = (await setup(dtoFor('githubWaiting')));
   assert.match(norm(waiting.host.querySelector('[data-setup-pending]')), /Step 1: Repository invitations must be accepted\./);
-  assert.match(norm(waiting.host.querySelector('[data-setup-pending]')), /Finish GitHub setup first\./);
+  assert.doesNotMatch(norm(waiting.host.querySelector('[data-setup-pending]')), /Finish GitHub setup first\./);
 });
 
-test('a locked title card offers a jump back to GitHub', async () => {
-  const f = (await setup(dtoFor('githubWaiting'))), title = f.host.querySelector('[data-student-panel="title"]');
-  assert.match(norm(title), /Finish GitHub setup first\./);
-  f.click(title.querySelector('[data-action="show-tab"]'));
-  assert.deepEqual(Array.from(f.host.querySelectorAll('[data-student-panel]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel')), ['github']);
-  assert.equal(f.document.querySelector('#studentSideNav [aria-current="page"]').getAttribute('data-student-tab'), 'github');
-  const open = (await setup(dtoFor('needsReview'))).host.querySelector('[data-student-panel="title"]');
-  assert.equal(open.querySelector('[data-action="show-tab"]'), null);
+test('title submission and status remain available before GitHub setup is complete', async () => {
+  for (const name of ['githubActive', 'githubWaiting']) {
+    const f = await setup(dtoFor(name)), title = f.host.querySelector('[data-student-panel="title"]');
+    assert.doesNotMatch(norm(title), /Finish GitHub setup first|Locked/);
+    assert.equal(title.querySelector('[data-action="show-tab"]'), null);
+    assert.match(norm(title), /Approval due/);
+    const action = title.querySelector('a[target="_blank"]');
+    if (name === 'githubActive') {
+      assert.equal(action.getAttribute('href'), 'https://forms.example/intake?team=T1');
+      assert.equal(norm(action), 'Submit title');
+    } else {
+      assert.equal(action, null);
+      assert.match(norm(title), /awaiting your guide/);
+    }
+  }
 });
 
 test('the team heading and roster live only on the Team screen, which needs no fetch', async () => {

@@ -23,7 +23,6 @@ function coordinatorTeamDto_(team, reviews) {
     registerNumbers:(team.registerNumbers || []).map(String),
     emailRecipients:(team.emailRecipients || []).map(String),
     health:String(team.health || ''),
-    pendingDeadlines:(team.pendingDeadlines || []).map(String),
     guideEvaluation:String(team.guideEvaluation || ''),
     reviews:Object.fromEntries(reviews.map(review => [review.key, String(team.reviews[review.key] || 'Unavailable')]))
   };
@@ -47,8 +46,7 @@ function buildCoordinatorDto_(data) {
     reviewColumns:reviews.map(review => ({key:String(review.key), label:String(review.label)})),
     reviewConfigurationError,
     partial:Object.values(stats.reviews || {}).some(review => review.unavailable),
-    teams:data.teamTrackerData.map(team => coordinatorTeamDto_(team, reviews)),
-    deadlinePills:data.deadlinePills.map(pill => ({key:String(pill.key), label:String(pill.label), count:pill.count, due:formatProjectDay_(pill.due), overdue:!!pill.overdue}))
+    teams:data.teamTrackerData.map(team => coordinatorTeamDto_(team, reviews))
   };
 }
 
@@ -99,8 +97,7 @@ function buildHealthDto_(data) {
   return {
     needsAttention:dto.stats.needsAttention,
     partial:dto.partial,
-    teams:Object.fromEntries(dto.teams.map(team => [team.teamId, {health:team.health, pendingDeadlines:team.pendingDeadlines}])),
-    deadlinePills:dto.deadlinePills
+    teams:Object.fromEntries(dto.teams.map(team => [team.teamId, {health:team.health}]))
   };
 }
 

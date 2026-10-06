@@ -136,8 +136,10 @@ Status also retains its explicit Refresh control.
 Graded By must be `Not Applicable`, with blank or zero weight. Graded rows are
 rejected with a configuration message; they never discover or configure assessments.
 Required schedule IDs remain `formation`, `start`, `title`, and `report`.
-Logging starts on the first Monday strictly after title approval and ends on report
-submission. Dates accept Sheets date cells, DD/MM/YYYY or YYYY-MM-DD.
+Logging periods come exclusively from the configured `WeeklyWindows` opening,
+deadline and late cutoff timestamps. The title deadline and report date do not
+derive or truncate those periods. Milestone dates accept Sheets date cells,
+DD/MM/YYYY or YYYY-MM-DD.
 
 `AssessmentDefinitions` is the sole authority for graded assessments. Coordinator
 System Status can create its ten-column schema without academic rows. The

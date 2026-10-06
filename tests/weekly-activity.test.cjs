@@ -16,7 +16,7 @@ function fixture() {
   SHEET_NAMES:{TEAM_STATUS:'teams',LOG_ENTRIES:'logs',COMMITS:'commits',GITHUB_ACCOUNTS:'usernames'},FIELD_DEFINITIONS:{TEAM_STATUS:{}},
   getColumnMap_:()=>columns,getSheet_:()=>({getLastColumn:()=>5}),getSheetRows_:name=>{calls.push(['all',name]);return rows[name];},
   withDashboardRead_:fn=>fn(),Session:{getActiveUser:()=>({getEmail:()=>user})},getCoordinatorEmail_:()=> 'coord@x',getConfig_:()=> 'pd@x',getCommitteeNumbersForReviewer_:()=>[],
-  getWeeklySubmissionWindows_:()=>[{weekId:'W1',opens_at:10,deadline_at:11,late_until:12}],getEffectiveLogEntries_:records=>[...new Map(records.map(r=>[r.regNo+':'+r.weekId,r])).values()],getProjectSchedule_:()=>({week1:10}),getProjectClock_:()=>({active,today:active?10:9,week:active?1:0,now:new Date(active?10:9)}),isCurrentProjectWeek_:date=>date===10
+  getWeeklySubmissionWindows_:()=>[{weekId:'W1',opens_at:10,deadline_at:11,late_until:12}],getEffectiveLogEntries_:records=>[...new Map(records.map(r=>[r.regNo+':'+r.weekId,r])).values()],getProjectSchedule_:()=>({}),getProjectClock_:()=>({today:active?10:9,now:new Date(active?10:9)}),isCurrentProjectWeek_:date=>date===10
  });
  vm.runInContext(fs.readFileSync('github-identity.js','utf8'),c);
  c.githubAccountColumns_=()=>({ID:4,NAME:5,URL:6});

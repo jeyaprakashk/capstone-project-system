@@ -67,9 +67,10 @@ rows are written. Commit rows and IDs are written together. No auxiliary journal
 is required. Only matching positive student and author IDs count, regardless of
 username changes, commit author names, emails or system display labels.
 
-Provisioning and accepted-invitation/title gates, weekly-log policy, assessments,
-deadlines and institutional authentication remain unchanged. Repository ownership
-comes from TeamStatus; timestamps remain in the account sheet.
+Title submission and approval are independent of GitHub registration, repository
+write access and invitation acceptance. Students submit titles for guide approval,
+then reviewer approval. Repository ownership comes from TeamStatus; timestamps
+remain in the account sheet.
 See [Weekly progress](WEEKLY-PROGRESS.md) for its normal configuration and policies.
 
 ### Normal deployment

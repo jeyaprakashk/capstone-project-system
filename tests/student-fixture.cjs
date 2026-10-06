@@ -16,7 +16,7 @@ const SCENARIOS = {
 
 function studentFixture(name = 'approved', { review = true } = {}) {
   const s = SCENARIOS[name], f = weeklyFixture(), c = f.c;
-  for (const file of ['milestone-config.js', 'assessment-registry.js', 'rubric-config.js', 'deadline-events.js', 'lucide-icons.js', 'icon-renderer.js', 'student-dashboard.js', 'student-github.js',
+  for (const file of ['milestone-config.js', 'assessment-registry.js', 'rubric-config.js', 'lucide-icons.js', 'icon-renderer.js', 'student-dashboard.js', 'student-github.js',
     'assessment-history-view.js','dashboard-client-scripts.js', 'api-envelope.js', 'student-api.js', 'common-styles.js', 'busy-state.js']) vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
   const day = Math.floor(Date.parse('2026-01-10') / 86400000);
   c.getProjectSchedule_ = () => ({ title: day, git: day - 2, timezone: 'Asia/Kolkata', assessments: [], milestones: [] });

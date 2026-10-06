@@ -205,7 +205,7 @@ test('bookmarked title form remains guarded; weekly Form ingestion is retired',(
   f.c.onTeamIntakeSubmit({range:{getSheet:()=>({getName:()=> 'intake'})},namedValues:{'Email Address':['one@example.com'],'Team ID':['T1'],'Project Title':['Replacement']}});
   assert.equal(f.c.onFormSubmit,undefined);
   assert.equal(JSON.stringify(f.team),old);assert.equal(f.writes.length,0);assert.equal(f.logs.length,0);
-  assert.equal(f.mails.length,1);assert(f.mails.every(mail=>mail[2].includes('Complete the GitHub step')));
+  assert.equal(f.mails.length,1);assert.match(f.mails[0][2],/fully approved and cannot be changed/);
 });
 
 test('ready teams retain title Form submission without weekly Form ingestion',()=>{
@@ -216,35 +216,35 @@ test('ready teams retain title Form submission without weekly Form ingestion',()
   assert.equal(f.c.onFormSubmit,undefined);assert.equal(f.logs.length,0);
 });
 
-test('strict intake emails the team for each prerequisite failure without modifying records',()=>{
+test('title intake is independent of GitHub registration, repository access and availability',()=>{
   const cases=[
-    [f=>f.usernames.pop(),/valid GitHub usernames/],
-    [f=>{f.usernames[1][4]='999';},/could not verify/],
-    [f=>{f.team[7]='';},/repository URL/],
-    [f=>f.repository(false),/Repository could not be verified/],
-    [f=>f.permissions.set('two','read'),/write access is missing/],
-    [f=>{f.permissions.delete('two');f.invitations.push({invitee:{login:'two',id:102},permissions:'write'});},/invitations must be accepted/],
-    [f=>f.outage('/user/102'),/could not verify/],
-    [f=>f.outage('/collaborators/two'),/could not be verified/],
-    [f=>f.outage('/invitations'),/could not be verified/]
+    f=>f.usernames.pop(),
+    f=>{f.usernames[1][4]='999';},
+    f=>{f.team[7]='';},
+    f=>f.repository(false),
+    f=>f.permissions.set('two','read'),
+    f=>{f.permissions.delete('two');f.invitations.push({invitee:{login:'two',id:102},permissions:'write'});},
+    f=>f.outage('/user/102'),
+    f=>f.outage('/collaborators/two'),
+    f=>f.outage('/invitations')
   ];
-  for(const [arrange,message] of cases){
+  for(const arrange of cases){
     const f=fixture();arrange(f);const before=JSON.stringify([f.team,f.usernames]);
     f.c.onTeamIntakeSubmit({range:{getSheet:()=>({getName:()=> 'intake'})},namedValues:{'Email Address':['one@example.com'],'Team ID':['T1'],'Project Title':['New project']}});
-    assert.equal(f.writes.length,0);assert.equal(JSON.stringify([f.team,f.usernames]),before);
-    assert.equal(f.mails.length,1);assert.equal(f.mails[0][0],'one@example.com,two@example.com');assert.match(f.mails[0][2],message);
-    assert.equal(f.calls.some(call=>['POST','PUT','PATCH','DELETE'].includes(call.method)),false);
+    assert.equal(f.writes[0].TITLE,'NEW PROJECT');assert.equal(JSON.stringify([f.team,f.usernames]),before);
+    assert.equal(f.mails.length,1);assert.equal(f.mails[0][0],'guide@example.com');
+    assert.equal(f.calls.length,0,'Title intake must not call GitHub');
   }
 });
 
-test('strict intake unlocks after acceptance; outsiders cannot email the team',()=>{
+test('pending GitHub invitations do not block title intake; roster membership is still required',()=>{
   const f=fixture();f.permissions.delete('two');f.invitations.push({invitee:{login:'two',id:102},permissions:'write'});
   assert.equal(f.state().ready,true);
   const intake={range:{getSheet:()=>({getName:()=> 'intake'})},namedValues:{'Email Address':['one@example.com'],'Team ID':['T1'],'Project Title':['New project']}};
-  f.c.onTeamIntakeSubmit(intake);assert.equal(f.writes.length,0);
   intake.namedValues['Email Address']=['outsider@example.com'];f.c.onTeamIntakeSubmit(intake);
-  assert.equal(f.writes.length,0);assert.equal(f.mails.at(-1)[0],'outsider@example.com');
-  intake.namedValues['Email Address']=['one@example.com'];f.permissions.set('two','write');f.invitations.length=0;
+  assert.equal(f.writes.length,0);assert.equal(f.mails.length,2);
+  assert.equal(f.mails[0][0],'outsider@example.com');assert.equal(f.mails[1][0],'guide@example.com');
+  intake.namedValues['Email Address']=['one@example.com'];
   f.c.onTeamIntakeSubmit(intake);assert.equal(f.writes[0].TITLE,'NEW PROJECT');
 });
 

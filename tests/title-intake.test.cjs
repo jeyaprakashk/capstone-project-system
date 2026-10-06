@@ -32,7 +32,7 @@ function setup(guideDecision = '', reviewerDecision = 'Revise') {
     FIELD_DEFINITIONS:{ TEAM_STATUS:{} }, getColumnMap_:() => TS,
     textEquals_:(a,b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(),
     normalizeEmail_:s => String(s).trim().toLowerCase(), driveFileUrl_:s => s,
-    requireTeamGithubReady_:() => {}, getSheet_:() => sheet, findTeamStatusRow_:() => 2,
+    getTeamGithubSetup_:() => { throw new Error('Title intake must not inspect GitHub'); }, getSheet_:() => sheet, findTeamStatusRow_:() => 2,
     MailApp:{ sendEmail:(...args) => emails.push(args) },
     getHubRegistrySheet_:() => ({ getDataRange:() => ({ getValues:() => [[]] }) }),
     setStatusFields_:(_sheet, _row, fields) => {
