@@ -65,6 +65,8 @@ for(const views of COMBINATIONS) {
   complete.ui().showRoleTab('rubrics');
   assert.equal(activePanel(complete.document),'rubrics');
   assert(complete.calls.includes('API_shared_getTimeline')&&complete.calls.includes('API_shared_getRubrics'));
+  // The Review marking drawer that ReviewerView opens exists on the page.
+  assert.equal(vm.runInContext('typeof ReviewEvaluations.open',complete.page),'function');
   const coordinator=views.some(view=>view.key==='coord');
   assert.equal(!!complete.document.querySelector('[data-role-tab="system-status"]'),coordinator);
   if(coordinator) {

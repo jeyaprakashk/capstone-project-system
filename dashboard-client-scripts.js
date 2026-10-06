@@ -702,7 +702,6 @@ const DashboardUI = (function() {
     run: dashboardRun,
     registerRole,
     registerUtilityEndpoints,
-    openReviewerMarks: function(team, review, button) { ReviewEvaluations.open(team, review, button); },
     changeTeamPageSize: function(key, value) { SystemStatusActions.changeTeamPageSize(key, value); },
     focusCoordinatorTeam,
     closeCoordinatorTeamDrawer,

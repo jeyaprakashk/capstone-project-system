@@ -743,10 +743,9 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function refreshTable() {
     ReviewerView.refresh().then(refreshed=>{if(!refreshed&&drawer.open)message('Evaluation saved. The assigned-team table could not refresh; reload to retry.');});
   }
-  function admin() { return InternalAssessmentPublishing.refresh(reviewKey); }
   window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
-  return {open,admin};
+  return {open};
 }
 function getReviewEvaluationClientScript_() {
-  return [reviewPolicyFacts_,reviewPolicyScoresComplete_,reviewPolicyCalculate_].map(f=>f.toString()).join('\n')+'\nconst ReviewAssessmentBrowser = '+reviewEvaluationBrowser_.toString()+'; const ReviewEvaluations = (()=>{const instances=new Map();const get=key=>{if(!instances.has(key))instances.set(key,ReviewAssessmentBrowser(key,DataBridge));return instances.get(key);};return {open:(team,key,button)=>get(key).open(team,button),admin:key=>get(key).admin()};})();';
+  return [reviewPolicyFacts_,reviewPolicyScoresComplete_,reviewPolicyCalculate_].map(f=>f.toString()).join('\n')+'\nconst ReviewAssessmentBrowser = '+reviewEvaluationBrowser_.toString()+'; const ReviewEvaluations = (()=>{const instances=new Map();const get=key=>{if(!instances.has(key))instances.set(key,ReviewAssessmentBrowser(key,DataBridge));return instances.get(key);};return {open:(team,key,button)=>get(key).open(team,button)};})();';
 }

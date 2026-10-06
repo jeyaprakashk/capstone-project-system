@@ -25,9 +25,9 @@ function setup(dto) {
     calls.writes.push([method, args]);
     return state.writeError ? JSON.stringify({ ok: false, error: { code: 'REJECTED', message: state.writeError } }) : JSON.stringify({ ok: true, data: state.writeResult });
   });
-  const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: () => '', openReviewerMarks: (...a) => calls.marks.push(a), refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
+  const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: () => '', refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
   vm.runInContext('globalThis.__make = ' + c.reviewerViewBrowser_.toString(), c);
-  const view = c.__make(bridge, () => ui);
+  const view = c.__make(bridge, () => ui, () => ({ open: (...a) => calls.marks.push(a) }));
   const host = document.getElementById('reviewerContent');
   return { view, host, document, calls, state, ui, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), settle: () => new Promise(r => setImmediate(r)) };
 }

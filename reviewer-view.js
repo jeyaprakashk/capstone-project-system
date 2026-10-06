@@ -3,8 +3,9 @@
  * Renders the reviewer DTO (DATA-CONTRACTS.md) with Tailwind utilities. It never calls
  * google.script.run and never sees spreadsheet columns; all server access goes through
  * the injected data bridge. Class names are literal so the Tailwind build can scan them.
+ * getMarking() returns the Review marking drawer (`ReviewEvaluations`), which is serialized after this view.
  */
-function reviewerViewBrowser_(bridge, getUi) {
+function reviewerViewBrowser_(bridge, getUi, getMarking) {
   'use strict';
   const delegated = new WeakSet();
   const PAGE_SIZES = [10, 25, 50, 'all'];
@@ -151,7 +152,7 @@ function reviewerViewBrowser_(bridge, getUi) {
     if (!target || target.disabled) return;
     const action = target.dataset.action;
     if (action === 'page') { state.page = Number(target.dataset.page); updateTable(); }
-    else if (action === 'marks') getUi().openReviewerMarks(target.dataset.team, target.dataset.review, target);
+    else if (action === 'marks') getMarking().open(target.dataset.team, target.dataset.review, target);
     else if (action === 'decide') decide(target.dataset.team, target.dataset.decision);
   }
 

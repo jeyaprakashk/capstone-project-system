@@ -106,12 +106,6 @@ test('assessment readiness renders server states and preserves results on failed
  assert.equal(node('initializeAssessmentStorageButton').disabled,false);assert.equal(node('reviewConfigurationCard').getAttribute('data-state'),'ready');assert.equal(node('reviewConfigurationIssues').hidden,true);
 });
 
-test('Reviewer dashboard opens the shared Review UI directly for arbitrary assessment IDs',async()=>{
- const f=fixture(),calls=[];
- f.c.ReviewEvaluations={open:(...args)=>calls.push(args)};
- const button={};vm.runInContext('DashboardUI',f.c).openReviewerMarks('T1','design_gate',button);
- assert.deepEqual(calls,[['T1','design_gate',button]]);assert.equal(f.requests.length,0);
-});
 function fixture(system=false,shipped=false) {
  const loadingNode=()=>({attrs:{},children:[],inert:false,addEventListener(){},querySelector(){return null;},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},classList:{add(){},remove(){},toggle(){}},appendChild(node){this.children.push(node);node.remove=()=>{this.children=this.children.filter(child=>child!==node);};}});
  const requests=[], early=[], timers=new Map(), listeners={}; let id=0;

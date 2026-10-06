@@ -101,7 +101,7 @@ function dataBridgeBrowser_() {
 /** Browser globals for views migrated to DTOs; must precede the dashboard client script. */
 function getMigratedViewsClientScript_() {
   return `const DataBridge = (${dataBridgeBrowser_.toString()})();
-const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI);
+const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations);
 const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => typeof InternalAssessmentPublishing === 'undefined' ? null : InternalAssessmentPublishing);
 const CoordinatorView = (${coordinatorViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI);
