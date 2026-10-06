@@ -103,7 +103,6 @@ const DashboardUI = (function() {
   const busy = (${busyStateBrowser_.toString()})(renderSkeleton, function(target, label, options) { return beginContentLoading(target, label, options); });
   const dialogs = (${dashboardDialogsBrowser_.toString()})();
   const renderExpandableText = ${renderExpandableText_.toString()};
-  const renderAssessmentHistory = ${renderAssessmentHistory_.toString()};
   ${getLucideIconNodes_.toString()}
   ${renderLucideIcon_.toString()}
   ${initializeDashboardTooltips_.toString()}
@@ -236,6 +235,7 @@ const DashboardUI = (function() {
   // optional activate() runs once per successful load) and the endpoints of utility tabs.
   const roleControllers = Object.create(null);
   const utilityEndpoints = Object.create(null);
+  const utilityControllers = Object.create(null);
   function registerRole(key, controller) {
     if (roleControllers[key]) throw new Error('Dashboard role registered twice: ' + key);
     if (!controller || typeof controller.load !== 'function' || typeof controller.render !== 'function' || (controller.activate && typeof controller.activate !== 'function')) {
@@ -243,7 +243,16 @@ const DashboardUI = (function() {
     }
     roleControllers[key] = controller;
   }
-  function registerUtilityEndpoints(methods) { methods.forEach(function(method) { utilityEndpoints[method] = true; }); }
+  // Utility tabs (System Status): load() resolves a DTO, render() draws it, optional rendered() starts follow-up checks.
+  // Their endpoints, and reads started from their callbacks, use the utility lane.
+  function registerUtility(key, controller) {
+    if (utilityControllers[key]) throw new Error('Dashboard utility registered twice: ' + key);
+    if (!controller || typeof controller.load !== 'function' || typeof controller.render !== 'function' || (controller.rendered && typeof controller.rendered !== 'function')) {
+      throw new Error('Dashboard utility ' + key + ' needs load and render functions.');
+    }
+    utilityControllers[key] = controller;
+    (controller.endpoints || []).forEach(function(method) { utilityEndpoints[method] = true; });
+  }
   function activateRole(key) {
     if (!loadedRoleTabs[key] || activatedRoles[key]) return;
     activatedRoles[key] = true;
@@ -323,17 +332,18 @@ const DashboardUI = (function() {
     const item = sharedRubrics && sharedRubrics.assessments.find(function(a) { return a.key === key; });
     const drawer = byId('rubricDrawer');
     if (!item || !item.available || !drawer) return;
-    closeCoordinatorTeamDrawer();
+    closeSharedDrawer('teamDrawer');
     byId('rubricDrawerTitle').textContent = item.label;
     byId('rubricDrawerContent').innerHTML = SharedRubricsView.detailMarkup(item);
     openContentDrawer(item.label, byId('rubricDrawerContent').innerHTML, trigger);
   }
 
-  function openSharedDrawer(drawerId, scrimId, trigger) {
+  // onClose runs whenever this drawer closes, for example to cancel the reads it started.
+  function openSharedDrawer(drawerId, scrimId, trigger, onClose) {
     const drawer = byId(drawerId), scrim = byId(scrimId);
     if (!drawer || !scrim) return;
     if (sharedDrawerState && sharedDrawerState.drawer !== drawer) closeSharedDrawer(sharedDrawerState.id, false);
-    sharedDrawerState = {id:drawerId, drawer:drawer, scrim:scrim, trigger:trigger || document.activeElement};
+    sharedDrawerState = {id:drawerId, drawer:drawer, scrim:scrim, trigger:trigger || document.activeElement, onClose:onClose};
     drawer.inert = false;
     drawer.hidden = false;
     scrim.hidden = false;
@@ -358,6 +368,7 @@ const DashboardUI = (function() {
       state.scrim.hidden = true;
       state.scrim.classList.remove('open');
       sharedDrawerState = null;
+      if (state.onClose) state.onClose();
       if (restoreFocus !== false && state.trigger && state.trigger.isConnected) state.trigger.focus();
     }
     document.body.classList.remove('overflow-hidden');
@@ -365,7 +376,7 @@ const DashboardUI = (function() {
   function openContentDrawer(title, content, trigger) {
     const drawer = byId('rubricDrawer');
     if (!drawer) return;
-    closeCoordinatorTeamDrawer(false);
+    closeSharedDrawer('teamDrawer', false);
     byId('rubricDrawerTitle').textContent = title;
     byId('rubricDrawerContent').innerHTML = content;
     openSharedDrawer('rubricDrawer', 'rubricDrawerBackdrop', trigger);
@@ -380,7 +391,7 @@ const DashboardUI = (function() {
     if (event.key === 'Escape') {
       event.preventDefault();
       if (state.id === 'rubricDrawer') closeRubricDrawer();
-      else closeCoordinatorTeamDrawer();
+      else closeSharedDrawer(state.id);
     }
     if (event.key === 'Tab') {
       const controls = Array.from(state.drawer.querySelectorAll ? state.drawer.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex="0"]') : []).filter(function(el) { return !el.hidden && (!el.getClientRects || el.getClientRects().length); });
@@ -523,10 +534,10 @@ const DashboardUI = (function() {
     const finishCards = (cards.length ? cards : [target]).map(function(card) { return beginContentLoading(card, 'Loading system status'); });
     busy.mark(target, true);
     setText('systemStatusMessage', '');
-    SystemStatusView.load().then(function(dto) { inUtilityLane(function() {
+    const controller = utilityControllers['system-status'];
+    (controller ? controller.load() : Promise.reject(new Error('This dashboard could not initialize. Reload the page.'))).then(function(dto) { inUtilityLane(function() {
       finishCards.forEach(function(finish) { finish(); });
-      SystemStatusActions.resetChecks();
-      SystemStatusView.render(target, dto);
+      controller.render(target, dto);
       systemStatusState.loading = false;
       systemStatusState.loaded = true;
       busy.mark(target, false);
@@ -535,8 +546,7 @@ const DashboardUI = (function() {
       setText('systemStatusUpdated', updatedLabel());
       shellUpdatedAt['system-status'] = updatedLabel();
       syncShellRefresh();
-      SystemStatusActions.recheckAll();
-      target.querySelectorAll('[data-publishing]').forEach(function(section) { InternalAssessmentPublishing.refresh(section.dataset.publishing); });
+      if (controller.rendered) controller.rendered(target);
     }); }).catch(function(err) {
       if (err && err.superseded) { systemStatusState.loading = false; syncShellRefresh(); return; }
       finishCards.forEach(function(finish) { finish(); });
@@ -660,29 +670,13 @@ const DashboardUI = (function() {
     schedulePreload();
   }
 
-  function focusCoordinatorTeam(teamId) {
-    closeRubricDrawer(false);
-    const drawer = byId('teamDrawer');
-    const backdrop = byId('teamDrawerBackdrop');
-    const content = byId('teamDrawerContent');
-    const title = byId('teamDrawerTitle');
-    if (!drawer || !backdrop || !content) return;
-    if (title) title.textContent = 'Team ' + teamId;
-    openSharedDrawer('teamDrawer', 'teamDrawerBackdrop', document.activeElement);
-    TeamDrawerView.mount(content, teamId, function() { return drawer.dataset.open === 'true'; });
-  }
-
-  function closeCoordinatorTeamDrawer(restoreFocus) {
-    TeamDrawerView.cancel();
-    closeSharedDrawer('teamDrawer', restoreFocus);
-  }
-
   // Application CSS is inline in the document head. Wait for web fonts as well
   // before revealing complete cards; the tracker intentionally stays progressive.
   return {
     notify: dialogs.notify, ask: dialogs.ask, confirmDialog: dialogs.confirmDialog, requestText: dialogs.requestText,
     openContentDrawer,
-    renderAssessmentHistory: renderAssessmentHistory,
+    openDrawer: openSharedDrawer,
+    closeDrawer: closeSharedDrawer,
     renderSkeleton: renderSkeleton,
     beginContentLoading: beginContentLoading,
     busy: busy,
@@ -701,18 +695,7 @@ const DashboardUI = (function() {
     renderIcon: renderLucideIcon_,
     run: dashboardRun,
     registerRole,
-    registerUtilityEndpoints,
-    changeTeamPageSize: function(key, value) { SystemStatusActions.changeTeamPageSize(key, value); },
-    focusCoordinatorTeam,
-    closeCoordinatorTeamDrawer,
-    runGithubSync: function() { SystemStatusActions.runGithubSync(); },
-    runStudentInvitationResend: function() { SystemStatusActions.runStudentInvitationResend(); },
-    initializeAssessmentStorage: function() { SystemStatusActions.initializeAssessmentStorage(); },
-    recheckCommitteeConfiguration: function() { SystemStatusActions.recheckCommitteeConfiguration(); },
-    recheckTeamFolders: function() { SystemStatusActions.recheckTeamFolders(); },
-    createTeamFolders: function() { SystemStatusActions.createTeamFolders(); },
-    bootstrapAssessmentDefinitions: function() { SystemStatusActions.bootstrapAssessmentDefinitions(); },
-    recheckReviewConfiguration: function() { SystemStatusActions.recheckReviewConfiguration(); },
+    registerUtility,
   };
 })();
 
@@ -731,7 +714,15 @@ DashboardUI.registerRole('student', StudentView);
 DashboardUI.registerRole('guide', {load: GuideView.load, render: GuideView.render, activate: function() { GuideWeekly.load(); }});
 DashboardUI.registerRole('reviewer', ReviewerView);
 DashboardUI.registerRole('coord', CoordinatorView);
-DashboardUI.registerUtilityEndpoints(['API_coordinator_getSystemStatus', 'API_coordinator_getWeeklySetup']);
+DashboardUI.registerUtility('system-status', {
+  endpoints: ['API_coordinator_getSystemStatus', 'API_coordinator_getWeeklySetup'],
+  load: function() { return SystemStatusView.load(); },
+  render: function(target, dto) { SystemStatusActions.resetChecks(); SystemStatusView.render(target, dto); },
+  rendered: function(target) {
+    SystemStatusActions.recheckAll();
+    target.querySelectorAll('[data-publishing]').forEach(function(section) { InternalAssessmentPublishing.refresh(section.dataset.publishing); });
+  }
+});
 
 function initializeFirstRoleTab_() {
   DashboardUI.initializeRoleMenu();

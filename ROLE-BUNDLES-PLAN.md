@@ -210,6 +210,19 @@ Order: Student → Reviewer (and remove `admin()`) → Guide → Coordinator.
   No global action registry.
 - Split `WeeklyPhase2Setup` serialization from `GuideWeekly`.
 - Move the team drawer opener and `renderAssessmentHistory` to the coordinator group.
+- **Done (6 Oct 2026), one commit per role.** `DashboardUI` no longer refers to any role module.
+  - Student: `StudentView` gets `{weekly, results, github}` through its constructor; `StudentGithub`
+    reloads the Project cards through `StudentView`. Eight shell wrappers removed (two were unused).
+  - Reviewer: `ReviewerView` opens the marking drawer through a getter; `ReviewEvaluations.admin()`
+    removed.
+  - Guide: the shell's `typeof GuideWeekly` guard removed (activation already uses the registry).
+  - Coordinator: `CoordinatorView.openTeam` opens the team drawer through `DashboardUI.openDrawer`,
+    which gained an `onClose` hook (`TeamDrawerView.cancel`). Closing the drawer by any route,
+    including the scrim, now cancels its reads; before, a scrim close did not. System Status
+    registers as a utility controller (`endpoints`, `load`, `render`, `rendered`), and its buttons call
+    `SystemStatusActions` directly. `renderAssessmentHistory_` ships with the publishing script.
+    `WeeklyPhase2Setup` has its own serializer (`getWeeklySetupClientScript_`) and its guard is gone.
+  - The assembly test checks that each module a view calls at run time exists on every page.
 
 ### Stage 4: selective serialization
 

@@ -74,19 +74,19 @@ test('Coordinator storage setup displays journals, blocks duplicates and retries
  f.c.document.createElement=tag=>document.createElement(tag);
  const node=id=>document.getElementById(id),calls=()=>f.requests.filter(r=>r.key==='prepareReviewAssessmentStorage_');
  const readiness=()=>({valid:true,ready:false,state:'setup-required',summary:'Assessment journals need setup',count:3,issues:[],links:{},checkedAt:new Date().toISOString(),storage:[{assessment:'review3',label:'Review 3',journal:'Assessment_review3',state:'MISSING'}]});
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',readiness());await f.settle();
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',readiness());await f.settle();
  assert.match(node('reviewConfigurationSummary').textContent,/need setup/);
- vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);assert.equal(calls().length,1);
+ vm.runInContext('SystemStatusActions.initializeAssessmentStorage()',f.c);vm.runInContext('SystemStatusActions.initializeAssessmentStorage()',f.c);assert.equal(calls().length,1);
  const journals=[1,2,3].map(n=>({assessment:'review'+n,label:'Review '+n,journal:'Journal_review'+n,created:n===1,initialized:n===2}));
  calls()[0].success({done:true,journals});await f.settle();
  assert.equal(node('assessmentStorageResults').children.length,3);
  assert.match(node('assessmentStorageResults').textContent,/Review 3: Journal_review3 — existing storage retained/);
  assert.match(node('assessmentStorageStatus').textContent,/3 assessment journals ready/);
  f.done('getCoordinatorReviewConfiguration_',readiness());await f.settle();
- vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);calls()[1].failure({message:'Temporary failure'});await f.settle();
+ vm.runInContext('SystemStatusActions.initializeAssessmentStorage()',f.c);calls()[1].failure({message:'Temporary failure'});await f.settle();
  assert.match(node('assessmentStorageStatus').textContent,/Retry/);
  f.done('getCoordinatorReviewConfiguration_',readiness());await f.settle();
- vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);assert.equal(calls().length,3);
+ vm.runInContext('SystemStatusActions.initializeAssessmentStorage()',f.c);assert.equal(calls().length,3);
  calls()[2].success({done:true,journals});await f.settle();f.done('getCoordinatorReviewConfiguration_',readiness());await f.settle();
  assert.equal(node('initializeAssessmentStorageButton').disabled,false);
 });
@@ -95,14 +95,14 @@ test('assessment readiness renders server states and preserves results on failed
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
  const node=id=>document.getElementById(id),states=['READY','MISSING','EMPTY','ERROR'];
  const report={valid:false,ready:false,state:'invalid',summary:'Server readiness summary',count:4,checkedAt:new Date().toISOString(),links:{definitions:'https://example.test/definitions'},issues:[{sheet:'Future Review',message:'Storage conflict'}],storage:states.map((state,i)=>({assessment:'gate_'+i,label:'Gate '+i,journal:'Assessment_gate_'+i,state,...(state==='ERROR'?{error:'Storage conflict'}:{})}))};
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);assert.equal(f.requests.length,1);f.done('getCoordinatorReviewConfiguration_',report);await f.settle();
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);assert.equal(f.requests.length,1);f.done('getCoordinatorReviewConfiguration_',report);await f.settle();
  assert.deepEqual(Array.from(node('reviewAssessmentReadiness').children,item=>item.getAttribute('data-state')),states);
  assert.equal(node('reviewConfigurationSummary').textContent,report.summary);assert.equal(node('initializeAssessmentStorageButton').disabled,true);
  assert.match(node('reviewAssessmentReadiness').textContent,/Storage conflict/);assert.equal(node('reviewDefinitionsLink').href,report.links.definitions);
- const before=node('reviewAssessmentReadiness').innerHTML;vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();
+ const before=node('reviewAssessmentReadiness').innerHTML;vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();
  assert.equal(node('reviewAssessmentReadiness').innerHTML,before);assert.equal(node('reviewConfigurationSummary').textContent,report.summary);
  assert.match(node('reviewConfigurationIssues').textContent,/Offline/);assert.equal(node('reviewConfigurationCard').getAttribute('aria-busy'),'false');assert.equal(node('reviewConfigurationRecheck').disabled,false);
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{...report,valid:true,ready:true,state:'ready',summary:'All journals ready',issues:[],storage:report.storage.map(({error,...entry})=>({...entry,state:'READY'}))});await f.settle();
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{...report,valid:true,ready:true,state:'ready',summary:'All journals ready',issues:[],storage:report.storage.map(({error,...entry})=>({...entry,state:'READY'}))});await f.settle();
  assert.equal(node('initializeAssessmentStorageButton').disabled,false);assert.equal(node('reviewConfigurationCard').getAttribute('data-state'),'ready');assert.equal(node('reviewConfigurationIssues').hidden,true);
 });
 
@@ -125,7 +125,7 @@ function fixture(system=false,shipped=false) {
   const migrated={API_reviewer_getDashboard:'reviewer',API_guide_getDashboard:'guide',API_student_getCore:'student',API_coordinator_getOverview:'coord'}[key];
   if(migrated)return requests.push({key:'loadDashboardRoleContent',args:[migrated],success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
   return requests.push({key,args,success,failure});}}); }
- const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:(fn,delay)=>{timers.set(++id,Object.assign(()=>fn(),{delay}));return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
+ const c=vm.createContext({GuideEvaluation:{admin(){},student(){}},WeeklyPhase2Setup:{load(){}},document,window:{},performance:{now:()=>Date.now()},console,Date,Promise,setTimeout:(fn,delay)=>{timers.set(++id,Object.assign(()=>fn(),{delay}));return id;},clearTimeout:key=>timers.delete(key),google:{script:{run:runner()}},getSkeletonMarkup_:()=>''});
  for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
  vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c); vm.runInContext(fs.readFileSync('busy-state.js','utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
@@ -186,7 +186,7 @@ test('student rubric tab reuses shared content and switching back restores My Te
 test('shell selects the common theme before scripts or fonts load',async()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
  for(const file of ['common-styles.js','busy-state.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getDashboardStartScript_']) c[name]=()=>'';
+ for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getWeeklySetupClientScript_','getDashboardStartScript_']) c[name]=()=>'';
  for(const key of ['student','guide','reviewer','coord']) {
   const html=c.buildDashboardShell_('preview@example.test',[{key,label:key,contentId:key+'Content'}]);
   assert.match(html,/<body class="[^"]*">/);
@@ -337,13 +337,13 @@ test('rubric drawer escapes text, traps focus, closes on Escape and excludes tea
  assert.equal(prevented,2);
  f.fire('keydown',{key:'Escape',preventDefault(){}});assert.equal(f.c.document.activeElement,trigger);assert.equal(f.nodes.rubricDrawer.inert,true);
  f.ui.openRubricDrawer('see',trigger);assert(!f.nodes.rubricDrawer.classList.contains('open'));
- f.ui.openRubricDrawer('review1',trigger);f.ui.focusCoordinatorTeam('1');assert(!f.nodes.rubricDrawer.classList.contains('open'));
+ f.ui.openRubricDrawer('review1',trigger);vm.runInContext('CoordinatorView',f.c).openTeam('1');assert(!f.nodes.rubricDrawer.classList.contains('open'));
  assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics_').length,1);
 });
 test('coordinator drawer shares focus trap, Escape and trigger focus return',async()=>{
  const f=rubricClientFixture(),trigger={isConnected:true,focus(){f.c.document.activeElement=this;}};
  f.c.document.activeElement=trigger;
- f.ui.focusCoordinatorTeam('1');
+ vm.runInContext('CoordinatorView',f.c).openTeam('1');
  assert(f.nodes.teamDrawer.classList.contains('open'));
  assert.equal(f.nodes.teamDrawer.attrs['aria-hidden'],'false');
  assert.equal(f.c.document.activeElement,f.nodes.teamDrawerClose);
@@ -551,12 +551,12 @@ test('shared refresh entry point excludes the student dashboard',async()=>{
 test('Coordinator bootstrap follows server state, blocks duplicate calls and refreshes to empty definitions',async()=>{
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body>'+['reviewConfigurationCard','createAssessmentDefinitionsButton','reviewDefinitionsLink','reviewAssessmentReadiness','reviewConfigurationRecheck','initializeAssessmentStorageButton','reviewConfigurationSummary','reviewConfigurationIssues','reviewConfigurationCheckedAt','reviewConfigLink','reviewRubricsLink','assessmentStorageStatus'].map(id=>'<div id="'+id+'"></div>').join('')+'</body></html>');
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
- const api=vm.runInContext('DashboardUI',f.c),node=id=>document.getElementById(id);
+ const api=vm.runInContext('SystemStatusActions',f.c),node=id=>document.getElementById(id);
  const missing={valid:false,ready:false,state:'definitions-missing',registryState:'MISSING',canBootstrap:true,summary:'AssessmentDefinitions is missing',issues:[{sheet:'AssessmentDefinitions',message:'Create the definitions tab'}],links:{},storage:[],checkedAt:new Date().toISOString()};
  api.bootstrapAssessmentDefinitions();assert.equal(f.requests.length,0);
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',missing);await f.settle();
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',missing);await f.settle();
  assert.equal(node('createAssessmentDefinitionsButton').hidden,false);assert.equal(node('createAssessmentDefinitionsButton').disabled,false);
- api.bootstrapAssessmentDefinitions();api.bootstrapAssessmentDefinitions();vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);
+ api.bootstrapAssessmentDefinitions();api.bootstrapAssessmentDefinitions();vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);vm.runInContext('SystemStatusActions.initializeAssessmentStorage()',f.c);
  assert.equal(f.requests.filter(r=>r.key==='createAssessmentDefinitions_').length,1);
  assert.equal(f.requests.filter(r=>r.key==='prepareReviewAssessmentStorage_').length,0);
  assert.equal(node('reviewConfigurationCard').getAttribute('aria-busy'),'true');
@@ -573,9 +573,9 @@ test('Coordinator bootstrap follows server state, blocks duplicate calls and ref
 test('failed bootstrap settles loading, keeps results, and allows a server-confirmed retry',async()=>{
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body>'+['reviewConfigurationCard','createAssessmentDefinitionsButton','reviewDefinitionsLink','reviewAssessmentReadiness','reviewConfigurationRecheck','initializeAssessmentStorageButton','reviewConfigurationSummary','reviewConfigurationIssues','reviewConfigurationCheckedAt','reviewConfigLink','reviewRubricsLink','assessmentStorageStatus'].map(id=>'<div id="'+id+'"></div>').join('')+'</body></html>');
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
- const api=vm.runInContext('DashboardUI',f.c),node=id=>document.getElementById(id);
+ const api=vm.runInContext('SystemStatusActions',f.c),node=id=>document.getElementById(id);
  const missing={valid:false,state:'definitions-missing',canBootstrap:true,summary:'AssessmentDefinitions is missing',issues:[],links:{},storage:[],checkedAt:new Date().toISOString()};
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',missing);await f.settle();
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',missing);await f.settle();
  api.bootstrapAssessmentDefinitions();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Permission denied'});await f.settle();
  assert.match(node('assessmentStorageStatus').textContent,/Permission denied/);
  f.done('getCoordinatorReviewConfiguration_',missing);await f.settle();
@@ -648,11 +648,11 @@ test('SEE-only readiness reports storage not required and prevents setup RPC',as
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body>'+['reviewConfigurationCard','createAssessmentDefinitionsButton','reviewDefinitionsLink','reviewAssessmentReadiness','reviewConfigurationRecheck','initializeAssessmentStorageButton','reviewConfigurationSummary','reviewConfigurationIssues','reviewConfigurationCheckedAt','reviewConfigLink','reviewRubricsLink'].map(id=>'<div id="'+id+'"></div>').join('')+'</body></html>');
  const original=f.c.document.getElementById;
  f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{valid:true,ready:true,canInitializeStorage:false,state:'ready',summary:'Configuration valid',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[{assessment:'see',label:'End Review (SEE)',journal:'',state:'NOT_REQUIRED',detail:'Not required - evaluated outside this app.'}]});await f.settle();
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{valid:true,ready:true,canInitializeStorage:false,state:'ready',summary:'Configuration valid',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[{assessment:'see',label:'End Review (SEE)',journal:'',state:'NOT_REQUIRED',detail:'Not required - evaluated outside this app.'}]});await f.settle();
  assert.equal(document.getElementById('initializeAssessmentStorageButton').disabled,true);
  assert.match(document.getElementById('reviewAssessmentReadiness').textContent,/Storage: Not required.*Evaluated outside this app/);
  assert.doesNotMatch(document.getElementById('reviewAssessmentReadiness').textContent,/Journal:/);
- vm.runInContext('DashboardUI.initializeAssessmentStorage()',f.c);assert(!f.requests.some(r=>r.key==='prepareReviewAssessmentStorage_'));
+ vm.runInContext('SystemStatusActions.initializeAssessmentStorage()',f.c);assert(!f.requests.some(r=>r.key==='prepareReviewAssessmentStorage_'));
 });
 
 
@@ -663,11 +663,11 @@ test('readiness cards render server rubric and overall states and preserve both 
   {assessment:'review1',label:'Review 1',state:'READY',journal:'Assessment_review1',ready:false,rubric:{state:'INVALID',error:'Rubrics Sheet row 9: <invalid criterion>'}},
   {assessment:'see',label:'End Review (SEE)',state:'NOT_REQUIRED',journal:'',ready:true,rubric:{state:'READY',criterionCount:4,maximumMarks:100}}
  ]};
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',report);await f.settle();
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',report);await f.settle();
  const host=document.getElementById('reviewAssessmentReadiness'),[review,see]=host.children;
  assert.match(review.textContent,/Review 1.*Needs attention/);assert.match(review.textContent,/Rubric: Invalid/);assert.match(review.textContent,/Storage: Ready/);assert.match(review.textContent,/row 9: <invalid criterion>/);assert.equal(review.querySelector('invalid'),null);
  assert.match(see.textContent,/End Review \(SEE\).*Ready/);assert.match(see.textContent,/Rubric: Ready.*4 criteria.*100 marks/);assert.match(see.textContent,/Storage: Not required.*Evaluated outside this app/);assert.doesNotMatch(see.textContent,/Journal:/);
- const before=host.innerHTML;vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();assert.equal(host.innerHTML,before);
+ const before=host.innerHTML;vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();assert.equal(host.innerHTML,before);
 });
 
 
@@ -676,28 +676,28 @@ function configurationCardsFixture(){
  const viewContext=vm.createContext({});vm.runInContext(fs.readFileSync('system-status-view.js','utf8'),viewContext);
  viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>'<span>Skeleton</span>'}),()=>null).render(document.body,{github:{coordUsername:'',reposWithAccess:0,totalRepos:0},publishing:{configured:false,items:[]}});
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
- return {...f,document,ui:vm.runInContext('DashboardUI',f.c),node:id=>document.getElementById(id)};
+ return {...f,document,ui:vm.runInContext('DashboardUI',f.c),actions:vm.runInContext('SystemStatusActions',f.c),node:id=>document.getElementById(id)};
 }
 
 test('configuration cards are siblings and committee refresh preserves expansion, retries and ignores replaced cards',async()=>{
  const f=configurationCardsFixture(),report={state:'ready',summary:'Review committees configured',issues:[],links:{committees:'https://example.test/committees'},checkedAt:new Date().toISOString(),committees:[{number:'C1',members:[{name:'Reviewer',email:'r@example.test'}],teams:['T1']}]};
  assert.equal(f.node('committeeConfigurationCard').parentNode,f.node('reviewConfigurationCard').parentNode);
- f.ui.recheckCommitteeConfiguration();f.ui.recheckCommitteeConfiguration();assert.equal(f.requests.filter(r=>r.key==='getCoordinatorCommitteeConfiguration_').length,1);
+ f.actions.recheckCommitteeConfiguration();f.actions.recheckCommitteeConfiguration();assert.equal(f.requests.filter(r=>r.key==='getCoordinatorCommitteeConfiguration_').length,1);
  assert.equal(f.requests.filter(r=>r.key==='getCoordinatorReviewConfiguration_').length,0);
  f.done('getCoordinatorCommitteeConfiguration_',report);await f.settle();
  f.node('committeeDirectoryContent').querySelector('details').setAttribute('open','');
- f.ui.recheckCommitteeConfiguration();f.done('getCoordinatorCommitteeConfiguration_',report);await f.settle();assert.equal(f.node('committeeDirectoryContent').querySelector('details').open,true);
- const before=f.node('committeeDirectoryContent').innerHTML;f.ui.recheckCommitteeConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();
+ f.actions.recheckCommitteeConfiguration();f.done('getCoordinatorCommitteeConfiguration_',report);await f.settle();assert.equal(f.node('committeeDirectoryContent').querySelector('details').open,true);
+ const before=f.node('committeeDirectoryContent').innerHTML;f.actions.recheckCommitteeConfiguration();const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();
  assert.equal(f.node('committeeDirectoryContent').innerHTML,before);assert.match(f.node('committeeConfigurationIssues').textContent,/Offline/);assert.equal(f.node('committeeConfigurationRecheck').disabled,false);
- f.ui.recheckCommitteeConfiguration();const old=f.node('committeeConfigurationCard'),replacement=old.cloneNode(true);old.replaceWith(replacement);replacement.querySelector('#committeeConfigurationSummary').textContent='New card';f.done('getCoordinatorCommitteeConfiguration_',report);await f.settle();assert.equal(f.node('committeeConfigurationSummary').textContent,'New card');
+ f.actions.recheckCommitteeConfiguration();const old=f.node('committeeConfigurationCard'),replacement=old.cloneNode(true);old.replaceWith(replacement);replacement.querySelector('#committeeConfigurationSummary').textContent='New card';f.done('getCoordinatorCommitteeConfiguration_',report);await f.settle();assert.equal(f.node('committeeConfigurationSummary').textContent,'New card');
 });
 
 test('storage creation area hides only after confirmed readiness and preserves visibility on refresh failure',async()=>{
  const f=configurationCardsFixture(),report={valid:true,ready:true,state:'ready',canInitializeStorage:false,storageComplete:true,summary:'All ready',issues:[],links:{},checkedAt:new Date().toISOString(),storage:[]};
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',report);await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,true);assert.equal(f.node('initializeAssessmentStorageButton').disabled,true);
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{...report,valid:false,ready:false,state:'invalid'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,true);
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{...report,ready:false,storageComplete:false,canInitializeStorage:true,state:'storage-missing'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,false);assert.equal(f.node('initializeAssessmentStorageButton').disabled,false);
- vm.runInContext('DashboardUI.recheckReviewConfiguration()',f.c);const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,false);
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',report);await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,true);assert.equal(f.node('initializeAssessmentStorageButton').disabled,true);
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{...report,valid:false,ready:false,state:'invalid'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,true);
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);f.done('getCoordinatorReviewConfiguration_',{...report,ready:false,storageComplete:false,canInitializeStorage:true,state:'storage-missing'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,false);assert.equal(f.node('initializeAssessmentStorageButton').disabled,false);
+ vm.runInContext('SystemStatusActions.recheckReviewConfiguration()',f.c);const failed=f.requests.at(-1);failed.done=true;failed.failure({message:'Offline'});await f.settle();assert.equal(f.node('assessmentStorageSetup').hidden,false);
 });
 
 test('the shell markup has no inline handlers and no legacy component classes; actions are delegated',()=>{
@@ -734,7 +734,7 @@ test('dashboards are not loaded in the background: only the viewed one is reques
 test('a student-only user gets a two-tab top bar on small screens instead of a Menu toggle',()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
  for(const file of ['common-styles.js','busy-state.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getDashboardStartScript_']) c[name]=()=>'';
+ for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getWeeklySetupClientScript_','getDashboardStartScript_']) c[name]=()=>'';
  const page=views=>require('linkedom').parseHTML(c.buildDashboardShell_('a@example.test',views)).document;
  const student=page([{key:'student',label:'My Team',contentId:'s'}]);
  const tabs=Array.from(student.querySelectorAll('#roleMenuItems [role="tab"]'));
@@ -756,7 +756,7 @@ test('a student-only user gets a two-tab top bar on small screens instead of a M
 test('the student sidebar links slot follows the last menu item and only exists for student users',()=>{
  const c=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
  for(const file of ['common-styles.js','busy-state.js','common-helpers.js','common-constants.js','guide-dashboard.js','coordinator-dashboard.js','reviewer-dashboard.js','lucide-icons.js','icon-renderer.js','review-evaluation-client.js','dashboard-router.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
- for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getDashboardStartScript_']) c[name]=()=>'';
+ for(const name of ['getInternalAssessmentPublishingClientScript_','getMigratedViewsClientScript_','getDashboardClientScript_','getGuideEvaluationClientScript_','getGuideWeeklyClientScript_','getReviewEvaluationClientScript_','getWeeklySetupClientScript_','getDashboardStartScript_']) c[name]=()=>'';
  const page=views=>require('linkedom').parseHTML(c.buildDashboardShell_('a@example.test',views)).document;
  const both=page([{key:'student',label:'My Team',contentId:'s'},{key:'guide',label:'Guide',contentId:'g'}]);
  const nav=both.querySelector('#studentSideNav');

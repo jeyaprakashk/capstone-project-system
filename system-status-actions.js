@@ -185,7 +185,7 @@ function systemStatusActionsBrowser_(bridge, getUi) {
   function recheckReviewConfiguration() {
     const card = byId('reviewConfigurationCard');
     if (!card || checkingReviewConfiguration || initializingAssessmentStorage || bootstrappingDefinitions) return;
-    if(typeof WeeklyPhase2Setup !== 'undefined')WeeklyPhase2Setup.load();
+    WeeklyPhase2Setup.load();
     checkingReviewConfiguration = true;
     const finishLoading = beginContentLoading(card, 'Checking assessment readiness');
     reviewConfigurationValid = false;

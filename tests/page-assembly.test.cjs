@@ -72,6 +72,7 @@ for(const views of COMBINATIONS) {
   const coordinator=views.some(view=>view.key==='coord');
   assert.equal(!!complete.document.querySelector('[data-role-tab="system-status"]'),coordinator);
   if(coordinator) {
+   for(const used of ['TeamDrawerView.mount','SystemStatusActions.recheckAll','InternalAssessmentPublishing.refresh','WeeklyPhase2Setup.load']) assert.equal(vm.runInContext('typeof '+used,complete.page),'function',used);
    complete.ui().showRoleTab('system-status');
    assert.equal(activePanel(complete.document),'system-status');
    assert(complete.calls.includes('API_coordinator_getSystemStatus'));

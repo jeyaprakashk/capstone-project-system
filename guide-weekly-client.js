@@ -415,4 +415,6 @@ function weeklyPhase2SetupBrowser_(bridge) {
   }
   return {load};
 }
-function getGuideWeeklyClientScript_() { return 'const GuideWeekly = ('+guideWeeklyBrowser_.toString()+')(DataBridge);\nconst WeeklyPhase2Setup = ('+weeklyPhase2SetupBrowser_.toString()+')(DataBridge);'; }
+function getGuideWeeklyClientScript_() { return 'const GuideWeekly = ('+guideWeeklyBrowser_.toString()+')(DataBridge);'; }
+/** Coordinator weekly setup, used by System Status; serialized separately from the Guide workspace. */
+function getWeeklySetupClientScript_() { return 'const WeeklyPhase2Setup = ('+weeklyPhase2SetupBrowser_.toString()+')(DataBridge);'; }

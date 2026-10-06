@@ -34,9 +34,10 @@ function setup({ data = sections(), activity = ACTIVITY } = {}) {
     return Promise.resolve(respond());
   });
   const ui = { renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton role="status" aria-label="' + l + '">…</span>',
-    focusCoordinatorTeam: t => calls.view.push(t), closeCoordinatorTeamDrawer: () => calls.close++, refreshRoleDashboard: () => calls.refresh++ };
+    closeRubricDrawer: () => {}, openDrawer: () => {}, closeDrawer: () => calls.close++, refreshRoleDashboard: () => calls.refresh++ };
+  const teamDrawer = { mount: (content, team) => calls.view.push(team), cancel: () => {} };
   vm.runInContext('globalThis.__make = ' + c.coordinatorViewBrowser_.toString(), c);
-  const view = c.__make(bridge, () => ui);
+  const view = c.__make(bridge, () => ui, () => teamDrawer);
   const host = document.getElementById('coordinatorContent');
   const flush = () => new Promise(r => setImmediate(r));
   return { view, host, document, calls, s, flush, fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), click: el => el.dispatchEvent(new window.Event('click', { bubbles: true })),

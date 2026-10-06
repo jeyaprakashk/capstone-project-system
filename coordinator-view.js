@@ -6,7 +6,7 @@
  * with its own Retry) on its own.
  * It never calls google.script.run; the team drawer is rendered by TeamDrawerView.
  */
-function coordinatorViewBrowser_(bridge, getUi) {
+function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
   'use strict';
   const PAGE_SIZES = [10, 25, 50, 'all'];
   const READ = {timeoutMs:120000};
@@ -367,11 +367,26 @@ function coordinatorViewBrowser_(bridge, getUi) {
     }
     else if (action === 'page') { state.page = Number(target.getAttribute('data-page')); updateTracker(); }
     else if (action === 'reset') { state.query = ''; state.filter = 'all'; state.page = 1; const box = q('#trackerSearch'); if (box) box.value = ''; updateTracker(); }
-    else if (action === 'view-team') ui.focusCoordinatorTeam(target.getAttribute('data-team'));
-    else if (action === 'close-drawer') ui.closeCoordinatorTeamDrawer();
+    else if (action === 'view-team') openTeam(target.getAttribute('data-team'));
+    else if (action === 'close-drawer') ui.closeDrawer('teamDrawer');
     else if (action === 'progress-retry') retryProgress();
     else if (action === 'activity-retry') retryActivity();
   }
 
-  return {load, render, state, persistent};
+  // Team drawer: DashboardUI owns the drawer frame (focus, Escape, scrim); TeamDrawerView fills its sections.
+  // Closing the drawer by any route cancels its reads.
+  function openTeam(teamId) {
+    const ui = getUi();
+    ui.closeRubricDrawer(false);
+    const drawer = document.getElementById('teamDrawer');
+    const backdrop = document.getElementById('teamDrawerBackdrop');
+    const content = document.getElementById('teamDrawerContent');
+    const title = document.getElementById('teamDrawerTitle');
+    if (!drawer || !backdrop || !content) return;
+    if (title) title.textContent = 'Team ' + teamId;
+    ui.openDrawer('teamDrawer', 'teamDrawerBackdrop', document.activeElement, () => getTeamDrawer().cancel());
+    getTeamDrawer().mount(content, teamId, () => drawer.dataset.open === 'true');
+  }
+
+  return {load, render, openTeam, state, persistent};
 }

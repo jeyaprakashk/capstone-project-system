@@ -14,12 +14,12 @@ function setup(dto = DTO) {
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   bridge.useFixtures({ API_coordinator_getSystemStatus: () => { calls.push('read'); return dto; } });
   const record = name => (...args) => calls.push([name, ...args]);
-  const ui = { renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton>' + String(l).replace(/[&<>"']/g, ch => '&#' + ch.charCodeAt(0) + ';') + '</span>',
-    runGithubSync: record('sync'), runStudentInvitationResend: record('resend'), recheckCommitteeConfiguration: record('committee'), recheckReviewConfiguration: record('review'),
+  const ui = { renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton>' + String(l).replace(/[&<>"']/g, ch => '&#' + ch.charCodeAt(0) + ';') + '</span>' };
+  const actions = { runGithubSync: record('sync'), runStudentInvitationResend: record('resend'), recheckCommitteeConfiguration: record('committee'), recheckReviewConfiguration: record('review'),
     bootstrapAssessmentDefinitions: record('bootstrap'), initializeAssessmentStorage: record('storage'), changeTeamPageSize: record('size') };
   const publishing = { toggle: record('toggle'), refresh: record('refresh') };
   vm.runInContext('globalThis.__make = ' + c.systemStatusViewBrowser_.toString(), c);
-  const view = c.__make(bridge, () => ui, () => publishing);
+  const view = c.__make(bridge, () => ui, () => publishing, () => actions);
   const host = document.getElementById('systemStatusContent');
   view.render(host, dto);
   return { view, host, calls, window, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })) };

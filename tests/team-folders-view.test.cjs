@@ -15,9 +15,10 @@ function setup() {
   const c = loadSources(['data-bridge-client.js', 'system-status-view.js', 'system-status-actions.js'], { document, Promise, JSON, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const record = name => () => calls.push(name);
-  const ui = { busy:require('./busy-fixture.cjs')(), renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton>' + l + '</span>', recheckTeamFolders: record('recheck'), createTeamFolders: record('create') };
+  const ui = { busy:require('./busy-fixture.cjs')(), renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton>' + l + '</span>' };
+  const actions = { recheckTeamFolders: record('recheck'), createTeamFolders: record('create') };
   vm.runInContext('globalThis.__view = ' + c.systemStatusViewBrowser_.toString(), c);
-  const view = c.__view(bridge, () => ui, () => null);
+  const view = c.__view(bridge, () => ui, () => null, () => actions);
   const host = document.getElementById('systemStatusContent');
   view.render(host, STATUS_DTO);
   c.SystemStatusView = view;

@@ -323,7 +323,7 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
   for(const file of ['data-bridge-client.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','system-status-actions.js','student-github-actions.js','system-status-view.js','student-weekly-view.js','student-results-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript_(),browser);vm.runInContext(c.getDashboardStartScript_(),browser);
   const section=name=>document.querySelector('[data-drawer-section="'+name+'"]');
-  vm.runInContext("DashboardUI.focusCoordinatorTeam('A'); DashboardUI.focusCoordinatorTeam('B');",browser);
+  vm.runInContext("CoordinatorView.openTeam('A'); CoordinatorView.openTeam('B');",browser);
   assert.deepEqual(requests.map(r=>r.section),['basic','progress','activity','basic','progress','activity']);
   requests[3].success({title:'Team B project',students:[],reviewers:[]});await settle();
   assert(section('basic').textContent.includes('Team B project'));
@@ -340,7 +340,7 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   const expected=section('basic').innerHTML;
   requests[0].success(null);await settle();requests[0].failure({message:'A response'});await settle();
   assert.equal(section('basic').innerHTML,expected);
-  vm.runInContext('DashboardUI.closeCoordinatorTeamDrawer()',browser);
+  vm.runInContext("DashboardUI.closeDrawer('teamDrawer')",browser);
   requests[3].success(null);await settle();
   assert.equal(section('basic').innerHTML,expected);
   // Release every held read so the bridge leaves no timers behind.

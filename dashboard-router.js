@@ -168,6 +168,7 @@ ${getDashboardClientScript_()}
 ${getInternalAssessmentPublishingClientScript_()}
 ${getGuideEvaluationClientScript_()}
 ${getGuideWeeklyClientScript_()}
+${getWeeklySetupClientScript_()}
 ${getReviewEvaluationClientScript_()}
 ${getDashboardStartScript_()}
 </script>

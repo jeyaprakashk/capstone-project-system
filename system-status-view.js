@@ -5,7 +5,7 @@
  * #studentInvitationResend, [data-publishing], #committeeConfigurationCard, #reviewConfigurationCard,
  * #assessmentStorageSetup, #weeklyPhase2Setup ...). It never calls google.script.run.
  */
-function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
+function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions) {
   'use strict';
   const delegated = new WeakSet();
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -152,22 +152,22 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing) {
 
   function onChange(event) {
     const el = event.target;
-    if (el.getAttribute && el.getAttribute('data-action') === 'resend-size') getUi().changeTeamPageSize('invitations', el.value);
+    if (el.getAttribute && el.getAttribute('data-action') === 'resend-size') getActions().changeTeamPageSize('invitations', el.value);
   }
   function onClick(event) {
     const el = event.target.closest ? event.target.closest('[data-action]') : null;
     if (!el || el.disabled) return;
-    const ui = getUi(), action = el.getAttribute('data-action'), key = el.getAttribute('data-key');
-    if (action === 'github-sync') ui.runGithubSync();
-    else if (action === 'resend') ui.runStudentInvitationResend();
+    const actions = getActions(), action = el.getAttribute('data-action'), key = el.getAttribute('data-key');
+    if (action === 'github-sync') actions.runGithubSync();
+    else if (action === 'resend') actions.runStudentInvitationResend();
     else if (action === 'publishing-toggle') getPublishing().toggle(key);
     else if (action === 'publishing-refresh') getPublishing().refresh(key);
-    else if (action === 'team-folders-recheck') ui.recheckTeamFolders();
-    else if (action === 'team-folders-create') ui.createTeamFolders();
-    else if (action === 'committee-recheck') ui.recheckCommitteeConfiguration();
-    else if (action === 'review-recheck') ui.recheckReviewConfiguration();
-    else if (action === 'bootstrap-definitions') ui.bootstrapAssessmentDefinitions();
-    else if (action === 'storage-init') ui.initializeAssessmentStorage();
+    else if (action === 'team-folders-recheck') actions.recheckTeamFolders();
+    else if (action === 'team-folders-create') actions.createTeamFolders();
+    else if (action === 'committee-recheck') actions.recheckCommitteeConfiguration();
+    else if (action === 'review-recheck') actions.recheckReviewConfiguration();
+    else if (action === 'bootstrap-definitions') actions.bootstrapAssessmentDefinitions();
+    else if (action === 'storage-init') actions.initializeAssessmentStorage();
   }
 
   function load() { return bridge.read('system-status', 'API_coordinator_getSystemStatus', [], {timeoutMs:120000}); }
