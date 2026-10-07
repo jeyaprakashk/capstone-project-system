@@ -87,7 +87,7 @@ function API_reviewer_submitDecision(teamId, decision, notes) {
 const REVIEW_SAVE_KINDS_ = {draft:'saveReviewEvaluationDraft_', submit:'submitReviewEvaluation_', absence:'recordReviewAbsence_', makeupDraft:'saveReviewMakeupDraft_', makeupSubmit:'submitReviewMakeup_'};
 
 function API_review_getEvaluation(teamId, assessmentId) {
-  return apiHandle_(() => loadReviewEvaluation_(String(teamId || ''), String(assessmentId || '')));
+  return apiHandle_(() => withDashboardRead_(() => loadReviewEvaluation_(String(teamId || ''), String(assessmentId || ''))));
 }
 
 /** kind is one of draft, submit, absence, makeupDraft, makeupSubmit; the rules function validates the input. */

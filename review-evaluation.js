@@ -38,7 +38,7 @@ function reviewRecords_(key) {
   const storage=assessmentJournal_(assessmentDefinition_(key)),name=storage.name,sheet=storage.sheet;
   if (!sheet) return {sheet:null,records:[]};
   if(storage.state==='EMPTY')throw new Error(assessmentStorageMissing_(name));
-  const rows = sheet.getDataRange().getValues();
+  const rows = storage.rows || sheet.getDataRange().getValues();
   if (REVIEW_JOURNAL_HEADERS_.some((h,i)=>(rows[0]||[])[i]!==h)) throw new Error(name+' headers must be: '+REVIEW_JOURNAL_HEADERS_.join(', ')+'.');
   const groups=new Map();
   rows.slice(1).filter(r=>r[0]&&r[4]!=='publish').forEach(r=>{
@@ -93,7 +93,7 @@ function reviewStudentView_(config,teamScores,student) {
   if(!student.assessment || student.assessment.policyVersion!==config.academicPolicyVersion)throw new Error('Invalid finalized outcome policy.');
   return student;
 }
-function loadReviewEvaluation_(teamId,key) {return getReviewEvaluation_(teamId,key);}
+function loadReviewEvaluation_(teamId,key) {return withAssessmentDefinitions_(()=>getReviewEvaluation_(teamId,key));}
 function getReviewEvaluation_(teamId,key) {
   const context = reviewContext_(teamId,false,key), config = reviewConfiguration_(key);
   const history=reviewRecords_(key);

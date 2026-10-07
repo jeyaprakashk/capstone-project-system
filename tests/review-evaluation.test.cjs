@@ -202,7 +202,11 @@ test('missing storage, oversized payload and unavailable lock fail without revis
 });
 test('browser source is serializable and uses shared drawer layout',()=>{
   const c=vm.createContext({});vm.runInContext(fs.readFileSync('review-academic-policy.js','utf8'),c);vm.runInContext(fs.readFileSync('review-evaluation-client.js','utf8'),c);
-  new vm.Script(c.getReviewEvaluationClientScript_());assert.match(c.getReviewEvaluationClientScript_(),/className='open review-drawer[^']*'/);
+  new vm.Script(c.getReviewEvaluationClientScript_());assert.match(c.getReviewEvaluationClientScript_(),/drawer\.className=DRAWER/);
+  // A flex column with a flexible, scrolling body keeps the footer actions on screen; the dialog's UA box is reset.
+  const drawerClasses=fs.readFileSync('review-evaluation-client.js','utf8').match(/const DRAWER='([^']+)'/)[1].split(' ');
+  for(const name of ['hidden','open:flex','flex-col','overflow-hidden','m-0','p-0','border-0','bg-paper','backdrop:bg-scrim'])assert(drawerClasses.includes(name),name);
+  assert.match(fs.readFileSync('review-evaluation-client.js','utf8'),/team-drawer-content min-h-0 flex-1 overflow-y-auto/);
 });
 
 test('Review 2 checks history on load and save, and reopening removes completion',()=>{
@@ -286,7 +290,7 @@ function browserFixture(extended=false,key='review1') {
   };
   const trigger={isConnected:true,focus(){focusCount++;}};
   function runner(success,failure){return new Proxy({},{get:(_,name)=>name==='withSuccessHandler'?fn=>runner(fn,failure):name==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({name,args,success,failure})});}
-  const c=vm.createContext({ReviewerView:{refresh:()=>Promise.resolve(true)},console,confirm:()=>discard,prompt:()=>extended?'Reviewed assessment':null,window:{crypto,addEventListener(){}},document:{createElement:()=>drawer,body:{appendChild(){},classList:{add(){},remove(){}}},getElementById:()=>null},DashboardUI:{busy: require('./busy-fixture.cjs')(), ask:async ()=>discard,requestText:async ()=>extended?'Reviewed assessment':null,notify:async ()=>{},guideRun:()=>runner(),renderSkeleton:()=>'<p>Loading</p>',...(extended?{beginContentLoading(){loading.begun++;let settled=false;return()=>{if(!settled)loading.settled++;settled=true;};}}:{})}});
+  const c=vm.createContext({ReviewerView:{refresh:()=>Promise.resolve(true)},console,confirm:()=>discard,prompt:()=>extended?'Reviewed assessment':null,window:{crypto,addEventListener(){}},document:{createElement:()=>drawer,body:{appendChild(){},dataset:{},classList:{add(){},remove(){}}},getElementById:()=>null},DashboardUI:{busy: require('./busy-fixture.cjs')(), ask:async ()=>discard,requestText:async ()=>extended?'Reviewed assessment':null,notify:async ()=>{},guideRun:()=>runner(),renderSkeleton:()=>'<p>Loading</p>',...(extended?{beginContentLoading(){loading.begun++;let settled=false;return()=>{if(!settled)loading.settled++;settled=true;};}}:{})}});
   vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
   for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;
@@ -367,8 +371,8 @@ for(const key of ['review1','review2']) {
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
     const host=f.absenceNodes().get('0'),label={},summary={attrs:{},setAttribute(k,v){this.attrs[k]=v;},focus(){this.focused=true;},closest:()=>picker,hasAttribute:()=>false};
     const option={value:'NORMAL',checked:false,hasAttribute:a=>a==='data-attendance-option',closest:()=>host};
-    const picker={open:true,hasAttribute:a=>a==='data-attendance-picker',querySelector:s=>s==='summary'?summary:label,querySelectorAll:()=>[option],closest:()=>host};
-    host.nodes['[data-attendance-picker]']=picker;host.nodes['[data-attendance-picker] > summary']=summary;
+    const picker={open:true,hasAttribute:a=>a==='data-attendance-picker',querySelector:s=>s==='[data-attendance-summary]'?summary:label,querySelectorAll:()=>[option],closest:()=>host};
+    host.nodes['[data-attendance-picker]']=picker;host.nodes['[data-attendance-summary]']=summary;
     const all=f.drawer.querySelectorAll.bind(f.drawer);f.drawer.querySelectorAll=s=>s==='[data-attendance-picker]'?[picker]:all(s);
     f.events.change({target:option});
     assert.equal(host.controls.type.value,'NORMAL');assert.equal(label.textContent,'Present');assert.equal(option.checked,true);

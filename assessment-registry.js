@@ -39,10 +39,19 @@ function parseAssessmentDefinitions_(rows,timezone) {
   definitions.forEach(visit);
   return definitions.sort((a,b)=>a.sequence-b.sequence||a.key.localeCompare(b.key));
 }
+// Set only inside withAssessmentDefinitions_, so a request parses the definitions tab once.
+let assessmentDefinitionsMemo_=null;
 function getAssessmentDefinitions_() {
+  if(assessmentDefinitionsMemo_)return assessmentDefinitionsMemo_;
   const sheet=getSheet_('AssessmentDefinitions');
   if(!sheet)return [];
   return parseAssessmentDefinitions_(sheet.getDataRange().getValues(),getSpreadsheet_().getSpreadsheetTimeZone());
+}
+/** Runs a read with AssessmentDefinitions parsed once; nested calls share the outer copy. */
+function withAssessmentDefinitions_(read) {
+  if(assessmentDefinitionsMemo_)return read();
+  assessmentDefinitionsMemo_=getAssessmentDefinitions_();
+  try {return read();} finally {assessmentDefinitionsMemo_=null;}
 }
 /** Required consumers distinguish unfinished setup from a configured registry. */
 function requireAssessmentDefinitions_() {
@@ -90,7 +99,8 @@ function assessmentJournal_(definition) {
     if(REVIEW_JOURNAL_HEADERS_.some((h,i)=>(rows[0]||[])[i]!==h))throw new Error('Incompatible journal '+name+'. Existing data was left unchanged.');
     const entries=rows.slice(1).filter(r=>r.some(v=>String(v??'')!==''));
     if(entries.some(r=>normalizeText_(r[0])!==definition.key))throw new Error('Journal '+name+' contains another assessment or unidentified data. Existing data was left unchanged.');
-    return {sheet,name,state:'READY',hasRecords:!!entries.length};
+    // The rows ride along (not enumerable, so never spread or serialized) to spare reviewRecords_ a second full read.
+    return Object.defineProperty({sheet,name,state:'READY',hasRecords:!!entries.length},'rows',{value:rows});
   };
   const direct=inspect(configured,definition.journal);
   if(direct.hasRecords||direct.state==='READY'&&definition.journalConfigured!==false)return direct;
