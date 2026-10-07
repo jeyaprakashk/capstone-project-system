@@ -59,6 +59,7 @@ SOFTWARE.
   "chevron-down": "<path d=\"m6 9 6 6 6-6\" />",
   "chevron-right": "<path d=\"m9 18 6-6-6-6\" />",
   "chevron-left": "<path d=\"m15 18-6-6 6-6\" />",
+  "ellipsis-vertical": "<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"12\" cy=\"5\" r=\"1\" /><circle cx=\"12\" cy=\"19\" r=\"1\" />",
   "arrow-left": "<path d=\"m12 19-7-7 7-7\" /><path d=\"M19 12H5\" />",
   "arrow-right": "<path d=\"M5 12h14\" /><path d=\"m12 5 7 7-7 7\" />",
   "arrow-left-right": "<path d=\"M8 3 4 7l4 4\" /><path d=\"M4 7h16\" /><path d=\"m16 21 4-4-4-4\" /><path d=\"M20 17H4\" />",

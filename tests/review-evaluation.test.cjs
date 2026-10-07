@@ -274,12 +274,12 @@ function browserFixture(extended=false,key='review1') {
       }
     },get innerHTML(){return html;},
     querySelector(selector){
-      if(selector==='[data-summary-unsaved]' || selector.startsWith('[data-summary-values='))return headerNodes[selector]||={};
+      if(selector.startsWith('[data-student-score'))return headerNodes[selector]||={};
       if(selector.startsWith('[data-footer-team=') || selector.startsWith('[data-footer-individual=') || selector.startsWith('[data-footer-total='))return headerNodes[selector]||={};
       if(selector==='[data-team-mark]' || selector.startsWith('[data-individual-mark=') || selector.startsWith('[data-assessment-status='))return headerNodes[selector]||=( {} );
+      const criterion=selector.match(/^\[data-index="(\d+)"\]\[data-owner="([^"]+)"\]$/);if(criterion)return fields.find(f=>f.dataset.index===criterion[1] && f.dataset.owner===criterion[2]);
       if(extended){
         const absence=selector.match(/^\[data-absence="(\d+)"\]$/);if(absence)return absenceNodes.get(absence[1]);
-        const criterion=selector.match(/^\[data-index="(\d+)"\]\[data-owner="([^"]+)"\]$/);if(criterion)return fields.find(f=>f.dataset.index===criterion[1] && f.dataset.owner===criterion[2]);
         if(selector.startsWith('[data-decision-reason'))return {value:'Reviewed evidence'};
         if(selector.startsWith('[data-components'))return {value:'individual'};
         if(selector.startsWith('[data-decision='))return {value:'OTHER'};
@@ -388,11 +388,11 @@ for(const key of ['review1','review2']) {
   test(key+': makeup preview updates its total without resolving the saved pending result',async ()=>{
     const server=absenceFixture(key),input=server.input();input.students[0].absence=absence('REVIEW_DAY_ABSENCE',true);input.students[0].scores={};server.submit(input);
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(JSON.parse(JSON.stringify(server.load())));await f.click('data-target');
-    const field=f.fields().find(field=>field.dataset.owner==='0'),summary=f.drawer.querySelector('[data-summary-values="0"]');
+    const field=f.fields().find(field=>field.dataset.owner==='0'),score=f.drawer.querySelector('[data-student-score="0"]'),note=f.drawer.querySelector('[data-student-score-note="0"]');
     field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='32';f.events.input();
-    assert.match(summary.innerHTML,/<dd[^>]*>80 \/ 100<\/dd>/);assert.match(summary.innerHTML,/<dd[^>]*>Completed<\/dd>/);
+    assert.equal(score.textContent,'80 / 100');assert.equal(note.textContent,'Review total. Completed.');
     field.controls['[data-marks]'].value='';f.events.input();
-    assert.match(summary.innerHTML,/<dd[^>]*>Pending \/ 100<\/dd>/);assert.match(summary.innerHTML,/<dd[^>]*>Makeup Pending<\/dd>/);
+    assert.equal(score.textContent,'Pending / 100');assert.equal(note.textContent,'Review total. Makeup Pending.');
     assert.equal(server.load().evaluation.students[0].assessment.status,'MAKEUP_PENDING');assert.equal(f.requests.length,1);
   });
   test(key+': unselected attendance survives a draft and cannot become an absent zero or submitted result',()=>{
@@ -473,6 +473,19 @@ for(const key of ['review1','review2']) {
     f.events.click({target:pill});assert.equal(scrolled,false);assert.equal(content.scrollTop,120);assert.match(f.status.textContent,/outside/);
     field.controls['[data-marks]'].value='48';f.events.click({target:pill});assert.equal(scrolled,false);assert.equal(content.scrollTop,0);assert.equal(field.controls['[data-marks]'].value,'48');assert.equal(f.requests.length,1);
   });
+  test(key+': Prev and Next cross from team PIs to student PIs and block invalid marks',()=>{
+    const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+    for(const host of f.absenceNodes().values())host.controls.type.value='NORMAL';f.events.input();
+    const panels=Object.fromEntries(['team','individual'].map(name=>[name,{querySelectorAll:()=>[]}])),query=f.drawer.querySelector.bind(f.drawer);
+    f.drawer.querySelector=s=>s.startsWith('[data-criteria-group="')?panels[s.match(/"([^"]+)"/)[1]]:query(s);
+    const [team,first]=f.fields(),step=n=>{const button={dataset:{piStep:String(n)},disabled:false,hasAttribute:a=>a==='data-pi-step',closest:s=>s==='button'?button:null};f.events.click({target:button});};
+    const marks=team.controls['[data-marks]'];marks.checkValidity=()=>!marks.validity;Object.defineProperty(marks,'validationMessage',{get:()=>marks.validity});
+    team.controls['[data-level]'].value='3';marks.value='59';f.events.input();
+    step(1);assert.notEqual(panels.team.hidden,true);assert.match(f.status.textContent,/outside/);
+    marks.value='48';f.events.input();
+    step(1);assert.equal(panels.team.hidden,true);assert.equal(panels.individual.hidden,false);assert.equal(first.hidden,false);
+    step(-1);assert.equal(panels.team.hidden,false);assert.equal(panels.individual.hidden,true);assert.equal(marks.value,'48');assert.equal(f.requests.length,1);
+  });
   test(key+': tab progress counts valid grading and changes completion color',()=>{
     const f=browserFixture(true,key),row={},query=f.drawer.querySelector.bind(f.drawer);
     f.drawer.querySelector=selector=>selector==='[data-tab-progress]'?row:query(selector);
@@ -482,19 +495,19 @@ for(const key of ['review1','review2']) {
     const team=f.fields()[0];team.controls['[data-level]'].value='3';team.controls['[data-marks]'].value='48';f.events.input();
     assert.match(row.innerHTML,/data-completion="complete"[^>]*>1 of 1 graded/);
     const tab={dataset:{criteriaTab:'individual'},hasAttribute:a=>a==='data-criteria-tab',closest:s=>s==='button'?tab:null};
-    f.events.click({target:tab});assert.match(row.innerHTML,/Students/);assert.match(row.innerHTML,/0 of 2 graded/);
+    f.events.click({target:tab});assert.match(row.innerHTML,/Student performance indicators/);assert.match(row.innerHTML,/data-completion="empty"[^>]*>0 of 1 graded/);
     const students=f.fields().filter(field=>field.dataset.owner!=='team');
-    students[0].controls['[data-level]'].value='3';students[0].controls['[data-marks]'].value='32';f.events.input();
-    assert.match(row.innerHTML,/data-completion="partial"[^>]*>1 of 2 graded/);
     students[1].controls['[data-level]'].value='3';students[1].controls['[data-marks]'].value='32';f.events.input();
-    assert.match(row.innerHTML,/data-completion="complete"[^>]*>2 of 2 graded/);
+    assert.match(row.innerHTML,/data-completion="empty"[^>]*>0 of 1 graded/);
+    students[0].controls['[data-level]'].value='3';students[0].controls['[data-marks]'].value='32';f.events.input();
+    assert.match(row.innerHTML,/data-completion="complete"[^>]*>1 of 1 graded/);
     students[0].controls['[data-marks]'].value='99';f.events.input();
-    assert.match(row.innerHTML,/data-completion="partial"[^>]*>1 of 2 graded/);
+    assert.match(row.innerHTML,/data-completion="empty"[^>]*>0 of 1 graded/);
   });
   test(key+': component tabs switch without reload, preserve entries and support arrow navigation',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
     assert(f.drawer.innerHTML.indexOf('review-project-title-row')<f.drawer.innerHTML.indexOf('role="tablist"'));
-    assert.match(f.drawer.innerHTML,/Team Criteria<\/span><span>60 pts pool<\/span>/);assert.match(f.drawer.innerHTML,/Individual<\/span><span>40 pts weight<\/span>/);
+    assert.match(f.drawer.innerHTML,/Team Criteria<\/span><span[^>]*>· 60 pts pool<\/span>/);assert.match(f.drawer.innerHTML,/Individual<\/span><span[^>]*>· 40 pts weight<\/span>/);
     const panels=Object.fromEntries(['team','individual'].map(name=>[name,{hidden:name!=='team',open:name==='team',querySelectorAll:()=>[]}]));
     const tabs=Object.fromEntries(['team','individual'].map(name=>[name,{dataset:{criteriaTab:name},attrs:{},hasAttribute:attr=>attr==='data-criteria-tab',setAttribute(k,v){this.attrs[k]=v;},focus(){this.focused=true;},closest(selector){return selector==='button'?this:null;}}]));
     const chips={},query=f.drawer.querySelector.bind(f.drawer);
@@ -515,7 +528,8 @@ for(const key of ['review1','review2']) {
     f.events.input();assert.equal(values.hidden,true);
     field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='48';f.events.input();
     assert.equal(values.hidden,false);assert.match(values.innerHTML,/<span>45<\/span>/);
-    assert.match(values.innerHTML,/<span class="font-semibold text-primary">48<\/span>/);assert.match(values.innerHTML,/<span>50.5<\/span>/);
+    // Eleven half-mark steps have no even spacing of seven or fewer labels, so only the ends show.
+    assert.match(values.innerHTML,/<span class="flex justify-between"><span>45<\/span><span>50.5<\/span><\/span>/);
     field.controls['[data-level]'].value='5';field.controls['[data-marks]'].value='60';f.events.input();
     assert.match(values.innerHTML,/<span>57<\/span>/);assert.match(values.innerHTML,/<span class="font-semibold text-primary">60<\/span>/);
   });
@@ -534,7 +548,8 @@ for(const key of ['review1','review2']) {
     f.events.click({target:chips[0]});assert.equal(panels[0].hidden,false);assert.equal(field.controls['[data-marks]'].value,'32');assert.equal(field.controls['[data-remark]'].value,'Unsaved feedback');assert.equal(f.requests.length,1);
     f.click('data-draft');f.events.click({target:chips[1]});assert.equal(panels[0].hidden,false);
     f.requests[1].failure({message:'Offline'});f.events.click({target:chips[1]});assert.equal(panels[1].hidden,false);
-    assert.match(f.drawer.innerHTML,/<small>s1<\/small>/);
+    assert.match(f.drawer.innerHTML,/data-select-student="0"[^>]*><span[^>]*>O<\/span><span class="font-semibold tabular-nums">s1<\/span>/);
+    assert.doesNotMatch(f.drawer.innerHTML,/data-assessment-summary|Assessment Summary/);
   });
   test(key+': individual rubric visibility follows attendance and preserves unsaved entries',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
@@ -821,19 +836,17 @@ function feedbackFixture() {
   const edit=value=>{remark.value=value;f.events.input();};
   return {...f,field,remark,pick,pills,toggle,edit};
 }
-test('header student scores update independently with shared marks and normalize to 100',()=>{
-  const f=browserFixture(),scores=[{},{}],query=f.drawer.querySelector.bind(f.drawer);
-  f.drawer.querySelector=selector=>selector.startsWith('[data-student-score=')?scores[Number(selector.match(/\d+/)[0])]:query(selector);
+test('student chips show each student\'s Review total preview',()=>{
+  const f=browserFixture(),scores=[{},{}],notes=[{},{}],query=f.drawer.querySelector.bind(f.drawer);
+  f.drawer.querySelector=selector=>selector.startsWith('[data-student-score=')?scores[Number(selector.match(/\d+/)[0])]:selector.startsWith('[data-student-score-note=')?notes[Number(selector.match(/\d+/)[0])]:query(selector);
   f.data.config.maximum=50;f.data.config.criteria[0].maxMarks=30;f.data.config.criteria[1].maxMarks=20;
   f.api.open('T1',f.trigger);f.requests[0].success(f.data);
-  assert.deepEqual(scores.map(s=>s.textContent),['— / 100','— / 100']);
+  assert.deepEqual(scores.map(s=>s.textContent),['Incomplete / 50','Incomplete / 50']);
   f.fields().forEach((field,i)=>{field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value=['24','16','15.5'][i];});f.events.input();
-  assert.deepEqual(scores.map(s=>s.textContent),['80 / 100','79 / 100']);
-  assert.equal(scores[0].title,'Score out of 100');
-  f.fields()[0].controls['[data-level]'].value='0';f.fields()[0].controls['[data-marks]'].value='0';f.events.input();
-  assert.deepEqual(scores.map(s=>s.textContent),['32 / 100','31 / 100']);
-  f.fields()[1].controls['[data-marks]'].value='';f.events.input();assert.equal(scores[0].textContent,'0 / 100');assert.equal(scores[0].title,'Score so far out of 100');
-  f.fields()[0].controls['[data-marks]'].value='';f.events.input();assert.equal(scores[0].textContent,'— / 100');
+  assert.deepEqual(scores.map(s=>s.textContent),['40 / 50','39.5 / 50']);
+  assert.equal(notes[0].textContent,'Review total. Completed.');
+  f.fields()[1].controls['[data-marks]'].value='';f.events.input();
+  assert.deepEqual(scores.map(s=>s.textContent),['Incomplete / 50','39.5 / 50']);assert.equal(notes[0].textContent,'Review total. Assessment Incomplete.');
 });
 test('level changes clear saved team and individual marks without assigning replacement scores',async ()=>{
   const f=browserFixture(),scores=[{},{}],progress={},query=f.drawer.querySelector.bind(f.drawer);
@@ -842,17 +855,17 @@ test('level changes clear saved team and individual marks without assigning repl
   f.data.evaluation={teamScores:{T:{level:3,marks:48,remark:'Team feedback'}},students:f.data.roster.students.map(s=>({register:s.register,scores:{I:{level:3,marks:32,remark:'Individual feedback'}}}))};
   f.api.open('T1',f.trigger);f.requests[0].success(f.data);
   const [team,student,other]=f.fields(),pick=(field,n)=>f.events.click({target:field.querySelectorAll('[data-pick-level]')[n]});
-  assert.equal(team.controls['[data-marks]'].value,'48');assert.match(progress.innerHTML,/3 of 3<\/strong> criteria evaluated/);
+  assert.equal(team.controls['[data-marks]'].value,'48');assert.equal(progress.textContent,'All criteria evaluated');
   pick(team,3);assert.equal(team.controls['[data-marks]'].value,'48');assert.equal(team.controls['[data-remark]'].value,'Team feedback');
   pick(team,4);assert.equal(team.controls['[data-marks]'].value,'');assert.equal(team.controls['[data-remark]'].value,'');
   assert.equal(team.querySelector('[data-awarded-total]').textContent,'—/60');assert.equal(team.controls['[data-marks-slider]'].value,51);
   assert.equal(f.status.textContent,'Level changed. Enter marks for the selected level.');
-  assert.deepEqual(scores.map(s=>s.textContent),['32 / 100','32 / 100']);assert.match(progress.innerHTML,/2 of 3<\/strong> criteria evaluated/);
+  assert.deepEqual(scores.map(s=>s.textContent),['Incomplete / 100','Incomplete / 100']);assert.equal(progress.textContent,'1 criterion remaining');
   student.controls['[data-level]'].value='0';student.controls['[data-marks]'].value='0';student.controls['[data-remark]'].value='Needs improvement';f.events.input();
   pick(student,0);assert.equal(student.controls['[data-marks]'].value,'0');
   pick(student,1);assert.equal(student.controls['[data-marks]'].value,'');assert.equal(student.controls['[data-remark]'].value,'');
   assert.equal(other.controls['[data-marks]'].value,'32');assert.equal(other.controls['[data-remark]'].value,'Individual feedback');
-  assert.deepEqual(scores.map(s=>s.textContent),['— / 100','32 / 100']);assert.match(progress.innerHTML,/1 of 3<\/strong> criteria evaluated/);
+  assert.deepEqual(scores.map(s=>s.textContent),['Incomplete / 100','Incomplete / 100']);assert.equal(progress.textContent,'2 criteria remaining');
   f.discard(false);await f.click('data-close');assert.equal(f.drawer.open,true);
   await f.click('data-submit');assert.equal(f.requests.length,1);
   await f.click('data-draft');const saved=f.requests[1].args[0];assert.equal(saved.teamScores.T.marks,null);assert.equal(saved.students[0].scores.I.marks,null);
@@ -865,10 +878,10 @@ test('level changes clear saved team and individual marks without assigning repl
 
 test('feedback pills toggle repeatedly without duplicate text and retain stable controls',()=>{
   const f=feedbackFixture(),pill=f.pills()[1];f.toggle(1);const suggestion=f.remark.value;
-  assert.match(pill.innerHTML,/lucide-check/);assert(pill.innerHTML.endsWith(' '+suggestion));assert.equal(pill.title,'Remove this feedback');
+  assert.match(pill.innerHTML,/lucide-check/);assert(pill.innerHTML.endsWith(' '+suggestion));assert.equal(pill.attrs['aria-pressed'],'true');assert.equal(pill.title,undefined);
   for(let i=0;i<10;i++){f.toggle(1);assert.equal(f.remark.value,'');f.toggle(1);assert.equal(f.remark.value,suggestion);}
   assert.equal(f.pills()[1],pill);assert.equal(pill.disabled,false);
-  f.toggle(1);assert.match(pill.innerHTML,/lucide-plus/);assert(pill.innerHTML.endsWith(' '+suggestion));assert.equal(pill.title,'Add this feedback');
+  f.toggle(1);assert.match(pill.innerHTML,/lucide-plus/);assert(pill.innerHTML.endsWith(' '+suggestion));assert.equal(pill.attrs['aria-pressed'],'false');assert.equal(pill.title,undefined);
 });
 test('manual deletion and undo resynchronize pill selection without rebuilding buttons',()=>{
   const f=feedbackFixture();f.toggle(0);f.toggle(1);const both=f.remark.value,first=both.split('\n')[0],pill=f.pills()[1];
@@ -1016,8 +1029,8 @@ for(const key of ['review1','review2','review_extra']) {
     assert.equal(b.drawer.innerHTML.includes('Conduct Makeup Assessment'),false);
     let host=b.absenceNodes().get('0');assert.equal(host.controls.approved.disabled,false);
     assert(b.fields().every(field=>field.controls['[data-marks]'].disabled));
-    host.controls.approved.value='no';b.events.input();assert.equal(b.drawer.querySelector('[data-summary-unsaved]').hidden,false);
-    assert.match(b.drawer.querySelector('[data-summary-values="0"]').innerHTML,/48/);
+    host.controls.approved.value='no';b.events.input();
+    assert.equal(b.drawer.querySelector('[data-student-score="0"]').textContent,'48 / 100');
     await b.click('data-record-absence');const first=b.requests[1];assert.equal(first.name,'recordReviewAbsence_');assert.equal(first.args[0].assessmentId,key);assert.equal(first.args[0].reason,undefined);
     await b.click('data-record-absence');assert.equal(b.requests.length,2);
     first.failure({message:'Offline'});assert.equal(host.controls.approved.value,'no');assert.equal(host.controls.approved.disabled,false);

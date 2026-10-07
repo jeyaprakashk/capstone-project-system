@@ -10,12 +10,15 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   const ICON_BUTTON='border-0 inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-paper text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50';
   const BUTTON='border-0 inline-flex min-h-10 items-center justify-center rounded-md bg-paper px-4 py-2 font-sans text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50';
   const PRIMARY='border-0 inline-flex min-h-10 items-center justify-center rounded-md bg-primary px-4 py-2 font-sans text-sm font-semibold text-paper hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50';
-  const SEGMENTED='mt-3 flex flex-wrap gap-1 rounded-xl bg-tint p-1';
-  const PILL='border-0 inline-flex min-h-10 items-center gap-2 rounded-lg bg-transparent px-3 py-1.5 text-left font-sans text-sm text-ink-2 hover:bg-paper aria-pressed:bg-paper aria-pressed:font-semibold aria-pressed:text-primary aria-pressed:shadow-selected disabled:cursor-not-allowed disabled:opacity-50 [&[data-complete=true]_[data-pi-icon]]:text-success';
-  const LEVELS='mt-2 grid grid-cols-6 gap-1 rounded-xl bg-tint p-1';
+  // Menus are native <details>; their items carry no display utility because scripts toggle them with `hidden`.
+  const MENU_SUMMARY='list-none cursor-pointer [&::-webkit-details-marker]:hidden';
+  const MENU_PANEL='absolute z-20 mt-1 rounded-card border border-edge bg-paper p-1 shadow-overlay';
+  const MENU_ITEM='border-0 w-full rounded-md bg-transparent px-3 py-2 text-left font-sans text-sm text-ink hover:bg-tint aria-pressed:bg-tint aria-pressed:text-primary disabled:cursor-not-allowed disabled:opacity-50 [&[data-complete=true]_[data-pi-icon]]:text-success';
+  const SEGMENT='h-1.5 flex-1 rounded-full bg-edge data-[state=complete]:bg-success data-[state=current]:bg-primary';
+  const LEVELS='mt-4 grid grid-cols-6 gap-1 rounded-xl bg-tint p-1';
   const LEVEL='border-0 flex min-h-12 min-w-0 flex-col items-center justify-center rounded-lg bg-transparent px-1 py-1.5 font-sans text-sm tabular-nums text-ink-2 hover:bg-paper aria-pressed:bg-primary aria-pressed:text-paper aria-pressed:shadow-selected disabled:cursor-not-allowed disabled:opacity-50';
   const FEEDBACK='border-0 flex w-full items-start gap-2 rounded-lg bg-paper px-3 py-2 text-left font-sans text-sm text-ink-2 ring-1 ring-inset ring-edge hover:bg-tint aria-pressed:bg-tint aria-pressed:text-primary aria-pressed:ring-primary disabled:cursor-not-allowed disabled:opacity-50';
-  const TAB='border-x-0 border-t-0 flex flex-1 flex-col items-start gap-0.5 border-b-[3px] border-transparent bg-transparent px-3 py-2.5 text-left font-sans text-xs text-muted hover:text-ink aria-selected:border-primary aria-selected:text-primary disabled:cursor-not-allowed disabled:opacity-50';
+  const TAB='border-x-0 border-t-0 flex flex-1 flex-wrap items-baseline gap-x-1.5 border-b-[3px] border-transparent bg-transparent px-1 py-3 text-left font-sans text-sm text-ink-2 hover:text-ink aria-selected:border-primary aria-selected:text-primary disabled:cursor-not-allowed disabled:opacity-50';
   const CHIP='flex min-w-24 flex-col items-center gap-0.5 rounded-tile border border-edge bg-paper px-3 py-2 font-sans text-sm text-ink hover:border-line aria-pressed:border-primary aria-pressed:bg-tint aria-pressed:ring-1 aria-pressed:ring-primary disabled:cursor-not-allowed disabled:opacity-60';
   const AVATARS=['bg-teal-700','bg-purple-700','bg-primary'];
   const FIELD='h-10 rounded-md border border-control bg-paper px-3 py-2 font-sans text-sm text-ink';
@@ -24,11 +27,10 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   // Radios, checkboxes and the slider opt out of the base text-field box (fixed height, padding, border).
   const CHOICE='flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 text-sm font-normal text-ink hover:bg-tint has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60';
   const CHECK='m-0 size-5 min-h-0 shrink-0 cursor-pointer rounded-none border-0 bg-transparent p-0 accent-primary';
-  const RANGE='mt-3 block h-6 min-h-0 w-full cursor-pointer rounded-none border-0 bg-transparent p-0 accent-primary disabled:cursor-not-allowed';
-  const PROGRESS='mt-1.5 block h-2 w-full appearance-none overflow-hidden rounded border-0 bg-tint [&::-webkit-progress-bar]:bg-tint [&::-webkit-progress-value]:rounded [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary';
+  const RANGE='block h-6 min-h-0 w-full cursor-pointer rounded-none border-0 bg-transparent p-0 accent-primary disabled:cursor-not-allowed';
+  const STEP='border-0 inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-paper hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-soft disabled:text-muted';
   const CARD='rounded-card border border-edge bg-paper p-4 shadow-card';
   const BADGE='rounded-md bg-tint px-2 py-0.5 text-xs font-semibold text-primary';
-  const ACTIONS='flex flex-wrap items-center gap-2';
   const SUMMARY_TONE={complete:'text-success',pending:'text-warning',incomplete:'text-ink'};
   const day=value=>new Date(value*86400000).toISOString().slice(0,10);
   const requestId=()=>window.crypto.randomUUID();
@@ -96,19 +98,19 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function hiddenStudent(index) {return targeted?targeted.index!==index:focusedAssessment() && !pendingStudents().includes(index) && !absenceCorrectable(index);}
   function absenceCorrectable(index) {const a=savedStudent(index).assessment;return !!a && (['REVIEW_DAY_ABSENCE','PROLONGED'].includes(a.facts.type) || a.nextActions?.makeup);}
   function criteriaTabs() {
-    return '<div class="review-criteria-tabs flex gap-1 border-b border-edge" role="tablist" aria-label="Assessment components">'+['team','individual'].map(component=>{
+    return '<div class="review-criteria-tabs mt-3 flex gap-4 border-b border-edge" role="tablist" aria-label="Assessment components">'+['team','individual'].map(component=>{
       const label=component==='team'?'Team Criteria':'Individual',max=model.config.criteria.filter(c=>c.type.toLowerCase()===component).reduce((sum,c)=>sum+c.maxMarks,0);
-      return '<button type="button" class="'+TAB+'" role="tab" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-selected="'+(activeCriteria===component)+'" tabindex="'+(activeCriteria===component?'0':'-1')+'"><span class="inline-flex items-center gap-2 text-sm font-semibold">'+DashboardUI.renderIcon(component==='team'?'users':'user')+label+'</span><span>'+max+' pts '+(component==='team'?'pool':'weight')+'</span></button>';
+      return '<button type="button" class="'+TAB+'" role="tab" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-selected="'+(activeCriteria===component)+'" tabindex="'+(activeCriteria===component?'0':'-1')+'"><span class="font-semibold">'+label+'</span><span class="text-xs text-muted">· '+max+' pts '+(component==='team'?'pool':'weight')+'</span></button>';
     }).join('')+'</div>';
   }
-  let gradingProgress={team:{graded:0,total:0},individual:{graded:0,total:0}},activeTeamPI=null,activeStudentPIs={};
+  let activeTeamPI=null,activeStudentPIs={};
   function piPillLabel(c) {
-    return '<span data-pi-icon class="inline-flex shrink-0">'+DashboardUI.renderIcon('clock')+'</span><span class="flex flex-col leading-tight"><strong>'+escape(c.pi+'–'+c.co)+'</strong><small class="text-xs font-normal text-muted">0–'+escape(c.maxMarks)+' marks</small></span>';
+    return '<span class="flex items-center gap-3"><span data-pi-icon class="inline-flex shrink-0">'+DashboardUI.renderIcon('clock')+'</span><span class="flex min-w-0 flex-col leading-snug"><strong>'+escape(c.pi+' · '+c.co)+'</strong><small class="truncate text-xs font-normal text-muted">'+escape(c.name)+' · 0–'+escape(c.maxMarks)+' marks</small></span></span>';
   }
   function individualPills(owner) {
-    return '<div class="'+SEGMENTED+' mb-4" data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators">'+model.config.criteria.map((c,index)=>{
+    return '<div data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators">'+model.config.criteria.map((c,index)=>{
       if(c.type!=='Individual' && !(targeted && targeted.index===owner && targeted.components.includes('team')))return '';
-      return '<button type="button" class="'+PILL+'" data-select-individual-pi="'+index+'" data-student="'+owner+'" aria-pressed="false" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>';
+      return '<button type="button" class="'+MENU_ITEM+'" data-select-individual-pi="'+index+'" data-student="'+owner+'" aria-pressed="false">'+piPillLabel(c)+'</button>';
     }).join('')+'</div>';
   }
   function syncIndividualCards() {
@@ -116,7 +118,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     model.roster.students.forEach((student,index)=>{
       const available=fields.filter(field=>Number(field.dataset.owner)===index && showRubric(field));
       if(!available.some(field=>Number(field.dataset.index)===activeStudentPIs[index]))activeStudentPIs[index]=available.length?Number(available[0].dataset.index):null;
-      const pills=drawer.querySelector('[data-individual-pills="'+index+'"]');if(pills)pills.hidden=!available.length;
+      const pills=drawer.querySelector('[data-individual-pills="'+index+'"]');if(pills)pills.hidden=!available.length || activeCriteria!=='individual' || index!==activeStudent;
       fields.filter(field=>Number(field.dataset.owner)===index).forEach(field=>{
         const applicable=available.includes(field),selected=Number(field.dataset.index)===activeStudentPIs[index];
         field.hidden=!applicable || !selected;
@@ -128,12 +130,57 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function teamPills() {
     const criteria=model.config.criteria.map((c,index)=>({c,index})).filter(({c})=>c.type==='Team');
     if(!criteria.some(({index})=>index===activeTeamPI))activeTeamPI=criteria.length?criteria[0].index:null;
-    return '<div class="'+SEGMENTED+'" data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" class="'+PILL+'" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'" title="'+escape(c.name)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
+    return '<div data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" class="'+MENU_ITEM+'" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
+  }
+  // PI cards in the selected tab: the team's, or the selected student's.
+  function contextFields() {
+    return Array.from(drawer.querySelectorAll('[data-index]')).filter(field=>(activeCriteria==='team'?field.dataset.owner==='team':field.dataset.owner===String(activeStudent)) && showRubric(field));
   }
   function updateTabProgress() {
     const row=drawer.querySelector('[data-tab-progress]');if(!row)return;
-    const {graded,total}=gradingProgress[activeCriteria],status=total>0 && graded===total?'complete':graded>0?'partial':'empty';
-    row.innerHTML='<span class="font-semibold text-ink-2">'+(activeCriteria==='team'?'Performance Indicators':'Students')+'</span><span data-completion="'+status+'" class="ml-3 rounded-md bg-soft px-2 py-0.5 text-xs font-semibold text-muted data-[completion=complete]:bg-success-tint data-[completion=complete]:text-success data-[completion=partial]:bg-warning-tint data-[completion=partial]:text-warning">'+graded+' of '+total+' graded</span>';
+    const fields=contextFields(),graded=fields.filter(field=>field.dataset.graded==='true').length,total=fields.length,status=total>0 && graded===total?'complete':graded>0?'partial':'empty';
+    setHtml(row,'<span class="sr-only">'+(activeCriteria==='team'?'Performance Indicators':'Student performance indicators')+': </span><span data-completion="'+status+'" class="text-xs text-muted data-[completion=complete]:font-semibold data-[completion=complete]:text-success">'+graded+' of '+total+' graded</span>');
+  }
+  // Prev/Next walk every applicable PI of this evaluation: team PIs, then each student's, in roster order.
+  const fieldKey=field=>[field.dataset.owner==='team'?-1:Number(field.dataset.owner),Number(field.dataset.index)];
+  const compareKeys=(a,b)=>a[0]-b[0] || a[1]-b[1];
+  function navigationFields() {
+    const all=Array.from(drawer.querySelectorAll('[data-index]'));
+    if(correctionIndex!==null)return all.filter(field=>field.dataset.owner===String(correctionIndex) && showRubric(field));
+    return all.filter(field=>showRubric(field) && (field.dataset.owner==='team' || !hiddenStudent(Number(field.dataset.owner))));
+  }
+  function currentKey() {
+    if(activeCriteria==='team')return [-1,activeTeamPI??-1];
+    return [activeStudent,activeStudentPIs[activeStudent]??-1];
+  }
+  function currentField() {
+    const key=currentKey();
+    return Array.from(drawer.querySelectorAll('[data-index]')).find(field=>!compareKeys(fieldKey(field),key) && showRubric(field));
+  }
+  function stepTarget(direction) {
+    const key=currentKey(),after=navigationFields().filter(field=>compareKeys(fieldKey(field),key)*direction>0);
+    return direction>0?after[0]:after[after.length-1];
+  }
+  function closePiMenu() {const menu=drawer.querySelector('[data-pi-menu]');if(menu)menu.open=false;}
+  /** Shows one PI card after validating the visible one; focusLevel moves focus to the new card's levels. */
+  function goToField(field,focusLevel) {
+    if(busy || reading || !field || !showRubric(field))return false;
+    const current=currentField();
+    if(current && !validateClosingGroup({querySelectorAll:()=>[current]}))return false;
+    if(field.dataset.owner==='team'){activeCriteria='team';activeTeamPI=Number(field.dataset.index);}
+    else {activeCriteria='individual';activeStudent=Number(field.dataset.owner);activeStudentPIs[activeStudent]=Number(field.dataset.index);syncStudentSelection();}
+    syncCriteriaTabs();closePiMenu();
+    const content=drawer.querySelector('[data-drawer-content]');if(content)content.scrollTop=0;
+    if(focusLevel){const level=field.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});}
+    return true;
+  }
+  function updateNavigator() {
+    const current=currentField(),label=drawer.querySelector('[data-pi-current]');
+    if(label){const c=current && model.config.criteria[Number(current.dataset.index)];label.textContent=c?c.pi+' · '+c.co:activeCriteria==='individual'?'Select attendance to assess':'No criteria';}
+    [-1,1].forEach(step=>{const blocked=busy || reading || !stepTarget(step);['top','bottom'].forEach(place=>{const button=drawer.querySelector('[data-pi-step="'+step+'"][data-pi-place="'+place+'"]');if(button)button.disabled=blocked;});});
+    const segments=drawer.querySelector('[data-pi-segments]');
+    if(segments)setHtml(segments,contextFields().map(field=>'<span class="'+SEGMENT+'" data-state="'+(field===current?'current':field.dataset.graded==='true'?'complete':'pending')+'"></span>').join(''));
+    updateTabProgress();
   }
   function syncCriteriaTabs() {
     for(const component of ['team','individual']) {
@@ -142,12 +189,11 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       if(panel){panel.hidden=!selected;panel.open=selected;}
     }
     const students=drawer.querySelector('[data-review-students]');if(students)students.hidden=activeCriteria!=='individual';
-    const assessmentSummary=drawer.querySelector('[data-assessment-summary]');if(assessmentSummary)assessmentSummary.hidden=activeCriteria!=='individual';
-    updateTabProgress();
     const pills=drawer.querySelector('[data-team-pills]');if(pills)pills.hidden=activeCriteria!=='team';
     model.config.criteria.forEach((c,index)=>{const button=drawer.querySelector('[data-select-pi="'+index+'"]');if(button){button.disabled=busy || reading;button.setAttribute('aria-pressed',String(index===activeTeamPI));}});
     syncTeamCards();
     syncIndividualCards();
+    updateNavigator();
   }
   function syncTeamCards() {
     drawer.querySelectorAll('[data-index]').forEach(field=>{if(field.dataset.owner==='team')field.hidden=!showRubric(field) || Number(field.dataset.index)!==activeTeamPI;});
@@ -164,8 +210,6 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       const selected=index===activeStudent,group=drawer.querySelector('[data-student-group="'+index+'"]'),chip=drawer.querySelector('[data-select-student="'+index+'"]');
       if(group){group.hidden=hiddenStudent(index) || !selected;group.open=selected;}
       if(chip){chip.setAttribute('aria-pressed',String(selected));chip.disabled=busy || reading;}
-      const summary=drawer.querySelector('[data-summary-student="'+index+'"]');
-      if(summary)summary.hidden=hiddenStudent(index) || !selected;
     });
   }
   async function selectStudent(index) {
@@ -179,28 +223,17 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if(group)revealCriterion(group);
   }
   function studentChips(students) {
-    return '<ul data-review-students aria-label="Select student" class="mb-0 mt-3 flex list-none flex-wrap gap-2 p-0">'+students.map((s,index)=>{
-      const words=String(s.name||s.register).trim().split(/\s+/),short=words[0]+(words.length>1?' '+words[words.length-1].charAt(0)+'.':'');
+    return '<div data-review-students><ul aria-label="Select student" class="mb-0 mt-3 flex list-none flex-wrap gap-2 p-0">'+students.map((s,index)=>{
+      const words=String(s.name||s.register).trim().split(/\s+/);
       const initials=words.map(w=>w.charAt(0)).slice(0,2).join('');
-      return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" class="'+CHIP+'" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" title="'+escape(s.name+' ('+s.register+')')+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'"><span class="inline-flex size-8 items-center justify-center rounded-full text-xs font-bold text-paper '+AVATARS[index%3]+'" aria-hidden="true">'+escape(initials)+'</span><span class="font-semibold">'+escape(short)+'</span><small>'+escape(s.register)+'</small><span data-student-score="'+index+'" class="text-xs font-semibold tabular-nums text-primary">— / '+model.config.maximum+'</span></button></li>';
-    }).join('')+'</ul>';
+      return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" class="'+CHIP+'" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'" aria-describedby="'+reviewKey+'Score-'+index+' '+reviewKey+'ScoreNote-'+index+'"><span class="inline-flex size-8 items-center justify-center rounded-full text-xs font-bold text-paper '+AVATARS[index%3]+'" aria-hidden="true">'+escape(initials)+'</span><span class="font-semibold tabular-nums">'+escape(s.register)+'</span><span data-student-score="'+index+'" id="'+reviewKey+'Score-'+index+'" class="text-xs font-semibold tabular-nums text-primary">— / '+model.config.maximum+'</span><span class="sr-only" data-student-score-note="'+index+'" id="'+reviewKey+'ScoreNote-'+index+'"></span></button></li>';
+    }).join('')+'</ul></div>';
   }
-  function assessmentSummaryCard(students) {
-    return '<section class="mb-4 '+CARD+'" data-assessment-summary aria-live="polite" aria-label="Assessment Summary"><h3 class="m-0 flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">Assessment Summary <small data-summary-unsaved hidden class="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-semibold text-warning">Unsaved preview</small></h3>'+students.map((student,index)=>assessmentSummary(index)).join('')+'</section>';
-  }
-  function assessmentSummary(index) {
-    const student=savedStudent(index).assessment?savedStudent(index):(model.assessmentResults||[]).find(s=>s.register===model.roster.students[index].register)||{};
-    const actions=!model.availability.editable && !targeted && correctionIndex===null && student.assessment?makeupControls(index,student):'';
-    return '<div data-summary-student="'+index+'"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+'><dl data-summary-values="'+index+'" class="m-0 mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">'+assessmentSummaryValues(student)+'</dl>'+(actions?'<div class="mt-3">'+actions+'</div>':'')+'</div>';
-  }
-  function assessmentSummaryValues(student) {
-    const a=student.assessment||{},maximum=type=>model.config.criteria.filter(c=>c.type===type).reduce((sum,c)=>sum+c.maxMarks,0);
-    const component=(value,state)=>value!=null?mark(value):state==='PENDING'?'Pending':'Unassessed';
-    const unresolved=a.teamState==='PENDING' || a.individualState==='PENDING'?'Pending':'Incomplete';
-    const labels={COMPLETED:'Completed',MAKEUP_PENDING:'Makeup Pending',INCOMPLETE:'Assessment Incomplete'};
-    const cells=[['Team Mark',component(a.teamMark,a.teamState)+' / '+maximum('Team')],['Individual Mark',component(a.individualMark,a.individualState)+' / '+maximum('Individual')],['Review Total',(student.total==null?unresolved:mark(student.total))+' / '+model.config.maximum]];
-    const tone=a.status==='COMPLETED'?'complete':a.status==='MAKEUP_PENDING'?'pending':'incomplete';
-    return cells.map(([label,value],index)=>'<div'+(index===2?' data-resolved="'+(student.total!=null)+'"':'')+'><dt class="text-xs font-medium text-muted">'+label+'</dt><dd class="m-0 mt-0.5 text-base font-semibold tabular-nums text-ink">'+escape(value)+'</dd></div>').join('')+'<div data-tone="'+tone+'"><dt class="text-xs font-medium text-muted">Assessment Status</dt><dd class="m-0 mt-0.5 font-semibold '+SUMMARY_TONE[tone]+'">'+escape(labels[a.status]||'Assessment Incomplete')+'</dd></div>';
+  const STATUS_LABELS={COMPLETED:'Completed',MAKEUP_PENDING:'Makeup Pending',INCOMPLETE:'Assessment Incomplete'};
+  /** The Review total preview, as the chip shows it: a mark, or why there is none yet. */
+  function reviewTotal(student) {
+    const a=student.assessment||{};
+    return (student.total==null?(a.teamState==='PENDING' || a.individualState==='PENDING'?'Pending':'Incomplete'):mark(student.total))+' / '+model.config.maximum;
   }
   function canEditAbsence(index) {return !busy && !reading && !targeted && (model.availability.editable || correctionIndex===index);}
   const attendanceChoices=[['','Select attendance'],['NORMAL','Present'],['REVIEW_DAY_ABSENCE','Absent for Review'],['PROLONGED','Long Absent']];
@@ -283,6 +316,8 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     drawer.addEventListener('keydown',event=>{
       const attendance=event.target.closest && event.target.closest('[data-attendance-picker]');
       if(attendance && attendance.open && event.key==='Escape'){event.preventDefault();event.stopPropagation();attendance.open=false;attendance.querySelector('[data-attendance-summary]').focus();return;}
+      const menu=event.target.closest && event.target.closest('[data-drawer-menu]');
+      if(menu && menu.open && event.key==='Escape'){event.preventDefault();event.stopPropagation();menu.open=false;menu.querySelector('[data-menu-summary]').focus();return;}
       if(!event.target.hasAttribute('data-criteria-tab') || !['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
       event.preventDefault();
       const next=event.key==='Home'?'team':event.key==='End'?'individual':activeCriteria==='team'?'individual':'team';
@@ -295,6 +330,8 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       const candidate=event.target.closest && event.target.closest('[data-attendance-picker]');
       const picker=candidate && candidate.hasAttribute && candidate.hasAttribute('data-attendance-picker')?candidate:null;
       drawer.querySelectorAll('[data-attendance-picker]').forEach(other=>{if(other!==picker)other.open=false;});
+      const openMenu=event.target.closest && event.target.closest('[data-drawer-menu]');
+      drawer.querySelectorAll('[data-drawer-menu]').forEach(other=>{if(other!==openMenu)other.open=false;});
       if(picker){const host=picker.closest('[data-absence]');if(!canEditAbsence(Number(host.dataset.absence))){event.preventDefault();return;}}
       if (event.target===drawer && event.clientX<drawer.getBoundingClientRect().left) {close();return;}
       const summary=event.target.closest('summary');
@@ -311,22 +348,11 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
         return;
       }
       const button=event.target.closest('button');if(!button)return;
-      if(button.hasAttribute('data-select-pi')) {
-        if(busy || reading)return;
-        const current=drawer.querySelector('[data-index="'+activeTeamPI+'"][data-owner="team"]');
-        if(current && !validateClosingGroup({querySelectorAll:()=>[current]}))return;
-        const field=drawer.querySelector('[data-index="'+Number(button.dataset.selectPi)+'"][data-owner="team"]');
-        if(field){activeTeamPI=Number(button.dataset.selectPi);syncCriteriaTabs();const content=drawer.querySelector('[data-drawer-content]');if(content)content.scrollTop=0;const level=field.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});}
-        return;
-      }
-      if(button.hasAttribute('data-select-individual-pi')) {
-        if(busy || reading)return;
-        const owner=Number(button.dataset.student),index=Number(button.dataset.selectIndividualPi),group=drawer.querySelector('[data-student-group="'+owner+'"]');
-        if(group && !validateClosingGroup(group))return;
-        const field=drawer.querySelector('[data-index="'+index+'"][data-owner="'+owner+'"]');
-        if(!field || !showRubric(field))return;
-        activeStudentPIs[owner]=index;syncIndividualCards();
-        const level=field.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});
+      if(button.hasAttribute('data-select-pi')){goToField(drawer.querySelector('[data-index="'+Number(button.dataset.selectPi)+'"][data-owner="team"]'),true);return;}
+      if(button.hasAttribute('data-select-individual-pi')){goToField(drawer.querySelector('[data-index="'+Number(button.dataset.selectIndividualPi)+'"][data-owner="'+Number(button.dataset.student)+'"]'),true);return;}
+      if(button.hasAttribute('data-pi-step')) {
+        // Focus stays on the button for repeated steps, and moves to the card once the end is reached.
+        if(goToField(stepTarget(Number(button.dataset.piStep)),false) && button.disabled){const level=currentField()?.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});}
         return;
       }
       if(button.hasAttribute('data-criteria-tab')){selectCriteria(button.dataset.criteriaTab);return;}
@@ -349,6 +375,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       }
       if(button.hasAttribute('data-target-draft'))return saveTarget(false);
       if(button.hasAttribute('data-target-submit'))return saveTarget(true);
+      if(button.hasAttribute('data-reload')){const menu=button.closest('[data-actions-menu]');if(menu)menu.open=false;}
       if(button.hasAttribute('data-reload') && (!dirty || await DashboardUI.ask('Discard unsaved marks and reload?')))open(model?model.roster.team:drawer.dataset.team,trigger);
       if(button.hasAttribute('data-other-feedback')) {
         const field=button.closest('[data-index]');if(busy || reading || !canEdit(field))return;
@@ -424,16 +451,25 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     title=String(title||'').trim().toUpperCase();
     const timing=assessment && assessment.availability.timing || {tone:'neutral',label:''};
     const dateLabel=assessment?new Date(assessment.config.due*86400000).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}):'';
-    const dateDetails=assessment?'Due '+day(assessment.config.due)+' · '+timing.label+' · '+assessment.status+' · Opens '+day(assessment.config.opens)+(assessment.availability.editable && assessment.availability.late?' · Late submissions allowed':''):'';
-    const meta=assessment?'<span data-timing="'+escape(timing.tone)+'" class="text-sm text-muted data-[timing=danger]:font-semibold data-[timing=danger]:text-danger data-[timing=info]:text-primary data-[timing=success]:text-success data-[timing=warning]:font-semibold data-[timing=warning]:text-warning" title="'+escape(dateDetails)+'">Due '+escape(dateLabel)+(timing.label?' · '+escape(timing.label):'')+'</span>':'';
+    const dateDetails=assessment?'Status '+assessment.status+'. Opens '+day(assessment.config.opens)+'.'+(assessment.availability.editable && assessment.availability.late?' Late submissions allowed.':''):'';
+    const meta=assessment?'<span data-timing="'+escape(timing.tone)+'" class="text-sm text-muted data-[timing=danger]:font-semibold data-[timing=danger]:text-danger data-[timing=info]:text-primary data-[timing=success]:text-success data-[timing=warning]:font-semibold data-[timing=warning]:text-warning">Due '+escape(dateLabel)+(timing.label?' · '+escape(timing.label):'')+'<span class="sr-only">. '+escape(dateDetails)+'</span></span>':'';
+    const studentCount=assessment?'<span class="text-sm text-muted">'+assessment.roster.students.length+' '+(assessment.roster.students.length===1?'student':'students')+'</span>':'';
+    const actionsMenu=assessment?'<details class="relative" data-drawer-menu data-actions-menu><summary data-menu-summary class="'+ICON_BUTTON+' '+MENU_SUMMARY+'" aria-label="More actions">'+DashboardUI.renderIcon('ellipsis-vertical')+'</summary><div class="'+MENU_PANEL+' right-0 w-56"><button type="button" class="'+MENU_ITEM+'" data-reload><span class="flex items-center gap-3">'+DashboardUI.renderIcon('refresh-cw','','shrink-0 text-muted')+'Reload from sheet</span></button></div></details>':'';
     const projectTitle=assessment?String(assessment.details.title||'Project title not provided'):'';
-    const titleRow=assessment?'<details class="review-project-title-row group mt-2 text-sm text-ink-2"><summary class="flex min-w-0 cursor-pointer list-none items-start gap-2 rounded-md hover:text-ink [&::-webkit-details-marker]:hidden" title="'+escape(projectTitle)+'" aria-label="Project title: '+escape(projectTitle)+'">'+DashboardUI.renderIcon('file-text','','mt-0.5 shrink-0 text-primary')+'<span class="min-w-0 flex-1 truncate group-open:whitespace-normal">'+escape(projectTitle)+'</span>'+DashboardUI.renderIcon('chevron-down','','review-title-chevron mt-0.5 shrink-0 transition-transform group-open:rotate-180')+'</summary></details>':'';
-    const headerDetails=assessment?'<dl class="m-0 mt-2 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-sm"><dt class="text-muted">Guide</dt><dd class="m-0 min-w-0 truncate text-ink-2">'+escape(assessment.details.guideName)+'</dd><dt class="text-muted">Committee</dt><dd class="m-0 min-w-0 truncate text-ink-2">'+escape(assessment.details.committee)+'</dd></dl>':'';
-    const navigation=assessment?'<div class="review-assessment-navigation max-h-[45dvh] shrink-0 overflow-y-auto border-b border-edge bg-paper px-5 pb-3">'+criteriaTabs()+'<div data-tab-progress aria-live="polite" class="mt-3 flex items-center text-sm"></div>'+teamPills()+(students.length?studentChips(students):'')+'</div>':'';
-    if(assessment && students.length)body=assessmentSummaryCard(students)+body;
+    const titleRow=assessment?'<details class="review-project-title-row group mt-2 text-sm text-ink"><summary class="flex min-w-0 cursor-pointer list-none items-start gap-2 rounded-md hover:text-primary [&::-webkit-details-marker]:hidden" aria-label="Project title: '+escape(projectTitle)+'">'+DashboardUI.renderIcon('file-text','','mt-0.5 shrink-0 text-muted')+'<span class="min-w-0 flex-1 truncate group-open:whitespace-normal">'+escape(projectTitle)+'</span>'+DashboardUI.renderIcon('chevron-down','','review-title-chevron mt-0.5 shrink-0 text-muted transition-transform group-open:rotate-180')+'</summary></details>':'';
+    const headerDetails=assessment?'<p class="m-0 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted"><span>Guide <span class="font-medium text-ink">'+escape(assessment.details.guideName)+'</span></span><span class="h-4 w-px bg-line" aria-hidden="true"></span><span>Committee <span class="font-medium text-ink">'+escape(assessment.details.committee)+'</span></span></p>':'';
+    const piNavigator=assessment?'<div class="mt-3 flex items-center gap-2"><button type="button" class="'+STEP+'" data-pi-step="-1" data-pi-place="top" aria-label="Previous performance indicator">'+DashboardUI.renderIcon('chevron-left')+'</button>'+
+      '<details class="group relative min-w-0 flex-1" data-drawer-menu data-pi-menu><summary data-menu-summary class="flex min-h-10 items-center gap-2 rounded-md border border-edge bg-paper px-3 text-sm hover:border-line '+MENU_SUMMARY+'"><span class="sr-only">Performance indicator: </span><span data-pi-current class="min-w-0 flex-1 truncate font-semibold text-ink"></span><span data-tab-progress aria-live="polite" class="shrink-0"></span>'+DashboardUI.renderIcon('chevron-down','','shrink-0 text-muted transition-transform group-open:rotate-180')+'</summary>'+
+      '<div class="'+MENU_PANEL+' inset-x-0 max-h-72 overflow-y-auto">'+teamPills()+students.map((_,index)=>individualPills(index)).join('')+'</div></details>'+
+      '<button type="button" class="'+STEP+'" data-pi-step="1" data-pi-place="top" aria-label="Next performance indicator">'+DashboardUI.renderIcon('chevron-right')+'</button></div><div data-pi-segments aria-hidden="true" class="mt-3 flex gap-1"></div>':'';
+    const navigation=assessment?criteriaTabs()+(students.length?studentChips(students):'')+piNavigator:'';
     const statusMessage='<p class="review-message m-0 max-h-20 overflow-y-auto text-sm text-ink-2 empty:hidden" data-message role="status" aria-live="polite"></p>';
-    return '<header class="flex shrink-0 items-start justify-between gap-3 border-b border-edge bg-paper px-5 py-4"><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-x-3 gap-y-1"><h2 id="'+reviewKey+'Heading" class="m-0 text-lg font-semibold text-ink">'+escape(title)+'</h2><span class="'+BADGE+'">'+escape(reviewLabel)+'</span>'+meta+'</div>'+headerDetails+titleRow+(assessment?'<div class="review-progress mt-3" data-evaluation-progress aria-live="polite"></div>':'')+'</div><button type="button" class="'+ICON_BUTTON+'" data-close data-drawer-close aria-label="Close '+escape(reviewLabel)+' drawer">'+DashboardUI.renderIcon('x')+'</button></header>'+navigation+'<div class="team-drawer-content min-h-0 flex-1 overflow-y-auto overscroll-contain bg-canvas px-5 py-4" data-drawer-content>'+body+(footer?'':statusMessage)+'</div>'+(footer?'<footer class="review-footer flex shrink-0 flex-col gap-2 border-t border-edge bg-paper px-5 py-3">'+statusMessage+footer+'</footer>':'');
+    const closeButton='<button type="button" class="'+ICON_BUTTON+'" data-close data-drawer-close aria-label="Close '+escape(reviewLabel)+' drawer">'+DashboardUI.renderIcon('x')+'</button>';
+    return '<header class="review-top shrink-0 border-b border-edge bg-paper px-5 pb-3 pt-4"><div class="flex items-start gap-2"><div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1"><h2 id="'+reviewKey+'Heading" class="m-0 text-lg font-semibold text-ink">'+escape(title)+'</h2>'+studentCount+'</div><div class="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1"><span class="'+BADGE+'">'+escape(reviewLabel)+'</span>'+meta+'</div>'+actionsMenu+closeButton+'</div>'+headerDetails+titleRow+navigation+'</header>'+
+      '<div class="team-drawer-content min-h-0 flex-1 overflow-y-auto overscroll-contain bg-canvas px-5 py-4" data-drawer-content>'+body+(footer?'':statusMessage)+'</div>'+
+      (footer?'<footer class="review-footer flex shrink-0 flex-col gap-2 border-t border-edge bg-paper px-5 py-3">'+statusMessage+'<p class="m-0 text-xs text-muted" data-evaluation-progress aria-live="polite"></p><div class="flex flex-wrap items-center gap-2"><button type="button" class="'+BUTTON+' gap-1" data-pi-step="-1" data-pi-place="bottom">'+DashboardUI.renderIcon('chevron-left')+'Prev</button><button type="button" class="'+BUTTON+' gap-1" data-pi-step="1" data-pi-place="bottom">Next'+DashboardUI.renderIcon('chevron-right')+'</button>'+footer+'</div></footer>':'');
   }
+
 
   function open(team,button) {
     if (busy || reading) return;
@@ -464,13 +500,13 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     return '<fieldset class="review-criterion relative m-0 mb-4 min-w-0 '+CARD+'" data-index="'+index+'" data-owner="'+owner+'"'+(focusedAssessment() && (!targeted || String(owner)!==String(targeted.index) || !targeted.components.includes(c.type==='Team'?'team':'individual'))?' hidden':'')+'><legend class="review-criterion-accessible-title sr-only">'+escape(c.name)+'</legend>'+
       '<div class="flex items-center justify-between gap-2"><span class="'+BADGE+'">'+escape(c.pi+' · '+c.co)+'</span><span class="text-sm text-muted">Max '+c.maxMarks+' marks</span></div>'+
       '<h3 class="review-card-title m-0 mt-2 text-base font-semibold text-ink" aria-hidden="true">'+escape(c.name)+'</h3>'+
-      '<p class="m-0 mt-4 text-sm font-semibold text-ink">Proficiency level</p><select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select>'+
-      '<div class="'+LEVELS+'" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" class="'+LEVEL+'" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+', '+levelMarkRange(c.maxMarks,n)+' marks" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div>'+
+      '<select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select>'+
+      '<div class="'+LEVELS+'" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" class="'+LEVEL+'" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+', '+bands[n]+'–'+bands[n+1]+'%, '+levelMarkRange(c.maxMarks,n)+' marks" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div>'+
       '<div data-descriptor aria-live="polite" class="mt-3 rounded-md bg-tint px-3 py-2 text-sm leading-relaxed text-ink-2"></div>'+
       '<details class="group mt-2"><summary class="inline-flex min-h-9 cursor-pointer list-none items-center gap-1 text-sm font-semibold text-primary hover:underline [&::-webkit-details-marker]:hidden">'+DashboardUI.renderIcon('chevron-right','','shrink-0 transition-transform group-open:rotate-90')+'View all level descriptors</summary><div class="mt-1 flex flex-col gap-2 border-l-2 border-edge pl-3">'+c.descriptors.map((text,i)=>'<p class="m-0 text-sm text-ink-2"><strong class="text-ink">Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</div></details>'+
       '<div class="mt-4 border-t border-edge pt-4"><div class="flex flex-wrap items-center justify-between gap-2"><label class="text-sm font-semibold text-ink" for="reviewMarks-'+id+'">Awarded marks</label><span data-range class="text-sm text-muted"></span></div>'+
-      '<div class="mt-2 flex items-center gap-2"><button class="'+ICON_BUTTON+'" type="button" data-step="-0.5" aria-label="Decrease marks by 0.5">'+DashboardUI.renderIcon('minus')+'</button><input class="'+FIELD+' w-24 text-center text-base font-semibold tabular-nums" data-marks id="reviewMarks-'+id+'" aria-describedby="reviewMarksError-'+id+'" type="number" inputmode="decimal" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button class="'+ICON_BUTTON+'" type="button" data-step="0.5" aria-label="Increase marks by 0.5">'+DashboardUI.renderIcon('plus')+'</button><span class="text-sm text-muted">of '+c.maxMarks+'</span></div>'+
-      '<input class="'+RANGE+'" data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total hidden" data-awarded-total></span><div data-slider-values aria-label="Selectable marks" class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs tabular-nums text-muted"></div></div>'+
+      '<div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-3"><div class="flex items-center gap-1"><button class="'+STEP+'" type="button" data-step="-0.5" aria-label="Decrease marks by 0.5">'+DashboardUI.renderIcon('minus')+'</button><input class="'+FIELD+' w-20 text-center text-base font-semibold tabular-nums" data-marks id="reviewMarks-'+id+'" aria-describedby="reviewMarksError-'+id+'" type="number" inputmode="decimal" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button class="'+STEP+'" type="button" data-step="0.5" aria-label="Increase marks by 0.5">'+DashboardUI.renderIcon('plus')+'</button></div>'+
+      '<div class="min-w-40 flex-1 pt-5"><input class="'+RANGE+'" data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total hidden" data-awarded-total></span><div data-slider-values aria-hidden="true" class="mt-1 h-5 text-xs tabular-nums text-muted"></div></div></div></div>'+
       '<p class="m-0 mt-2 rounded-md bg-danger-tint px-3 py-2 text-sm text-danger" data-marks-error id="reviewMarksError-'+id+'" aria-live="polite" hidden></p>'+
       '<div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-edge pt-4 text-sm"><div class="flex flex-wrap items-center gap-2"><strong class="text-ink">Criterion feedback</strong><span data-feedback-required class="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-semibold text-warning"></span></div><span data-feedback-status class="text-sm text-muted"></span></div>'+
       '<div class="mt-2 flex flex-col gap-1.5 text-sm text-muted" data-feedback-options aria-label="Feedback suggestions"></div>'+
@@ -523,10 +559,10 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     const teamFields=criteria.map((c,i)=>c.type==='Team'?control(c,i,'team',team[c.pi]):'').join('');
     const individual=d.roster.students.map((s,index)=>{
       const student=savedStudents.find(v=>v.register===s.register)||{},a=student.assessment||{},draft=a.makeupDraft||{},scores=targeted && targeted.index===index?(draft.scores||{}):!d.availability.editable && a.individualSource==='makeup'?(a.makeup?.scores||{}):(student.scores||{});
-      return '<details class="review-student-accordion" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary class="hidden"><span><strong>'+escape(s.name)+'</strong><span data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div>'+absenceControl(index,student)+individualPills(index)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
+      return '<details class="review-student-accordion" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary class="hidden"><span><strong>'+escape(s.name)+'</strong><span data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div>'+(!d.availability.editable && !targeted && correctionIndex===null && student.assessment?.nextActions?.makeup?'<div class="mb-4">'+makeupControls(index,student)+'</div>':'')+absenceControl(index,student)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
     }).join('');
-    drawer.innerHTML=shell(d.details.team,(old.reason?'<p class="m-0 mb-4 rounded-md bg-warning-tint px-3 py-2 text-sm text-warning"><strong>Reopened:</strong> '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div data-review-actions class="'+ACTIONS+'"><button class="'+BUTTON+'" type="button" data-close>Close</button><button class="'+BUTTON+'" type="button" data-reload>Reload</button>'+(d.availability.editable?'<button class="'+BUTTON+' ml-auto" type="button" data-draft>Save Draft</button><button class="'+PRIMARY+'" type="button" data-submit>Submit Evaluation</button>':'')+'</div>');
-    if(targeted)drawer.querySelector('[data-review-actions]').innerHTML='<button class="'+BUTTON+'" type="button" data-close>Close</button><button class="'+BUTTON+'" type="button" data-reload>Cancel / Reload</button><button class="'+BUTTON+' ml-auto" type="button" data-target-draft>Save Makeup Draft</button><button class="'+PRIMARY+'" type="button" data-target-submit>Submit Makeup</button>';
+    drawer.innerHTML=shell(d.details.team,(old.reason?'<p class="m-0 mb-4 rounded-md bg-warning-tint px-3 py-2 text-sm text-warning"><strong>Reopened:</strong> '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div data-review-actions class="ml-auto flex flex-wrap items-center gap-2">'+(d.availability.editable?'<button class="'+BUTTON+'" type="button" data-draft>Save Draft</button><button class="'+PRIMARY+'" type="button" data-submit>Submit</button>':'')+'</div>');
+    if(targeted)drawer.querySelector('[data-review-actions]').innerHTML='<button class="'+BUTTON+'" type="button" data-reload>Cancel Makeup</button><button class="'+BUTTON+'" type="button" data-target-draft>Save Makeup Draft</button><button class="'+PRIMARY+'" type="button" data-target-submit>Submit Makeup</button>';
     drawer.querySelectorAll('[data-absence] input,[data-absence] select,[data-absence] textarea').forEach(el=>el.disabled=!!targeted);
     syncStudentSelection();syncCriteriaTabs();updateRanges();drawer.querySelector('[data-close]').focus();
   }
@@ -536,6 +572,12 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if(writtenHtml.get(element)===html)return;
     element.innerHTML=html;writtenHtml.set(element,html);
   }
+  // At most seven evenly spaced half-mark values, always including both ends of the level's range.
+  function sliderScale(range) {
+    const steps=Math.round((range.max-range.min)*2);
+    let every=1;while(every<steps && (steps%every || steps/every>6))every++;
+    return Array.from({length:steps/every+1},(_,i)=>range.min+i*every/2);
+  }
   function markPill(pill,c,graded) {
     if(!pill)return;
     pill.dataset.complete=String(graded);pill.setAttribute('aria-label',c.pi+' · '+c.co+' · '+c.name+': '+(graded?'Completed':'Incomplete'));
@@ -544,9 +586,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function updateRanges() {withPass(refreshRanges);}
   function refreshRanges() {
     if(!model)return;
-    const unsaved=drawer.querySelector('[data-summary-unsaved]');if(unsaved)unsaved.hidden=!dirty;
-    const totals=model.roster.students.map(()=>0),entered=model.roster.students.map(()=>0);let completed=0,count=0;
-    let teamGraded=0;const individualGraded=model.roster.students.map(()=>0);
+    let completed=0,count=0;
     drawer.querySelectorAll('[data-index]').forEach(field=>{
       const c=model.config.criteria[Number(field.dataset.index)], level=field.querySelector('[data-level]').value;
       const editable=canEdit(field);
@@ -600,11 +640,8 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       else {
         markPill(drawer.querySelector('[data-select-individual-pi="'+field.dataset.index+'"][data-student="'+field.dataset.owner+'"]'),c,graded);
       }
-      if(graded) {
-        completed++;
-        if(field.dataset.owner==='team')teamGraded++;
-        else if(c.type==='Individual')individualGraded[Number(field.dataset.owner)]++;
-      }
+      field.dataset.graded=String(graded);
+      if(graded)completed++;
       const descriptor=field.querySelector('[data-descriptor]');
       if(descriptor) {
         field.dataset.level=level;
@@ -617,7 +654,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
         const values=field.querySelector('[data-slider-values]');
         if(values) {
           values.hidden=level==='' || range.max<range.min;
-          setHtml(values,values.hidden?'':'<span class="flex flex-wrap gap-x-3 gap-y-1">'+Array.from({length:Math.round((range.max-range.min)*2)+1},(_,i)=>{const value=range.min+i/2;return '<span'+(marks!=='' && Number(marks)===value?' class="font-semibold text-primary"':'')+'>'+value+'</span>';}).join('')+'</span>');
+          setHtml(values,values.hidden?'':'<span class="flex justify-between">'+sliderScale(range).map(value=>'<span'+(marks!=='' && Number(marks)===value?' class="font-semibold text-primary"':'')+'>'+value+'</span>').join('')+'</span>');
         }
         if(level!=='' && range.max<range.min)text.textContent='No whole or half mark fits this level. Choose another level or ask the coordinator to check the rubric.';
         field.querySelectorAll('[data-step]').forEach(button=>{button.disabled=slider.disabled;});
@@ -630,76 +667,74 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
         if(options.dataset.level!==level || options.dataset.pendingMessage!==pendingMessage) {
           options.dataset.level=level;
           options.dataset.pendingMessage=pendingMessage;
-          options.innerHTML=pendingIndividual?'<small>'+escape(pendingMessage)+'</small>':level===''?'<small>Select a level for suggested feedback.</small>':feedbackOptions(c,n).map((suggestion,i)=>'<button type="button" class="'+FEEDBACK+'" data-feedback="'+i+'" aria-pressed="false" aria-label="'+escape(suggestion)+'" title="Add this feedback">'+DashboardUI.renderIcon('plus')+' '+escape(suggestion)+'</button>').join('');
+          options.innerHTML=pendingIndividual?'<small>'+escape(pendingMessage)+'</small>':level===''?'<small>Select a level for suggested feedback.</small>':feedbackOptions(c,n).map((suggestion,i)=>'<button type="button" class="'+FEEDBACK+'" data-feedback="'+i+'" aria-pressed="false" aria-label="'+escape(suggestion)+'">'+DashboardUI.renderIcon('plus')+' '+escape(suggestion)+'</button>').join('');
         }
         const suggestions=feedbackOptions(c,n),selected=selectedFeedback(remark.value);
         options.querySelectorAll('[data-feedback]').forEach(button=>{
           const suggestion=suggestions[Number(button.dataset.feedback)],pressed=selected.has(suggestion);
           button.disabled=busy || !editable;
           button.setAttribute('aria-pressed',String(pressed));
-          button.title=pressed?'Remove this feedback':'Add this feedback';
           setHtml(button,DashboardUI.renderIcon(pressed?'check':'plus','','mt-0.5 shrink-0')+' '+escape(suggestion));
         });
       }
-      if(marks!=='' && valid){
-        const add=i=>{totals[i]+=Math.round(Number(marks)*100);entered[i]++;};
-        if(field.dataset.owner==='team')totals.forEach((_,i)=>add(i));else add(Number(field.dataset.owner));
-      }
     });
-    totals.forEach((cents,i)=>{
-      const el=drawer.querySelector('[data-student-score="'+i+'"]');
-      if(el){el.textContent=(entered[i]?String(Number((cents/model.config.maximum).toFixed(2))):'—')+' / 100';el.title=entered[i]===model.config.criteria.length?'Score out of 100':'Score so far out of 100';}
-    });
-    const individualCount=model.config.criteria.filter(c=>c.type==='Individual').length;
-    gradingProgress={team:{graded:teamGraded,total:model.config.criteria.filter(c=>c.type==='Team').length},individual:{graded:individualGraded.filter(n=>individualCount>0 && n===individualCount).length,total:model.roster.students.length}};
-    updateTabProgress();
     const progress=drawer.querySelector('[data-evaluation-progress]');
-    if(progress)progress.hidden=focusedAssessment() && !targeted;
-    if(progress)setHtml(progress,'<div class="flex flex-wrap items-center justify-between gap-x-3 text-sm text-ink-2"><span><strong class="text-ink">'+completed+' of '+count+'</strong> criteria evaluated</span><span class="text-muted">'+model.roster.students.length+' '+(model.roster.students.length===1?'student':'students')+'</span></div><progress class="'+PROGRESS+'" max="'+Math.max(1,count)+'" value="'+completed+'" aria-label="Evaluated criteria"></progress>');
+    if(progress) {
+      const remaining=count-completed;
+      progress.hidden=focusedAssessment() && !targeted;
+      progress.textContent=!(model.availability.editable || targeted)?completed+' of '+count+' criteria evaluated':!count?'No criteria to evaluate':!remaining?'All criteria evaluated':remaining+(remaining===1?' criterion':' criteria')+' remaining';
+    }
     syncIndividualCards();
+    updateNavigator();
     updateAbsenceDisplay();
   }
   const mark=value=>value===null || value===undefined || !Number.isFinite(Number(value))?'Pending':String(value);
   function updateAbsenceDisplay() {
     model.roster.students.forEach((s,index)=>{
-      const host=drawer.querySelector('[data-absence="'+index+'"]');if(!host)return;
+      const host=drawer.querySelector('[data-absence="'+index+'"]');
       const f=facts(index),old=savedStudent(index);
-      ['type','approved','contribution','attended'].forEach(name=>{const node=host.querySelector('[data-fact="'+name+'"]');if(node)node.disabled=!canEditAbsence(index);});
-      const picker=host.querySelector('[data-attendance-picker]');
-      if(picker){picker.querySelector('[data-attendance-summary]').setAttribute('aria-disabled',String(!canEditAbsence(index)));if(!canEditAbsence(index))picker.open=false;picker.querySelector('[data-attendance-label]').textContent=(attendanceChoices.find(([k])=>k===f.type)||attendanceChoices[0])[1];picker.querySelectorAll('[data-attendance-option]').forEach(n=>{n.disabled=!canEditAbsence(index);n.checked=n.value===f.type;});}
-      host.querySelector('[data-exception-fields]').hidden=['NORMAL','UNSELECTED'].includes(f.type);
-      host.querySelector('[data-prolonged-fields]').hidden=f.type!=='PROLONGED';
-      const approvalNotApplicable=f.type==='PROLONGED' && f.verifiedContribution===false && f.attended===true;
-      host.querySelector('[data-approval-field]').hidden=approvalNotApplicable;
-      host.querySelector('[data-fact="approved"]').disabled=approvalNotApplicable || !canEditAbsence(index);
-      const evidenceHost=host.querySelector('[data-absence-evidence]');
-      if(evidenceHost){
-        const relevant=!['NORMAL','UNSELECTED'].includes(f.type) && f.approved===true && !approvalNotApplicable;
-        evidenceHost.hidden=!relevant;
-        evidenceHost.querySelector('[data-other-evidence-label]').hidden=!(f.supportingEvidence||[]).includes('OTHER');
-        evidenceHost.querySelectorAll('[data-supporting-evidence],[data-other-evidence]').forEach(node=>{node.disabled=!relevant || !canEditAbsence(index);});
-      }
-      const teamScores={},scores={};
-      model.config.criteria.forEach((c,i)=>{
-        const field=drawer.querySelector('[data-index="'+i+'"][data-owner="'+(c.type==='Team'?'team':index)+'"]');
-        const value=field?{level:field.querySelector('[data-level]').value===''?null:Number(field.querySelector('[data-level]').value),marks:field.querySelector('[data-marks]').value===''?null:Number(field.querySelector('[data-marks]').value),remark:field.querySelector('[data-remark]').value}:(c.type==='Team'?(model.evaluation?.teamScores||{}):old.scores||{})[c.pi];
-        (c.type==='Team'?teamScores:scores)[c.pi]=value;
-      });
-      let preview=old;
-      if(model.availability.editable || targeted?.index===index || correctionIndex===index){
-        try{
-          const assessment={...old.assessment,facts:f};
-          if(targeted?.index===index)assessment.makeup={scores,eventId:'preview'};
-          preview=reviewPolicyCalculate_(model.config,correctionIndex===index?model.evaluation.teamScores:teamScores,{register:s.register,scores:targeted || correctionIndex===index?old.scores:scores,assessment});
-        }catch(error){preview={total:null,assessment:{teamMark:null,individualMark:null,status:'INCOMPLETE',teamState:'UNASSESSED',individualState:'UNASSESSED'}};}
-      }
-      const a=preview.assessment||{};
-      const values=drawer.querySelector('[data-summary-values="'+index+'"]');if(values)setHtml(values,assessmentSummaryValues(preview));
-      const individual=drawer.querySelector('[data-individual-mark="'+index+'"]');if(individual)individual.textContent=mark(a.individualMark)+' / '+model.config.criteria.filter(c=>c.type==='Individual').reduce((n,c)=>n+c.maxMarks,0);
-      const status=drawer.querySelector('[data-assessment-status="'+index+'"]');if(status)status.textContent='Assessment status: '+(a.status||'INCOMPLETE');
-      const summary=drawer.querySelector('[data-student-score="'+index+'"]');if(summary)summary.textContent=mark(preview.total)+' / '+model.config.maximum;
-      const team=drawer.querySelector('[data-team-mark]');if(team)team.textContent=mark(Object.values(teamScores).every(s=>s&&s.marks!==null)?Object.values(teamScores).reduce((n,s)=>n+s.marks,0):null);
+      if(host)updateAttendanceCard(host,index,f);
+      updatePreview(s,index,f,old);
     });
+  }
+  function updateAttendanceCard(host,index,f) {
+    ['type','approved','contribution','attended'].forEach(name=>{const node=host.querySelector('[data-fact="'+name+'"]');if(node)node.disabled=!canEditAbsence(index);});
+    const picker=host.querySelector('[data-attendance-picker]');
+    if(picker){picker.querySelector('[data-attendance-summary]').setAttribute('aria-disabled',String(!canEditAbsence(index)));if(!canEditAbsence(index))picker.open=false;picker.querySelector('[data-attendance-label]').textContent=(attendanceChoices.find(([k])=>k===f.type)||attendanceChoices[0])[1];picker.querySelectorAll('[data-attendance-option]').forEach(n=>{n.disabled=!canEditAbsence(index);n.checked=n.value===f.type;});}
+    host.querySelector('[data-exception-fields]').hidden=['NORMAL','UNSELECTED'].includes(f.type);
+    host.querySelector('[data-prolonged-fields]').hidden=f.type!=='PROLONGED';
+    const approvalNotApplicable=f.type==='PROLONGED' && f.verifiedContribution===false && f.attended===true;
+    host.querySelector('[data-approval-field]').hidden=approvalNotApplicable;
+    host.querySelector('[data-fact="approved"]').disabled=approvalNotApplicable || !canEditAbsence(index);
+    const evidenceHost=host.querySelector('[data-absence-evidence]');
+    if(evidenceHost){
+      const relevant=!['NORMAL','UNSELECTED'].includes(f.type) && f.approved===true && !approvalNotApplicable;
+      evidenceHost.hidden=!relevant;
+      evidenceHost.querySelector('[data-other-evidence-label]').hidden=!(f.supportingEvidence||[]).includes('OTHER');
+      evidenceHost.querySelectorAll('[data-supporting-evidence],[data-other-evidence]').forEach(node=>{node.disabled=!relevant || !canEditAbsence(index);});
+    }
+  }
+  function updatePreview(s,index,f,old) {
+    const teamScores={},scores={};
+    model.config.criteria.forEach((c,i)=>{
+      const field=drawer.querySelector('[data-index="'+i+'"][data-owner="'+(c.type==='Team'?'team':index)+'"]');
+      const value=field?{level:field.querySelector('[data-level]').value===''?null:Number(field.querySelector('[data-level]').value),marks:field.querySelector('[data-marks]').value===''?null:Number(field.querySelector('[data-marks]').value),remark:field.querySelector('[data-remark]').value}:(c.type==='Team'?(model.evaluation?.teamScores||{}):old.scores||{})[c.pi];
+      (c.type==='Team'?teamScores:scores)[c.pi]=value;
+    });
+    let preview=old;
+    if(model.availability.editable || targeted?.index===index || correctionIndex===index){
+      try{
+        const assessment={...old.assessment,facts:f};
+        if(targeted?.index===index)assessment.makeup={scores,eventId:'preview'};
+        preview=reviewPolicyCalculate_(model.config,correctionIndex===index?model.evaluation.teamScores:teamScores,{register:s.register,scores:targeted || correctionIndex===index?old.scores:scores,assessment});
+      }catch(error){preview={total:null,assessment:{teamMark:null,individualMark:null,status:'INCOMPLETE',teamState:'UNASSESSED',individualState:'UNASSESSED'}};}
+    }
+    const a=preview.assessment||{};
+    const individual=drawer.querySelector('[data-individual-mark="'+index+'"]');if(individual)individual.textContent=mark(a.individualMark)+' / '+model.config.criteria.filter(c=>c.type==='Individual').reduce((n,c)=>n+c.maxMarks,0);
+    const status=drawer.querySelector('[data-assessment-status="'+index+'"]');if(status)status.textContent='Assessment status: '+(a.status||'INCOMPLETE');
+    const score=drawer.querySelector('[data-student-score="'+index+'"]');if(score)score.textContent=reviewTotal(preview);
+    const note=drawer.querySelector('[data-student-score-note="'+index+'"]');if(note)note.textContent='Review total. '+(STATUS_LABELS[a.status]||'Assessment Incomplete')+'.';
+    const team=drawer.querySelector('[data-team-mark]');if(team)team.textContent=mark(Object.values(teamScores).every(s=>s&&s.marks!==null)?Object.values(teamScores).reduce((n,s)=>n+s.marks,0):null);
   }
   function validateFeedback(submit) {
     for(const field of drawer.querySelectorAll('[data-index]')) {
