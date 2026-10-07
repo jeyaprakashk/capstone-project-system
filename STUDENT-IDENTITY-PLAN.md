@@ -9,26 +9,25 @@ As of 2026-10-07.
 | Item | State |
 |---|---|
 | Plan | Revision 14. All 21 decisions are settled, except the written academic sign-off, which Phase 0 requires. |
-| Independent review (Codex) | Reviewed through Revision 3, and again on Revision 6 (four findings). Revisions 4 and 5 addressed the first findings; Revision 7 addresses the Revision 6 findings. An internal review of Revision 7 against the code, a check against DATA-CONTRACTS.md, a check against the existing tests and snapshots, and a conflict check against the plan, the code and `AMBIGUTIES-TO-BE-RESOLVED.md` (none by Codex) are addressed in Revisions 8 to 12. Codex also gave three findings on Revision 10, addressed in Revision 11. **Revisions 4 to 14 have not been re-reviewed by Codex.** |
+| Independent review (Codex) | Reviewed through Revision 3, and again on Revision 6 (four findings). Revisions 4 and 5 addressed the first findings; Revision 7 addresses the Revision 6 findings. An internal review of Revision 7 against the code, a check against DATA-CONTRACTS.md, a check against the existing tests and snapshots, and a conflict check against the plan, the code and `AMBIGUTIES-TO-BE-RESOLVED.md` (none by Codex) are addressed in Revisions 8 to 12. Codex also gave three findings on Revision 10, addressed in Revision 11. Codex has since reviewed the whole plan through Revision 14, and its findings are addressed. |
 | Implementation | Not started. No code, sheet or setting has changed for this plan. |
 | Backup | An earlier backup of the live spreadsheet has been taken. It is an extra copy only; rollback uses the fresh backup taken in the Phase 5 window. |
 
 **Next steps, in order**
 
-1. Optionally, have Revisions 4 to 14 reviewed before implementation.
-2. Phase 0:
+1. Phase 0:
    - approve this as a reviewed change to frozen items
    - get written academic sign-off on Decisions 15 to 18 ([Sign-off](#decisions))
    - confirm that only the coordinator can edit the spreadsheet
    - prepare the `Students` tab with Student IDs, Student ID and Register Number columns as plain text
    - add the `Student n Student ID` columns to `TeamRoster` and fill every slot with a Student ID
    - reconcile `TeamRoster` with `TeamStatus`
-   - check the live `Semester` values and add the `SEMESTER` Config row (the drain uses the published
-     6-minute limit)
-3. Phase 1 onwards, one phase at a time, each with `npm test` green.
-4. After Phase 1, before Phase 5: the [journal gate](#gate-after-phase-1-inspect-the-live-journals).
+   - check the live `Semester` values and add the `SEMESTER` and `SEMESTER_COMPLETE` Config rows (the
+     drain uses the published 6-minute limit)
+2. Phase 1 onwards, one phase at a time, each with `npm test` green.
+3. After Phase 1, before Phase 5: the [journal gate](#gate-after-phase-1-inspect-the-live-journals).
    Inspect the result journals with the Phase 1 report and record their content fingerprint.
-5. Before the Phase 5 window: choose the [pilot users](#pilot-users), at least one student with an open
+4. Before the Phase 5 window: choose the [pilot users](#pilot-users), at least one student with an open
    week, one guide and one reviewer, and make sure they are available at that time.
 
 **Continuing in a new session:** start by asking the assistant to read this file and AGENTS.md, then
