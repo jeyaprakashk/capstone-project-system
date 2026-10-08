@@ -186,5 +186,9 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
       error => { state.busyTeam = null; done(error.message || 'Unable to submit decision.'); });
   }
 
-  return {load, render, refresh, decide, state};
+  function evaluationTeams(key) {
+    return (state.dto?.teams || []).filter(team => team.reviews.some(review => review.key === key && review.enabled)).map(team => team.teamId);
+  }
+
+  return {load, render, refresh, decide, evaluationTeams, state};
 }

@@ -17,7 +17,6 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   const LEVEL='border-0 flex min-h-12 min-w-0 flex-col items-center justify-center rounded-lg bg-transparent px-1 py-1.5 font-sans text-sm tabular-nums text-ink-2 hover:bg-paper aria-pressed:bg-primary aria-pressed:text-paper aria-pressed:shadow-selected disabled:cursor-not-allowed disabled:opacity-50';
   const FEEDBACK='border-0 flex w-full items-start gap-2 rounded-lg bg-paper px-3 py-2 text-left font-sans text-sm text-ink-2 ring-1 ring-inset ring-edge hover:bg-tint aria-pressed:bg-tint aria-pressed:text-primary aria-pressed:ring-primary disabled:cursor-not-allowed disabled:opacity-50';
   const CHIP='flex min-w-24 flex-col items-center gap-0.5 rounded-tile border border-edge bg-paper px-3 py-2 font-sans text-sm text-ink hover:border-line aria-pressed:border-primary aria-pressed:bg-tint aria-pressed:ring-1 aria-pressed:ring-primary disabled:cursor-not-allowed disabled:opacity-60';
-  const AVATARS=['bg-teal-700','bg-purple-700','bg-primary'];
   const FIELD='h-10 rounded-md border border-control bg-paper px-3 py-2 font-sans text-sm text-ink';
   const TEXTAREA='block min-h-20 w-full resize-y rounded-md border border-control bg-paper px-3 py-2 font-sans text-sm font-normal text-ink';
   const LABEL='block text-sm font-semibold text-ink';
@@ -25,7 +24,6 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   const CHOICE='flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 text-sm font-normal text-ink hover:bg-tint has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60';
   const CHECK='m-0 size-5 min-h-0 shrink-0 cursor-pointer rounded-none border-0 bg-transparent p-0 accent-primary';
   const RANGE='block h-6 min-h-0 w-full cursor-pointer rounded-none border-0 bg-transparent p-0 accent-primary disabled:cursor-not-allowed';
-  const STEP='border-0 inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-paper hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-soft disabled:text-muted';
   const CARD='rounded-card border border-edge bg-paper p-4 shadow-card';
   const BADGE='rounded-md bg-tint px-2 py-0.5 text-xs font-semibold text-primary';
   const SUMMARY_TONE={complete:'text-success',pending:'text-warning',incomplete:'text-ink'};
@@ -69,7 +67,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
 
 
 
-  let page,listHost,listScroll,model,trigger,busy=false,dirty=false,sequence=0,pending=null,targeted=null,reading=false,finishRead=null,correctionIndex=null,activeStudent=0,activeCriteria='team';
+  let page,listHost,listScroll,model,trigger,originTeam,busy=false,dirty=false,sequence=0,pending=null,targeted=null,reading=false,confirming=false,finishRead=null,correctionIndex=null,activeStudent=0,activeCriteria='team';
   // Values that cannot change during one synchronous refresh pass; null outside a pass.
   let passMemo=null;
   function withPass(run) {
@@ -78,6 +76,47 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     try {return run();} finally {passMemo=null;}
   }
   function message(text) {page.querySelector('[data-message]').textContent=text;}
+  function chooseSlider(slider) {
+    if(busy || reading || !model || slider.disabled)return;
+    const field=slider.closest('[data-index]');if(!field || !canEdit(field) || field.querySelector('[data-level]').value==='')return;
+    field.querySelector('[data-marks]').value=slider.value;dirty=true;pending=null;updateRanges();
+  }
+  function teamOptions(team,teams) {
+    const options=teams.includes(team)?teams:[team,...teams];
+    return options.map(id=>'<option value="'+escape(id)+'"'+(id===team?' selected':'')+(!teams.includes(id)?' disabled':'')+'>'+escape(id)+'</option>').join('');
+  }
+  function syncTeamNavigation() {
+    const teams=ReviewerView.evaluationTeams(reviewKey),index=teams.indexOf(page.dataset.team),blocked=busy || reading || confirming || !model;
+    const select=page.querySelector('[data-team-select]');
+    if(select){setHtml(select,teamOptions(page.dataset.team,teams));select.value=page.dataset.team;select.disabled=blocked || !teams.some(team=>team!==page.dataset.team);}
+    [-1,1].forEach(step=>{const button=page.querySelector('[data-team-step="'+step+'"]');if(button)button.disabled=blocked || index<0 || index+step<0 || index+step>=teams.length;});
+  }
+  async function switchTeam(team) {
+    if(busy || reading || confirming || !model || team===page.dataset.team || !ReviewerView.evaluationTeams(reviewKey).includes(team)){syncTeamNavigation();return;}
+    confirming=true;syncTeamNavigation();
+    const token=sequence;
+    let accepted;
+    try {accepted=!dirty || await DashboardUI.ask('Discard unsaved '+reviewLabel+' marks?');}
+    finally {confirming=false;syncTeamNavigation();}
+    if(!accepted || page.hidden || token!==sequence || busy || reading)return;
+    reading=true;syncTeamNavigation();
+    const disabled=Array.from(page.querySelectorAll('button,input,select,textarea')).map(element=>({element,disabled:element.disabled}));
+    disabled.forEach(({element})=>{if(!element.hasAttribute('data-close'))element.disabled=true;});
+    const done=DashboardUI.beginContentLoading(page.querySelector('[data-drawer-content]'),'Loading '+reviewLabel+' evaluation', {compact:true});
+    finishRead=()=>{done();disabled.forEach(({element,disabled})=>element.disabled=disabled);};
+    const request=++sequence;
+    bridge.read('review-evaluation:'+reviewKey,'API_review_getEvaluation',[team,reviewKey],{timeoutMs:60000}).then(data=>{
+      if(request!==sequence || page.hidden)return;
+      finishRead();finishRead=null;reading=false;
+      page.dataset.team=team;model=data;reviewLabel=data.config.label;dirty=false;pending=null;targeted=null;correctionIndex=null;
+      activeCriteria='team';activeStudent=0;activeTeamPI=null;activeStudentPIs={};render();
+    },error=>{
+      if(request!==sequence || page.hidden)return;
+      finishRead();finishRead=null;reading=false;syncTeamNavigation();
+      message(error.message+' Existing entries are retained. Choose a team again to retry.');
+      const select=page.querySelector('[data-team-select]');if(select)select.focus({preventScroll:true});
+    });
+  }
   function keepFocusVisible() {
     const focused=document.activeElement;
     if(!focused || !page.contains(focused) || !focused.closest('[data-drawer-content]'))return;
@@ -222,9 +261,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   }
   function studentChips(students) {
     return '<div data-review-students><ul aria-label="Select student" class="mb-0 mt-3 flex list-none flex-wrap gap-2 p-0">'+students.map((s,index)=>{
-      const words=String(s.name||s.register).trim().split(/\s+/);
-      const initials=words.map(w=>w.charAt(0)).slice(0,2).join('');
-      return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" class="'+CHIP+'" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'" aria-describedby="'+reviewKey+'Score-'+index+' '+reviewKey+'ScoreNote-'+index+'"><span class="inline-flex size-8 items-center justify-center rounded-full text-xs font-bold text-paper '+AVATARS[index%3]+'" aria-hidden="true">'+escape(initials)+'</span><span class="font-semibold tabular-nums">'+escape(s.register)+'</span><span data-student-score="'+index+'" id="'+reviewKey+'Score-'+index+'" class="text-xs font-semibold tabular-nums text-primary">— / '+model.config.maximum+'</span><span class="sr-only" data-student-score-note="'+index+'" id="'+reviewKey+'ScoreNote-'+index+'"></span></button></li>';
+      return '<li'+(hiddenStudent(index)?' hidden':'')+'><button type="button" class="'+CHIP+'" data-select-student="'+index+'" aria-pressed="'+(index===activeStudent)+'" aria-label="'+escape('Assess '+s.name+', '+s.register)+'" aria-describedby="'+reviewKey+'Score-'+index+' '+reviewKey+'ScoreNote-'+index+'"><span class="font-semibold tabular-nums">'+escape(s.register)+'</span><span data-student-score="'+index+'" id="'+reviewKey+'Score-'+index+'" class="text-xs font-semibold tabular-nums text-primary">— / '+model.config.maximum+'</span><span class="sr-only" data-student-score-note="'+index+'" id="'+reviewKey+'ScoreNote-'+index+'"></span></button></li>';
     }).join('')+'</ul></div>';
   }
   const STATUS_LABELS={COMPLETED:'Completed',MAKEUP_PENDING:'Makeup Pending',INCOMPLETE:'Assessment Incomplete'};
@@ -294,11 +331,11 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     return '<div class="review-criterion mb-4 '+CARD+'" data-absence="'+index+'"'+(targeted?' hidden':'')+'>'+attendancePicker(index,f.type)+'<div data-exception-fields><div class="mt-4 flex flex-col gap-4 border-t border-edge pt-4"><label class="'+LABEL+'" data-approval-field>Absence Approved?'+choice('approved',f.approved)+'</label>'+absenceEvidenceFields(index,f)+'<div data-prolonged-fields><div class="flex flex-col gap-4"><label class="'+LABEL+'">Contribution Established?'+choice('contribution',f.verifiedContribution)+'</label><p class="m-0 text-sm text-muted">The committee considers contribution evidence submitted by the team and endorsed by the Guide.</p><label class="'+LABEL+'">Attended the Review?'+choice('attended',f.attended)+'</label></div></div></div></div><div data-effective="'+index+'"></div>'+(actions?'<div class="mt-4 flex flex-wrap gap-2">'+actions+'</div>':'')+'</div>';
   }
   async function close() {
-    if (busy || (dirty && !await DashboardUI.ask('Discard unsaved '+reviewLabel+' marks?'))) return;
+    if (busy || confirming || (dirty && !await DashboardUI.ask('Discard unsaved '+reviewLabel+' marks?'))) return;
     if(finishRead)finishRead();finishRead=null;reading=false;
     sequence++;page.hidden=true;listHost.hidden=false;dirty=false;model=null;pending=null;correctionIndex=null;
     const table=listHost.querySelector('[data-reviewer-table-scroll]');if(table)table.scrollLeft=listScroll.table;
-    const origin=trigger && trigger.isConnected?trigger:Array.from(listHost.querySelectorAll('[data-action="marks"]')).find(button=>button.dataset.team===page.dataset.team && button.dataset.review===reviewKey);
+    const origin=trigger && trigger.isConnected?trigger:Array.from(listHost.querySelectorAll('[data-action="marks"]')).find(button=>button.dataset.team===originTeam && button.dataset.review===reviewKey);
     if(origin)origin.focus({preventScroll:true});
     window.scrollTo(listScroll.x,listScroll.y);
   }
@@ -328,6 +365,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     page.addEventListener('invalid',event=>revealCriterion(event.target),true);
     page.addEventListener('submit',event=>event.preventDefault());
     page.addEventListener('click',async event=>{
+      if(event.target.hasAttribute && event.target.hasAttribute('data-marks-slider')){chooseSlider(event.target);return;}
       const candidate=event.target.closest && event.target.closest('[data-attendance-picker]');
       const picker=candidate && candidate.hasAttribute && candidate.hasAttribute('data-attendance-picker')?candidate:null;
       page.querySelectorAll('[data-attendance-picker]').forEach(other=>{if(other!==picker)other.open=false;});
@@ -348,6 +386,10 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
         return;
       }
       const button=event.target.closest('button');if(!button)return;
+      if(button.hasAttribute('data-team-step')) {
+        const teams=ReviewerView.evaluationTeams(reviewKey),index=teams.indexOf(page.dataset.team);
+        return switchTeam(teams[index+Number(button.dataset.teamStep)]);
+      }
       if(button.hasAttribute('data-select-pi')){goToField(page.querySelector('[data-index="'+Number(button.dataset.selectPi)+'"][data-owner="team"]'),true);return;}
       if(button.hasAttribute('data-select-individual-pi')){goToField(page.querySelector('[data-index="'+Number(button.dataset.selectIndividualPi)+'"][data-owner="'+Number(button.dataset.student)+'"]'),true);return;}
       if(button.hasAttribute('data-pi-step')) {
@@ -388,7 +430,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
         }
         dirty=true;pending=null;updateRanges();if(custom && field.dataset.otherFeedback==='true')custom.focus();return;
       }
-      if(button.hasAttribute('data-pick-level') || button.hasAttribute('data-feedback') || button.hasAttribute('data-step')) {
+      if(button.hasAttribute('data-pick-level') || button.hasAttribute('data-feedback')) {
         if(busy || !model)return;
         const field=button.closest('[data-index]'),c=model.config.criteria[Number(field.dataset.index)];
         if(!canEdit(field))return;
@@ -412,30 +454,24 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
           remark.value=next;
           message(selected?'Suggested feedback removed.':'Suggested feedback selected.');
         }
-        if(button.hasAttribute('data-step')) {
-          if(level.value==='')return;
-          const range=bounds(c.maxMarks,Number(level.value));
-          if(range.max<range.min)return;
-          const direction=Number(button.dataset.step);
-          const next=marks.value===''?range.min:(direction>0?Math.floor(Number(marks.value)*2)+1:Math.ceil(Number(marks.value)*2)-1)/2;
-          marks.value=String(Math.max(range.min,Math.min(range.max,next)));
-        }
         dirty=true;pending=null;updateRanges();
       }
     });
     page.addEventListener('input',event=>{
+      if(event && event.target && event.target.hasAttribute('data-team-select'))return;
       if(event && event.target && event.target.hasAttribute('data-attendance-option'))return;
       if(event && event.target && event.target.hasAttribute('data-custom-feedback')) {
         const field=event.target.closest('[data-index]'),c=model.config.criteria[Number(field.dataset.index)],remark=field.querySelector('[data-remark]');
         const suggestions=feedbackOptions(c,Number(field.querySelector('[data-level]').value)),selected=selectedFeedback(remark.value);
         remark.value=[...suggestions.filter(s=>selected.has(s)),event.target.value].filter(Boolean).join('\n');
       }
-      if(event && event.target && event.target.hasAttribute('data-marks-slider')) {
-        event.target.closest('[data-index]').querySelector('[data-marks]').value=event.target.value;
-      }
+      if(event && event.target && event.target.hasAttribute('data-marks-slider')) {chooseSlider(event.target);return;}
       dirty=true;pending=null;updateRanges();
     });
+    page.addEventListener('keyup',event=>{if(event.target.hasAttribute('data-marks-slider') && ['Home','End','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))chooseSlider(event.target);});
     page.addEventListener('change',event=>{
+      if(event.target.hasAttribute('data-team-select'))return switchTeam(event.target.value);
+      if(event.target.hasAttribute('data-marks-slider')){chooseSlider(event.target);return;}
       if(event.target.hasAttribute('data-attendance-option')) {
         const host=event.target.closest('[data-absence]'),index=Number(host.dataset.absence);
         if(!canEditAbsence(index))return;
@@ -461,8 +497,10 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     const headerDetails=assessment?'<p class="m-0 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted"><span>Guide <span class="font-medium text-ink">'+escape(assessment.details.guideName)+'</span></span><span class="h-4 w-px bg-line" aria-hidden="true"></span><span>Committee <span class="font-medium text-ink">'+escape(assessment.details.committee)+'</span></span>'+students.map(student=>'<span class="'+BADGE+'">'+escape(student.register)+'</span>').join('')+'</p>':'';
     const rail=assessment?'<details data-criteria-rail class="group rounded-card border border-edge bg-paper p-4 shadow-card lg:sticky lg:top-2 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto"><summary data-criteria-rail-summary class="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-ink lg:hidden [&::-webkit-details-marker]:hidden"><span data-criteria-rail-label>Criteria</span>'+DashboardUI.renderIcon('chevron-down','','shrink-0 transition-transform group-open:rotate-180')+'</summary><p data-evaluation-progress class="m-0 mt-2 text-xs text-muted max-lg:hidden" aria-live="polite"></p><p class="m-0 mt-2 text-sm text-ink">Team total <span data-team-mark aria-label="Common team score"></span> / '+assessment.config.criteria.filter(c=>c.type==='Team').reduce((total,c)=>total+c.maxMarks,0)+'</p>'+'<div data-pi-segments aria-hidden="true" class="mt-3 flex gap-1"></div>'+criteriaTabs()+'</details>':'';
     const statusMessage='<p class="review-message m-0 max-h-20 overflow-y-auto text-sm text-ink-2 empty:hidden" data-message role="status" aria-live="polite"></p>';
-    const closeButton='<button type="button" class="'+ICON_BUTTON+'" data-close aria-label="Back to evaluations">'+DashboardUI.renderIcon('arrow-left')+'</button>';
-    return '<header class="review-top shrink-0 rounded-card border border-edge shadow-card bg-paper px-5 pb-3 pt-4"><div class="flex flex-wrap items-start gap-2"><div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1"><h2 data-evaluation-heading tabindex="-1" id="'+reviewKey+'Heading" class="m-0 text-lg font-semibold text-ink">'+escape(title)+'</h2>'+studentCount+'</div><div class="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1"><span class="'+BADGE+'">'+escape(reviewLabel)+'</span>'+meta+'</div>'+actionsMenu+closeButton+'</div>'+titleRow+headerDetails+'</header>'+
+    const teams=ReviewerView.evaluationTeams(reviewKey);
+    const teamNavigation='<div data-team-navigation class="flex min-w-0 items-center justify-center gap-2"><h2 data-evaluation-heading tabindex="-1" id="'+reviewKey+'Heading" class="sr-only">'+escape(title)+'</h2><button type="button" class="'+ICON_BUTTON+'" data-team-step="-1" aria-label="Previous team">'+DashboardUI.renderIcon('chevron-left')+'</button><select data-team-select aria-label="'+escape('Select team for '+reviewLabel)+'" class="'+FIELD+' min-w-0 max-w-full text-center font-semibold">'+teamOptions(title,teams)+'</select><button type="button" class="'+ICON_BUTTON+'" data-team-step="1" aria-label="Next team">'+DashboardUI.renderIcon('chevron-right')+'</button></div>';
+    const closeButton='<button type="button" class="'+BUTTON+' mb-3 gap-2" data-close>'+DashboardUI.renderIcon('arrow-left')+'Back to dashboard</button>';
+    return '<header class="review-top shrink-0 rounded-card border border-edge shadow-card bg-paper px-5 pb-3 pt-4">'+closeButton+teamNavigation+'<div class="flex flex-wrap items-start gap-2"><div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">'+studentCount+'</div><div class="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1"><span class="'+BADGE+'">'+escape(reviewLabel)+'</span>'+meta+'</div>'+actionsMenu+'</div>'+titleRow+headerDetails+'</header>'+
       '<div class="bg-canvas px-5 py-4" data-drawer-content><div class="grid items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">'+rail+'<div class="min-w-0">'+body+(footer?'':statusMessage)+'</div></div></div>'+
       (footer?'<footer data-evaluation-footer class="review-footer sticky bottom-0 z-20 flex shrink-0 flex-col gap-2 border-t border-edge bg-paper px-5 py-3">'+statusMessage+'<div class="flex flex-wrap items-center gap-2"><button type="button" class="'+BUTTON+' gap-1" data-pi-step="-1" data-pi-place="bottom">'+DashboardUI.renderIcon('chevron-left')+'Prev</button><button type="button" class="'+BUTTON+' gap-1" data-pi-step="1" data-pi-place="bottom">Next'+DashboardUI.renderIcon('chevron-right')+'</button>'+footer+'</div></footer>':'');
   }
@@ -475,10 +513,10 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     const previous=!page.hidden && String(page.dataset.team).trim().toLowerCase()===String(team).trim().toLowerCase()?model:null,previousDirty=dirty,previousTarget=targeted;
     trigger=button;reading=true;
     if(previous && DashboardUI.beginContentLoading){finishRead=DashboardUI.beginContentLoading(page.querySelector('[data-drawer-content]'),'Refreshing '+reviewLabel+' evaluation');const reload=page.querySelector('[data-reload]');if(reload)reload.disabled=true;}
-    else {activeCriteria='team';activeStudent=0;activeStudentPIs={};model=null;dirty=false;pending=null;targeted=null;correctionIndex=null;page.dataset.team=team;page.innerHTML=shell(team,DashboardUI.renderSkeleton('panel','Loading '+reviewLabel+' evaluation'));}
+    else {activeCriteria='team';activeStudent=0;activeTeamPI=null;activeStudentPIs={};model=null;dirty=false;pending=null;targeted=null;correctionIndex=null;page.dataset.team=team;page.innerHTML=shell(team,DashboardUI.renderSkeleton('panel','Loading '+reviewLabel+' evaluation'));}
     const token=++sequence;
-    if(page.hidden){const table=listHost.querySelector('[data-reviewer-table-scroll]');listScroll={x:window.scrollX,y:window.scrollY,table:table?table.scrollLeft:0};listHost.hidden=true;page.hidden=false;page.scrollIntoView({block:'start'});}
-    page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});
+    if(page.hidden){originTeam=team;const table=listHost.querySelector('[data-reviewer-table-scroll]');listScroll={x:window.scrollX,y:window.scrollY,table:table?table.scrollLeft:0};listHost.hidden=true;page.hidden=false;page.scrollIntoView({block:'start'});}
+    syncTeamNavigation();page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});
     bridge.read('review-evaluation:'+reviewKey,'API_review_getEvaluation',[team,reviewKey],{timeoutMs:60000}).then(data=>{
       if(token!==sequence || page.hidden)return;
       if(finishRead)finishRead();finishRead=null;reading=false;
@@ -487,8 +525,8 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       if(error && error.superseded)return;
       if(token!==sequence || page.hidden)return;
       if(finishRead)finishRead();finishRead=null;reading=false;
-      if(previous){model=previous;dirty=previousDirty;targeted=previousTarget;const reload=page.querySelector('[data-reload]');if(reload)reload.disabled=false;message(error.message+' Existing entries are retained. Use Reload to retry.');}
-      else {page.innerHTML=shell(team,'<div class="'+CARD+' mb-4 flex flex-col items-start gap-3"><p class="m-0 text-sm text-ink-2">The evaluation could not be loaded.</p><button class="'+BUTTON+'" type="button" data-reload>Retry</button></div>');message(error.message);page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});}
+      if(previous){model=previous;dirty=previousDirty;targeted=previousTarget;const reload=page.querySelector('[data-reload]');if(reload)reload.disabled=false;syncTeamNavigation();message(error.message+' Existing entries are retained. Use Reload to retry.');}
+      else {page.innerHTML=shell(team,'<div class="'+CARD+' mb-4 flex flex-col items-start gap-3"><p class="m-0 text-sm text-ink-2">The evaluation could not be loaded.</p><button class="'+BUTTON+'" type="button" data-reload>Retry</button></div>');message(error.message);syncTeamNavigation();page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});}
     });
   }
   function control(c,index,owner,score) {
@@ -502,8 +540,10 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       '<div data-descriptor aria-live="polite" class="mt-3 rounded-md bg-tint px-3 py-2 text-sm leading-relaxed text-ink-2"></div>'+
       '<details class="group mt-2"><summary class="inline-flex min-h-9 cursor-pointer list-none items-center gap-1 text-sm font-semibold text-primary hover:underline [&::-webkit-details-marker]:hidden">'+DashboardUI.renderIcon('chevron-right','','shrink-0 transition-transform group-open:rotate-90')+'View all level descriptors</summary><div class="mt-1 flex flex-col gap-2 border-l-2 border-edge pl-3">'+c.descriptors.map((text,i)=>'<p class="m-0 text-sm text-ink-2"><strong class="text-ink">Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</div></details>'+
       '<div data-scoring-controls class="mt-4 grid gap-4 border-t border-edge pt-4 xl:grid-cols-2"><div data-marks-panel class="min-w-0"><div class="flex flex-wrap items-center justify-between gap-2"><label class="text-sm font-semibold text-ink" for="reviewMarks-'+id+'">Awarded marks</label><span data-range class="text-sm text-muted"></span></div>'+
-      '<div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-3"><div class="flex items-center gap-1"><button class="'+STEP+'" type="button" data-step="-0.5" aria-label="Decrease marks by 0.5">'+DashboardUI.renderIcon('minus')+'</button><input class="'+FIELD+' w-20 text-center text-base font-semibold tabular-nums" data-marks id="reviewMarks-'+id+'" aria-describedby="reviewMarksError-'+id+'" type="number" inputmode="decimal" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button class="'+STEP+'" type="button" data-step="0.5" aria-label="Increase marks by 0.5">'+DashboardUI.renderIcon('plus')+'</button></div>'+
-      '<div class="min-w-40 flex-1 pt-5"><input class="'+RANGE+'" data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total hidden" data-awarded-total></span><div data-slider-values aria-hidden="true" class="mt-1 h-5 text-xs tabular-nums text-muted"></div></div></div>'+
+      // Hidden numeric state retains the existing native range/required validation and save payload.
+      '<input data-marks hidden type="number" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'">'+
+      '<span data-awarded-total class="mt-2 block text-base font-semibold tabular-nums text-ink" aria-live="polite"></span>'+
+      '<div class="mt-2 pt-5"><input class="'+RANGE+'" data-marks-slider id="reviewMarks-'+id+'" aria-describedby="reviewMarksError-'+id+'" type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><div data-slider-values aria-hidden="true" class="mt-1 h-5 text-xs tabular-nums text-muted"></div></div>'+
       '<p class="m-0 mt-2 rounded-md bg-danger-tint px-3 py-2 text-sm text-danger" data-marks-error id="reviewMarksError-'+id+'" aria-live="polite" hidden></p></div>'+
       '<div data-feedback-panel class="min-w-0"><div class="flex flex-wrap items-center justify-between gap-2 text-sm"><div class="flex flex-wrap items-center gap-2"><strong class="text-ink">Criterion feedback</strong><span data-feedback-required class="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-semibold text-warning"></span></div><span data-feedback-status class="text-sm text-muted"></span></div>'+
       '<div class="mt-2 flex flex-col gap-1.5 text-sm text-muted" data-feedback-options aria-label="Feedback suggestions"></div>'+
@@ -518,7 +558,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     for(const field of group.querySelectorAll('[data-index]')) {
       const marks=field.querySelector('[data-marks]'),remark=field.querySelector('[data-remark]');
       let text='',target;
-      if((marks.value!=='' || marks.validity.badInput) && !marks.checkValidity()){text=marks.validationMessage;target=marks;}
+      if((marks.value!=='' || marks.validity.badInput) && !marks.checkValidity()){text=marks.validationMessage;target=field.querySelector('[data-marks-slider]');}
       else if(remark.value.length>2000){text='Feedback must be 2000 characters or fewer.';target=field.querySelector('[data-custom-feedback]')||remark;}
       if(target) {
         revealCriterion(field);
@@ -562,7 +602,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if(targeted)page.querySelector('[data-review-actions]').innerHTML='<button class="'+BUTTON+'" type="button" data-reload>Cancel Makeup</button><button class="'+BUTTON+'" type="button" data-target-draft>Save Makeup Draft</button><button class="'+PRIMARY+'" type="button" data-target-submit>Submit Makeup</button>';
     page.querySelectorAll('[data-absence] input,[data-absence] select,[data-absence] textarea').forEach(el=>el.disabled=!!targeted);
     const rail=page.querySelector('[data-criteria-rail]');if(rail)rail.open=window.matchMedia('(min-width: 1024px)').matches;
-    syncStudentSelection();syncCriteriaTabs();updateRanges();page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});
+    syncStudentSelection();syncCriteriaTabs();updateRanges();syncTeamNavigation();page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});
   }
   // Markup last written to each element, so unchanged fragments are not re-parsed on every keystroke.
   const writtenHtml=new WeakMap();
@@ -655,7 +695,8 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
           setHtml(values,values.hidden?'':'<span class="flex justify-between">'+sliderScale(range).map(value=>'<span'+(marks!=='' && Number(marks)===value?' class="font-semibold text-primary"':'')+'>'+value+'</span>').join('')+'</span>');
         }
         if(level!=='' && range.max<range.min)text.textContent='No whole or half mark fits this level. Choose another level or ask the coordinator to check the rubric.';
-        field.querySelectorAll('[data-step]').forEach(button=>{button.disabled=slider.disabled;});
+        slider.setCustomValidity(error);
+        slider.setAttribute('aria-invalid',String(Boolean(error)));
         const requiredBadge=field.querySelector('[data-feedback-required]');
         requiredBadge.textContent=level!=='' && n<2?'Required for Level < 2':'Optional for Level '+n;
         requiredBadge.hidden=level==='' || n>=2;
@@ -798,7 +839,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function setBusy(value) {
     busy=value;page.querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=value);
     syncCriteriaTabs();
-    updateRanges();
+    updateRanges();syncTeamNavigation();
   }
   async function save(submit) {
     if(busy || reading || !model || !model.availability.editable)return;
@@ -821,13 +862,14 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       const c=model.config.criteria[Number(field.dataset.index)],level=field.querySelector('[data-level]'),marks=field.querySelector('[data-marks]'),remark=field.querySelector('[data-remark]');
       const editable=canEdit(field);
       level.required=submit && editable;marks.required=submit && editable;remark.required=false;
+      if(editable)field.querySelector('[data-marks-slider]').setCustomValidity(marks.validationMessage || (submit && marks.value===''?'Select awarded marks before submitting.':''));
       if(!editable){if(field.dataset.owner!=='team')payload.students[Number(field.dataset.owner)].scores=savedStudent(Number(field.dataset.owner)).scores||{};return;}
       const score={level:level.value===''?null:Number(level.value),marks:marks.value===''?null:marks.value,remark:remark.value};
       (field.dataset.owner==='team'?payload.teamScores:payload.students[Number(field.dataset.owner)].scores)[c.pi]=score;
     });
     const form=page.querySelector('form');
     const invalid=form.querySelector && form.querySelector('input:invalid,select:invalid,textarea:invalid');
-    if(invalid){revealCriterion(invalid);invalid.reportValidity();return;}
+    if(invalid){revealCriterion(invalid);const target=invalid.hasAttribute('data-marks')?invalid.closest('[data-index]').querySelector('[data-marks-slider]'):invalid;target.reportValidity();target.focus();return;}
     if(!form.reportValidity())return;
     if(submit && !await DashboardUI.ask('Submit '+reviewLabel+' for the entire team? Normal scores will lock; documented pending cases can be assessed separately.'))return;
     const method=submit?'submitReviewEvaluation_':'saveReviewEvaluationDraft_', signature=JSON.stringify({method,payload});
@@ -841,7 +883,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     },error=>{done();setBusy(false);message(error.message+' Your entries are retained. Retry uses the same request ID until you edit.');});
   }
   function refreshTable() {
-    ReviewerView.refresh().then(refreshed=>{if(!refreshed&&!page.hidden)message('Evaluation saved. The assigned-team table could not refresh; reload to retry.');});
+    ReviewerView.refresh().then(refreshed=>{if(!page.hidden){syncTeamNavigation();if(!refreshed)message('Evaluation saved. The assigned-team table could not refresh; reload to retry.');}});
   }
   window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
   return {open};

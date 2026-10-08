@@ -212,3 +212,17 @@ test('refresh and updated time live in the page header, not the view', () => {
   assert.equal(f.host.querySelector('#reviewerRefresh'), null);
   assert.equal(f.host.querySelector('#reviewerUpdated'), null);
 });
+
+
+test('evaluation team candidates use enabled review keys and DTO order across search and pages', () => {
+  const dto=dtoOf(Array.from({length:12},(_,i)=>team(i+1)));
+  dto.teams[1].reviews[0].enabled=false;
+  dto.teams[3].reviews.push({key:'review_extra',enabled:true,actionLabel:'Anything',note:'Anything'});
+  const f=setup(dto);f.view.render(f.host,dto);
+  f.view.state.query='T12';f.view.state.page=2;
+  assert.deepEqual(Array.from(f.view.evaluationTeams('review1')),['T1','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12']);
+  assert.deepEqual(Array.from(f.view.evaluationTeams('review2')),[]);
+  assert.deepEqual(Array.from(f.view.evaluationTeams('review_extra')),['T4']);
+  assert.deepEqual(Array.from(f.view.evaluationTeams('unknown')),[]);
+  assert.equal(f.view.state.query,'T12');assert.equal(f.view.state.page,2);
+});

@@ -245,8 +245,10 @@ function browserFixture(extended=false,key='review1') {
   const loading={begun:0,settled:0};
   const rail={open:false},media={matches:true,addEventListener(name,handler){this.changed=handler;}};
   let absenceNodes=new Map();
-  const control=(value='',kind='input')=>({value,kind,disabled:false,required:false,validity:'',attrs:{},setAttribute(k,v){this.attrs[k]=v;},focus(){focusCount++;},setCustomValidity(text){this.validity=text;},matches:()=>kind!=='button'});
+  const control=(value='',kind='input')=>({value,kind,disabled:false,required:false,validity:'',attrs:{},hasAttribute:()=>false,setAttribute(k,v){this.attrs[k]=v;},focus(){focusCount++;},setCustomValidity(text){this.validity=text;},matches:()=>kind!=='button'});
   const button=(attr,value,field)=>({kind:'button',dataset:{[attr.slice(5).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]:value},attrs:{},setAttribute(k,v){this.attrs[k]=v;},disabled:false,hasAttribute:key=>key===attr,closest(selector){return selector==='[data-index]'?field:this;},focus(){focusCount++;},matches:()=>false});
+  const teamSelect={...control('T1','select'),hasAttribute:name=>name==='data-team-select'};
+  const teamSteps=[button('data-team-step','-1'),button('data-team-step','1')];
   const form={addEventListener(){},reportValidity:()=>fields.every(field=>Object.values(field.controls).every(c=>!c.validity && (!c.required || c.value!=='')))};
   const drawer={hidden:true,scrollIntoView(){},dataset:{},setAttribute(){},addEventListener:(name,fn)=>events[name]=fn,
     set innerHTML(value){html=value;fields=[];buttons=[];absenceNodes=new Map();
@@ -277,6 +279,8 @@ function browserFixture(extended=false,key='review1') {
       }
     },get innerHTML(){return html;},
     querySelector(selector){
+      if(selector==='[data-team-select]')return teamSelect;
+      if(selector.startsWith('[data-team-step='))return teamSteps.find(button=>selector.includes('"'+button.dataset.teamStep+'"'));
       if(selector==='[data-criteria-rail]')return html.includes('data-criteria-rail')?rail:null;
       if(selector==='[data-evaluation-heading]')return {focus(){focusCount++;}};
       if(selector.startsWith('[data-student-score'))return headerNodes[selector]||={};
@@ -291,14 +295,14 @@ function browserFixture(extended=false,key='review1') {
         if(selector==='[data-review-actions]')return {set innerHTML(value){for(const m of value.matchAll(/(data-(?:target-draft|target-submit|reload|close))/g))buttons.push(button(m[1]));}};
       }
       if(selector==='[data-message]')return status;if(selector==='form')return form;if(selector.startsWith('[data-total='))return totals[Number(selector.match(/\d+/)[0])];return buttons.find(b=>b.hasAttribute(selector.slice(1,-1)));},
-    querySelectorAll(selector){if(selector==='[data-index]')return fields;if(selector.startsWith('[data-absence]'))return [...absenceNodes.values()].flatMap(h=>Object.values(h.controls));const inputs=fields.flatMap(f=>Object.values(f.controls));return selector.includes('button')?[...buttons,...inputs,...fields.flatMap(f=>[...f.buttons,...f.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')])]:inputs;}
+    querySelectorAll(selector){if(selector==='[data-index]')return fields;if(selector.startsWith('[data-absence]'))return [...absenceNodes.values()].flatMap(h=>Object.values(h.controls));const inputs=fields.flatMap(f=>Object.values(f.controls));return selector.includes('button')?[...buttons,...teamSteps,teamSelect,...inputs,...fields.flatMap(f=>[...f.buttons,...f.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')])]:inputs;}
   };
   const trigger={isConnected:true,focus(){focusCount++;}};
   const tableScroll={scrollLeft:190};
   const listHost={querySelector:()=>tableScroll,hidden:false,parentElement:{appendChild(node){node.parentElement=this;}},querySelectorAll:()=>[trigger]};
   const scrolls=[];
   function runner(success,failure){return new Proxy({},{get:(_,name)=>name==='withSuccessHandler'?fn=>runner(fn,failure):name==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({name,args,success,failure})});}
-  const c=vm.createContext({ReviewerView:{refresh:()=>Promise.resolve(true)},console,confirm:()=>discard,prompt:()=>extended?'Reviewed assessment':null,window:{crypto,matchMedia:()=>media,scrollX:12,scrollY:340,scrollTo:(x,y)=>scrolls.push([x,y]),addEventListener(){}},document:{querySelector:()=>listHost,createElement:()=>drawer,body:{appendChild(){},dataset:{},classList:{add(){},remove(){}}},getElementById:()=>null},DashboardUI:{busy: require('./busy-fixture.cjs')(), ask:async ()=>discard,requestText:async ()=>extended?'Reviewed assessment':null,notify:async ()=>{},guideRun:()=>runner(),renderSkeleton:()=>'<p>Loading</p>',...(extended?{beginContentLoading(){loading.begun++;let settled=false;return()=>{if(!settled)loading.settled++;settled=true;};}}:{})}});
+  const c=vm.createContext({ReviewerView:{refresh:()=>Promise.resolve(true),evaluationTeams:()=>['T1']},console,confirm:()=>discard,prompt:()=>extended?'Reviewed assessment':null,window:{crypto,matchMedia:()=>media,scrollX:12,scrollY:340,scrollTo:(x,y)=>scrolls.push([x,y]),addEventListener(){}},document:{querySelector:()=>listHost,createElement:()=>drawer,body:{appendChild(){},dataset:{},classList:{add(){},remove(){}}},getElementById:()=>null},DashboardUI:{busy: require('./busy-fixture.cjs')(), ask:async ()=>discard,requestText:async ()=>extended?'Reviewed assessment':null,notify:async ()=>{},guideRun:()=>runner(),renderSkeleton:()=>'<p>Loading</p>',...(extended?{beginContentLoading(){loading.begun++;let settled=false;return()=>{if(!settled)loading.settled++;settled=true;};}}:{})}});
   vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
   for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;
@@ -310,7 +314,7 @@ function browserFixture(extended=false,key='review1') {
   const api=c.reviewEvaluationBrowser_(key,bridge);
   const click=attr=>events.click({target:buttons.find(b=>b.hasAttribute(attr))});
   const data=JSON.parse(JSON.stringify(fixture().load()));
-  return {api,drawer,rail,media,listHost,tableScroll,scrolls,requests,status,data,trigger,click,events,fields:()=>fields,discard:v=>discard=v,focus:()=>focusCount,absenceNodes:()=>absenceNodes,loading,context:c};
+  return {api,drawer,rail,media,teamSelect,teamSteps,listHost,tableScroll,scrolls,requests,status,data,trigger,click,events,fields:()=>fields,discard:v=>discard=v,focus:()=>focusCount,absenceNodes:()=>absenceNodes,loading,context:c};
 }
 
 // Both configured reviews must obey the same policy without sharing records or rubric content.
@@ -552,7 +556,7 @@ for(const key of ['review1','review2']) {
     f.events.click({target:chips[0]});assert.equal(panels[0].hidden,false);assert.equal(field.controls['[data-marks]'].value,'32');assert.equal(field.controls['[data-remark]'].value,'Unsaved feedback');assert.equal(f.requests.length,1);
     f.click('data-draft');f.events.click({target:chips[1]});assert.equal(panels[0].hidden,false);
     f.requests[1].failure({message:'Offline'});f.events.click({target:chips[1]});assert.equal(panels[1].hidden,false);
-    assert.match(f.drawer.innerHTML,/data-select-student="0"[^>]*><span[^>]*>O<\/span><span class="font-semibold tabular-nums">s1<\/span>/);
+    assert.match(f.drawer.innerHTML,/data-select-student="0"[^>]*><span class="font-semibold tabular-nums">s1<\/span><span data-student-score="0"/);
     assert.doesNotMatch(f.drawer.innerHTML,/data-assessment-summary|Assessment Summary/);
   });
   test(key+': individual rubric visibility follows attendance and preserves unsaved entries',()=>{
@@ -797,19 +801,19 @@ test('saved draft out-of-range marks show a distinct range warning and clear aft
   for(const value of ['17','18.5','']) {marks.value=value;f.events.input();assert.equal(marks.validity,'');assert.equal(warning.hidden,true);assert.equal(marks.attrs['aria-invalid'],'false');}
 });
 
-test('mark steppers and slider retain configured exclusive band boundaries',()=>{
+test('slider alone retains configured bands, accepts its starting position and clears marks on level changes',async()=>{
   const f=browserFixture();f.api.open('T1',f.trigger);f.requests[0].success(f.data);const field=f.fields()[0],marks=field.controls['[data-marks]'];
-  f.events.click({target:field.querySelectorAll('[data-pick-level]')[2]});
-  const [minus,plus]=field.querySelectorAll('[data-step]');
-  f.events.click({target:plus});assert.equal(marks.value,'36');
-  marks.value='44.50';f.events.click({target:plus});assert.equal(marks.value,'44.5');
-  marks.value='36';f.events.click({target:minus});assert.equal(marks.value,'36');
-  const slider=field.controls['[data-marks-slider]'];assert.equal(slider.min,36);assert.equal(slider.max,44.5);
+  await f.events.click({target:field.querySelectorAll('[data-pick-level]')[2]});
+  const slider=field.controls['[data-marks-slider]'];slider.hasAttribute=name=>name==='data-marks-slider';slider.closest=()=>field;
+  assert.equal(marks.value,'');assert.equal(slider.min,36);assert.equal(slider.max,44.5);
+  await f.events.click({target:slider});assert.equal(Number(marks.value),36);
+  slider.value='44.5';f.events.input({target:slider});assert.equal(marks.value,'44.5');
   assert.equal(marks.step,'0.5');assert.equal(marks.min,36);assert.equal(marks.max,44.5);
-  marks.value='40.25';f.events.input();assert.match(marks.validity,/whole or half/);
-  slider.value='40.5';slider.hasAttribute=name=>name==='data-marks-slider';slider.closest=()=>field;f.events.input({target:slider});assert.equal(marks.value,'40.5');
-  f.events.click({target:field.querySelectorAll('[data-pick-level]')[5]});assert.equal(marks.value,'');assert.equal(marks.validity,'');assert.equal(slider.value,57);
-  assert.equal(slider.max,60);
+  marks.value='40.25';f.events.input();assert.match(marks.validity,/whole or half/);assert.match(slider.validity,/whole or half/);
+  slider.value='40.5';f.events.input({target:slider});assert.equal(marks.value,'40.5');assert.equal(slider.validity,'');
+  await f.events.click({target:field.querySelectorAll('[data-pick-level]')[5]});assert.equal(marks.value,'');assert.equal(slider.value,57);assert.equal(slider.max,60);
+  f.events.keyup({target:slider,key:'Home'});assert.equal(Number(marks.value),57);
+  slider.disabled=true;slider.value='60';await f.events.click({target:slider});assert.equal(Number(marks.value),57);
 });
 test('half-mark bounds round fractional band limits inward and disable empty bands',()=>{
   const f=browserFixture();f.data.config.criteria[0].maxMarks=15;
@@ -1181,7 +1185,7 @@ test('hostile remarks and the reopening reason are escaped when a saved evaluati
   assert.equal(f.drawer.hidden,false);assert.equal(f.listHost.hidden,true);
   assert.equal(f.drawer.parentElement,f.listHost.parentElement);
   assert.match(f.drawer.innerHTML,/data-evaluation-heading tabindex="-1"/);
-  assert.match(f.drawer.innerHTML,/aria-label="Back to evaluations"/);
+  assert.match(f.drawer.innerHTML,/data-close>.*?Back to dashboard<\/button>/);
   f.requests[0].success(f.data);
   assert.equal(f.drawer.hidden,false);
   f.tableScroll.scrollLeft=0;f.trigger.isConnected=false;let restored=false;
@@ -1200,8 +1204,8 @@ test('native criteria disclosure collapses on mobile, reopens on desktop and pre
   await f.events.click({target:pill});assert.equal(f.rail.open,false);assert.equal(field.controls['[data-marks]'].value,'48');
   f.media.matches=true;f.media.changed({matches:true});assert.equal(f.rail.open,true);
   assert.equal(field.controls['[data-marks]'].value,'48');assert.equal(f.requests.length,1);
-  assert.match(f.drawer.innerHTML,/data-reload/);assert.match(f.drawer.innerHTML,/data-marks type="number"|data-marks id=/);
-  assert.match(f.drawer.innerHTML,/data-step="-0.5"/);assert.match(f.drawer.innerHTML,/data-step="0.5"/);assert.match(f.drawer.innerHTML,/data-marks-slider/);
+  assert.match(f.drawer.innerHTML,/data-reload/);assert.match(f.drawer.innerHTML,/data-marks hidden type="number"/);
+  assert.doesNotMatch(f.drawer.innerHTML,/data-step=/);assert.match(f.drawer.innerHTML,/data-marks-slider/);
 });
 
 test('rearranged markup keeps complete scoring controls and one progress area in the rail',()=>{
@@ -1219,7 +1223,9 @@ test('rearranged markup keeps complete scoring controls and one progress area in
   for(const field of document.querySelectorAll('[data-index]')){
     const marks=field.querySelector('[data-marks-panel]'),feedback=field.querySelector('[data-feedback-panel]');
     assert.equal(marks.parentElement,feedback.parentElement);
-    assert.equal(marks.querySelectorAll('[data-step]').length,2);
+    assert.equal(marks.querySelectorAll('[data-step]').length,0);
+    assert.equal(marks.querySelector('[data-marks]').hidden,true);
+    assert.equal(marks.querySelector('[data-awarded-total]').hidden,false);
     assert.equal(marks.querySelector('[data-marks]').type,'number');
     assert.equal(marks.querySelector('[data-marks-slider]').type,'range');
     assert(feedback.querySelector('[data-feedback-options]'));
@@ -1252,4 +1258,106 @@ test('selecting a student from the rail retains the existing validation before l
   assert.equal(team.hidden,false);assert.equal(individual.hidden,true);assert.match(f.status.textContent,/outside/);
   marks.value='48';await f.events.click({target:chip});
   assert.equal(team.hidden,true);assert.equal(individual.hidden,false);assert.equal(marks.value,'48');assert.equal(f.requests.length,1);
+});
+
+
+function teamNavigationFixture(key='review1') {
+  const f=browserFixture(true,key),teams=['T1','T2','T3'];
+  f.context.ReviewerView.evaluationTeams=review=>review===key?teams:[];
+  f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+  const select=async team=>{f.teamSelect.value=team;await f.events.change({target:f.teamSelect});};
+  const step=async direction=>f.events.click({target:f.teamSteps.find(b=>Number(b.dataset.teamStep)===direction)});
+  const loaded=team=>({...structuredClone(f.data),roster:{...structuredClone(f.data.roster),team}});
+  return {...f,teams,select,step,loaded};
+}
+
+test('centered native team selector has independent arrows, stable IDs and non-wrapping boundaries',async()=>{
+  const f=teamNavigationFixture('review_extra'),{document}=require('linkedom').parseHTML(f.drawer.innerHTML);
+  const nav=document.querySelector('[data-team-navigation]');
+  assert.equal(nav.previousElementSibling.getAttribute('data-close'),'');
+  assert.equal(nav.querySelector('[data-team-select]').tagName,'SELECT');
+  assert.deepEqual([...nav.querySelectorAll('option')].map(o=>o.value),['T1','T2','T3']);
+  assert.equal(nav.querySelector('[data-evaluation-heading]').textContent,'T1');
+  assert.equal(nav.querySelector('[data-team-step="-1"]').getAttribute('aria-label'),'Previous team');
+  assert.equal(nav.querySelector('[data-team-step="1"]').getAttribute('aria-label'),'Next team');
+  assert.equal(f.teamSteps[0].disabled,true);assert.equal(f.teamSteps[1].disabled,false);
+  await f.step(-1);assert.equal(f.requests.length,1);
+  await f.step(1);assert.deepEqual(Array.from(f.requests[1].args),['T2','review_extra']);
+  assert.equal(f.teamSelect.disabled,true);assert(f.teamSteps.every(b=>b.disabled));
+  f.requests[1].success(f.loaded('T2'));assert.equal(f.drawer.dataset.team,'T2');assert(f.teamSteps.every(b=>!b.disabled));
+  await f.select('T3');f.requests[2].success(f.loaded('T3'));
+  assert.equal(f.teamSteps[1].disabled,true);assert.equal(f.teamSteps[0].disabled,false);
+  await f.step(1);await f.select('T3');await f.select('UNASSIGNED');assert.equal(f.requests.length,3);assert.equal(f.teamSelect.value,'T3');
+  f.teams.splice(0,f.teams.length,'T3');await f.select('T3');assert.equal(f.teamSelect.disabled,true);assert(f.teamSteps.every(b=>b.disabled));
+});
+
+test('team switching retains edits on cancellation and errors, deduplicates loading and permits retry',async()=>{
+  const f=teamNavigationFixture(),field=f.fields()[0],marks=field.controls['[data-marks]'],remark=field.controls['[data-remark]'];
+  field.controls['[data-level]'].value='3';marks.value='48';remark.value='Unsaved team feedback';f.events.input();
+  f.discard(false);await f.select('T2');assert.equal(f.requests.length,1);assert.equal(f.teamSelect.value,'T1');assert.equal(marks.value,'48');
+  let resolve;f.context.DashboardUI.ask=()=>new Promise(r=>resolve=r);
+  const confirmation=f.select('T2');assert(f.teamSteps.every(b=>b.disabled));assert.equal(f.teamSelect.disabled,true);
+  await f.step(1);assert.equal(f.requests.length,1);resolve(true);await confirmation;
+  assert.equal(f.drawer.dataset.team,'T1');assert.equal(f.fields()[0],field);assert.equal(marks.disabled,true);
+  await f.select('T3');await f.click('data-draft');assert.equal(f.requests.length,2);
+  f.requests[1].failure({message:'Offline'});assert.equal(f.loading.begun,f.loading.settled);
+  assert.equal(f.fields()[0],field);assert.equal(marks.value,'48');assert.equal(remark.value,'Unsaved team feedback');assert.equal(marks.disabled,false);
+  assert.equal(f.teamSelect.value,'T1');assert.match(f.status.textContent,/Offline.*retained/);
+  f.discard(false);f.context.DashboardUI.ask=async()=>false;await f.select('T2');assert.equal(f.requests.length,2);
+  f.context.DashboardUI.ask=async()=>true;await f.select('T2');f.requests[2].success(f.loaded('T2'));
+  assert.equal(f.drawer.dataset.team,'T2');assert.notEqual(f.fields()[0],field);assert.equal(f.fields()[0].controls['[data-marks]'].value,'');
+});
+
+test('team switching retains original dashboard return context and ignores responses after closing',async()=>{
+  const f=teamNavigationFixture();await f.select('T2');f.requests[1].success(f.loaded('T2'));
+  f.trigger.isConnected=false;let focused=false;
+  f.listHost.querySelectorAll=()=>[{dataset:{team:'T1',review:'review1'},focus(){focused=true;}}];
+  await f.select('T3');await f.click('data-close');assert.equal(f.loading.begun,f.loading.settled);
+  assert.equal(f.listHost.hidden,false);assert.equal(f.drawer.hidden,true);assert.equal(focused,true);
+  assert.equal(f.tableScroll.scrollLeft,190);assert.deepEqual(f.scrolls.at(-1),[12,340]);
+  f.requests[2].success(f.loaded('T3'));assert.equal(f.drawer.hidden,true);assert.equal(f.drawer.dataset.team,'T2');
+});
+
+test('team navigation stays disabled during writes and restores boundaries after a failed save',async()=>{
+  const f=teamNavigationFixture();await f.click('data-draft');assert.equal(f.requests.length,2);
+  assert.equal(f.teamSelect.disabled,true);assert(f.teamSteps.every(b=>b.disabled));
+  await f.select('T2');assert.equal(f.requests.length,2);
+  f.requests[1].failure({message:'Offline'});assert.equal(f.teamSelect.disabled,false);
+  assert.equal(f.teamSteps[0].disabled,true);assert.equal(f.teamSteps[1].disabled,false);
+});
+
+
+test('switching from submitted absence correction retains its draft and actions on failure',async()=>{
+  const f=teamNavigationFixture(),server=submittedAbsence();
+  f.api.open('T1',f.trigger);f.requests[1].success(JSON.parse(JSON.stringify(server.load())));
+  await f.click('data-edit-absence');const host=f.absenceNodes().get('0');host.controls.approved.value='no';f.events.input();
+  f.discard(false);await f.select('T2');assert.equal(f.requests.length,2);assert.equal(host.controls.approved.value,'no');
+  f.discard(true);await f.select('T2');f.requests[2].failure({message:'Offline'});
+  assert.equal(f.absenceNodes().get('0'),host);assert.equal(host.controls.approved.value,'no');assert.equal(host.controls.approved.disabled,false);
+  assert.match(f.drawer.innerHTML,/data-record-absence/);assert(f.fields().every(field=>field.controls['[data-marks]'].disabled));
+  await f.select('T2');f.requests[3].success(f.loaded('T2'));assert.doesNotMatch(f.drawer.innerHTML,/data-record-absence/);
+});
+
+test('switching from individual makeup preserves edits on failure and clears the makeup context on success',async()=>{
+  const f=teamNavigationFixture(),server=submittedAbsence();
+  f.api.open('T1',f.trigger);f.requests[1].success(JSON.parse(JSON.stringify(server.load())));await f.click('data-target');
+  const field=f.fields().find(field=>field.dataset.owner==='0');field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='32';field.controls['[data-remark]'].value='Makeup feedback';f.events.input();
+  f.discard(false);await f.select('T2');assert.equal(f.requests.length,2);
+  f.discard(true);await f.select('T2');f.requests[2].failure({message:'Unavailable'});
+  assert.equal(f.fields().find(field=>field.dataset.owner==='0'),field);assert.equal(field.controls['[data-marks]'].value,'32');assert.equal(field.controls['[data-remark]'].value,'Makeup feedback');
+  assert(f.drawer.querySelector('[data-target-submit]'));assert.equal(field.controls['[data-marks]'].disabled,false);
+  await f.select('T2');f.requests[3].success(f.loaded('T2'));assert.doesNotMatch(f.drawer.innerHTML,/data-target-submit/);assert.match(f.drawer.innerHTML,/data-submit/);
+});
+
+
+test('native team-select input does not mark a clean evaluation dirty or prompt for discard',async()=>{
+  const f=teamNavigationFixture();let prompts=0;f.context.DashboardUI.ask=async()=>{prompts++;return true;};
+  f.events.input({target:f.teamSelect});await f.select('T2');assert.equal(prompts,0);assert.equal(f.requests.length,2);
+  f.requests[1].success(f.loaded('T2'));assert.equal(f.drawer.dataset.team,'T2');
+});
+
+test('initial loading errors leave team navigation disabled until an evaluation is loaded',()=>{
+  const f=browserFixture(true);f.context.ReviewerView.evaluationTeams=()=>['T1','T2'];f.api.open('T1',f.trigger);
+  assert.equal(f.teamSelect.disabled,true);f.requests[0].failure({message:'Offline'});
+  assert.equal(f.teamSelect.disabled,true);assert(f.teamSteps.every(b=>b.disabled));assert.match(f.drawer.innerHTML,/Retry/);
 });
