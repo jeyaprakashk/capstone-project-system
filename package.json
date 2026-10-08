@@ -21,7 +21,7 @@
     "test:invariants": "node --test tests/invariants/schema-guard.test.cjs tests/invariants/academic-rules.test.cjs",
     "build:tailwind": "node scripts/build-tailwind.cjs",
     "check:tailwind": "node scripts/build-tailwind.cjs --check",
-    "test:migration": "node --test tests/busy-state.test.cjs tests/reviewer-migration.test.cjs tests/data-bridge.test.cjs tests/reviewer-view.test.cjs tests/guide-migration.test.cjs tests/guide-view.test.cjs tests/student-migration.test.cjs tests/student-view.test.cjs tests/coordinator-migration.test.cjs tests/coordinator-view.test.cjs tests/team-drawer-view.test.cjs tests/shared-rubrics-view.test.cjs tests/system-status-view.test.cjs tests/team-folders.test.cjs tests/team-folders-view.test.cjs tests/student-weekly-view.test.cjs tests/weekly-api.test.cjs tests/student-results-view.test.cjs tests/guide-evaluation-view.test.cjs tests/page-assembly.test.cjs"
+    "test:migration": "node --test tests/review-evaluation.test.cjs tests/busy-state.test.cjs tests/reviewer-migration.test.cjs tests/data-bridge.test.cjs tests/reviewer-view.test.cjs tests/guide-migration.test.cjs tests/guide-view.test.cjs tests/student-migration.test.cjs tests/student-view.test.cjs tests/coordinator-migration.test.cjs tests/coordinator-view.test.cjs tests/team-drawer-view.test.cjs tests/shared-rubrics-view.test.cjs tests/system-status-view.test.cjs tests/team-folders.test.cjs tests/team-folders-view.test.cjs tests/student-weekly-view.test.cjs tests/weekly-api.test.cjs tests/student-results-view.test.cjs tests/guide-evaluation-view.test.cjs tests/page-assembly.test.cjs"
   },
   "keywords": [],
   "type": "commonjs"

@@ -3,7 +3,7 @@
  * Renders the reviewer DTO (DATA-CONTRACTS.md) with Tailwind utilities. It never calls
  * google.script.run and never sees spreadsheet columns; all server access goes through
  * the injected data bridge. Class names are literal so the Tailwind build can scan them.
- * getMarking() returns the Review marking drawer (`ReviewEvaluations`), which is serialized after this view.
+ * getMarking() returns the Review evaluation page (`ReviewEvaluations`), which is serialized after this view.
  */
 function reviewerViewBrowser_(bridge, getUi, getMarking) {
   'use strict';
@@ -21,9 +21,7 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
     neutral:'bg-soft text-ink-2 ring-1 ring-inset ring-control/20'
   };
   const STAT = [
-    ['pending', 'Pending Your Decision', 'text-warning'],
     ['approved', 'Approved', 'text-success'],
-    ['awaitingGuide', 'Not Yet Guide-Approved', 'text-muted'],
     ['total', 'Total Assigned to You', 'text-primary']
   ];
 
@@ -49,13 +47,13 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
     const t = team.titleApproval, id = escape(team.teamId);
     const decide = t.canDecide
       ? '<label class="mt-3 block text-sm font-semibold text-ink-2" for="reviewer-notes-' + id + '">Reviewer notes</label>' +
-        '<textarea id="reviewer-notes-' + id + '" rows="3" class="mt-1 block w-full rounded-md border border-control px-3 py-2 text-sm" placeholder="Notes (required for Revise)"></textarea>' +
-        '<div class="mt-2 flex gap-2">' +
+        '<textarea id="reviewer-notes-' + id + '" rows="3" class="mt-1 block w-full min-w-0 rounded-md border border-control px-3 py-2 text-sm" placeholder="Notes (required for Revise)"></textarea>' +
+        '<div class="mt-2 flex flex-wrap gap-2">' +
         '<button type="button" class="border-0 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50" data-action="decide" data-decision="Approved" data-team="' + id + '">Approve</button>' +
         '<button type="button" class="border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50" data-action="decide" data-decision="Revise" data-team="' + id + '">Revise</button></div>'
       : '';
-    return '<details><summary class="cursor-pointer text-sm"><span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ' + (TONE[t.status.tone] || TONE.neutral) + '">' + escape(t.status.label) + '</span> ' + (t.canDecide ? 'Review title' : 'Details') + '</summary>' +
-      '<div id="reviewer-decision-' + id + '" class="mt-2 min-w-64"><strong>' + escape(t.submittedTitle || 'Not submitted') + '</strong>' +
+    return '<span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ' + (TONE[t.status.tone] || TONE.neutral) + '">' + escape(t.status.label) + '</span><details class="mt-1"><summary class="cursor-pointer list-none text-sm text-primary hover:underline [&::-webkit-details-marker]:hidden">Details</summary>' +
+      '<div id="reviewer-decision-' + id + '" class="mt-2 min-w-0 [overflow-wrap:anywhere]"><strong>' + escape(t.submittedTitle || 'Not submitted') + '</strong>' +
       (t.similarityFlag ? '<p class="mt-1 text-sm text-warning">' + icon('triangle-alert', 'Similarity warning') + ' ' + escape(t.similarityFlag) + '</p>' : '') +
       documentsMarkup(t.documents) +
       (t.reviewerNotes ? '<p class="mt-2 text-sm text-muted">' + escape(t.reviewerNotes) + '</p>' : '') +
@@ -69,16 +67,14 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
   }
   function rowMarkup(team, reviews) {
     return '<tr class="border-b border-edge hover:bg-tint" data-team-id="' + escape(team.teamId) + '">' +
-      '<td class="px-4 py-3 align-top text-sm font-semibold text-ink">' + escape(team.teamId) + '</td>' +
-      '<td class="px-4 py-3 align-top text-sm text-muted">' + escape(team.guideName || '—') + '</td>' +
-      '<td class="px-4 py-3 align-top text-sm text-muted">' + (team.registerNumbers.length ? team.registerNumbers.map(r => '<span class="mr-2 inline-block">' + escape(r) + '</span>').join('') : '—') + '</td>' +
-      '<td class="px-4 py-3 align-top text-sm text-ink">' + escape(team.title || 'Not submitted') + '</td>' +
-      '<td class="px-4 py-3 align-top text-sm text-muted">' + escape(team.committee || '—') + '</td>' +
+      '<td class="px-4 py-3 align-top text-sm font-semibold text-ink">' + escape(team.teamId) + '<small class="mt-1 block text-xs font-normal text-muted">Committee ' + escape(team.committee || '—') + '</small></td>' +
+      '<td class="px-4 py-3 align-top text-sm text-ink"><span class="line-clamp-2 [overflow-wrap:anywhere]">' + escape(team.title || 'Not submitted') + '</span><small class="mt-1 block text-xs text-muted">' + escape(team.guideName || '—') + '</small></td>' +
+      '<td class="px-4 py-3 align-top text-sm text-muted">' + (team.registerNumbers.length ? team.registerNumbers.map(r => '<span class="block [overflow-wrap:anywhere]">' + escape(r) + '</span>').join('') : '—') + '</td>' +
       '<td class="px-4 py-3 align-top">' + titleApprovalMarkup(team) + '</td>' +
       reviews.map(review => reviewCellMarkup(team, review)).join('') + '</tr>';
   }
   function statsMarkup(summary) {
-    const chips = STAT.filter(([key]) => summary[key] > 0).map(([key, label, tone]) =>
+    const chips = STAT.map(([key, label, tone]) =>
       '<span class="inline-flex items-baseline gap-2 rounded-card border border-edge bg-paper shadow-card px-3 py-2"><span class="text-xl font-semibold ' + tone + '">' + summary[key] + '</span><span class="text-sm text-muted">' + label + '</span></span>').join('');
     return chips ? '<div class="mt-4 flex flex-wrap gap-2">' + chips + '</div>' : '';
   }
@@ -99,7 +95,7 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
     const found = matches(), bounds = pageBounds(found.length);
     const shown = found.slice(bounds.start, bounds.end);
     const reviews = state.dto.reviews;
-    const empty = found.length ? '' : '<tr><td class="px-4 py-6 text-sm text-muted" colspan="' + (6 + reviews.length) + '">' + (state.dto.teams.length ? 'No teams match your search.' : 'No teams are assigned to you.') + '</td></tr>';
+    const empty = found.length ? '' : '<tr><td class="px-4 py-6 text-sm text-muted" colspan="' + (4 + reviews.length) + '">' + (state.dto.teams.length ? 'No teams match your search.' : 'No teams are assigned to you.') + '</td></tr>';
     return {rows:shown.map(team => rowMarkup(team, reviews)).join('') + empty, pagination:paginationMarkup(found.length, bounds)};
   }
   function updateTable() {
@@ -118,6 +114,8 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
 
   /** Replaces the host content with the DTO, keeping the current search and page size. */
   function render(host, dto) {
+    const previousTable = host.querySelector('[data-reviewer-table-scroll]');
+    const scrollLeft = previousTable ? previousTable.scrollLeft : 0;
     state.host = host;
     state.dto = dto;
     const part = rowsAndPagination();
@@ -128,10 +126,11 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
       '<h3 id="reviewerAssignedHeading" class="text-base font-semibold text-ink">Assigned Teams (' + dto.teams.length + ' teams)</h3>' +
       '<input type="search" id="reviewerAssignedSearch" aria-label="Search assigned teams" placeholder="Search team, guide, register number, or title…" value="' + escape(state.query) + '" class="mt-3 block w-full max-w-md rounded-md border border-control px-3 py-2 text-sm" data-action="search">' +
       '<p id="reviewerAssignedScrollHint" class="mt-2 text-xs text-muted">Scroll horizontally if more review columns are off-screen.</p>' +
-      '<div class="mt-2 max-w-full overflow-x-auto rounded-card border border-edge" data-tooltip-boundary role="region" aria-label="Assigned teams table, scroll horizontally for more columns" aria-describedby="reviewerAssignedScrollHint" tabindex="0">' +
-      '<table class="min-w-full divide-y divide-edge bg-paper text-left"><thead class="bg-canvas text-xs font-semibold uppercase tracking-wider text-muted"><tr>' +
-      '<th scope="col" class="px-4 py-3">Team</th><th scope="col" class="px-4 py-3">Guide</th><th scope="col" class="px-4 py-3">Register Numbers</th><th scope="col" class="px-4 py-3">Project Title</th><th scope="col" class="px-4 py-3">Committee</th><th scope="col" class="px-4 py-3">Title Approval</th>' + head +
+      '<div class="mt-2 max-w-full overflow-x-auto rounded-card border border-edge" data-reviewer-table-scroll data-tooltip-boundary role="region" aria-label="Assigned teams table, scroll horizontally for more columns" aria-describedby="reviewerAssignedScrollHint" tabindex="0">' +
+      '<table class="w-full min-w-full table-fixed divide-y divide-edge bg-paper text-left"><thead class="bg-canvas text-xs font-semibold uppercase tracking-wider text-muted"><tr>' +
+      '<th scope="col" class="px-4 py-3">Team</th><th scope="col" class="px-4 py-3">Project &amp; guide</th><th scope="col" class="px-4 py-3">Register Numbers</th><th scope="col" class="px-4 py-3">Title Approval</th>' + head +
       '</tr></thead><tbody data-reviewer-body>' + part.rows + '</tbody></table></div><div data-reviewer-pagination>' + part.pagination + '</div></section>';
+    q('[data-reviewer-table-scroll]').scrollLeft = scrollLeft;
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('input', onInput); host.addEventListener('change', onChange); }
   }
 

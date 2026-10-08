@@ -200,13 +200,15 @@ test('missing storage, oversized payload and unavailable lock fail without revis
   delete f.sheets.Review1Evaluations;assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/Error in Initialization/);
   const big=fixture();big.reviews[0].rubric[0].descriptors=Array(6).fill('x'.repeat(10000));assert.throws(()=>big.c.submitReviewEvaluation_({...(big.input()),assessmentId:'review1'}),/too large/);assert.equal(big.tables.Review1Evaluations.length,1);
 });
-test('browser source is serializable and uses shared drawer layout',()=>{
+test('browser source is serializable and uses an in-dashboard page with existing utilities',()=>{
   const c=vm.createContext({});vm.runInContext(fs.readFileSync('review-academic-policy.js','utf8'),c);vm.runInContext(fs.readFileSync('review-evaluation-client.js','utf8'),c);
-  new vm.Script(c.getReviewEvaluationClientScript_());assert.match(c.getReviewEvaluationClientScript_(),/drawer\.className=DRAWER/);
-  // A flex column with a flexible, scrolling body keeps the footer actions on screen; the dialog's UA box is reset.
-  const drawerClasses=fs.readFileSync('review-evaluation-client.js','utf8').match(/const DRAWER='([^']+)'/)[1].split(' ');
-  for(const name of ['hidden','open:flex','flex-col','overflow-hidden','m-0','p-0','border-0','bg-paper','backdrop:bg-scrim'])assert(drawerClasses.includes(name),name);
-  assert.match(fs.readFileSync('review-evaluation-client.js','utf8'),/team-drawer-content min-h-0 flex-1 overflow-y-auto/);
+  new vm.Script(c.getReviewEvaluationClientScript_());
+  const src=fs.readFileSync('review-evaluation-client.js','utf8');
+  assert.match(src,/createElement\('section'\)/);
+  assert.match(src,/data-review-evaluation-page/);
+  assert.doesNotMatch(src,/showModal|scrollLocked|backdrop:bg|fixed inset/);
+  assert.match(src,/class="bg-canvas px-5 py-4" data-drawer-content/);
+  assert.doesNotMatch(src,/\sstyle=|\son[a-z]+=/i);
 });
 
 test('Review 2 checks history on load and save, and reopening removes completion',()=>{
@@ -241,11 +243,12 @@ function browserFixture(extended=false,key='review1') {
   const headerNodes={};
   const requests=[],events={},status={setAttribute(){}},totals=[{},{}];let html='',fields=[],buttons=[],focusCount=0,discard=true;
   const loading={begun:0,settled:0};
+  const rail={open:false},media={matches:true,addEventListener(name,handler){this.changed=handler;}};
   let absenceNodes=new Map();
   const control=(value='',kind='input')=>({value,kind,disabled:false,required:false,validity:'',attrs:{},setAttribute(k,v){this.attrs[k]=v;},focus(){focusCount++;},setCustomValidity(text){this.validity=text;},matches:()=>kind!=='button'});
   const button=(attr,value,field)=>({kind:'button',dataset:{[attr.slice(5).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]:value},attrs:{},setAttribute(k,v){this.attrs[k]=v;},disabled:false,hasAttribute:key=>key===attr,closest(selector){return selector==='[data-index]'?field:this;},focus(){focusCount++;},matches:()=>false});
   const form={addEventListener(){},reportValidity:()=>fields.every(field=>Object.values(field.controls).every(c=>!c.validity && (!c.required || c.value!=='')))};
-  const drawer={open:false,dataset:{},setAttribute(){},addEventListener:(name,fn)=>events[name]=fn,showModal(){this.open=true;},close(){this.open=false;},
+  const drawer={hidden:true,scrollIntoView(){},dataset:{},setAttribute(){},addEventListener:(name,fn)=>events[name]=fn,
     set innerHTML(value){html=value;fields=[];buttons=[];absenceNodes=new Map();
       for(const match of value.matchAll(/<button[^>]*(data-(?:close|draft|submit|reload|edit-absence|cancel-absence|record-absence|record-decision|target-draft|target-submit|target))(?:="([^"]*)")?[^>]*>/g))buttons.push(button(match[1],match[2]));
       if(extended)for(const match of value.matchAll(/data-absence="(\d+)"[^>]*>([\s\S]*?)<div data-effective="\d+"><\/div>/g)){
@@ -274,6 +277,8 @@ function browserFixture(extended=false,key='review1') {
       }
     },get innerHTML(){return html;},
     querySelector(selector){
+      if(selector==='[data-criteria-rail]')return html.includes('data-criteria-rail')?rail:null;
+      if(selector==='[data-evaluation-heading]')return {focus(){focusCount++;}};
       if(selector.startsWith('[data-student-score'))return headerNodes[selector]||={};
       if(selector.startsWith('[data-footer-team=') || selector.startsWith('[data-footer-individual=') || selector.startsWith('[data-footer-total='))return headerNodes[selector]||={};
       if(selector==='[data-team-mark]' || selector.startsWith('[data-individual-mark=') || selector.startsWith('[data-assessment-status='))return headerNodes[selector]||=( {} );
@@ -289,8 +294,11 @@ function browserFixture(extended=false,key='review1') {
     querySelectorAll(selector){if(selector==='[data-index]')return fields;if(selector.startsWith('[data-absence]'))return [...absenceNodes.values()].flatMap(h=>Object.values(h.controls));const inputs=fields.flatMap(f=>Object.values(f.controls));return selector.includes('button')?[...buttons,...inputs,...fields.flatMap(f=>[...f.buttons,...f.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')])]:inputs;}
   };
   const trigger={isConnected:true,focus(){focusCount++;}};
+  const tableScroll={scrollLeft:190};
+  const listHost={querySelector:()=>tableScroll,hidden:false,parentElement:{appendChild(node){node.parentElement=this;}},querySelectorAll:()=>[trigger]};
+  const scrolls=[];
   function runner(success,failure){return new Proxy({},{get:(_,name)=>name==='withSuccessHandler'?fn=>runner(fn,failure):name==='withFailureHandler'?fn=>runner(success,fn):(...args)=>requests.push({name,args,success,failure})});}
-  const c=vm.createContext({ReviewerView:{refresh:()=>Promise.resolve(true)},console,confirm:()=>discard,prompt:()=>extended?'Reviewed assessment':null,window:{crypto,addEventListener(){}},document:{createElement:()=>drawer,body:{appendChild(){},dataset:{},classList:{add(){},remove(){}}},getElementById:()=>null},DashboardUI:{busy: require('./busy-fixture.cjs')(), ask:async ()=>discard,requestText:async ()=>extended?'Reviewed assessment':null,notify:async ()=>{},guideRun:()=>runner(),renderSkeleton:()=>'<p>Loading</p>',...(extended?{beginContentLoading(){loading.begun++;let settled=false;return()=>{if(!settled)loading.settled++;settled=true;};}}:{})}});
+  const c=vm.createContext({ReviewerView:{refresh:()=>Promise.resolve(true)},console,confirm:()=>discard,prompt:()=>extended?'Reviewed assessment':null,window:{crypto,matchMedia:()=>media,scrollX:12,scrollY:340,scrollTo:(x,y)=>scrolls.push([x,y]),addEventListener(){}},document:{querySelector:()=>listHost,createElement:()=>drawer,body:{appendChild(){},dataset:{},classList:{add(){},remove(){}}},getElementById:()=>null},DashboardUI:{busy: require('./busy-fixture.cjs')(), ask:async ()=>discard,requestText:async ()=>extended?'Reviewed assessment':null,notify:async ()=>{},guideRun:()=>runner(),renderSkeleton:()=>'<p>Loading</p>',...(extended?{beginContentLoading(){loading.begun++;let settled=false;return()=>{if(!settled)loading.settled++;settled=true;};}}:{})}});
   vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
   for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;
@@ -302,7 +310,7 @@ function browserFixture(extended=false,key='review1') {
   const api=c.reviewEvaluationBrowser_(key,bridge);
   const click=attr=>events.click({target:buttons.find(b=>b.hasAttribute(attr))});
   const data=JSON.parse(JSON.stringify(fixture().load()));
-  return {api,drawer,requests,status,data,trigger,click,events,fields:()=>fields,discard:v=>discard=v,focus:()=>focusCount,absenceNodes:()=>absenceNodes,loading,context:c};
+  return {api,drawer,rail,media,listHost,tableScroll,scrolls,requests,status,data,trigger,click,events,fields:()=>fields,discard:v=>discard=v,focus:()=>focusCount,absenceNodes:()=>absenceNodes,loading,context:c};
 }
 
 // Both configured reviews must obey the same policy without sharing records or rubric content.
@@ -379,7 +387,7 @@ for(const key of ['review1','review2']) {
     assert.equal(picker.open,false);assert.equal(summary.focused,true);assert.equal(f.fields()[1].hidden,false);
     picker.open=true;let prevented=false,stopped=false;
     f.events.keydown({target:summary,key:'Escape',preventDefault(){prevented=true;},stopPropagation(){stopped=true;}});
-    assert.equal(picker.open,false);assert(prevented && stopped);assert.equal(f.drawer.open,true);
+    assert.equal(picker.open,false);assert(prevented && stopped);assert.equal(!f.drawer.hidden,true);
     picker.open=true;f.events.click({target:{closest:()=>null}});assert.equal(picker.open,false);
     f.click('data-draft');assert.equal(option.disabled,true);assert.equal(summary.attrs['aria-disabled'],'true');
     option.value='PROLONGED';f.events.change({target:option});assert.equal(host.controls.type.value,'NORMAL');
@@ -466,12 +474,12 @@ for(const key of ['review1','review2']) {
     assert.match(f.drawer.innerHTML,/data-team-pills/);assert.match(f.drawer.innerHTML,/data-select-pi="0"/);
     const field=f.fields()[0],group={querySelectorAll:()=>[field]},content={scrollTop:120},query=f.drawer.querySelector.bind(f.drawer);
     f.drawer.querySelector=s=>s==='[data-criteria-group="team"]'?group:s==='[data-drawer-content]'?content:query(s);
-    let scrolled=false;field.scrollIntoView=()=>{scrolled=true;};
+    let scrolled=false,pageScrolled=false;field.scrollIntoView=()=>{scrolled=true;};f.drawer.scrollIntoView=()=>{pageScrolled=true;};
     const marks=field.controls['[data-marks]'];marks.checkValidity=()=>!marks.validity;Object.defineProperty(marks,'validationMessage',{get:()=>marks.validity});
     const pill={dataset:{selectPi:'0'},hasAttribute:a=>a==='data-select-pi',closest:s=>s==='button'?pill:null};
     field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='59';
-    f.events.click({target:pill});assert.equal(scrolled,false);assert.equal(content.scrollTop,120);assert.match(f.status.textContent,/outside/);
-    field.controls['[data-marks]'].value='48';f.events.click({target:pill});assert.equal(scrolled,false);assert.equal(content.scrollTop,0);assert.equal(field.controls['[data-marks]'].value,'48');assert.equal(f.requests.length,1);
+    f.events.click({target:pill});assert.equal(scrolled,false);assert.equal(pageScrolled,false);assert.equal(content.scrollTop,120);assert.match(f.status.textContent,/outside/);
+    field.controls['[data-marks]'].value='48';f.events.click({target:pill});assert.equal(scrolled,false);assert.equal(pageScrolled,true);assert.equal(content.scrollTop,0);assert.equal(field.controls['[data-marks]'].value,'48');assert.equal(f.requests.length,1);
   });
   test(key+': Prev and Next cross from team PIs to student PIs and block invalid marks',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
@@ -486,35 +494,31 @@ for(const key of ['review1','review2']) {
     step(1);assert.equal(panels.team.hidden,true);assert.equal(panels.individual.hidden,false);assert.equal(first.hidden,false);
     step(-1);assert.equal(panels.team.hidden,false);assert.equal(panels.individual.hidden,true);assert.equal(marks.value,'48');assert.equal(f.requests.length,1);
   });
-  test(key+': tab progress counts valid grading and changes completion color',()=>{
-    const f=browserFixture(true,key),row={},query=f.drawer.querySelector.bind(f.drawer);
-    f.drawer.querySelector=selector=>selector==='[data-tab-progress]'?row:query(selector);
+  test(key+': rail progress counts all applicable criteria using existing grading rules',()=>{
+    const f=browserFixture(true,key),label={},segments={},query=f.drawer.querySelector.bind(f.drawer);
+    f.drawer.querySelector=selector=>selector==='[data-criteria-rail-label]'?label:selector==='[data-pi-segments]'?segments:query(selector);
     f.api.open('T1',f.trigger);f.requests[0].success(f.data);
-    for(const host of f.absenceNodes().values())host.controls.type.value='NORMAL';
-    assert.match(row.innerHTML,/Performance Indicators/);assert.match(row.innerHTML,/data-completion="empty"[^>]*>0 of 1 graded/);
+    for(const host of f.absenceNodes().values())host.controls.type.value='NORMAL';f.events.input();
+    assert.match(label.textContent,/0 of 3 criteria evaluated/);
     const team=f.fields()[0];team.controls['[data-level]'].value='3';team.controls['[data-marks]'].value='48';f.events.input();
-    assert.match(row.innerHTML,/data-completion="complete"[^>]*>1 of 1 graded/);
-    const tab={dataset:{criteriaTab:'individual'},hasAttribute:a=>a==='data-criteria-tab',closest:s=>s==='button'?tab:null};
-    f.events.click({target:tab});assert.match(row.innerHTML,/Student performance indicators/);assert.match(row.innerHTML,/data-completion="empty"[^>]*>0 of 1 graded/);
+    assert.match(label.textContent,/1 of 3 criteria evaluated/);assert.equal((segments.innerHTML.match(/data-state="complete"/g)||[]).length,0);
     const students=f.fields().filter(field=>field.dataset.owner!=='team');
-    students[1].controls['[data-level]'].value='3';students[1].controls['[data-marks]'].value='32';f.events.input();
-    assert.match(row.innerHTML,/data-completion="empty"[^>]*>0 of 1 graded/);
-    students[0].controls['[data-level]'].value='3';students[0].controls['[data-marks]'].value='32';f.events.input();
-    assert.match(row.innerHTML,/data-completion="complete"[^>]*>1 of 1 graded/);
-    students[0].controls['[data-marks]'].value='99';f.events.input();
-    assert.match(row.innerHTML,/data-completion="empty"[^>]*>0 of 1 graded/);
+    students.forEach(field=>{field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='32';});f.events.input();
+    assert.match(label.textContent,/3 of 3 criteria evaluated/);assert.equal((segments.innerHTML.match(/data-state="complete"/g)||[]).length,2);
+    students[0].controls['[data-marks]'].value='99';f.events.input();assert.match(label.textContent,/2 of 3 criteria evaluated/);
+    students[0].controls['[data-level]'].value='0';students[0].controls['[data-marks]'].value='0';students[0].controls['[data-remark]'].value='';f.events.input();assert.match(label.textContent,/2 of 3 criteria evaluated/);
   });
-  test(key+': component tabs switch without reload, preserve entries and support arrow navigation',()=>{
+  test(key+': rail sections switch without reload, preserve entries and support arrow navigation',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
-    assert(f.drawer.innerHTML.indexOf('review-project-title-row')<f.drawer.innerHTML.indexOf('role="tablist"'));
-    assert.match(f.drawer.innerHTML,/Team Criteria<\/span><span[^>]*>· 60 pts pool<\/span>/);assert.match(f.drawer.innerHTML,/Individual<\/span><span[^>]*>· 40 pts weight<\/span>/);
+    assert(f.drawer.innerHTML.indexOf('review-project-title-row')<f.drawer.innerHTML.indexOf('data-criteria-rail'));
+    assert.match(f.drawer.innerHTML,/Team Criteria<\/strong><span[^>]*> \u00b7 60 pts pool<\/span>/);assert.match(f.drawer.innerHTML,/Individual<\/strong><span[^>]*> \u00b7 40 pts weight<\/span>/);
     const panels=Object.fromEntries(['team','individual'].map(name=>[name,{hidden:name!=='team',open:name==='team',querySelectorAll:()=>[]}]));
     const tabs=Object.fromEntries(['team','individual'].map(name=>[name,{dataset:{criteriaTab:name},attrs:{},hasAttribute:attr=>attr==='data-criteria-tab',setAttribute(k,v){this.attrs[k]=v;},focus(){this.focused=true;},closest(selector){return selector==='button'?this:null;}}]));
     const chips={},query=f.drawer.querySelector.bind(f.drawer);
     f.drawer.querySelector=selector=>selector==='[data-review-students]'?chips:selector.startsWith('[data-criteria-group="')?panels[selector.match(/"([^"]+)"/)[1]]:selector.startsWith('[data-criteria-tab="')?tabs[selector.match(/"([^"]+)"/)[1]]:query(selector);
     f.fields()[0].controls['[data-marks]'].value='48';f.fields()[0].controls['[data-level]'].value='3';f.events.input();
-    f.events.click({target:tabs.individual});assert.equal(panels.team.hidden,true);assert.equal(panels.individual.hidden,false);assert.equal(tabs.individual.attrs['aria-selected'],'true');assert.equal(chips.hidden,false);
-    f.events.keydown({target:tabs.individual,key:'ArrowLeft',preventDefault(){}});assert.equal(panels.team.hidden,false);assert.equal(panels.individual.hidden,true);assert.equal(tabs.team.focused,true);assert.equal(chips.hidden,true);
+    f.events.click({target:tabs.individual});assert.equal(panels.team.hidden,true);assert.equal(panels.individual.hidden,false);assert.equal(tabs.individual.attrs['aria-pressed'],'true');assert.equal(chips.hidden,false);
+    f.events.keydown({target:tabs.individual,key:'ArrowLeft',preventDefault(){}});assert.equal(panels.team.hidden,false);assert.equal(panels.individual.hidden,true);assert.equal(tabs.team.focused,true);assert.equal(chips.hidden,false);
     assert.equal(f.fields()[0].controls['[data-marks]'].value,'48');assert.equal(f.requests.length,1);
     f.click('data-draft');f.events.click({target:tabs.individual});assert.equal(panels.team.hidden,false);
   });
@@ -666,11 +670,11 @@ test('review refresh retains entries on failure, deduplicates requests and settl
   assert.equal(f.fields()[0],field);assert.equal(field.controls['[data-marks]'].value,'48');assert.match(f.status.textContent,/retained/);
   f.api.open('T1',f.trigger);f.requests[2].success(f.data);assert.equal(f.loading.settled,2);
   f.api.open('T1',f.trigger);await f.click('data-close');assert.equal(f.loading.settled,3);
-  f.requests[3].success(f.data);assert.equal(f.drawer.open,false);assert.equal(f.loading.settled,3);
+  f.requests[3].success(f.data);assert.equal(!f.drawer.hidden,false);assert.equal(f.loading.settled,3);
 });
 
 test('drawer ignores stale responses after close and escapes project text',async ()=>{
-  const f=browserFixture();f.api.open('T1',f.trigger);await f.click('data-close');f.requests[0].success(f.data);assert.equal(f.drawer.open,false);assert(!f.drawer.innerHTML.includes('Team criteria'));
+  const f=browserFixture();f.api.open('T1',f.trigger);await f.click('data-close');f.requests[0].success(f.data);assert.equal(!f.drawer.hidden,false);assert(!f.drawer.innerHTML.includes('Team criteria'));
   f.api.open('T1',f.trigger);f.data.details.title='<script>bad</script>';f.requests[1].success(f.data);assert.match(f.drawer.innerHTML,/&lt;script&gt;/);assert.equal(f.fields().length,3);
 });
 test('criteria accordions start collapsed, open exclusively, and reveal missing entries',async ()=>{
@@ -734,7 +738,7 @@ test('student accordions switch exclusively, allow blanks, and reveal nested val
 
 test('drawer retains failed entries, deduplicates saves and reuses retry request IDs',async ()=>{
   const f=browserFixture();f.api.open('T1',f.trigger);f.requests[0].success(f.data);
-  await f.click('data-draft');await f.click('data-draft');await f.click('data-close');assert.equal(f.requests.length,2);assert.equal(f.drawer.open,true);
+  await f.click('data-draft');await f.click('data-draft');await f.click('data-close');assert.equal(f.requests.length,2);assert.equal(!f.drawer.hidden,true);
   const first=f.requests[1];first.failure({message:'Offline'});assert.match(f.status.textContent,/entries are retained/);
   await f.click('data-draft');assert.equal(f.requests[2].args[0].requestId,first.args[0].requestId);
   f.requests[2].success({revision:1,status:'Draft'});assert.match(f.status.textContent,/Draft saved/);
@@ -748,8 +752,8 @@ test('drawer validates bands, requires complete submissions and locks after subm
   f.requests[1].success({revision:1,status:'Submitted'});assert(f.fields().every(field=>Object.values(field.controls).every(c=>c.disabled)));assert.doesNotMatch(f.drawer.innerHTML,/data-submit/);
 });
 test('drawer warns before discarding unsaved edits and restores focus on close',async ()=>{
-  const f=browserFixture();f.api.open('T1',f.trigger);f.requests[0].success(f.data);f.events.input();f.discard(false);await f.click('data-close');assert.equal(f.drawer.open,true);
-  f.discard(true);await f.events.cancel({preventDefault(){}});assert.equal(f.drawer.open,false);assert(f.focus()>0);
+  const f=browserFixture();f.api.open('T1',f.trigger);f.requests[0].success(f.data);f.events.input();f.discard(false);await f.click('data-close');assert.equal(!f.drawer.hidden,true);
+  f.discard(true);await f.click('data-close');assert.equal(!f.drawer.hidden,false);assert(f.focus()>0);
 });
 test('level buttons update descriptors and clear previous feedback',()=>{
   const f=browserFixture();f.data.config.criteria[0].name='Literature and gap analysis';f.data.config.criteria[0].descriptors[2]='Partial comparison';
@@ -866,7 +870,7 @@ test('level changes clear saved team and individual marks without assigning repl
   pick(student,1);assert.equal(student.controls['[data-marks]'].value,'');assert.equal(student.controls['[data-remark]'].value,'');
   assert.equal(other.controls['[data-marks]'].value,'32');assert.equal(other.controls['[data-remark]'].value,'Individual feedback');
   assert.deepEqual(scores.map(s=>s.textContent),['Incomplete / 100','Incomplete / 100']);assert.equal(progress.textContent,'2 criteria remaining');
-  f.discard(false);await f.click('data-close');assert.equal(f.drawer.open,true);
+  f.discard(false);await f.click('data-close');assert.equal(!f.drawer.hidden,true);
   await f.click('data-submit');assert.equal(f.requests.length,1);
   await f.click('data-draft');const saved=f.requests[1].args[0];assert.equal(saved.teamScores.T.marks,null);assert.equal(saved.students[0].scores.I.marks,null);
   f.requests[1].success({revision:1,status:'Draft'});
@@ -1038,7 +1042,7 @@ for(const key of ['review1','review2','review_extra']) {
     b.requests[2].success(server.c.recordReviewAbsence_(first.args[0]));assert.match(b.drawer.innerHTML,/Edit absence details/);
     assert.equal(b.absenceNodes().get('0').controls.approved.disabled,true);
     await b.click('data-edit-absence');host=b.absenceNodes().get('0');host.controls.approved.value='yes';b.events.input();
-    b.discard(false);await b.click('data-cancel-absence');assert.equal(host.controls.approved.value,'yes');await b.click('data-close');assert.equal(b.drawer.open,true);
+    b.discard(false);await b.click('data-cancel-absence');assert.equal(host.controls.approved.value,'yes');await b.click('data-close');assert.equal(!b.drawer.hidden,true);
     b.discard(true);await b.click('data-reload');b.requests.at(-1).failure({message:'Unavailable'});
     assert.equal(b.absenceNodes().get('0').controls.approved.value,'yes');assert.equal(host.controls.approved.disabled,false);assert.equal(b.loading.begun,b.loading.settled);
     await b.click('data-cancel-absence');assert.equal(b.absenceNodes().get('0').controls.approved.value,'no');
@@ -1126,7 +1130,7 @@ test('completed absence remains accessible alongside pending makeup; student swi
   assert.match(b.drawer.innerHTML,/data-select-student="1" aria-pressed="true"/);
 });
 
-test('the drawer reads and saves through the bridge, and its markup uses only compiled Tailwind utilities', () => {
+test('the evaluation page reads and saves through the bridge, and its markup uses only compiled Tailwind utilities', () => {
   const { missingClasses } = require('./compiled-css.cjs');
   const src = fs.readFileSync('review-evaluation-client.js', 'utf8');
   assert.doesNotMatch(src, /google\.script\.run|guideRun|rpc\(/);
@@ -1143,7 +1147,7 @@ test('the drawer reads and saves through the bridge, and its markup uses only co
   assert.deepEqual(missingClasses(used), []);
 });
 
-// Student names, rubric text and reviewer remarks all reach the Review drawer; none may become markup.
+// Student names, rubric text and reviewer remarks all reach the Review page; none may become markup.
 const EVIL='<img src=x onerror=PWN>"\'&';
 function assertInert(html,label){
   assert(!/<img/i.test(html),label+': a tag from data became markup');
@@ -1151,7 +1155,7 @@ function assertInert(html,label){
   assert(/&lt;img src=x onerror=PWN&gt;/i.test(html),label+': the hostile text should be displayed, escaped');
   {const rest=html.replace(/&lt;img[^&]*&gt;/gi,''),hit=rest.match(/.{40}\son(?:error|click|load)=.{40}/i);assert(!hit,label+': an event-handler attribute appeared: '+(hit&&hit[0]));}
 }
-test('hostile names, rubric text and reviewer details never become markup in the Review drawer',()=>{
+test('hostile names, rubric text and reviewer details never become markup in the Review page',()=>{
   const f=browserFixture(true,'review1'),data=f.data;
   Object.assign(data.details,{team:EVIL,title:EVIL,problem:EVIL,committee:EVIL,guideName:EVIL,guideEmail:EVIL});
   data.details.reviewers=[{name:EVIL,email:EVIL}];
@@ -1170,4 +1174,82 @@ test('hostile remarks and the reopening reason are escaped when a saved evaluati
   if(saved.evaluation)saved.evaluation.reason=EVIL;
   const browser=browserFixture(true,'review1');browser.api.open('T1',browser.trigger);browser.requests[0].success(saved);
   assertInert(browser.drawer.innerHTML,'saved evaluation');
+});
+
+ test('evaluation page preserves the list host and restores scroll and refreshed trigger focus',async()=>{
+  const f=browserFixture();f.api.open('T1',f.trigger);
+  assert.equal(f.drawer.hidden,false);assert.equal(f.listHost.hidden,true);
+  assert.equal(f.drawer.parentElement,f.listHost.parentElement);
+  assert.match(f.drawer.innerHTML,/data-evaluation-heading tabindex="-1"/);
+  assert.match(f.drawer.innerHTML,/aria-label="Back to evaluations"/);
+  f.requests[0].success(f.data);
+  assert.equal(f.drawer.hidden,false);
+  f.tableScroll.scrollLeft=0;f.trigger.isConnected=false;let restored=false;
+  f.listHost.querySelectorAll=()=>[{dataset:{team:'T1',review:'review1'},focus(options){restored=options.preventScroll;}}];
+  await f.click('data-close');
+  assert.equal(f.listHost.hidden,false);assert.equal(f.drawer.hidden,true);assert.equal(restored,true);
+  assert.deepEqual(f.scrolls,[[12,340]]);
+  assert.equal(f.tableScroll.scrollLeft,190);
+ });
+
+test('native criteria disclosure collapses on mobile, reopens on desktop and preserves marks',async()=>{
+  const f=browserFixture(true);f.media.matches=false;f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+  assert.equal(f.rail.open,false);f.rail.open=true;
+  const field=f.fields()[0];field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='48';field.controls['[data-marks]'].checkValidity=()=>true;
+  const pill={dataset:{selectPi:'0'},hasAttribute:a=>a==='data-select-pi',closest:s=>s==='button'?pill:null};
+  await f.events.click({target:pill});assert.equal(f.rail.open,false);assert.equal(field.controls['[data-marks]'].value,'48');
+  f.media.matches=true;f.media.changed({matches:true});assert.equal(f.rail.open,true);
+  assert.equal(field.controls['[data-marks]'].value,'48');assert.equal(f.requests.length,1);
+  assert.match(f.drawer.innerHTML,/data-reload/);assert.match(f.drawer.innerHTML,/data-marks type="number"|data-marks id=/);
+  assert.match(f.drawer.innerHTML,/data-step="-0.5"/);assert.match(f.drawer.innerHTML,/data-step="0.5"/);assert.match(f.drawer.innerHTML,/data-marks-slider/);
+});
+
+test('rearranged markup keeps complete scoring controls and one progress area in the rail',()=>{
+  const f=browserFixture(true);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+  const {document}=require('linkedom').parseHTML(f.drawer.innerHTML);
+  const rail=document.querySelector('[data-criteria-rail]');
+  assert.equal(rail.tagName,'DETAILS');
+  assert.equal(rail.querySelectorAll('[data-select-pi]').length,1);
+  assert.equal(rail.querySelectorAll('[data-select-student]').length,2);
+  assert.equal(rail.querySelectorAll('[data-select-individual-pi]').length,2);
+  assert.equal(document.querySelectorAll('[data-evaluation-progress]').length,1);
+  assert.equal(rail.contains(document.querySelector('[data-evaluation-progress]')),true);
+  assert.equal(document.querySelector('[data-project-title]').tagName,'P');
+  assert.equal(document.querySelector('[data-project-title]').querySelector('summary'),null);
+  for(const field of document.querySelectorAll('[data-index]')){
+    const marks=field.querySelector('[data-marks-panel]'),feedback=field.querySelector('[data-feedback-panel]');
+    assert.equal(marks.parentElement,feedback.parentElement);
+    assert.equal(marks.querySelectorAll('[data-step]').length,2);
+    assert.equal(marks.querySelector('[data-marks]').type,'number');
+    assert.equal(marks.querySelector('[data-marks-slider]').type,'range');
+    assert(feedback.querySelector('[data-feedback-options]'));
+    assert(feedback.querySelector('[data-other-feedback]'));
+    assert.equal(field.contains(field.querySelector('[data-marks-error]')),true);
+  }
+  assert(document.querySelector('[data-evaluation-footer] [data-draft]'));
+  assert(document.querySelector('[data-evaluation-footer] [data-submit]'));
+});
+
+test('focus and feedback updates keep the active content control clear of the sticky footer',()=>{
+  const f=browserFixture(true);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+  let bottom=650;const scrolls=[];
+  const focused={closest:selector=>selector==='[data-drawer-content]'?{}:null,getBoundingClientRect:()=>({bottom}),scrollIntoView:options=>scrolls.push(options.block)};
+  f.context.document.activeElement=focused;f.drawer.contains=node=>node===focused;
+  const query=f.drawer.querySelector.bind(f.drawer);
+  f.drawer.querySelector=selector=>selector==='[data-evaluation-footer]'?{getBoundingClientRect:()=>({top:600})}:query(selector);
+  f.events.focusin();f.events.input();assert.deepEqual(scrolls,['nearest','nearest']);
+  bottom=550;f.events.input();assert.equal(scrolls.length,2);
+});
+
+test('selecting a student from the rail retains the existing validation before leaving team criteria',async()=>{
+  const f=browserFixture(true);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+  const field=f.fields()[0],query=f.drawer.querySelector.bind(f.drawer),team={hidden:false,open:true,querySelectorAll:()=>[field]},individual={hidden:true,open:false,querySelectorAll:()=>[]};
+  individual.dataset={criteriaGroup:'individual'};individual.closest=selector=>selector==='[data-criteria-group]'?individual:null;
+  f.drawer.querySelector=selector=>selector==='[data-criteria-group="team"]'?team:selector==='[data-criteria-group="individual"]'?individual:query(selector);
+  const marks=field.controls['[data-marks]'];marks.checkValidity=()=>!marks.validity;Object.defineProperty(marks,'validationMessage',{get:()=>marks.validity});
+  const chip={dataset:{selectStudent:'1'},hasAttribute:attr=>attr==='data-select-student',closest:selector=>selector==='button'?chip:null};
+  field.controls['[data-level]'].value='3';marks.value='59';await f.events.click({target:chip});
+  assert.equal(team.hidden,false);assert.equal(individual.hidden,true);assert.match(f.status.textContent,/outside/);
+  marks.value='48';await f.events.click({target:chip});
+  assert.equal(team.hidden,true);assert.equal(individual.hidden,false);assert.equal(marks.value,'48');assert.equal(f.requests.length,1);
 });

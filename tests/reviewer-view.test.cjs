@@ -33,11 +33,41 @@ function setup(dto) {
 }
 const rows = f => f.host.querySelectorAll('[data-reviewer-body] tr[data-team-id]');
 
+test('consolidated columns keep committee, guide, registers and native title approval controls', () => {
+  const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
+  assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(n => n.textContent),
+    ['Team', 'Project & guide', 'Register Numbers', 'Title Approval', 'Review 1', 'Review 2']);
+  const cells = rows(f)[0].querySelectorAll('td');
+  assert.match(cells[0].textContent, /T1.*Committee C1/);
+  assert.match(cells[1].textContent, /Title 1.*Guide 1/);
+  assert.deepEqual(Array.from(cells[2].children).map(n => n.textContent), ['R1a', 'R1b']);
+  assert.equal(cells[3].querySelector('summary').textContent, 'Details');
+  assert.equal(cells[3].querySelectorAll('[data-action="decide"]').length, 2);
+});
+
+test('additional configured reviews and empty-state spans follow the consolidated column count', () => {
+  const f = setup(), dto = dtoOf([]); dto.reviews.push({key:'review_extra', label:'Additional Review'});
+  f.view.render(f.host, dto);
+  assert.equal(f.host.querySelectorAll('thead th').length, 7);
+  assert.equal(f.host.querySelector('[data-reviewer-body] td').getAttribute('colspan'), '7');
+});
+
+test('background refresh preserves the assigned table scroll while the list is hidden', async () => {
+  const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
+  f.host.hidden = true;
+  f.host.querySelector('[data-reviewer-table-scroll]').scrollLeft = 190;
+  assert.equal(await f.view.refresh(), true);
+  assert.equal(f.host.hidden, true);
+  assert.equal(f.host.querySelector('[data-reviewer-table-scroll]').scrollLeft, 190);
+});
+
 test('renders header, stats, rows and review columns from the DTO', () => {
   const f = setup(); f.view.render(f.host, dtoOf([team(1), team(2)]));
   assert.equal(rows(f).length, 2);
   assert.match(f.host.textContent, /Reviewer Dashboard/);
-  assert.match(f.host.textContent, /Pending Your Decision/);
+  assert.match(f.host.textContent, /Approved/);
+  assert.match(f.host.textContent, /Total Assigned to You/);
+  assert.doesNotMatch(f.host.textContent, /Pending Your Decision/);
   assert.match(f.host.textContent, /Assigned Teams \(2 teams\)/);
   assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(t => t.textContent).slice(-2), ['Review 1', 'Review 2']);
   assert.equal(f.host.querySelector('[data-action="marks"]:not([disabled])').getAttribute('data-review'), 'review1');
@@ -173,7 +203,7 @@ test('review errors are shown without hiding the table', () => {
   const f = setup(); f.view.render(f.host, { ...dtoOf([team(1)]), reviews: [], reviewError: 'AssessmentDefinitions <missing>' });
   assert.match(f.host.textContent, /Review marks are unavailable: AssessmentDefinitions <missing>/);
   assert.equal(rows(f).length, 1);
-  assert.equal(f.host.querySelectorAll('thead th').length, 6);
+  assert.equal(f.host.querySelectorAll('thead th').length, 4);
 });
 
 test('refresh and updated time live in the page header, not the view', () => {

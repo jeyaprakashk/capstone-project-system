@@ -1,11 +1,9 @@
-/** Shared drawer classes supply layout; native dialog supplies modality and focus containment. */
+/** Review evaluation page reuses the existing assessment content and controls. */
 function reviewEvaluationBrowser_(reviewKey, bridge) {
   let reviewLabel=reviewKey;
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const SAVE_KINDS={saveReviewEvaluationDraft_:'draft',submitReviewEvaluation_:'submit',recordReviewAbsence_:'absence',saveReviewMakeupDraft_:'makeupDraft',submitReviewMakeup_:'makeupSubmit'};
-  // The dialog is a flex column (header, navigation, scrolling body, footer). Without preflight the browser's dialog
-  // margin, padding and border must be reset here, and `open:flex` keeps a closed dialog hidden.
-  const DRAWER='review-drawer fixed inset-y-0 right-0 left-auto z-40 m-0 hidden h-dvh max-h-dvh w-full max-w-full flex-col overflow-hidden border-0 bg-paper p-0 font-sans text-ink shadow-overlay animate-[slide-in-right_.25s_cubic-bezier(.2,0,0,1)] backdrop:bg-scrim open:flex sm:w-[min(560px,92vw)]';
+  const PAGE='min-w-0 bg-paper font-sans text-ink [&_[data-index]_:is(button,input,select,textarea)]:scroll-mb-56';
   const SMALL='border-0 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-paper px-3 py-1.5 font-sans text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50';
   const ICON_BUTTON='border-0 inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-paper text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50';
   const BUTTON='border-0 inline-flex min-h-10 items-center justify-center rounded-md bg-paper px-4 py-2 font-sans text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50';
@@ -18,7 +16,6 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   const LEVELS='mt-4 grid grid-cols-6 gap-1 rounded-xl bg-tint p-1';
   const LEVEL='border-0 flex min-h-12 min-w-0 flex-col items-center justify-center rounded-lg bg-transparent px-1 py-1.5 font-sans text-sm tabular-nums text-ink-2 hover:bg-paper aria-pressed:bg-primary aria-pressed:text-paper aria-pressed:shadow-selected disabled:cursor-not-allowed disabled:opacity-50';
   const FEEDBACK='border-0 flex w-full items-start gap-2 rounded-lg bg-paper px-3 py-2 text-left font-sans text-sm text-ink-2 ring-1 ring-inset ring-edge hover:bg-tint aria-pressed:bg-tint aria-pressed:text-primary aria-pressed:ring-primary disabled:cursor-not-allowed disabled:opacity-50';
-  const TAB='border-x-0 border-t-0 flex flex-1 flex-wrap items-baseline gap-x-1.5 border-b-[3px] border-transparent bg-transparent px-1 py-3 text-left font-sans text-sm text-ink-2 hover:text-ink aria-selected:border-primary aria-selected:text-primary disabled:cursor-not-allowed disabled:opacity-50';
   const CHIP='flex min-w-24 flex-col items-center gap-0.5 rounded-tile border border-edge bg-paper px-3 py-2 font-sans text-sm text-ink hover:border-line aria-pressed:border-primary aria-pressed:bg-tint aria-pressed:ring-1 aria-pressed:ring-primary disabled:cursor-not-allowed disabled:opacity-60';
   const AVATARS=['bg-teal-700','bg-purple-700','bg-primary'];
   const FIELD='h-10 rounded-md border border-control bg-paper px-3 py-2 font-sans text-sm text-ink';
@@ -72,7 +69,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
 
 
 
-  let drawer,model,trigger,busy=false,dirty=false,sequence=0,pending=null,targeted=null,reading=false,finishRead=null,correctionIndex=null,activeStudent=0,activeCriteria='team';
+  let page,listHost,listScroll,model,trigger,busy=false,dirty=false,sequence=0,pending=null,targeted=null,reading=false,finishRead=null,correctionIndex=null,activeStudent=0,activeCriteria='team';
   // Values that cannot change during one synchronous refresh pass; null outside a pass.
   let passMemo=null;
   function withPass(run) {
@@ -80,7 +77,13 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     passMemo={facts:new Map(),pending:null};
     try {return run();} finally {passMemo=null;}
   }
-  function message(text) {drawer.querySelector('[data-message]').textContent=text;}
+  function message(text) {page.querySelector('[data-message]').textContent=text;}
+  function keepFocusVisible() {
+    const focused=document.activeElement;
+    if(!focused || !page.contains(focused) || !focused.closest('[data-drawer-content]'))return;
+    const footer=page.querySelector('[data-evaluation-footer]');
+    if(footer && focused.getBoundingClientRect().bottom>footer.getBoundingClientRect().top)focused.scrollIntoView({block:'nearest'});
+  }
   function savedStudent(index) {return ((model.evaluation||{}).students||[]).find(s=>s.register===model.roster.students[index].register)||{};}
   function pendingStudents() {
     if(!passMemo)return readPendingStudents();
@@ -98,10 +101,10 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function hiddenStudent(index) {return targeted?targeted.index!==index:focusedAssessment() && !pendingStudents().includes(index) && !absenceCorrectable(index);}
   function absenceCorrectable(index) {const a=savedStudent(index).assessment;return !!a && (['REVIEW_DAY_ABSENCE','PROLONGED'].includes(a.facts.type) || a.nextActions?.makeup);}
   function criteriaTabs() {
-    return '<div class="review-criteria-tabs mt-3 flex gap-4 border-b border-edge" role="tablist" aria-label="Assessment components">'+['team','individual'].map(component=>{
+    return '<nav aria-label="Assessment components">'+['team','individual'].map(component=>{
       const label=component==='team'?'Team Criteria':'Individual',max=model.config.criteria.filter(c=>c.type.toLowerCase()===component).reduce((sum,c)=>sum+c.maxMarks,0);
-      return '<button type="button" class="'+TAB+'" role="tab" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-selected="'+(activeCriteria===component)+'" tabindex="'+(activeCriteria===component?'0':'-1')+'"><span class="font-semibold">'+label+'</span><span class="text-xs text-muted">· '+max+' pts '+(component==='team'?'pool':'weight')+'</span></button>';
-    }).join('')+'</div>';
+      return '<div class="mt-3"><button type="button" class="'+MENU_ITEM+'" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-pressed="'+(activeCriteria===component)+'"><span class="whitespace-nowrap"><strong>'+label+'</strong><span class="text-xs"> · '+max+' pts '+(component==='team'?'pool':'weight')+'</span></span></button>'+(component==='team'?teamPills():studentChips(model.roster.students)+model.roster.students.map((_,index)=>individualPills(index)).join(''))+'</div>';
+    }).join('')+'</nav>';
   }
   let activeTeamPI=null,activeStudentPIs={};
   function piPillLabel(c) {
@@ -114,16 +117,16 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     }).join('')+'</div>';
   }
   function syncIndividualCards() {
-    const fields=Array.from(drawer.querySelectorAll('[data-index]')).filter(field=>field.dataset.owner!=='team');
+    const fields=Array.from(page.querySelectorAll('[data-index]')).filter(field=>field.dataset.owner!=='team');
     model.roster.students.forEach((student,index)=>{
       const available=fields.filter(field=>Number(field.dataset.owner)===index && showRubric(field));
       if(!available.some(field=>Number(field.dataset.index)===activeStudentPIs[index]))activeStudentPIs[index]=available.length?Number(available[0].dataset.index):null;
-      const pills=drawer.querySelector('[data-individual-pills="'+index+'"]');if(pills)pills.hidden=!available.length || activeCriteria!=='individual' || index!==activeStudent;
+      const pills=page.querySelector('[data-individual-pills="'+index+'"]');if(pills)pills.hidden=!available.length || index!==activeStudent;
       fields.filter(field=>Number(field.dataset.owner)===index).forEach(field=>{
         const applicable=available.includes(field),selected=Number(field.dataset.index)===activeStudentPIs[index];
         field.hidden=!applicable || !selected;
-        const button=drawer.querySelector('[data-select-individual-pi="'+field.dataset.index+'"][data-student="'+index+'"]');
-        if(button){button.hidden=!applicable;button.disabled=busy || reading;button.setAttribute('aria-pressed',String(selected));}
+        const button=page.querySelector('[data-select-individual-pi="'+field.dataset.index+'"][data-student="'+index+'"]');
+        if(button){button.hidden=!applicable;button.disabled=busy || reading;button.setAttribute('aria-pressed',String(selected && activeCriteria==='individual' && index===activeStudent));}
       });
     });
   }
@@ -133,19 +136,11 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     return '<div data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" class="'+MENU_ITEM+'" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
   }
   // PI cards in the selected tab: the team's, or the selected student's.
-  function contextFields() {
-    return Array.from(drawer.querySelectorAll('[data-index]')).filter(field=>(activeCriteria==='team'?field.dataset.owner==='team':field.dataset.owner===String(activeStudent)) && showRubric(field));
-  }
-  function updateTabProgress() {
-    const row=drawer.querySelector('[data-tab-progress]');if(!row)return;
-    const fields=contextFields(),graded=fields.filter(field=>field.dataset.graded==='true').length,total=fields.length,status=total>0 && graded===total?'complete':graded>0?'partial':'empty';
-    setHtml(row,'<span class="sr-only">'+(activeCriteria==='team'?'Performance Indicators':'Student performance indicators')+': </span><span data-completion="'+status+'" class="text-xs text-muted data-[completion=complete]:font-semibold data-[completion=complete]:text-success">'+graded+' of '+total+' graded</span>');
-  }
   // Prev/Next walk every applicable PI of this evaluation: team PIs, then each student's, in roster order.
   const fieldKey=field=>[field.dataset.owner==='team'?-1:Number(field.dataset.owner),Number(field.dataset.index)];
   const compareKeys=(a,b)=>a[0]-b[0] || a[1]-b[1];
   function navigationFields() {
-    const all=Array.from(drawer.querySelectorAll('[data-index]'));
+    const all=Array.from(page.querySelectorAll('[data-index]'));
     if(correctionIndex!==null)return all.filter(field=>field.dataset.owner===String(correctionIndex) && showRubric(field));
     return all.filter(field=>showRubric(field) && (field.dataset.owner==='team' || !hiddenStudent(Number(field.dataset.owner))));
   }
@@ -155,13 +150,13 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   }
   function currentField() {
     const key=currentKey();
-    return Array.from(drawer.querySelectorAll('[data-index]')).find(field=>!compareKeys(fieldKey(field),key) && showRubric(field));
+    return Array.from(page.querySelectorAll('[data-index]')).find(field=>!compareKeys(fieldKey(field),key) && showRubric(field));
   }
   function stepTarget(direction) {
     const key=currentKey(),after=navigationFields().filter(field=>compareKeys(fieldKey(field),key)*direction>0);
     return direction>0?after[0]:after[after.length-1];
   }
-  function closePiMenu() {const menu=drawer.querySelector('[data-pi-menu]');if(menu)menu.open=false;}
+  function closePiMenu() {const rail=page.querySelector('[data-criteria-rail]');if(rail && !window.matchMedia('(min-width: 1024px)').matches)rail.open=false;}
   /** Shows one PI card after validating the visible one; focusLevel moves focus to the new card's levels. */
   function goToField(field,focusLevel) {
     if(busy || reading || !field || !showRubric(field))return false;
@@ -170,56 +165,59 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if(field.dataset.owner==='team'){activeCriteria='team';activeTeamPI=Number(field.dataset.index);}
     else {activeCriteria='individual';activeStudent=Number(field.dataset.owner);activeStudentPIs[activeStudent]=Number(field.dataset.index);syncStudentSelection();}
     syncCriteriaTabs();closePiMenu();
-    const content=drawer.querySelector('[data-drawer-content]');if(content)content.scrollTop=0;
+    const content=page.querySelector('[data-drawer-content]');if(content)content.scrollTop=0;
+    page.scrollIntoView({block:'start'});
     if(focusLevel){const level=field.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});}
     return true;
   }
   function updateNavigator() {
-    const current=currentField(),label=drawer.querySelector('[data-pi-current]');
-    if(label){const c=current && model.config.criteria[Number(current.dataset.index)];label.textContent=c?c.pi+' · '+c.co:activeCriteria==='individual'?'Select attendance to assess':'No criteria';}
-    [-1,1].forEach(step=>{const blocked=busy || reading || !stepTarget(step);['top','bottom'].forEach(place=>{const button=drawer.querySelector('[data-pi-step="'+step+'"][data-pi-place="'+place+'"]');if(button)button.disabled=blocked;});});
-    const segments=drawer.querySelector('[data-pi-segments]');
-    if(segments)setHtml(segments,contextFields().map(field=>'<span class="'+SEGMENT+'" data-state="'+(field===current?'current':field.dataset.graded==='true'?'complete':'pending')+'"></span>').join(''));
-    updateTabProgress();
+    const current=currentField();
+    const segments=page.querySelector('[data-pi-segments]');
+    if(segments)setHtml(segments,navigationFields().map(field=>'<span class="'+SEGMENT+'" data-state="'+(field===current?'current':field.dataset.graded==='true'?'complete':'pending')+'"></span>').join(''));
+    [-1,1].forEach(step=>{const blocked=busy || reading || !stepTarget(step);['top','bottom'].forEach(place=>{const button=page.querySelector('[data-pi-step="'+step+'"][data-pi-place="'+place+'"]');if(button)button.disabled=blocked;});});
+
   }
   function syncCriteriaTabs() {
     for(const component of ['team','individual']) {
-      const selected=activeCriteria===component,tab=drawer.querySelector('[data-criteria-tab="'+component+'"]'),panel=drawer.querySelector('[data-criteria-group="'+component+'"]');
-      if(tab){tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;tab.disabled=busy || reading || focusedAssessment() && component==='team';}
+      const selected=activeCriteria===component,tab=page.querySelector('[data-criteria-tab="'+component+'"]'),panel=page.querySelector('[data-criteria-group="'+component+'"]');
+      if(tab){tab.setAttribute('aria-pressed',String(selected));tab.disabled=busy || reading || focusedAssessment() && component==='team';}
       if(panel){panel.hidden=!selected;panel.open=selected;}
     }
-    const students=drawer.querySelector('[data-review-students]');if(students)students.hidden=activeCriteria!=='individual';
-    const pills=drawer.querySelector('[data-team-pills]');if(pills)pills.hidden=activeCriteria!=='team';
-    model.config.criteria.forEach((c,index)=>{const button=drawer.querySelector('[data-select-pi="'+index+'"]');if(button){button.disabled=busy || reading;button.setAttribute('aria-pressed',String(index===activeTeamPI));}});
+    const students=page.querySelector('[data-review-students]');if(students)students.hidden=false;
+    const pills=page.querySelector('[data-team-pills]');if(pills)pills.hidden=focusedAssessment();
+    model.config.criteria.forEach((c,index)=>{const button=page.querySelector('[data-select-pi="'+index+'"]');if(button){button.disabled=busy || reading;button.setAttribute('aria-pressed',String(activeCriteria==='team' && index===activeTeamPI));}});
+    syncStudentSelection();
     syncTeamCards();
     syncIndividualCards();
     updateNavigator();
   }
   function syncTeamCards() {
-    drawer.querySelectorAll('[data-index]').forEach(field=>{if(field.dataset.owner==='team')field.hidden=!showRubric(field) || Number(field.dataset.index)!==activeTeamPI;});
+    page.querySelectorAll('[data-index]').forEach(field=>{if(field.dataset.owner==='team')field.hidden=!showRubric(field) || Number(field.dataset.index)!==activeTeamPI;});
   }
   function selectCriteria(component,focus=false) {
     if(busy || reading || !['team','individual'].includes(component) || focusedAssessment() && component==='team')return;
-    const current=drawer.querySelector('[data-criteria-group="'+activeCriteria+'"]');
+    const current=page.querySelector('[data-criteria-group="'+activeCriteria+'"]');
     if(component!==activeCriteria && current && !validateClosingGroup(current))return;
     activeCriteria=component;syncCriteriaTabs();
-    if(focus){const tab=drawer.querySelector('[data-criteria-tab="'+component+'"]');if(tab)tab.focus();}
+    if(focus){const tab=page.querySelector('[data-criteria-tab="'+component+'"]');if(tab)tab.focus();}
   }
   function syncStudentSelection() {
     model.roster.students.forEach((student,index)=>{
-      const selected=index===activeStudent,group=drawer.querySelector('[data-student-group="'+index+'"]'),chip=drawer.querySelector('[data-select-student="'+index+'"]');
+      const selected=index===activeStudent,group=page.querySelector('[data-student-group="'+index+'"]'),chip=page.querySelector('[data-select-student="'+index+'"]');
       if(group){group.hidden=hiddenStudent(index) || !selected;group.open=selected;}
-      if(chip){chip.setAttribute('aria-pressed',String(selected));chip.disabled=busy || reading;}
+      if(chip){chip.setAttribute('aria-pressed',String(selected && activeCriteria==='individual'));chip.disabled=busy || reading;}
     });
   }
   async function selectStudent(index) {
     if(busy || reading || !model || !model.roster.students[index] || hiddenStudent(index))return;
+    const current=page.querySelector('[data-criteria-group="'+activeCriteria+'"]');
+    if(activeCriteria!=='individual' && current && !validateClosingGroup(current))return;
     if(index!==activeStudent && correctionIndex!==null){
       if(dirty && !await DashboardUI.ask('Discard unsaved absence correction?'))return;
       correctionIndex=null;dirty=false;pending=null;activeStudent=index;render();
     }
-    activeStudent=index;syncStudentSelection();
-    const group=drawer.querySelector('[data-criteria-group="individual"]');
+    activeStudent=index;activeCriteria='individual';syncStudentSelection();
+    const group=page.querySelector('[data-criteria-group="individual"]');
     if(group)revealCriterion(group);
   }
   function studentChips(students) {
@@ -251,7 +249,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     return passMemo.facts.get(index);
   }
   function readFacts(index) {
-    const host=drawer.querySelector('[data-absence="'+index+'"]');
+    const host=page.querySelector('[data-absence="'+index+'"]');
     if(!host)return (savedStudent(index).assessment||{}).facts||{type:'NORMAL'};
     const read=name=>host.querySelector('[data-fact="'+name+'"]').value;
     const type=read('type')||'UNSELECTED',bool=name=>read(name)===''?null:read(name)==='yes';
@@ -298,22 +296,26 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   async function close() {
     if (busy || (dirty && !await DashboardUI.ask('Discard unsaved '+reviewLabel+' marks?'))) return;
     if(finishRead)finishRead();finishRead=null;reading=false;
-    sequence++;drawer.close();dirty=false;model=null;pending=null;correctionIndex=null;
-    delete document.body.dataset.scrollLocked;
-    if (trigger && trigger.isConnected) trigger.focus();
+    sequence++;page.hidden=true;listHost.hidden=false;dirty=false;model=null;pending=null;correctionIndex=null;
+    const table=listHost.querySelector('[data-reviewer-table-scroll]');if(table)table.scrollLeft=listScroll.table;
+    const origin=trigger && trigger.isConnected?trigger:Array.from(listHost.querySelectorAll('[data-action="marks"]')).find(button=>button.dataset.team===page.dataset.team && button.dataset.review===reviewKey);
+    if(origin)origin.focus({preventScroll:true});
+    window.scrollTo(listScroll.x,listScroll.y);
   }
   function ensure() {
-    if (drawer) return;
-    drawer=document.createElement('dialog');drawer.className=DRAWER;drawer.setAttribute('data-tooltip-boundary','');
-    drawer.setAttribute('aria-labelledby',reviewKey+'Heading');
-    drawer.addEventListener('toggle',event=>{
+    if (page) return;
+    listHost=document.querySelector('[data-role-content="reviewer"]');
+    page=document.createElement('section');page.className=PAGE;page.hidden=true;page.setAttribute('data-review-evaluation-page',reviewKey);page.setAttribute('data-tooltip-boundary','');
+    page.setAttribute('aria-labelledby',reviewKey+'Heading');
+    page.addEventListener('focusin',keepFocusVisible);
+    page.addEventListener('toggle',event=>{
       const group=event.target;
       const selector=group.hasAttribute('data-student-group')?'[data-student-group]':group.hasAttribute('data-criteria-group')?'[data-criteria-group]':null;
       if(selector && group.open) {
-        drawer.querySelectorAll(selector).forEach(other=>{if(other!==group)other.open=false;});
+        page.querySelectorAll(selector).forEach(other=>{if(other!==group)other.open=false;});
       }
     },true);
-    drawer.addEventListener('keydown',event=>{
+    page.addEventListener('keydown',event=>{
       const attendance=event.target.closest && event.target.closest('[data-attendance-picker]');
       if(attendance && attendance.open && event.key==='Escape'){event.preventDefault();event.stopPropagation();attendance.open=false;attendance.querySelector('[data-attendance-summary]').focus();return;}
       const menu=event.target.closest && event.target.closest('[data-drawer-menu]');
@@ -323,17 +325,15 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       const next=event.key==='Home'?'team':event.key==='End'?'individual':activeCriteria==='team'?'individual':'team';
       selectCriteria(next,true);
     });
-    drawer.addEventListener('invalid',event=>revealCriterion(event.target),true);
-    drawer.addEventListener('cancel',event=>{event.preventDefault();return close();});
-    drawer.addEventListener('submit',event=>event.preventDefault());
-    drawer.addEventListener('click',async event=>{
+    page.addEventListener('invalid',event=>revealCriterion(event.target),true);
+    page.addEventListener('submit',event=>event.preventDefault());
+    page.addEventListener('click',async event=>{
       const candidate=event.target.closest && event.target.closest('[data-attendance-picker]');
       const picker=candidate && candidate.hasAttribute && candidate.hasAttribute('data-attendance-picker')?candidate:null;
-      drawer.querySelectorAll('[data-attendance-picker]').forEach(other=>{if(other!==picker)other.open=false;});
+      page.querySelectorAll('[data-attendance-picker]').forEach(other=>{if(other!==picker)other.open=false;});
       const openMenu=event.target.closest && event.target.closest('[data-drawer-menu]');
-      drawer.querySelectorAll('[data-drawer-menu]').forEach(other=>{if(other!==openMenu)other.open=false;});
+      page.querySelectorAll('[data-drawer-menu]').forEach(other=>{if(other!==openMenu)other.open=false;});
       if(picker){const host=picker.closest('[data-absence]');if(!canEditAbsence(Number(host.dataset.absence))){event.preventDefault();return;}}
-      if (event.target===drawer && event.clientX<drawer.getBoundingClientRect().left) {close();return;}
       const summary=event.target.closest('summary');
       if(summary && summary.parentElement && (summary.parentElement.hasAttribute('data-criteria-group') || summary.parentElement.hasAttribute('data-student-group'))) {
         event.preventDefault();
@@ -341,15 +341,15 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
         const group=summary.parentElement;
         if(group.dataset && group.dataset.criteriaGroup){selectCriteria(group.dataset.criteriaGroup);return;}
         const selector=group.hasAttribute('data-student-group')?'[data-student-group]':'[data-criteria-group]';
-        const current=Array.from(drawer.querySelectorAll(selector)).find(item=>item.open);
+        const current=Array.from(page.querySelectorAll(selector)).find(item=>item.open);
         if(current && !validateClosingGroup(current))return;
         if(current)current.open=false;
         if(current!==group)group.open=true;
         return;
       }
       const button=event.target.closest('button');if(!button)return;
-      if(button.hasAttribute('data-select-pi')){goToField(drawer.querySelector('[data-index="'+Number(button.dataset.selectPi)+'"][data-owner="team"]'),true);return;}
-      if(button.hasAttribute('data-select-individual-pi')){goToField(drawer.querySelector('[data-index="'+Number(button.dataset.selectIndividualPi)+'"][data-owner="'+Number(button.dataset.student)+'"]'),true);return;}
+      if(button.hasAttribute('data-select-pi')){goToField(page.querySelector('[data-index="'+Number(button.dataset.selectPi)+'"][data-owner="team"]'),true);return;}
+      if(button.hasAttribute('data-select-individual-pi')){goToField(page.querySelector('[data-index="'+Number(button.dataset.selectIndividualPi)+'"][data-owner="'+Number(button.dataset.student)+'"]'),true);return;}
       if(button.hasAttribute('data-pi-step')) {
         // Focus stays on the button for repeated steps, and moves to the card once the end is reached.
         if(goToField(stepTarget(Number(button.dataset.piStep)),false) && button.disabled){const level=currentField()?.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});}
@@ -376,7 +376,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       if(button.hasAttribute('data-target-draft'))return saveTarget(false);
       if(button.hasAttribute('data-target-submit'))return saveTarget(true);
       if(button.hasAttribute('data-reload')){const menu=button.closest('[data-actions-menu]');if(menu)menu.open=false;}
-      if(button.hasAttribute('data-reload') && (!dirty || await DashboardUI.ask('Discard unsaved marks and reload?')))open(model?model.roster.team:drawer.dataset.team,trigger);
+      if(button.hasAttribute('data-reload') && (!dirty || await DashboardUI.ask('Discard unsaved marks and reload?')))open(model?model.roster.team:page.dataset.team,trigger);
       if(button.hasAttribute('data-other-feedback')) {
         const field=button.closest('[data-index]');if(busy || reading || !canEdit(field))return;
         const remark=field.querySelector('[data-remark]'),custom=field.querySelector('[data-custom-feedback]');
@@ -423,7 +423,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
         dirty=true;pending=null;updateRanges();
       }
     });
-    drawer.addEventListener('input',event=>{
+    page.addEventListener('input',event=>{
       if(event && event.target && event.target.hasAttribute('data-attendance-option'))return;
       if(event && event.target && event.target.hasAttribute('data-custom-feedback')) {
         const field=event.target.closest('[data-index]'),c=model.config.criteria[Number(field.dataset.index)],remark=field.querySelector('[data-remark]');
@@ -435,7 +435,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       }
       dirty=true;pending=null;updateRanges();
     });
-    drawer.addEventListener('change',event=>{
+    page.addEventListener('change',event=>{
       if(event.target.hasAttribute('data-attendance-option')) {
         const host=event.target.closest('[data-absence]'),index=Number(host.dataset.absence);
         if(!canEditAbsence(index))return;
@@ -445,7 +445,8 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       }
 
     });
-    document.body.appendChild(drawer);
+    listHost.parentElement.appendChild(page);
+    window.matchMedia('(min-width: 1024px)').addEventListener('change',event=>{const rail=page.querySelector('[data-criteria-rail]');if(rail)rail.open=event.matches;});
   }
   function shell(title,body,students=[],assessment=null,footer='') {
     title=String(title||'').trim().toUpperCase();
@@ -456,18 +457,14 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     const studentCount=assessment?'<span class="text-sm text-muted">'+assessment.roster.students.length+' '+(assessment.roster.students.length===1?'student':'students')+'</span>':'';
     const actionsMenu=assessment?'<details class="relative" data-drawer-menu data-actions-menu><summary data-menu-summary class="'+ICON_BUTTON+' '+MENU_SUMMARY+'" aria-label="More actions">'+DashboardUI.renderIcon('ellipsis-vertical')+'</summary><div class="'+MENU_PANEL+' right-0 w-56"><button type="button" class="'+MENU_ITEM+'" data-reload><span class="flex items-center gap-3">'+DashboardUI.renderIcon('refresh-cw','','shrink-0 text-muted')+'Reload from sheet</span></button></div></details>':'';
     const projectTitle=assessment?String(assessment.details.title||'Project title not provided'):'';
-    const titleRow=assessment?'<details class="review-project-title-row group mt-2 text-sm text-ink"><summary class="flex min-w-0 cursor-pointer list-none items-start gap-2 rounded-md hover:text-primary [&::-webkit-details-marker]:hidden" aria-label="Project title: '+escape(projectTitle)+'">'+DashboardUI.renderIcon('file-text','','mt-0.5 shrink-0 text-muted')+'<span class="min-w-0 flex-1 truncate group-open:whitespace-normal">'+escape(projectTitle)+'</span>'+DashboardUI.renderIcon('chevron-down','','review-title-chevron mt-0.5 shrink-0 text-muted transition-transform group-open:rotate-180')+'</summary></details>':'';
-    const headerDetails=assessment?'<p class="m-0 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted"><span>Guide <span class="font-medium text-ink">'+escape(assessment.details.guideName)+'</span></span><span class="h-4 w-px bg-line" aria-hidden="true"></span><span>Committee <span class="font-medium text-ink">'+escape(assessment.details.committee)+'</span></span></p>':'';
-    const piNavigator=assessment?'<div class="mt-3 flex items-center gap-2"><button type="button" class="'+STEP+'" data-pi-step="-1" data-pi-place="top" aria-label="Previous performance indicator">'+DashboardUI.renderIcon('chevron-left')+'</button>'+
-      '<details class="group relative min-w-0 flex-1" data-drawer-menu data-pi-menu><summary data-menu-summary class="flex min-h-10 items-center gap-2 rounded-md border border-edge bg-paper px-3 text-sm hover:border-line '+MENU_SUMMARY+'"><span class="sr-only">Performance indicator: </span><span data-pi-current class="min-w-0 flex-1 truncate font-semibold text-ink"></span><span data-tab-progress aria-live="polite" class="shrink-0"></span>'+DashboardUI.renderIcon('chevron-down','','shrink-0 text-muted transition-transform group-open:rotate-180')+'</summary>'+
-      '<div class="'+MENU_PANEL+' inset-x-0 max-h-72 overflow-y-auto">'+teamPills()+students.map((_,index)=>individualPills(index)).join('')+'</div></details>'+
-      '<button type="button" class="'+STEP+'" data-pi-step="1" data-pi-place="top" aria-label="Next performance indicator">'+DashboardUI.renderIcon('chevron-right')+'</button></div><div data-pi-segments aria-hidden="true" class="mt-3 flex gap-1"></div>':'';
-    const navigation=assessment?criteriaTabs()+(students.length?studentChips(students):'')+piNavigator:'';
+    const titleRow=assessment?'<p data-project-title class="review-project-title-row m-0 mt-2 text-sm text-ink [overflow-wrap:anywhere]">'+escape(projectTitle)+'</p>':'';
+    const headerDetails=assessment?'<p class="m-0 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted"><span>Guide <span class="font-medium text-ink">'+escape(assessment.details.guideName)+'</span></span><span class="h-4 w-px bg-line" aria-hidden="true"></span><span>Committee <span class="font-medium text-ink">'+escape(assessment.details.committee)+'</span></span>'+students.map(student=>'<span class="'+BADGE+'">'+escape(student.register)+'</span>').join('')+'</p>':'';
+    const rail=assessment?'<details data-criteria-rail class="group rounded-card border border-edge bg-paper p-4 shadow-card lg:sticky lg:top-2 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto"><summary data-criteria-rail-summary class="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-ink lg:hidden [&::-webkit-details-marker]:hidden"><span data-criteria-rail-label>Criteria</span>'+DashboardUI.renderIcon('chevron-down','','shrink-0 transition-transform group-open:rotate-180')+'</summary><p data-evaluation-progress class="m-0 mt-2 text-xs text-muted max-lg:hidden" aria-live="polite"></p><p class="m-0 mt-2 text-sm text-ink">Team total <span data-team-mark aria-label="Common team score"></span> / '+assessment.config.criteria.filter(c=>c.type==='Team').reduce((total,c)=>total+c.maxMarks,0)+'</p>'+'<div data-pi-segments aria-hidden="true" class="mt-3 flex gap-1"></div>'+criteriaTabs()+'</details>':'';
     const statusMessage='<p class="review-message m-0 max-h-20 overflow-y-auto text-sm text-ink-2 empty:hidden" data-message role="status" aria-live="polite"></p>';
-    const closeButton='<button type="button" class="'+ICON_BUTTON+'" data-close data-drawer-close aria-label="Close '+escape(reviewLabel)+' drawer">'+DashboardUI.renderIcon('x')+'</button>';
-    return '<header class="review-top shrink-0 border-b border-edge bg-paper px-5 pb-3 pt-4"><div class="flex items-start gap-2"><div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1"><h2 id="'+reviewKey+'Heading" class="m-0 text-lg font-semibold text-ink">'+escape(title)+'</h2>'+studentCount+'</div><div class="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1"><span class="'+BADGE+'">'+escape(reviewLabel)+'</span>'+meta+'</div>'+actionsMenu+closeButton+'</div>'+headerDetails+titleRow+navigation+'</header>'+
-      '<div class="team-drawer-content min-h-0 flex-1 overflow-y-auto overscroll-contain bg-canvas px-5 py-4" data-drawer-content>'+body+(footer?'':statusMessage)+'</div>'+
-      (footer?'<footer class="review-footer flex shrink-0 flex-col gap-2 border-t border-edge bg-paper px-5 py-3">'+statusMessage+'<p class="m-0 text-xs text-muted" data-evaluation-progress aria-live="polite"></p><div class="flex flex-wrap items-center gap-2"><button type="button" class="'+BUTTON+' gap-1" data-pi-step="-1" data-pi-place="bottom">'+DashboardUI.renderIcon('chevron-left')+'Prev</button><button type="button" class="'+BUTTON+' gap-1" data-pi-step="1" data-pi-place="bottom">Next'+DashboardUI.renderIcon('chevron-right')+'</button>'+footer+'</div></footer>':'');
+    const closeButton='<button type="button" class="'+ICON_BUTTON+'" data-close aria-label="Back to evaluations">'+DashboardUI.renderIcon('arrow-left')+'</button>';
+    return '<header class="review-top shrink-0 rounded-card border border-edge shadow-card bg-paper px-5 pb-3 pt-4"><div class="flex flex-wrap items-start gap-2"><div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1"><h2 data-evaluation-heading tabindex="-1" id="'+reviewKey+'Heading" class="m-0 text-lg font-semibold text-ink">'+escape(title)+'</h2>'+studentCount+'</div><div class="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1"><span class="'+BADGE+'">'+escape(reviewLabel)+'</span>'+meta+'</div>'+actionsMenu+closeButton+'</div>'+titleRow+headerDetails+'</header>'+
+      '<div class="bg-canvas px-5 py-4" data-drawer-content><div class="grid items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">'+rail+'<div class="min-w-0">'+body+(footer?'':statusMessage)+'</div></div></div>'+
+      (footer?'<footer data-evaluation-footer class="review-footer sticky bottom-0 z-20 flex shrink-0 flex-col gap-2 border-t border-edge bg-paper px-5 py-3">'+statusMessage+'<div class="flex flex-wrap items-center gap-2"><button type="button" class="'+BUTTON+' gap-1" data-pi-step="-1" data-pi-place="bottom">'+DashboardUI.renderIcon('chevron-left')+'Prev</button><button type="button" class="'+BUTTON+' gap-1" data-pi-step="1" data-pi-place="bottom">Next'+DashboardUI.renderIcon('chevron-right')+'</button>'+footer+'</div></footer>':'');
   }
 
 
@@ -475,23 +472,23 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if (busy || reading) return;
     if (DashboardUI.closeRubricDrawer) DashboardUI.closeRubricDrawer(false);
     ensure();
-    const previous=drawer.open && String(drawer.dataset.team).trim().toLowerCase()===String(team).trim().toLowerCase()?model:null,previousDirty=dirty,previousTarget=targeted;
+    const previous=!page.hidden && String(page.dataset.team).trim().toLowerCase()===String(team).trim().toLowerCase()?model:null,previousDirty=dirty,previousTarget=targeted;
     trigger=button;reading=true;
-    if(previous && DashboardUI.beginContentLoading){finishRead=DashboardUI.beginContentLoading(drawer.querySelector('[data-drawer-content]'),'Refreshing '+reviewLabel+' evaluation');const reload=drawer.querySelector('[data-reload]');if(reload)reload.disabled=true;}
-    else {activeCriteria='team';activeStudent=0;activeStudentPIs={};model=null;dirty=false;pending=null;targeted=null;correctionIndex=null;drawer.dataset.team=team;drawer.innerHTML=shell(team,DashboardUI.renderSkeleton('drawer','Loading '+reviewLabel+' evaluation'));}
+    if(previous && DashboardUI.beginContentLoading){finishRead=DashboardUI.beginContentLoading(page.querySelector('[data-drawer-content]'),'Refreshing '+reviewLabel+' evaluation');const reload=page.querySelector('[data-reload]');if(reload)reload.disabled=true;}
+    else {activeCriteria='team';activeStudent=0;activeStudentPIs={};model=null;dirty=false;pending=null;targeted=null;correctionIndex=null;page.dataset.team=team;page.innerHTML=shell(team,DashboardUI.renderSkeleton('panel','Loading '+reviewLabel+' evaluation'));}
     const token=++sequence;
-    if(!drawer.open)drawer.showModal();
-    document.body.dataset.scrollLocked='true';
+    if(page.hidden){const table=listHost.querySelector('[data-reviewer-table-scroll]');listScroll={x:window.scrollX,y:window.scrollY,table:table?table.scrollLeft:0};listHost.hidden=true;page.hidden=false;page.scrollIntoView({block:'start'});}
+    page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});
     bridge.read('review-evaluation:'+reviewKey,'API_review_getEvaluation',[team,reviewKey],{timeoutMs:60000}).then(data=>{
-      if(token!==sequence || !drawer.open)return;
+      if(token!==sequence || page.hidden)return;
       if(finishRead)finishRead();finishRead=null;reading=false;
       model=data;reviewLabel=data.config.label;dirty=false;pending=null;targeted=null;correctionIndex=null;render();
     },error=>{
       if(error && error.superseded)return;
-      if(token!==sequence || !drawer.open)return;
+      if(token!==sequence || page.hidden)return;
       if(finishRead)finishRead();finishRead=null;reading=false;
-      if(previous){model=previous;dirty=previousDirty;targeted=previousTarget;const reload=drawer.querySelector('[data-reload]');if(reload)reload.disabled=false;message(error.message+' Existing entries are retained. Use Reload to retry.');}
-      else {drawer.innerHTML=shell(team,'<div class="'+CARD+' mb-4 flex flex-col items-start gap-3"><p class="m-0 text-sm text-ink-2">The evaluation could not be loaded.</p><button class="'+BUTTON+'" type="button" data-reload>Retry</button></div>');message(error.message);}
+      if(previous){model=previous;dirty=previousDirty;targeted=previousTarget;const reload=page.querySelector('[data-reload]');if(reload)reload.disabled=false;message(error.message+' Existing entries are retained. Use Reload to retry.');}
+      else {page.innerHTML=shell(team,'<div class="'+CARD+' mb-4 flex flex-col items-start gap-3"><p class="m-0 text-sm text-ink-2">The evaluation could not be loaded.</p><button class="'+BUTTON+'" type="button" data-reload>Retry</button></div>');message(error.message);page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});}
     });
   }
   function control(c,index,owner,score) {
@@ -504,16 +501,16 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       '<div class="'+LEVELS+'" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" class="'+LEVEL+'" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+', '+bands[n]+'–'+bands[n+1]+'%, '+levelMarkRange(c.maxMarks,n)+' marks" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div>'+
       '<div data-descriptor aria-live="polite" class="mt-3 rounded-md bg-tint px-3 py-2 text-sm leading-relaxed text-ink-2"></div>'+
       '<details class="group mt-2"><summary class="inline-flex min-h-9 cursor-pointer list-none items-center gap-1 text-sm font-semibold text-primary hover:underline [&::-webkit-details-marker]:hidden">'+DashboardUI.renderIcon('chevron-right','','shrink-0 transition-transform group-open:rotate-90')+'View all level descriptors</summary><div class="mt-1 flex flex-col gap-2 border-l-2 border-edge pl-3">'+c.descriptors.map((text,i)=>'<p class="m-0 text-sm text-ink-2"><strong class="text-ink">Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</div></details>'+
-      '<div class="mt-4 border-t border-edge pt-4"><div class="flex flex-wrap items-center justify-between gap-2"><label class="text-sm font-semibold text-ink" for="reviewMarks-'+id+'">Awarded marks</label><span data-range class="text-sm text-muted"></span></div>'+
+      '<div data-scoring-controls class="mt-4 grid gap-4 border-t border-edge pt-4 xl:grid-cols-2"><div data-marks-panel class="min-w-0"><div class="flex flex-wrap items-center justify-between gap-2"><label class="text-sm font-semibold text-ink" for="reviewMarks-'+id+'">Awarded marks</label><span data-range class="text-sm text-muted"></span></div>'+
       '<div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-3"><div class="flex items-center gap-1"><button class="'+STEP+'" type="button" data-step="-0.5" aria-label="Decrease marks by 0.5">'+DashboardUI.renderIcon('minus')+'</button><input class="'+FIELD+' w-20 text-center text-base font-semibold tabular-nums" data-marks id="reviewMarks-'+id+'" aria-describedby="reviewMarksError-'+id+'" type="number" inputmode="decimal" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'"><button class="'+STEP+'" type="button" data-step="0.5" aria-label="Increase marks by 0.5">'+DashboardUI.renderIcon('plus')+'</button></div>'+
-      '<div class="min-w-40 flex-1 pt-5"><input class="'+RANGE+'" data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total hidden" data-awarded-total></span><div data-slider-values aria-hidden="true" class="mt-1 h-5 text-xs tabular-nums text-muted"></div></div></div></div>'+
-      '<p class="m-0 mt-2 rounded-md bg-danger-tint px-3 py-2 text-sm text-danger" data-marks-error id="reviewMarksError-'+id+'" aria-live="polite" hidden></p>'+
-      '<div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-edge pt-4 text-sm"><div class="flex flex-wrap items-center gap-2"><strong class="text-ink">Criterion feedback</strong><span data-feedback-required class="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-semibold text-warning"></span></div><span data-feedback-status class="text-sm text-muted"></span></div>'+
+      '<div class="min-w-40 flex-1 pt-5"><input class="'+RANGE+'" data-marks-slider type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><span class="review-awarded-total hidden" data-awarded-total></span><div data-slider-values aria-hidden="true" class="mt-1 h-5 text-xs tabular-nums text-muted"></div></div></div>'+
+      '<p class="m-0 mt-2 rounded-md bg-danger-tint px-3 py-2 text-sm text-danger" data-marks-error id="reviewMarksError-'+id+'" aria-live="polite" hidden></p></div>'+
+      '<div data-feedback-panel class="min-w-0"><div class="flex flex-wrap items-center justify-between gap-2 text-sm"><div class="flex flex-wrap items-center gap-2"><strong class="text-ink">Criterion feedback</strong><span data-feedback-required class="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-semibold text-warning"></span></div><span data-feedback-status class="text-sm text-muted"></span></div>'+
       '<div class="mt-2 flex flex-col gap-1.5 text-sm text-muted" data-feedback-options aria-label="Feedback suggestions"></div>'+
-      '<button type="button" class="'+SMALL+' mt-2" data-other-feedback aria-pressed="false">Other remarks</button><label data-custom-feedback-label hidden class="mt-3 '+LABEL+'">Other remarks<textarea class="mt-1.5 '+TEXTAREA+'" data-custom-feedback maxlength="2000" rows="3" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden class="resize-y" maxlength="2000">'+escape(score.remark||'')+'</textarea></fieldset>';
+      '<button type="button" class="'+SMALL+' mt-2" data-other-feedback aria-pressed="false">Other remarks</button><label data-custom-feedback-label hidden class="mt-3 '+LABEL+'">Other remarks<textarea class="mt-1.5 '+TEXTAREA+'" data-custom-feedback maxlength="2000" rows="3" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden class="resize-y" maxlength="2000">'+escape(score.remark||'')+'</textarea></div></div></fieldset>';
   }
   function accordion(title,description,content) {
-    return '<details class="review-accordion" data-criteria-group="'+(title==='Team Criteria'?'team':'individual')+'" name="review-criteria" id="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-panel" role="tabpanel" aria-labelledby="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-tab"'+(focusedAssessment()?(title==='Team Criteria'?' hidden':' open'):'')+'><summary class="hidden"><strong>'+title+'</strong>'+(title==='Team Criteria'?'<span data-team-mark aria-label="Common team score"></span>':'')+(description?'<span>'+description+'</span>':'')+'</summary><div>'+content+'</div></details>';
+    return '<details class="review-accordion" data-criteria-group="'+(title==='Team Criteria'?'team':'individual')+'" name="review-criteria" id="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-panel" role="region" aria-labelledby="'+reviewKey+'-'+(title==='Team Criteria'?'team':'individual')+'-tab"'+(focusedAssessment()?(title==='Team Criteria'?' hidden':' open'):'')+'><summary class="hidden"><strong>'+title+'</strong>'+(description?'<span>'+description+'</span>':'')+'</summary><div>'+content+'</div></details>';
   }
   function validateClosingGroup(group) {
     if(!model.availability.editable)return true;
@@ -541,12 +538,12 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     const group=element.closest && element.closest('[data-criteria-group]');
     if(group) {
       if(group.dataset && group.dataset.criteriaGroup){activeCriteria=group.dataset.criteriaGroup;syncCriteriaTabs();}
-      drawer.querySelectorAll('[data-criteria-group]').forEach(other=>{other.open=other===group;});
+      page.querySelectorAll('[data-criteria-group]').forEach(other=>{other.open=other===group;});
     }
     const student=element.closest && element.closest('[data-student-group]');
     if(student){
       if(student.dataset && student.dataset.studentGroup!==undefined){activeStudent=Number(student.dataset.studentGroup);syncStudentSelection();}
-      drawer.querySelectorAll('[data-student-group]').forEach(other=>{other.open=other===student;});
+      page.querySelectorAll('[data-student-group]').forEach(other=>{other.open=other===student;});
     }
   }
   function render() {withPass(renderDrawer);}
@@ -561,10 +558,11 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       const student=savedStudents.find(v=>v.register===s.register)||{},a=student.assessment||{},draft=a.makeupDraft||{},scores=targeted && targeted.index===index?(draft.scores||{}):!d.availability.editable && a.individualSource==='makeup'?(a.makeup?.scores||{}):(student.scores||{});
       return '<details class="review-student-accordion" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary class="hidden"><span><strong>'+escape(s.name)+'</strong><span data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div>'+(!d.availability.editable && !targeted && correctionIndex===null && student.assessment?.nextActions?.makeup?'<div class="mb-4">'+makeupControls(index,student)+'</div>':'')+absenceControl(index,student)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
     }).join('');
-    drawer.innerHTML=shell(d.details.team,(old.reason?'<p class="m-0 mb-4 rounded-md bg-warning-tint px-3 py-2 text-sm text-warning"><strong>Reopened:</strong> '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div data-review-actions class="ml-auto flex flex-wrap items-center gap-2">'+(d.availability.editable?'<button class="'+BUTTON+'" type="button" data-draft>Save Draft</button><button class="'+PRIMARY+'" type="button" data-submit>Submit</button>':'')+'</div>');
-    if(targeted)drawer.querySelector('[data-review-actions]').innerHTML='<button class="'+BUTTON+'" type="button" data-reload>Cancel Makeup</button><button class="'+BUTTON+'" type="button" data-target-draft>Save Makeup Draft</button><button class="'+PRIMARY+'" type="button" data-target-submit>Submit Makeup</button>';
-    drawer.querySelectorAll('[data-absence] input,[data-absence] select,[data-absence] textarea').forEach(el=>el.disabled=!!targeted);
-    syncStudentSelection();syncCriteriaTabs();updateRanges();drawer.querySelector('[data-close]').focus();
+    page.innerHTML=shell(d.details.team,(old.reason?'<p class="m-0 mb-4 rounded-md bg-warning-tint px-3 py-2 text-sm text-warning"><strong>Reopened:</strong> '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div data-review-actions class="ml-auto flex flex-wrap items-center gap-2">'+(d.availability.editable?'<button class="'+BUTTON+'" type="button" data-draft>Save Draft</button><button class="'+PRIMARY+'" type="button" data-submit>Submit</button>':'')+'</div>');
+    if(targeted)page.querySelector('[data-review-actions]').innerHTML='<button class="'+BUTTON+'" type="button" data-reload>Cancel Makeup</button><button class="'+BUTTON+'" type="button" data-target-draft>Save Makeup Draft</button><button class="'+PRIMARY+'" type="button" data-target-submit>Submit Makeup</button>';
+    page.querySelectorAll('[data-absence] input,[data-absence] select,[data-absence] textarea').forEach(el=>el.disabled=!!targeted);
+    const rail=page.querySelector('[data-criteria-rail]');if(rail)rail.open=window.matchMedia('(min-width: 1024px)').matches;
+    syncStudentSelection();syncCriteriaTabs();updateRanges();page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});
   }
   // Markup last written to each element, so unchanged fragments are not re-parsed on every keystroke.
   const writtenHtml=new WeakMap();
@@ -587,7 +585,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function refreshRanges() {
     if(!model)return;
     let completed=0,count=0;
-    drawer.querySelectorAll('[data-index]').forEach(field=>{
+    page.querySelectorAll('[data-index]').forEach(field=>{
       const c=model.config.criteria[Number(field.dataset.index)], level=field.querySelector('[data-level]').value;
       const editable=canEdit(field);
       const applicable=showRubric(field);
@@ -635,10 +633,10 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       }
       const graded=applicable && level!=='' && marks!=='' && valid && (n>=2 || !!remark.value.trim()) && remark.value.length<=2000;
       if(field.dataset.owner==='team') {
-        markPill(drawer.querySelector('[data-select-pi="'+field.dataset.index+'"]'),c,graded);
+        markPill(page.querySelector('[data-select-pi="'+field.dataset.index+'"]'),c,graded);
       }
       else {
-        markPill(drawer.querySelector('[data-select-individual-pi="'+field.dataset.index+'"][data-student="'+field.dataset.owner+'"]'),c,graded);
+        markPill(page.querySelector('[data-select-individual-pi="'+field.dataset.index+'"][data-student="'+field.dataset.owner+'"]'),c,graded);
       }
       field.dataset.graded=String(graded);
       if(graded)completed++;
@@ -678,7 +676,8 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
         });
       }
     });
-    const progress=drawer.querySelector('[data-evaluation-progress]');
+    const railLabel=page.querySelector('[data-criteria-rail-label]');if(railLabel)railLabel.textContent='Criteria · '+completed+' of '+count+' criteria evaluated';
+    const progress=page.querySelector('[data-evaluation-progress]');
     if(progress) {
       const remaining=count-completed;
       progress.hidden=focusedAssessment() && !targeted;
@@ -687,11 +686,12 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     syncIndividualCards();
     updateNavigator();
     updateAbsenceDisplay();
+    keepFocusVisible();
   }
   const mark=value=>value===null || value===undefined || !Number.isFinite(Number(value))?'Pending':String(value);
   function updateAbsenceDisplay() {
     model.roster.students.forEach((s,index)=>{
-      const host=drawer.querySelector('[data-absence="'+index+'"]');
+      const host=page.querySelector('[data-absence="'+index+'"]');
       const f=facts(index),old=savedStudent(index);
       if(host)updateAttendanceCard(host,index,f);
       updatePreview(s,index,f,old);
@@ -717,7 +717,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function updatePreview(s,index,f,old) {
     const teamScores={},scores={};
     model.config.criteria.forEach((c,i)=>{
-      const field=drawer.querySelector('[data-index="'+i+'"][data-owner="'+(c.type==='Team'?'team':index)+'"]');
+      const field=page.querySelector('[data-index="'+i+'"][data-owner="'+(c.type==='Team'?'team':index)+'"]');
       const value=field?{level:field.querySelector('[data-level]').value===''?null:Number(field.querySelector('[data-level]').value),marks:field.querySelector('[data-marks]').value===''?null:Number(field.querySelector('[data-marks]').value),remark:field.querySelector('[data-remark]').value}:(c.type==='Team'?(model.evaluation?.teamScores||{}):old.scores||{})[c.pi];
       (c.type==='Team'?teamScores:scores)[c.pi]=value;
     });
@@ -730,14 +730,14 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       }catch(error){preview={total:null,assessment:{teamMark:null,individualMark:null,status:'INCOMPLETE',teamState:'UNASSESSED',individualState:'UNASSESSED'}};}
     }
     const a=preview.assessment||{};
-    const individual=drawer.querySelector('[data-individual-mark="'+index+'"]');if(individual)individual.textContent=mark(a.individualMark)+' / '+model.config.criteria.filter(c=>c.type==='Individual').reduce((n,c)=>n+c.maxMarks,0);
-    const status=drawer.querySelector('[data-assessment-status="'+index+'"]');if(status)status.textContent='Assessment status: '+(a.status||'INCOMPLETE');
-    const score=drawer.querySelector('[data-student-score="'+index+'"]');if(score)score.textContent=reviewTotal(preview);
-    const note=drawer.querySelector('[data-student-score-note="'+index+'"]');if(note)note.textContent='Review total. '+(STATUS_LABELS[a.status]||'Assessment Incomplete')+'.';
-    const team=drawer.querySelector('[data-team-mark]');if(team)team.textContent=mark(Object.values(teamScores).every(s=>s&&s.marks!==null)?Object.values(teamScores).reduce((n,s)=>n+s.marks,0):null);
+    const individual=page.querySelector('[data-individual-mark="'+index+'"]');if(individual)individual.textContent=mark(a.individualMark)+' / '+model.config.criteria.filter(c=>c.type==='Individual').reduce((n,c)=>n+c.maxMarks,0);
+    const status=page.querySelector('[data-assessment-status="'+index+'"]');if(status)status.textContent='Assessment status: '+(a.status||'INCOMPLETE');
+    const score=page.querySelector('[data-student-score="'+index+'"]');if(score)score.textContent=reviewTotal(preview);
+    const note=page.querySelector('[data-student-score-note="'+index+'"]');if(note)note.textContent='Review total. '+(STATUS_LABELS[a.status]||'Assessment Incomplete')+'.';
+    const team=page.querySelector('[data-team-mark]');if(team)team.textContent=mark(Object.values(teamScores).every(s=>s&&s.marks!==null)?Object.values(teamScores).reduce((n,s)=>n+s.marks,0):null);
   }
   function validateFeedback(submit) {
-    for(const field of drawer.querySelectorAll('[data-index]')) {
+    for(const field of page.querySelectorAll('[data-index]')) {
       if(!canEdit(field))continue;
       const level=field.querySelector('[data-level]').value,remark=field.querySelector('[data-remark]');
       const error=remark.value.length>2000?'Total feedback must be 2000 characters or fewer.':submit && level!=='' && Number(level)<2 && !remark.value.trim()?'Select feedback or add Other remarks for Level 0 or 1.':'';
@@ -754,13 +754,13 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if(busy || reading || targeted || model.availability.editable || !absenceCorrectable(index))return;
     if(dirty && !await DashboardUI.ask('Discard unsaved absence correction?'))return;
     correctionIndex=index;activeStudent=index;activeCriteria='individual';dirty=false;pending=null;render();
-    const host=drawer.querySelector('[data-absence="'+index+'"]');revealCriterion(host);focusAttendance(host);
+    const host=page.querySelector('[data-absence="'+index+'"]');revealCriterion(host);focusAttendance(host);
   }
   async function cancelAbsence() {
     if(busy || reading || correctionIndex===null)return;
     if(dirty && !await DashboardUI.ask('Discard unsaved absence correction?'))return;
     const index=correctionIndex;correctionIndex=null;dirty=false;pending=null;render();
-    const button=drawer.querySelector('[data-edit-absence="'+index+'"]');if(button)button.focus();
+    const button=page.querySelector('[data-edit-absence="'+index+'"]');if(button)button.focus();
   }
   function saveAbsence() {
     if(correctionIndex===null || !canEditAbsence(correctionIndex))return;
@@ -780,7 +780,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
 
     const input={assessmentId:reviewKey,team:model.roster.team,student:model.roster.students[targeted.index].register,revision:model.revision,token:model.token};
     targeted.components.forEach(component=>{input[component==='team'?'teamScores':'scores']={};});
-    drawer.querySelectorAll('[data-index]').forEach(field=>{
+    page.querySelectorAll('[data-index]').forEach(field=>{
       if(!canEdit(field))return;
       const c=model.config.criteria[Number(field.dataset.index)],level=field.querySelector('[data-level]').value,marks=field.querySelector('[data-marks]').value;
       input[c.type==='Team'?'teamScores':'scores'][c.pi]={level:level===''?null:Number(level),marks:marks===''?null:marks,remark:field.querySelector('[data-remark]').value};
@@ -789,14 +789,14 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   }
   function sendAcademic(method,input) {
     const signature=JSON.stringify({method,input});if(!pending || pending.signature!==signature)pending={signature,id:requestId()};
-    input.requestId=pending.id;setBusy(true);const done=DashboardUI.busy.write(drawer.querySelector('[data-message]'),'Saving assessment…');
+    input.requestId=pending.id;setBusy(true);const done=DashboardUI.busy.write(page.querySelector('[data-message]'),'Saving assessment…');
     bridge.write('API_review_save',[SAVE_KINDS[method],input]).then(result=>{
       done();busy=false;dirty=false;pending=null;targeted=null;correctionIndex=null;model.revision=result.revision;model.status=result.status;model.evaluation=result.evaluation;
       render();message('Assessment saved. Changed results require publication.');refreshTable();
     },error=>{done();setBusy(false);message(error.message+' Your entries are retained.');});
   }
   function setBusy(value) {
-    busy=value;drawer.querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=value);
+    busy=value;page.querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=value);
     syncCriteriaTabs();
     updateRanges();
   }
@@ -806,18 +806,18 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if(!validateFeedback(submit))return;
     if(submit) {
       const unselected=model.roster.students.findIndex((s,index)=>facts(index).type==='UNSELECTED');
-      if(unselected!==-1){const host=drawer.querySelector('[data-absence="'+unselected+'"]');revealCriterion(host);message('Select attendance for every student before submitting.');focusAttendance(host);return;}
+      if(unselected!==-1){const host=page.querySelector('[data-absence="'+unselected+'"]');revealCriterion(host);message('Select attendance for every student before submitting.');focusAttendance(host);return;}
       for(let index=0;index<model.roster.students.length;index++){
         const f=facts(index),irrelevant=f.type==='PROLONGED'&&f.verifiedContribution===false&&f.attended===true;
         if(!['NORMAL','UNSELECTED'].includes(f.type)&&f.approved===true&&!irrelevant&&(f.supportingEvidence||[]).includes('OTHER')&&!String(f.otherEvidenceText||'').trim()){
-          const host=drawer.querySelector('[data-absence="'+index+'"]');revealCriterion(host);message('Describe the other supporting absence evidence.');host.querySelector('[data-other-evidence]').focus();return;
+          const host=page.querySelector('[data-absence="'+index+'"]');revealCriterion(host);message('Describe the other supporting absence evidence.');host.querySelector('[data-other-evidence]').focus();return;
         }
       }
-      const missing=Array.from(drawer.querySelectorAll('[data-index]')).find(field=>canEdit(field) && field.querySelector('[data-level]').value==='');
+      const missing=Array.from(page.querySelectorAll('[data-index]')).find(field=>canEdit(field) && field.querySelector('[data-level]').value==='');
       if(missing){revealCriterion(missing);message('Select a proficiency level for every criterion before submitting.');const button=missing.querySelector('[data-pick-level]');if(button)button.focus();return;}
     }
     const payload={team:model.roster.team,revision:model.revision,token:model.token,teamScores:{},students:model.roster.students.map((s,index)=>({register:s.register,scores:{},absence:facts(index)}))};
-    drawer.querySelectorAll('[data-index]').forEach(field=>{
+    page.querySelectorAll('[data-index]').forEach(field=>{
       const c=model.config.criteria[Number(field.dataset.index)],level=field.querySelector('[data-level]'),marks=field.querySelector('[data-marks]'),remark=field.querySelector('[data-remark]');
       const editable=canEdit(field);
       level.required=submit && editable;marks.required=submit && editable;remark.required=false;
@@ -825,14 +825,14 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       const score={level:level.value===''?null:Number(level.value),marks:marks.value===''?null:marks.value,remark:remark.value};
       (field.dataset.owner==='team'?payload.teamScores:payload.students[Number(field.dataset.owner)].scores)[c.pi]=score;
     });
-    const form=drawer.querySelector('form');
+    const form=page.querySelector('form');
     const invalid=form.querySelector && form.querySelector('input:invalid,select:invalid,textarea:invalid');
     if(invalid){revealCriterion(invalid);invalid.reportValidity();return;}
     if(!form.reportValidity())return;
     if(submit && !await DashboardUI.ask('Submit '+reviewLabel+' for the entire team? Normal scores will lock; documented pending cases can be assessed separately.'))return;
     const method=submit?'submitReviewEvaluation_':'saveReviewEvaluationDraft_', signature=JSON.stringify({method,payload});
     if(!pending || pending.signature!==signature)pending={signature,id:requestId()};
-    payload.requestId=pending.id;setBusy(true);const done=DashboardUI.busy.write(drawer.querySelector('[data-message]'),'Saving '+reviewLabel+'…');
+    payload.requestId=pending.id;setBusy(true);const done=DashboardUI.busy.write(page.querySelector('[data-message]'),'Saving '+reviewLabel+'…');
     bridge.write('API_review_save',[SAVE_KINDS[method],{...payload,assessmentId:reviewKey}]).then(result=>{
       dirty=false;pending=null;model.revision=result.revision;model.status=result.status;
       model.evaluation=result.evaluation || {...payload,status:result.status,submittedAt:result.submittedAt,submittedDay:result.submittedDay,late:result.late};model.availability.editable=result.status==='Draft';
@@ -841,7 +841,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     },error=>{done();setBusy(false);message(error.message+' Your entries are retained. Retry uses the same request ID until you edit.');});
   }
   function refreshTable() {
-    ReviewerView.refresh().then(refreshed=>{if(!refreshed&&drawer.open)message('Evaluation saved. The assigned-team table could not refresh; reload to retry.');});
+    ReviewerView.refresh().then(refreshed=>{if(!refreshed&&!page.hidden)message('Evaluation saved. The assigned-team table could not refresh; reload to retry.');});
   }
   window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
   return {open};
