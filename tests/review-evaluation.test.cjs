@@ -241,7 +241,7 @@ test('reviewer dashboard shows opening reason and read-only action after submiss
 
 function browserFixture(extended=false,key='review1') {
   const headerNodes={};
-  const requests=[],events={},status={setAttribute(){}},totals=[{},{}];let html='',fields=[],buttons=[],focusCount=0,discard=true;
+   const requests=[],events={},status={setAttribute(){}},totals=[{},{}],footerProgress={dataset:{}},unsaved={hidden:true};let html='',fields=[],buttons=[],focusCount=0,discard=true;
   const loading={begun:0,settled:0};
   const rail={open:false},media={matches:true,addEventListener(name,handler){this.changed=handler;}};
   let absenceNodes=new Map();
@@ -251,7 +251,7 @@ function browserFixture(extended=false,key='review1') {
   const teamSteps=[button('data-team-step','-1'),button('data-team-step','1')];
   const form={addEventListener(){},reportValidity:()=>fields.every(field=>Object.values(field.controls).every(c=>!c.validity && (!c.required || c.value!=='')))};
   const drawer={hidden:true,scrollIntoView(){},dataset:{},setAttribute(){},addEventListener:(name,fn)=>events[name]=fn,
-    set innerHTML(value){html=value;fields=[];buttons=[];absenceNodes=new Map();
+     set innerHTML(value){html=value;fields=[];buttons=[];absenceNodes=new Map();unsaved.hidden=true;
       for(const match of value.matchAll(/<button[^>]*(data-(?:close|draft|submit|reload|edit-absence|cancel-absence|record-absence|record-decision|target-draft|target-submit|target))(?:="([^"]*)")?[^>]*>/g))buttons.push(button(match[1],match[2]));
       if(extended)for(const match of value.matchAll(/data-absence="(\d+)"[^>]*>([\s\S]*?)<div data-effective="\d+"><\/div>/g)){
         const controls={};
@@ -279,7 +279,9 @@ function browserFixture(extended=false,key='review1') {
       }
     },get innerHTML(){return html;},
     querySelector(selector){
-      if(selector==='[data-team-select]')return teamSelect;
+       if(selector==='[data-team-select]')return teamSelect;
+       if(selector==='[data-footer-progress]')return html.includes('data-footer-progress')?footerProgress:null;
+       if(selector==='[data-unsaved-message]')return html.includes('data-unsaved-message')?unsaved:null;
       if(selector.startsWith('[data-team-step='))return teamSteps.find(button=>selector.includes('"'+button.dataset.teamStep+'"'));
       if(selector==='[data-criteria-rail]')return html.includes('data-criteria-rail')?rail:null;
       if(selector==='[data-evaluation-heading]')return {focus(){focusCount++;}};
@@ -314,7 +316,7 @@ function browserFixture(extended=false,key='review1') {
   const api=c.reviewEvaluationBrowser_(key,bridge);
   const click=attr=>events.click({target:buttons.find(b=>b.hasAttribute(attr))});
   const data=JSON.parse(JSON.stringify(fixture().load()));
-  return {api,drawer,rail,media,teamSelect,teamSteps,listHost,tableScroll,scrolls,requests,status,data,trigger,click,events,fields:()=>fields,discard:v=>discard=v,focus:()=>focusCount,absenceNodes:()=>absenceNodes,loading,context:c};
+   return {api,drawer,rail,media,teamSelect,teamSteps,listHost,tableScroll,scrolls,requests,status,footerProgress,unsaved,data,trigger,click,events,fields:()=>fields,discard:v=>discard=v,focus:()=>focusCount,absenceNodes:()=>absenceNodes,loading,context:c};
 }
 
 // Both configured reviews must obey the same policy without sharing records or rubric content.
@@ -452,9 +454,9 @@ for(const key of ['review1','review2']) {
     assert.equal(teams[0].hidden,false);assert.equal(teams[1].hidden,true);
     const click=index=>{const pill={dataset:{selectPi:teams[index].dataset.index},hasAttribute:a=>a==='data-select-pi',closest:s=>s==='button'?pill:null};f.events.click({target:pill});};
     teams[0].controls['[data-level]'].value='3';teams[0].controls['[data-marks]'].value='48';f.events.input();
-    click(1);assert.equal(teams[0].hidden,true);assert.equal(teams[1].hidden,false);
+     click(1);assert.equal(teams[0].hidden,true);assert.equal(teams[1].hidden,false);assert.equal(teams[1].controls['[data-level]'].value,'2');assert.equal(teams[1].controls['[data-marks]'].value,'');
     click(0);assert.equal(teams[0].controls['[data-marks]'].value,'48');assert.equal(teams[1].hidden,true);
-    await f.click('data-submit');assert.equal(teams[1].hidden,false);assert.equal(teams[0].hidden,true);assert.match(f.status.textContent,/Select a proficiency level/);assert.equal(f.requests.length,1);
+     await f.click('data-submit');assert.equal(teams[1].hidden,false);assert.equal(teams[0].hidden,true);assert.match(f.status.textContent,/Select awarded marks/);assert.equal(f.requests.length,1);
   });
   test(key+': Other remarks shows only custom text while selected feedback stays in pills',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
@@ -473,7 +475,7 @@ for(const key of ['review1','review2']) {
     assert.equal(label.hidden,false);assert.equal(custom.value,'Historical custom feedback.');
     f.click('data-draft');assert.equal(f.requests[1].args[0].teamScores.T.remark,selected+'\nHistorical custom feedback.');
   });
-  test(key+': team PI navigation blocks invalid marks and preserves valid entries',()=>{
+   test(key+': team PI navigation blocks invalid marks without scrolling and preserves valid entries',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
     assert.match(f.drawer.innerHTML,/data-team-pills/);assert.match(f.drawer.innerHTML,/data-select-pi="0"/);
     const field=f.fields()[0],group={querySelectorAll:()=>[field]},content={scrollTop:120},query=f.drawer.querySelector.bind(f.drawer);
@@ -483,7 +485,7 @@ for(const key of ['review1','review2']) {
     const pill={dataset:{selectPi:'0'},hasAttribute:a=>a==='data-select-pi',closest:s=>s==='button'?pill:null};
     field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='59';
     f.events.click({target:pill});assert.equal(scrolled,false);assert.equal(pageScrolled,false);assert.equal(content.scrollTop,120);assert.match(f.status.textContent,/outside/);
-    field.controls['[data-marks]'].value='48';f.events.click({target:pill});assert.equal(scrolled,false);assert.equal(pageScrolled,true);assert.equal(content.scrollTop,0);assert.equal(field.controls['[data-marks]'].value,'48');assert.equal(f.requests.length,1);
+     field.controls['[data-marks]'].value='48';f.events.click({target:pill});assert.equal(scrolled,false);assert.equal(pageScrolled,false);assert.equal(content.scrollTop,120);assert.equal(field.controls['[data-marks]'].value,'48');assert.equal(f.requests.length,1);
   });
   test(key+': Prev and Next cross from team PIs to student PIs and block invalid marks',()=>{
     const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
@@ -533,7 +535,7 @@ for(const key of ['review1','review2']) {
     assert.match(f.drawer.innerHTML,/<strong>L3<\/strong><small>45\u201350.5<\/small>/);
     const field=f.fields()[0],values={},query=field.querySelector.bind(field);
     field.querySelector=s=>s==='[data-slider-values]'?values:query(s);
-    f.events.input();assert.equal(values.hidden,true);
+     f.events.input();assert.equal(field.controls['[data-level]'].value,'2');assert.equal(values.hidden,false);
     field.controls['[data-level]'].value='3';field.controls['[data-marks]'].value='48';f.events.input();
     assert.equal(values.hidden,false);assert.match(values.innerHTML,/<span>45<\/span>/);
     // Eleven half-mark steps have no even spacing of seven or fewer labels, so only the ends show.
@@ -762,10 +764,11 @@ test('drawer warns before discarding unsaved edits and restores focus on close',
 test('level buttons update descriptors and clear previous feedback',()=>{
   const f=browserFixture();f.data.config.criteria[0].name='Literature and gap analysis';f.data.config.criteria[0].descriptors[2]='Partial comparison';
   f.api.open('T1',f.trigger);f.requests[0].success(f.data);const field=f.fields()[0],remark=field.controls['[data-remark]'];
-  assert.match(field.querySelector('[data-feedback-options]').innerHTML,/Select a level/);
-  remark.value='Faculty observation.';
-  const pick=n=>f.events.click({target:field.querySelectorAll('[data-pick-level]')[n]});
-  pick(2);assert.equal(field.controls['[data-level]'].value,'2');assert.equal(field.querySelector('[data-descriptor]').textContent,'Level 2: Partial comparison');
+   assert.equal(field.controls['[data-level]'].value,'2');
+   assert.match(field.querySelector('[data-feedback-options]').innerHTML,/Compare relevant recent sources/);
+   remark.value='Faculty observation.';
+   const pick=n=>f.events.click({target:field.querySelectorAll('[data-pick-level]')[n]});
+   pick(4);pick(2);assert.equal(field.controls['[data-level]'].value,'2');assert.equal(field.querySelector('[data-descriptor]').textContent,'Level 2: Partial comparison');
   assert.equal(remark.value,'');remark.value='Faculty observation.';
   assert.match(field.querySelector('[data-feedback-options]').innerHTML,/Compare relevant recent sources/);
   const chip=field.querySelector('[data-feedback-options]').querySelectorAll('[data-feedback]')[1];
@@ -1019,20 +1022,26 @@ for(const key of ['review1','review2','review_extra']) {
     assert.equal(f.c.recordReviewAbsence_(request).revision,after.revision);assert.equal(f.load().revision,after.revision);
     assert.throws(()=>f.c.recordReviewAbsence_({...request,absence:{type:'REVIEW_DAY_ABSENCE',approved:true}}),/different data/);
   });
-  test(key+' absence correction keeps published results frozen until republication',()=>{
+  test(key+' published absence requires coordinator reopen before correction',()=>{
     const f=submittedAbsence(key,{type:'REVIEW_DAY_ABSENCE',approved:false});f.publish();
     f.actor('one@x');const released=f.c.loadPublishedReviewEvaluation_(key);f.actor('reviewer@x');
-    const before=f.load().evaluation;
-    f.c.recordReviewAbsence_(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true}));
-    assert.equal(JSON.stringify(f.load().evaluation.students[1]),JSON.stringify(before.students[1]));
+    const published=f.load();assert.equal(published.availability.absenceCorrectionAllowed,false);
+    assert.throws(()=>f.c.recordReviewAbsence_(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:true})),/coordinator.*reopen/i);
+    assert.equal(f.load().revision,published.revision);
+    f.actor('coord@x');f.c.reopenReviewEvaluation_({...(f.staffInput(published.revision,'Correct attendance')),assessmentId:key});f.actor('reviewer@x');
+    const draft=f.load();assert.equal(draft.availability.editable,true);assert.equal(draft.availability.absenceCorrectionAllowed,false);
+    const input=f.input(draft);input.students=draft.evaluation.students.map(s=>({register:s.register,absence:s.assessment.facts,scores:s.scores}));
+    input.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true};f.submit(input);
+    const resubmitted=f.load();assert.equal(resubmitted.availability.absenceCorrectionAllowed,false);
+    assert.throws(()=>f.c.recordReviewAbsence_(correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false})),/coordinator.*reopen/i);
     f.actor('one@x');const waiting=f.c.loadPublishedReviewEvaluation_(key);
     assert.equal(waiting.total,released.total);assert.equal(waiting.publication.sourceRevision,released.publication.sourceRevision);assert.equal(waiting.updatePending,true);
-    f.actor('two@x');assert.equal(f.c.loadPublishedReviewEvaluation_(key).updatePending,false);f.actor('reviewer@x');
-    const sourceRevision=f.load().revision;f.publish('s1');f.actor('one@x');
-    const updated=f.c.loadPublishedReviewEvaluation_(key);assert.equal(updated.total,null);assert.equal(updated.publication.sourceRevision,sourceRevision);assert.equal(updated.updatePending,false);
+    f.actor('reviewer@x');f.publish();f.actor('one@x');
+    const updated=f.c.loadPublishedReviewEvaluation_(key);assert.equal(updated.total,null);assert.equal(updated.publication.sourceRevision,resubmitted.revision);assert.equal(updated.updatePending,false);
   });
   test(key+' absence correction UI saves, retries, cancels and preserves refresh failures',async()=>{
     const server=submittedAbsence(key),b=browserFixture(true,key);b.api.open('T1',b.trigger);b.requests[0].success(JSON.parse(JSON.stringify(server.load())));
+    assert.equal(server.load().availability.absenceCorrectionAllowed,true);
     assert.match(b.drawer.innerHTML,/Edit absence details/);await b.click('data-edit-absence');
     assert.equal(b.drawer.innerHTML.includes('Conduct Makeup Assessment'),false);
     let host=b.absenceNodes().get('0');assert.equal(host.controls.approved.disabled,false);
@@ -1052,6 +1061,12 @@ for(const key of ['review1','review2','review_extra']) {
     await b.click('data-cancel-absence');assert.equal(b.absenceNodes().get('0').controls.approved.value,'no');
   });
 }
+test('published absence has no direct reviewer correction action',()=>{
+  const server=submittedAbsence();server.publish();
+  const b=browserFixture(true);b.api.open('T1',b.trigger);b.requests[0].success(JSON.parse(JSON.stringify(server.load())));
+  assert.equal(server.load().availability.absenceCorrectionAllowed,false);
+  assert.doesNotMatch(b.drawer.innerHTML,/data-edit-absence|data-record-absence/);
+});
 test('absence correction enforces authorization, eligibility, concurrency and payload boundaries',()=>{
   const f=submittedAbsence(),request=correctionInput(f,{type:'REVIEW_DAY_ABSENCE',approved:false}),revision=f.load().revision;
   for(const actor of ['coord@x','guide@x','outsider@x']){f.actor(actor);assert.throws(()=>f.c.recordReviewAbsence_(request),/assigned reviewer/);}
@@ -1151,6 +1166,46 @@ test('the evaluation page reads and saves through the bridge, and its markup use
   assert.deepEqual(missingClasses(used), []);
 });
 
+test('sticky footer shows completion and unsaved status through data hooks',()=>{
+  const f=browserFixture(true);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+  assert.match(f.footerProgress.textContent,/^0 of \d+ criteria completed$/);
+  assert.equal(f.footerProgress.dataset.state,'incomplete');assert.equal(f.unsaved.hidden,true);
+  const field=f.fields()[0];field.controls['[data-marks]'].value='40';f.events.input();
+  assert.equal(f.unsaved.hidden,false);
+  assert.equal(f.footerProgress.dataset.state,'incomplete');
+  for(const host of f.absenceNodes().values())host.controls.type.value='NORMAL';
+  for(const individual of f.fields().filter(item=>item.dataset.owner!=='team')){individual.controls['[data-level]'].value='2';individual.controls['[data-marks]'].value=String(Math.ceil(f.data.config.criteria[Number(individual.dataset.index)].maxMarks*.6*2)/2);}
+  f.events.input();assert.equal(f.footerProgress.dataset.state,'complete');
+  f.click('data-draft');f.requests[1].success({revision:1,status:'Draft'});
+  assert.equal(f.unsaved.hidden,true);
+});
+
+test('submitted team marks appear in the PI selector',()=>{
+  const f=browserFixture(true),criterion=f.data.config.criteria.find(item=>item.type==='Team');
+  f.data.availability.editable=false;
+  f.data.evaluation={...(f.data.evaluation||{}),teamScores:{[criterion.pi]:{level:2,marks:40,remark:''}},students:[]};
+  f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+  const mark={textContent:''},pill={dataset:{},attrs:{},setAttribute(key,value){this.attrs[key]=value;},querySelector(selector){return selector==='[data-pi-mark]'?mark:null;}};
+  const query=f.drawer.querySelector.bind(f.drawer);
+  f.drawer.querySelector=selector=>selector==='[data-select-pi="0"]'?pill:query(selector);
+  f.events.input();
+  assert.equal(mark.textContent,'40 / '+criterion.maxMarks);
+  assert.match(pill.attrs['aria-label'],/40 of \d+ marks/);
+});
+
+test('submitted individual PI marks appear only for the selected student',async()=>{
+  const server=absenceFixture(),input=server.input();server.submit(input);
+  const f=browserFixture(true);f.api.open('T1',f.trigger);f.requests[0].success(JSON.parse(JSON.stringify(server.load())));
+  const field=f.fields().find(item=>item.dataset.owner==='0'),mark={textContent:''};
+  const pill={dataset:{},setAttribute(){},querySelector(selector){return selector==='[data-pi-mark]'?mark:null;}};
+  const query=f.drawer.querySelector.bind(f.drawer);
+  f.drawer.querySelector=selector=>selector==='[data-select-individual-pi="'+field.dataset.index+'"][data-student="0"]'?pill:query(selector);
+  f.events.input();assert.equal(mark.textContent,'— / '+f.data.config.criteria[Number(field.dataset.index)].maxMarks);
+  const student={dataset:{selectStudent:'0'},hasAttribute:name=>name==='data-select-student',closest:selector=>selector==='button'?student:null};
+  await f.events.click({target:student});
+  assert.equal(mark.textContent,field.controls['[data-marks]'].value+' / '+f.data.config.criteria[Number(field.dataset.index)].maxMarks);
+});
+
 // Student names, rubric text and reviewer remarks all reach the Review page; none may become markup.
 const EVIL='<img src=x onerror=PWN>"\'&';
 function assertInert(html,label){
@@ -1185,7 +1240,7 @@ test('hostile remarks and the reopening reason are escaped when a saved evaluati
   assert.equal(f.drawer.hidden,false);assert.equal(f.listHost.hidden,true);
   assert.equal(f.drawer.parentElement,f.listHost.parentElement);
   assert.match(f.drawer.innerHTML,/data-evaluation-heading tabindex="-1"/);
-  assert.match(f.drawer.innerHTML,/data-close>.*?Back to dashboard<\/button>/);
+  assert.match(f.drawer.innerHTML,/data-close aria-label="Back to dashboard">.*?<span class="max-sm:hidden">Dashboard<\/span><\/button>/);
   f.requests[0].success(f.data);
   assert.equal(f.drawer.hidden,false);
   f.tableScroll.scrollLeft=0;f.trigger.isConnected=false;let restored=false;
@@ -1209,17 +1264,22 @@ test('native criteria disclosure collapses on mobile, reopens on desktop and pre
 });
 
 test('rearranged markup keeps complete scoring controls and one progress area in the rail',()=>{
-  const f=browserFixture(true);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+  const f=browserFixture(true);f.data.details.title='A long project title for mobile expansion that continues beyond the collapsed preview in the evaluation header';f.api.open('T1',f.trigger);f.requests[0].success(f.data);
   const {document}=require('linkedom').parseHTML(f.drawer.innerHTML);
   const rail=document.querySelector('[data-criteria-rail]');
   assert.equal(rail.tagName,'DETAILS');
   assert.equal(rail.querySelectorAll('[data-select-pi]').length,1);
   assert.equal(rail.querySelectorAll('[data-select-student]').length,2);
   assert.equal(rail.querySelectorAll('[data-select-individual-pi]').length,2);
+  for(const selector of ['[data-select-pi]','[data-select-individual-pi]']){
+    const item=rail.querySelector(selector);
+    assert.equal(item.querySelector('small'),null);
+  }
   assert.equal(document.querySelectorAll('[data-evaluation-progress]').length,1);
   assert.equal(rail.contains(document.querySelector('[data-evaluation-progress]')),true);
-  assert.equal(document.querySelector('[data-project-title]').tagName,'P');
-  assert.equal(document.querySelector('[data-project-title]').querySelector('summary'),null);
+  assert.equal(document.querySelector('[data-project-title]').tagName,'DIV');
+  assert(document.querySelector('[data-project-title] details summary'));
+  assert.equal(document.querySelector('[data-actions-menu]').parentElement,document.querySelector('[data-team-navigation]').parentElement.parentElement);
   for(const field of document.querySelectorAll('[data-index]')){
     const marks=field.querySelector('[data-marks-panel]'),feedback=field.querySelector('[data-feedback-panel]');
     assert.equal(marks.parentElement,feedback.parentElement);

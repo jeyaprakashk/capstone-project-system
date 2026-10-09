@@ -67,6 +67,9 @@ function reviewRecords_(key) {
 function reviewLatest_(records, team) {
   return records.filter(r=>r.team===normalizeReviewKey_(team)).reduce((best,r)=>!best || r.revision>best.revision?r:best,null);
 }
+function reviewHasPublication_(records,team) {
+  return records.some(r=>r.team===normalizeReviewKey_(team)&&r.publication);
+}
 function reviewTiming_(config, evaluation) {
   if (evaluation && ['Submitted','Published'].includes(evaluation.status)) {
     const submittedConfig=evaluation.config || config;
@@ -100,6 +103,7 @@ function getReviewEvaluation_(teamId,key) {
   if(!history.sheet)throw new Error(assessmentStorageMissing_(reviewHistoryName_(key)));
   const latest = reviewLatest_(history.records,context.roster.team);
   const availability = reviewAvailability_(context,config,latest);
+  availability.absenceCorrectionAllowed=!!latest&&latest.status==='Submitted'&&!reviewHasPublication_(history.records,context.roster.team);
   if (!availability.readable) throw new Error(availability.reason);
   return {details:context.details,roster:latest && latest.status!=='Draft'?latest.roster:context.roster,
     config:latest && latest.status!=='Draft'?latest.config:config,availability,
@@ -155,7 +159,8 @@ function reviewWrite_(action,input,key) {
         delete payload.publishedStudents;
         payload.students=payload.students.map(s=>reviewEffectiveStudent_(payload.config,payload.teamScores,{...s,needsPublication:true}));
     } else if (action==='absenceCorrection') {
-      if(!latest || !['Submitted','Published'].includes(latest.status))throw new Error('Submit the evaluation before correcting absence details.');
+       if(!latest || latest.status!=='Submitted')throw new Error('Submit the evaluation before correcting absence details. Published evaluations require a coordinator to reopen them.');
+       if(reviewHasPublication_(records,context.roster.team))throw new Error('A coordinator must reopen a published evaluation before correcting absence details.');
       evaluationAssertCompatible_(latest,reviewConfiguration_(key),context.roster);
       if(input.token!==guideFingerprint_({roster:context.roster,config:latest.config}))throw new Error('Roster or rubric changed. Reload before correcting absence details.');
       payload=reviewAbsenceCorrection_(latest,input,actor);
@@ -259,4 +264,3 @@ function reviewProgress_(row, columns, records, config, definition, loaded) {
   return {completed,recorded,prerequisiteReason,markedStudents,totalStudents,available:true,status:latest?latest.status:'Not started',...availability};
 }
 function loadPublishedReviewEvaluation_(key) {return loadPublishedAssessment_(key);}
-

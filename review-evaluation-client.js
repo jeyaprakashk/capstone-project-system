@@ -3,7 +3,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   let reviewLabel=reviewKey;
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const SAVE_KINDS={saveReviewEvaluationDraft_:'draft',submitReviewEvaluation_:'submit',recordReviewAbsence_:'absence',saveReviewMakeupDraft_:'makeupDraft',submitReviewMakeup_:'makeupSubmit'};
-  const PAGE='min-w-0 bg-paper font-sans text-ink [&_[data-index]_:is(button,input,select,textarea)]:scroll-mb-56';
+  const PAGE='min-w-0 bg-paper font-sans text-ink lg:bg-canvas [&_[data-index]_:is(button,input,select,textarea)]:scroll-mb-56';
   const SMALL='border-0 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-paper px-3 py-1.5 font-sans text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50';
   const ICON_BUTTON='border-0 inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-paper text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50';
   const BUTTON='border-0 inline-flex min-h-10 items-center justify-center rounded-md bg-paper px-4 py-2 font-sans text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:cursor-not-allowed disabled:opacity-50';
@@ -13,8 +13,8 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   const MENU_PANEL='absolute z-20 mt-1 rounded-card border border-edge bg-paper p-1 shadow-overlay';
   const MENU_ITEM='border-0 w-full rounded-md bg-transparent px-3 py-2 text-left font-sans text-sm text-ink hover:bg-tint aria-pressed:bg-tint aria-pressed:text-primary disabled:cursor-not-allowed disabled:opacity-50 [&[data-complete=true]_[data-pi-icon]]:text-success';
   const SEGMENT='h-1.5 flex-1 rounded-full bg-edge data-[state=complete]:bg-success data-[state=current]:bg-primary';
-  const LEVELS='mt-4 grid grid-cols-6 gap-1 rounded-xl bg-tint p-1';
-  const LEVEL='border-0 flex min-h-12 min-w-0 flex-col items-center justify-center rounded-lg bg-transparent px-1 py-1.5 font-sans text-sm tabular-nums text-ink-2 hover:bg-paper aria-pressed:bg-primary aria-pressed:text-paper aria-pressed:shadow-selected disabled:cursor-not-allowed disabled:opacity-50';
+  const LEVELS='mt-7 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6';
+  const LEVEL='border-0 flex min-h-16 min-w-0 flex-col items-center justify-center rounded-md bg-paper px-2 py-2 font-sans text-sm tabular-nums text-ink ring-2 ring-inset ring-line hover:bg-tint aria-pressed:bg-primary aria-pressed:text-paper aria-pressed:ring-primary disabled:cursor-not-allowed disabled:opacity-50';
   const FEEDBACK='border-0 flex w-full items-start gap-2 rounded-lg bg-paper px-3 py-2 text-left font-sans text-sm text-ink-2 ring-1 ring-inset ring-edge hover:bg-tint aria-pressed:bg-tint aria-pressed:text-primary aria-pressed:ring-primary disabled:cursor-not-allowed disabled:opacity-50';
   const CHIP='flex min-w-24 flex-col items-center gap-0.5 rounded-tile border border-edge bg-paper px-3 py-2 font-sans text-sm text-ink hover:border-line aria-pressed:border-primary aria-pressed:bg-tint aria-pressed:ring-1 aria-pressed:ring-primary disabled:cursor-not-allowed disabled:opacity-60';
   const FIELD='h-10 rounded-md border border-control bg-paper px-3 py-2 font-sans text-sm text-ink';
@@ -24,7 +24,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   const CHOICE='flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 text-sm font-normal text-ink hover:bg-tint has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60';
   const CHECK='m-0 size-5 min-h-0 shrink-0 cursor-pointer rounded-none border-0 bg-transparent p-0 accent-primary';
   const RANGE='block h-6 min-h-0 w-full cursor-pointer rounded-none border-0 bg-transparent p-0 accent-primary disabled:cursor-not-allowed';
-  const CARD='rounded-card border border-edge bg-paper p-4 shadow-card';
+  const CARD='rounded-card border border-edge bg-paper p-5 shadow-card';
   const BADGE='rounded-md bg-tint px-2 py-0.5 text-xs font-semibold text-primary';
   const SUMMARY_TONE={complete:'text-success',pending:'text-warning',incomplete:'text-ink'};
   const day=value=>new Date(value*86400000).toISOString().slice(0,10);
@@ -142,17 +142,17 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function criteriaTabs() {
     return '<nav aria-label="Assessment components">'+['team','individual'].map(component=>{
       const label=component==='team'?'Team Criteria':'Individual',max=model.config.criteria.filter(c=>c.type.toLowerCase()===component).reduce((sum,c)=>sum+c.maxMarks,0);
-      return '<div class="mt-3"><button type="button" class="'+MENU_ITEM+'" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-pressed="'+(activeCriteria===component)+'"><span class="whitespace-nowrap"><strong>'+label+'</strong><span class="text-xs"> · '+max+' pts '+(component==='team'?'pool':'weight')+'</span></span></button>'+(component==='team'?teamPills():studentChips(model.roster.students)+model.roster.students.map((_,index)=>individualPills(index)).join(''))+'</div>';
+       return '<div class="mt-3 border-t border-edge pt-3"><button type="button" class="border-0 w-full rounded-md bg-tint px-3 py-3 text-left font-sans text-sm text-primary hover:bg-primary/10 aria-pressed:ring-1 aria-pressed:ring-inset aria-pressed:ring-primary disabled:opacity-50" id="'+reviewKey+'-'+component+'-tab" data-criteria-tab="'+component+'" aria-controls="'+reviewKey+'-'+component+'-panel" aria-pressed="'+(activeCriteria===component)+'"><span class="whitespace-nowrap"><strong>'+label+'</strong><span class="text-xs"> · '+max+' pts '+(component==='team'?'pool':'weight')+'</span></span></button>'+(component==='team'?teamPills():studentChips(model.roster.students)+model.roster.students.map((_,index)=>individualPills(index)).join(''))+'</div>';
     }).join('')+'</nav>';
   }
   let activeTeamPI=null,activeStudentPIs={};
   function piPillLabel(c) {
-    return '<span class="flex items-center gap-3"><span data-pi-icon class="inline-flex shrink-0">'+DashboardUI.renderIcon('clock')+'</span><span class="flex min-w-0 flex-col leading-snug"><strong>'+escape(c.pi+' · '+c.co)+'</strong><small class="truncate text-xs font-normal text-muted">'+escape(c.name)+' · 0–'+escape(c.maxMarks)+' marks</small></span></span>';
+    return '<span class="flex min-w-0 items-center gap-2 sm:gap-3"><span data-pi-icon class="inline-flex shrink-0">'+DashboardUI.renderIcon('clock')+'</span><strong class="min-w-0 flex-1">'+escape(c.pi+' · '+c.co)+'</strong><span data-pi-mark class="shrink-0 text-xs tabular-nums text-muted">— / '+escape(c.maxMarks)+'</span></span>';
   }
   function individualPills(owner) {
-    return '<div data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators">'+model.config.criteria.map((c,index)=>{
+    return '<div data-individual-pills="'+owner+'" role="group" aria-label="Individual performance indicators" class="mt-2">'+model.config.criteria.map((c,index)=>{
       if(c.type!=='Individual' && !(targeted && targeted.index===owner && targeted.components.includes('team')))return '';
-      return '<button type="button" class="'+MENU_ITEM+'" data-select-individual-pi="'+index+'" data-student="'+owner+'" aria-pressed="false">'+piPillLabel(c)+'</button>';
+      return '<button type="button" class="'+MENU_ITEM+' max-sm:px-2" data-select-individual-pi="'+index+'" data-student="'+owner+'" aria-pressed="false">'+piPillLabel(c)+'</button>';
     }).join('')+'</div>';
   }
   function syncIndividualCards() {
@@ -172,7 +172,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function teamPills() {
     const criteria=model.config.criteria.map((c,index)=>({c,index})).filter(({c})=>c.type==='Team');
     if(!criteria.some(({index})=>index===activeTeamPI))activeTeamPI=criteria.length?criteria[0].index:null;
-    return '<div data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" class="'+MENU_ITEM+'" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
+    return '<div data-team-pills role="group" aria-label="Team performance indicators">'+criteria.map(({c,index})=>'<button type="button" class="'+MENU_ITEM+' max-sm:px-2" data-select-pi="'+index+'" aria-pressed="'+(index===activeTeamPI)+'">'+piPillLabel(c)+'</button>').join('')+'</div>';
   }
   // PI cards in the selected tab: the team's, or the selected student's.
   // Prev/Next walk every applicable PI of this evaluation: team PIs, then each student's, in roster order.
@@ -196,6 +196,13 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     return direction>0?after[0]:after[after.length-1];
   }
   function closePiMenu() {const rail=page.querySelector('[data-criteria-rail]');if(rail && !window.matchMedia('(min-width: 1024px)').matches)rail.open=false;}
+  function startPi(field,markDirty=true) {
+    if(!field || !showRubric(field) || !canEdit(field))return;
+    const level=field.querySelector('[data-level]'),marks=field.querySelector('[data-marks]'),remark=field.querySelector('[data-remark]');
+    const criterion=model.config.criteria[Number(field.dataset.index)],range=bounds(criterion.maxMarks,2);
+    if(level.value!=='' || marks.value!=='' || remark.value!=='' || range.max<range.min)return;
+    level.value='2';if(markDirty){dirty=true;pending=null;}
+  }
   /** Shows one PI card after validating the visible one; focusLevel moves focus to the new card's levels. */
   function goToField(field,focusLevel) {
     if(busy || reading || !field || !showRubric(field))return false;
@@ -203,9 +210,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if(current && !validateClosingGroup({querySelectorAll:()=>[current]}))return false;
     if(field.dataset.owner==='team'){activeCriteria='team';activeTeamPI=Number(field.dataset.index);}
     else {activeCriteria='individual';activeStudent=Number(field.dataset.owner);activeStudentPIs[activeStudent]=Number(field.dataset.index);syncStudentSelection();}
-    syncCriteriaTabs();closePiMenu();
-    const content=page.querySelector('[data-drawer-content]');if(content)content.scrollTop=0;
-    page.scrollIntoView({block:'start'});
+    syncCriteriaTabs();startPi(field);updateRanges();closePiMenu();
     if(focusLevel){const level=field.querySelector('[data-pick-level]');if(level)level.focus({preventScroll:true});}
     return true;
   }
@@ -237,7 +242,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     if(busy || reading || !['team','individual'].includes(component) || focusedAssessment() && component==='team')return;
     const current=page.querySelector('[data-criteria-group="'+activeCriteria+'"]');
     if(component!==activeCriteria && current && !validateClosingGroup(current))return;
-    activeCriteria=component;syncCriteriaTabs();
+    activeCriteria=component;syncCriteriaTabs();updateRanges();
     if(focus){const tab=page.querySelector('[data-criteria-tab="'+component+'"]');if(tab)tab.focus();}
   }
   function syncStudentSelection() {
@@ -255,7 +260,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       if(dirty && !await DashboardUI.ask('Discard unsaved absence correction?'))return;
       correctionIndex=null;dirty=false;pending=null;activeStudent=index;render();
     }
-    activeStudent=index;activeCriteria='individual';syncStudentSelection();
+    activeStudent=index;activeCriteria='individual';syncStudentSelection();updateRanges();
     const group=page.querySelector('[data-criteria-group="individual"]');
     if(group)revealCriterion(group);
   }
@@ -327,7 +332,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
   function absenceControl(index,student) {
     const f=student.assessment?.facts||{type:'UNSELECTED'};
     const choice=(name,value)=>'<select data-fact="'+name+'" class="'+FIELD+' mt-1.5 block w-full font-normal sm:w-48"><option value="">Select</option><option value="yes"'+(value===true?' selected':'')+'>Yes</option><option value="no"'+(value===false?' selected':'')+'>No</option></select>';
-    const actions=!model.availability.editable && !targeted && absenceCorrectable(index)?(correctionIndex===index?'<button class="'+PRIMARY+'" type="button" data-record-absence="'+index+'">Save absence details</button><button class="'+BUTTON+'" type="button" data-cancel-absence="'+index+'">Cancel editing</button>':correctionIndex===null?'<button class="'+BUTTON+'" type="button" data-edit-absence="'+index+'">Edit absence details</button>':''):'';
+    const actions=model.availability.absenceCorrectionAllowed && !targeted && absenceCorrectable(index)?(correctionIndex===index?'<button class="'+PRIMARY+'" type="button" data-record-absence="'+index+'">Save absence details</button><button class="'+BUTTON+'" type="button" data-cancel-absence="'+index+'">Cancel editing</button>':correctionIndex===null?'<button class="'+BUTTON+'" type="button" data-edit-absence="'+index+'">Edit absence details</button>':''):'';
     return '<div class="review-criterion mb-4 '+CARD+'" data-absence="'+index+'"'+(targeted?' hidden':'')+'>'+attendancePicker(index,f.type)+'<div data-exception-fields><div class="mt-4 flex flex-col gap-4 border-t border-edge pt-4"><label class="'+LABEL+'" data-approval-field>Absence Approved?'+choice('approved',f.approved)+'</label>'+absenceEvidenceFields(index,f)+'<div data-prolonged-fields><div class="flex flex-col gap-4"><label class="'+LABEL+'">Contribution Established?'+choice('contribution',f.verifiedContribution)+'</label><p class="m-0 text-sm text-muted">The committee considers contribution evidence submitted by the team and endorsed by the Guide.</p><label class="'+LABEL+'">Attended the Review?'+choice('attended',f.attended)+'</label></div></div></div></div><div data-effective="'+index+'"></div>'+(actions?'<div class="mt-4 flex flex-wrap gap-2">'+actions+'</div>':'')+'</div>';
   }
   async function close() {
@@ -490,19 +495,19 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     const dateLabel=assessment?new Date(assessment.config.due*86400000).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}):'';
     const dateDetails=assessment?'Status '+assessment.status+'. Opens '+day(assessment.config.opens)+'.'+(assessment.availability.editable && assessment.availability.late?' Late submissions allowed.':''):'';
     const meta=assessment?'<span data-timing="'+escape(timing.tone)+'" class="text-sm text-muted data-[timing=danger]:font-semibold data-[timing=danger]:text-danger data-[timing=info]:text-primary data-[timing=success]:text-success data-[timing=warning]:font-semibold data-[timing=warning]:text-warning">Due '+escape(dateLabel)+(timing.label?' · '+escape(timing.label):'')+'<span class="sr-only">. '+escape(dateDetails)+'</span></span>':'';
-    const studentCount=assessment?'<span class="text-sm text-muted">'+assessment.roster.students.length+' '+(assessment.roster.students.length===1?'student':'students')+'</span>':'';
-    const actionsMenu=assessment?'<details class="relative" data-drawer-menu data-actions-menu><summary data-menu-summary class="'+ICON_BUTTON+' '+MENU_SUMMARY+'" aria-label="More actions">'+DashboardUI.renderIcon('ellipsis-vertical')+'</summary><div class="'+MENU_PANEL+' right-0 w-56"><button type="button" class="'+MENU_ITEM+'" data-reload><span class="flex items-center gap-3">'+DashboardUI.renderIcon('refresh-cw','','shrink-0 text-muted')+'Reload from sheet</span></button></div></details>':'';
+    const studentCount=assessment?'<span class="shrink-0 text-sm text-muted">'+assessment.roster.students.length+' '+(assessment.roster.students.length===1?'student':'students')+'</span>':'';
+    const actionsMenu=assessment?'<details class="relative order-2 ml-auto sm:order-3 sm:ml-0" data-drawer-menu data-actions-menu><summary data-menu-summary class="'+ICON_BUTTON+' '+MENU_SUMMARY+'" aria-label="More actions">'+DashboardUI.renderIcon('ellipsis-vertical')+'</summary><div class="'+MENU_PANEL+' right-0 w-56"><button type="button" class="'+MENU_ITEM+'" data-reload><span class="flex items-center gap-3">'+DashboardUI.renderIcon('refresh-cw','','shrink-0 text-muted')+'Reload from sheet</span></button></div></details>':'';
     const projectTitle=assessment?String(assessment.details.title||'Project title not provided'):'';
-    const titleRow=assessment?'<p data-project-title class="review-project-title-row m-0 mt-2 text-sm text-ink [overflow-wrap:anywhere]">'+escape(projectTitle)+'</p>':'';
-    const headerDetails=assessment?'<p class="m-0 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted"><span>Guide <span class="font-medium text-ink">'+escape(assessment.details.guideName)+'</span></span><span class="h-4 w-px bg-line" aria-hidden="true"></span><span>Committee <span class="font-medium text-ink">'+escape(assessment.details.committee)+'</span></span>'+students.map(student=>'<span class="'+BADGE+'">'+escape(student.register)+'</span>').join('')+'</p>':'';
-    const rail=assessment?'<details data-criteria-rail class="group rounded-card border border-edge bg-paper p-4 shadow-card lg:sticky lg:top-2 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto"><summary data-criteria-rail-summary class="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-ink lg:hidden [&::-webkit-details-marker]:hidden"><span data-criteria-rail-label>Criteria</span>'+DashboardUI.renderIcon('chevron-down','','shrink-0 transition-transform group-open:rotate-180')+'</summary><p data-evaluation-progress class="m-0 mt-2 text-xs text-muted max-lg:hidden" aria-live="polite"></p><p class="m-0 mt-2 text-sm text-ink">Team total <span data-team-mark aria-label="Common team score"></span> / '+assessment.config.criteria.filter(c=>c.type==='Team').reduce((total,c)=>total+c.maxMarks,0)+'</p>'+'<div data-pi-segments aria-hidden="true" class="mt-3 flex gap-1"></div>'+criteriaTabs()+'</details>':'';
-    const statusMessage='<p class="review-message m-0 max-h-20 overflow-y-auto text-sm text-ink-2 empty:hidden" data-message role="status" aria-live="polite"></p>';
+    const titleRow=assessment?'<div data-project-title class="review-project-title-row mt-5 text-base font-semibold text-ink [overflow-wrap:anywhere]"><div class="sm:hidden">'+DashboardUI.renderExpandableText(projectTitle,55)+'</div><span class="hidden sm:inline">'+escape(projectTitle)+'</span></div>':'';
+    const headerDetails=assessment?'<p class="m-0 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted"><span>Guide <span class="font-medium text-ink">'+escape(assessment.details.guideName)+'</span></span><span class="h-4 w-px bg-line" aria-hidden="true"></span><span>Committee <span class="font-medium text-ink">'+escape(assessment.details.committee)+'</span></span><span class="h-4 w-px bg-line" aria-hidden="true"></span>'+studentCount+students.map(student=>'<span class="'+BADGE+'">'+escape(student.register)+'</span>').join('')+'</p>':'';
+    const rail=assessment?'<details data-criteria-rail class="group rounded-card border border-edge bg-paper p-4 shadow-card lg:sticky lg:top-2 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto"><summary data-criteria-rail-summary class="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-ink lg:hidden [&::-webkit-details-marker]:hidden"><span data-criteria-rail-label>Criteria</span>'+DashboardUI.renderIcon('chevron-down','','shrink-0 transition-transform group-open:rotate-180')+'</summary><div class="flex items-center justify-between gap-2 text-xs"><p data-evaluation-progress class="m-0 font-semibold text-ink" aria-live="polite"></p><p class="m-0 shrink-0 text-muted">Team <span data-team-mark aria-label="Common team score"></span> / '+assessment.config.criteria.filter(c=>c.type==='Team').reduce((total,c)=>total+c.maxMarks,0)+'</p></div><div data-pi-segments aria-hidden="true" class="mt-3 flex gap-1"></div>'+criteriaTabs()+'</details>':'';
+    const statusMessage='<p class="review-message m-0 max-h-20 overflow-y-auto text-sm text-ink-2 empty:hidden'+(footer?' max-sm:sr-only':'')+'" data-message role="status" aria-live="polite"></p>';
     const teams=ReviewerView.evaluationTeams(reviewKey);
-    const teamNavigation='<div data-team-navigation class="flex min-w-0 items-center justify-center gap-2"><h2 data-evaluation-heading tabindex="-1" id="'+reviewKey+'Heading" class="sr-only">'+escape(title)+'</h2><button type="button" class="'+ICON_BUTTON+'" data-team-step="-1" aria-label="Previous team">'+DashboardUI.renderIcon('chevron-left')+'</button><select data-team-select aria-label="'+escape('Select team for '+reviewLabel)+'" class="'+FIELD+' min-w-0 max-w-full text-center font-semibold">'+teamOptions(title,teams)+'</select><button type="button" class="'+ICON_BUTTON+'" data-team-step="1" aria-label="Next team">'+DashboardUI.renderIcon('chevron-right')+'</button></div>';
-    const closeButton='<button type="button" class="'+BUTTON+' mb-3 gap-2" data-close>'+DashboardUI.renderIcon('arrow-left')+'Back to dashboard</button>';
-    return '<header class="review-top shrink-0 rounded-card border border-edge shadow-card bg-paper px-5 pb-3 pt-4">'+closeButton+teamNavigation+'<div class="flex flex-wrap items-start gap-2"><div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">'+studentCount+'</div><div class="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1"><span class="'+BADGE+'">'+escape(reviewLabel)+'</span>'+meta+'</div>'+actionsMenu+'</div>'+titleRow+headerDetails+'</header>'+
+    const teamNavigation='<div data-team-navigation class="flex shrink-0 items-center gap-2 sm:gap-3"><h2 data-evaluation-heading tabindex="-1" id="'+reviewKey+'Heading" class="sr-only">'+escape(title)+'</h2><button type="button" class="'+ICON_BUTTON+'" data-team-step="-1" aria-label="Previous team">'+DashboardUI.renderIcon('chevron-left')+'</button><select data-team-select aria-label="'+escape('Select team for '+reviewLabel)+'" class="min-w-16 border-0 bg-transparent p-0 font-sans text-sm font-semibold text-ink">'+teamOptions(title,teams)+'</select><button type="button" class="'+ICON_BUTTON+'" data-team-step="1" aria-label="Next team">'+DashboardUI.renderIcon('chevron-right')+'</button></div>';
+    const closeButton='<button type="button" class="'+BUTTON+' shrink-0 gap-2" data-close aria-label="Back to dashboard">'+DashboardUI.renderIcon('arrow-left')+'<span class="max-sm:hidden">Dashboard</span></button>';
+    return '<header class="review-top shrink-0 rounded-card border border-edge bg-paper px-4 pb-5 pt-5 shadow-card sm:px-6"><div class="flex flex-wrap items-center gap-x-3 gap-y-3 sm:gap-x-5"><div class="order-1 flex min-w-0 items-center gap-2 sm:gap-5">'+closeButton+teamNavigation+'</div><div class="order-3 flex basis-full items-center gap-3 sm:order-2 sm:ml-auto sm:basis-auto"><span class="'+BADGE+'">'+escape(reviewLabel)+'</span>'+meta+'</div>'+actionsMenu+'</div>'+titleRow+headerDetails+'</header>'+
       '<div class="bg-canvas px-5 py-4" data-drawer-content><div class="grid items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">'+rail+'<div class="min-w-0">'+body+(footer?'':statusMessage)+'</div></div></div>'+
-      (footer?'<footer data-evaluation-footer class="review-footer sticky bottom-0 z-20 flex shrink-0 flex-col gap-2 border-t border-edge bg-paper px-5 py-3">'+statusMessage+'<div class="flex flex-wrap items-center gap-2"><button type="button" class="'+BUTTON+' gap-1" data-pi-step="-1" data-pi-place="bottom">'+DashboardUI.renderIcon('chevron-left')+'Prev</button><button type="button" class="'+BUTTON+' gap-1" data-pi-step="1" data-pi-place="bottom">Next'+DashboardUI.renderIcon('chevron-right')+'</button>'+footer+'</div></footer>':'');
+      (footer?'<footer data-evaluation-footer class="review-footer sticky bottom-0 z-20 flex shrink-0 flex-col gap-2 border-t border-edge bg-paper px-5 py-3 max-sm:px-3 max-sm:py-2">'+statusMessage+'<div class="flex flex-wrap items-center gap-2"><button type="button" class="'+BUTTON+' gap-1" data-pi-step="-1" data-pi-place="bottom">'+DashboardUI.renderIcon('chevron-left')+'Prev PI</button><button type="button" class="'+BUTTON+' gap-1" data-pi-step="1" data-pi-place="bottom">Next PI'+DashboardUI.renderIcon('chevron-right')+'</button><span data-footer-progress data-state="incomplete" class="max-sm:sr-only text-sm font-semibold text-danger data-[state=complete]:text-success" role="status" aria-live="polite"></span>'+footer+'</div></footer>':'');
   }
 
 
@@ -533,19 +538,18 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     score=score||{};
     const id=owner+'-'+index;
     return '<fieldset class="review-criterion relative m-0 mb-4 min-w-0 '+CARD+'" data-index="'+index+'" data-owner="'+owner+'"'+(focusedAssessment() && (!targeted || String(owner)!==String(targeted.index) || !targeted.components.includes(c.type==='Team'?'team':'individual'))?' hidden':'')+'><legend class="review-criterion-accessible-title sr-only">'+escape(c.name)+'</legend>'+
-      '<div class="flex items-center justify-between gap-2"><span class="'+BADGE+'">'+escape(c.pi+' · '+c.co)+'</span><span class="text-sm text-muted">Max '+c.maxMarks+' marks</span></div>'+
-      '<h3 class="review-card-title m-0 mt-2 text-base font-semibold text-ink" aria-hidden="true">'+escape(c.name)+'</h3>'+
+      '<div class="flex items-center justify-between gap-2"><span class="'+BADGE+'">'+escape(c.pi+' · '+c.co)+'</span><span class="rounded-md bg-canvas px-2 py-1 text-xs font-semibold text-ink">Max '+c.maxMarks+' marks</span></div>'+
+      '<h3 class="review-card-title m-0 mt-3 text-base font-semibold text-ink" aria-hidden="true">'+escape(c.name)+'</h3>'+
       '<select data-level hidden aria-label="Proficiency level"><option value="">Select level</option>'+[0,1,2,3,4,5].map(n=>'<option value="'+n+'"'+(score.level===n?' selected':'')+'>'+n+'</option>').join('')+'</select>'+
       '<div class="'+LEVELS+'" role="group" aria-label="Choose proficiency level">'+[0,1,2,3,4,5].map(n=>'<button type="button" class="'+LEVEL+'" data-pick-level="'+n+'" aria-pressed="'+(score.level===n)+'" aria-label="Level '+n+', '+bands[n]+'–'+bands[n+1]+'%, '+levelMarkRange(c.maxMarks,n)+' marks" title="Level '+n+' · '+bands[n]+'–'+bands[n+1]+'%"><strong>L'+n+'</strong><small>'+levelMarkRange(c.maxMarks,n)+'</small></button>').join('')+'</div>'+
-      '<div data-descriptor aria-live="polite" class="mt-3 rounded-md bg-tint px-3 py-2 text-sm leading-relaxed text-ink-2"></div>'+
+      '<div data-descriptor aria-live="polite" class="mt-3 rounded-md border-l-4 border-primary bg-tint px-4 py-3 text-sm leading-relaxed text-ink"></div>'+
       '<details class="group mt-2"><summary class="inline-flex min-h-9 cursor-pointer list-none items-center gap-1 text-sm font-semibold text-primary hover:underline [&::-webkit-details-marker]:hidden">'+DashboardUI.renderIcon('chevron-right','','shrink-0 transition-transform group-open:rotate-90')+'View all level descriptors</summary><div class="mt-1 flex flex-col gap-2 border-l-2 border-edge pl-3">'+c.descriptors.map((text,i)=>'<p class="m-0 text-sm text-ink-2"><strong class="text-ink">Level '+i+':</strong> '+escape(text)+'</p>').join('')+'</div></details>'+
-      '<div data-scoring-controls class="mt-4 grid gap-4 border-t border-edge pt-4 xl:grid-cols-2"><div data-marks-panel class="min-w-0"><div class="flex flex-wrap items-center justify-between gap-2"><label class="text-sm font-semibold text-ink" for="reviewMarks-'+id+'">Awarded marks</label><span data-range class="text-sm text-muted"></span></div>'+
+      '<div data-scoring-controls class="mt-5 grid gap-5 border-t border-edge pt-5 xl:grid-cols-2"><div data-marks-panel class="min-w-0"><div class="flex flex-wrap items-center justify-between gap-2"><label class="text-base font-semibold text-ink" for="reviewMarks-'+id+'">Awarded marks</label><span data-range class="text-sm text-muted"></span></div>'+
       // Hidden numeric state retains the existing native range/required validation and save payload.
       '<input data-marks hidden type="number" min="0" max="'+c.maxMarks+'" step="0.5" value="'+escape(score.marks??'')+'">'+
-      '<span data-awarded-total class="mt-2 block text-base font-semibold tabular-nums text-ink" aria-live="polite"></span>'+
-      '<div class="mt-2 pt-5"><input class="'+RANGE+'" data-marks-slider id="reviewMarks-'+id+'" aria-describedby="reviewMarksError-'+id+'" type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><div data-slider-values aria-hidden="true" class="mt-1 h-5 text-xs tabular-nums text-muted"></div></div>'+
+      '<div class="mt-3 flex items-center gap-3"><div class="min-w-0 flex-1"><input class="'+RANGE+'" data-marks-slider id="reviewMarks-'+id+'" aria-describedby="reviewMarksError-'+id+'" type="range" step="0.5" min="0" max="'+c.maxMarks+'" value="'+escape(score.marks??0)+'" aria-label="Adjust awarded marks"><div data-slider-values aria-hidden="true" class="mt-1 h-5 text-xs tabular-nums text-muted"></div></div><span data-awarded-total class="min-w-12 shrink-0 text-right text-base font-semibold tabular-nums text-ink" aria-live="polite"></span></div>'+
       '<p class="m-0 mt-2 rounded-md bg-danger-tint px-3 py-2 text-sm text-danger" data-marks-error id="reviewMarksError-'+id+'" aria-live="polite" hidden></p></div>'+
-      '<div data-feedback-panel class="min-w-0"><div class="flex flex-wrap items-center justify-between gap-2 text-sm"><div class="flex flex-wrap items-center gap-2"><strong class="text-ink">Criterion feedback</strong><span data-feedback-required class="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-semibold text-warning"></span></div><span data-feedback-status class="text-sm text-muted"></span></div>'+
+      '<div data-feedback-panel class="min-w-0"><div class="flex flex-wrap items-center justify-between gap-2"><div class="flex flex-wrap items-center gap-2"><strong class="text-base font-semibold text-ink">Criterion feedback</strong><span data-feedback-required class="rounded-md bg-warning-tint px-2 py-0.5 text-xs font-semibold text-warning"></span></div><span data-feedback-status class="text-sm text-muted"></span></div>'+
       '<div class="mt-2 flex flex-col gap-1.5 text-sm text-muted" data-feedback-options aria-label="Feedback suggestions"></div>'+
       '<button type="button" class="'+SMALL+' mt-2" data-other-feedback aria-pressed="false">Other remarks</button><label data-custom-feedback-label hidden class="mt-3 '+LABEL+'">Other remarks<textarea class="mt-1.5 '+TEXTAREA+'" data-custom-feedback maxlength="2000" rows="3" placeholder="Add custom feedback"></textarea></label><textarea data-remark hidden class="resize-y" maxlength="2000">'+escape(score.remark||'')+'</textarea></div></div></fieldset>';
   }
@@ -598,11 +602,11 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       const student=savedStudents.find(v=>v.register===s.register)||{},a=student.assessment||{},draft=a.makeupDraft||{},scores=targeted && targeted.index===index?(draft.scores||{}):!d.availability.editable && a.individualSource==='makeup'?(a.makeup?.scores||{}):(student.scores||{});
       return '<details class="review-student-accordion" data-student-group="'+index+'" name="review-students"'+(hiddenStudent(index) || index!==activeStudent?' hidden':'')+(index===activeStudent?' open':'')+'><summary class="hidden"><span><strong>'+escape(s.name)+'</strong><span data-individual-mark="'+index+'" aria-label="Individual score"></span></span><span><span>'+escape(s.register)+'</span><span data-assessment-status="'+index+'"></span></span></summary><div>'+(!d.availability.editable && !targeted && correctionIndex===null && student.assessment?.nextActions?.makeup?'<div class="mb-4">'+makeupControls(index,student)+'</div>':'')+absenceControl(index,student)+criteria.map((c,i)=>c.type==='Individual'?control(c,i,index,scores[c.pi]):targeted && targeted.index===index && targeted.components.includes('team')?control(c,i,index,(draft.team||{})[c.pi]):'').join('')+'</div></details>';
     }).join('');
-    page.innerHTML=shell(d.details.team,(old.reason?'<p class="m-0 mb-4 rounded-md bg-warning-tint px-3 py-2 text-sm text-warning"><strong>Reopened:</strong> '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div data-review-actions class="ml-auto flex flex-wrap items-center gap-2">'+(d.availability.editable?'<button class="'+BUTTON+'" type="button" data-draft>Save Draft</button><button class="'+PRIMARY+'" type="button" data-submit>Submit</button>':'')+'</div>');
-    if(targeted)page.querySelector('[data-review-actions]').innerHTML='<button class="'+BUTTON+'" type="button" data-reload>Cancel Makeup</button><button class="'+BUTTON+'" type="button" data-target-draft>Save Makeup Draft</button><button class="'+PRIMARY+'" type="button" data-target-submit>Submit Makeup</button>';
+    page.innerHTML=shell(d.details.team,(old.reason?'<p class="m-0 mb-4 rounded-md bg-warning-tint px-3 py-2 text-sm text-warning"><strong>Reopened:</strong> '+escape(old.reason)+'</p>':'')+'<form novalidate>'+accordion('Team Criteria','',teamFields || '<p>No team criteria configured.</p>')+accordion(focusedAssessment()?'Pending Assessment':'Individual Criteria',focusedAssessment()?'Review the pending student and enter their Individual Makeup.':'',focusedAssessment() || criteria.some(c=>c.type==='Individual')?individual:'<p>No individual criteria configured.</p>')+'</form>',d.roster.students,d,'<div data-review-actions class="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0">'+(d.availability.editable?'<span data-unsaved-message class="max-sm:sr-only text-sm font-semibold text-danger" role="status" hidden>Unsaved changes</span><button class="'+BUTTON+'" type="button" data-draft>Save Draft</button><button class="'+PRIMARY+'" type="button" data-submit>Submit</button>':'')+'</div>');
+    if(targeted)page.querySelector('[data-review-actions]').innerHTML='<button class="'+BUTTON+'" type="button" data-reload>Cancel Makeup</button><span data-unsaved-message class="max-sm:sr-only text-sm font-semibold text-danger" role="status" hidden>Unsaved changes</span><button class="'+BUTTON+'" type="button" data-target-draft>Save Makeup Draft</button><button class="'+PRIMARY+'" type="button" data-target-submit>Submit Makeup</button>';
     page.querySelectorAll('[data-absence] input,[data-absence] select,[data-absence] textarea').forEach(el=>el.disabled=!!targeted);
     const rail=page.querySelector('[data-criteria-rail]');if(rail)rail.open=window.matchMedia('(min-width: 1024px)').matches;
-    syncStudentSelection();syncCriteriaTabs();updateRanges();syncTeamNavigation();page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});
+    syncStudentSelection();syncCriteriaTabs();startPi(currentField(),false);updateRanges();syncTeamNavigation();page.querySelector('[data-evaluation-heading]').focus({preventScroll:true});
   }
   // Markup last written to each element, so unchanged fragments are not re-parsed on every keystroke.
   const writtenHtml=new WeakMap();
@@ -616,10 +620,11 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     let every=1;while(every<steps && (steps%every || steps/every>6))every++;
     return Array.from({length:steps/every+1},(_,i)=>range.min+i*every/2);
   }
-  function markPill(pill,c,graded) {
+  function markPill(pill,c,graded,marks) {
     if(!pill)return;
-    pill.dataset.complete=String(graded);pill.setAttribute('aria-label',c.pi+' · '+c.co+' · '+c.name+': '+(graded?'Completed':'Incomplete'));
+    pill.dataset.complete=String(graded);pill.setAttribute('aria-label',c.pi+' · '+c.co+' · '+c.name+': '+(graded?'Completed':'Incomplete')+', '+(marks===''?'no marks':marks+' of '+c.maxMarks+' marks'));
     const icon=pill.querySelector('[data-pi-icon]');if(icon)setHtml(icon,DashboardUI.renderIcon(graded?'check':'clock'));
+    const mark=pill.querySelector('[data-pi-mark]');if(mark)mark.textContent=(marks===''?'—':marks)+' / '+c.maxMarks;
   }
   function updateRanges() {withPass(refreshRanges);}
   function refreshRanges() {
@@ -673,10 +678,10 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       }
       const graded=applicable && level!=='' && marks!=='' && valid && (n>=2 || !!remark.value.trim()) && remark.value.length<=2000;
       if(field.dataset.owner==='team') {
-        markPill(page.querySelector('[data-select-pi="'+field.dataset.index+'"]'),c,graded);
+         markPill(page.querySelector('[data-select-pi="'+field.dataset.index+'"]'),c,graded,marks);
       }
       else {
-        markPill(page.querySelector('[data-select-individual-pi="'+field.dataset.index+'"][data-student="'+field.dataset.owner+'"]'),c,graded);
+          markPill(page.querySelector('[data-select-individual-pi="'+field.dataset.index+'"][data-student="'+field.dataset.owner+'"]'),c,graded,activeCriteria==='individual' && Number(field.dataset.owner)===activeStudent?marks:'');
       }
       field.dataset.graded=String(graded);
       if(graded)completed++;
@@ -724,6 +729,14 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
       progress.hidden=focusedAssessment() && !targeted;
       progress.textContent=!(model.availability.editable || targeted)?completed+' of '+count+' criteria evaluated':!count?'No criteria to evaluate':!remaining?'All criteria evaluated':remaining+(remaining===1?' criterion':' criteria')+' remaining';
     }
+    const footerProgress=page.querySelector('[data-footer-progress]');
+    if(footerProgress){
+      const unselected=targeted?0:model.roster.students.filter((_,index)=>facts(index).type==='UNSELECTED').length;
+      const total=count+unselected*model.config.criteria.filter(c=>c.type==='Individual').length;
+      footerProgress.textContent=completed+' of '+total+' criteria completed';
+      footerProgress.dataset.state=total>0 && completed===total?'complete':'incomplete';
+    }
+    const unsaved=page.querySelector('[data-unsaved-message]');if(unsaved)unsaved.hidden=!dirty;
     syncIndividualCards();
     updateNavigator();
     updateAbsenceDisplay();
@@ -792,7 +805,7 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
     return true;
   }
   async function editAbsence(index) {
-    if(busy || reading || targeted || model.availability.editable || !absenceCorrectable(index))return;
+    if(busy || reading || targeted || !model.availability.absenceCorrectionAllowed || !absenceCorrectable(index))return;
     if(dirty && !await DashboardUI.ask('Discard unsaved absence correction?'))return;
     correctionIndex=index;activeStudent=index;activeCriteria='individual';dirty=false;pending=null;render();
     const host=page.querySelector('[data-absence="'+index+'"]');revealCriterion(host);focusAttendance(host);
@@ -854,6 +867,8 @@ function reviewEvaluationBrowser_(reviewKey, bridge) {
           const host=page.querySelector('[data-absence="'+index+'"]');revealCriterion(host);message('Describe the other supporting absence evidence.');host.querySelector('[data-other-evidence]').focus();return;
         }
       }
+      const unmarked=Array.from(page.querySelectorAll('[data-index]')).find(field=>canEdit(field) && field.querySelector('[data-level]').value!=='' && field.querySelector('[data-marks]').value==='');
+      if(unmarked){revealCriterion(unmarked);message('Select awarded marks for every criterion before submitting.');const slider=unmarked.querySelector('[data-marks-slider]');if(slider)slider.focus();return;}
       const missing=Array.from(page.querySelectorAll('[data-index]')).find(field=>canEdit(field) && field.querySelector('[data-level]').value==='');
       if(missing){revealCriterion(missing);message('Select a proficiency level for every criterion before submitting.');const button=missing.querySelector('[data-pick-level]');if(button)button.focus();return;}
     }
