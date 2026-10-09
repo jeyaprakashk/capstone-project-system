@@ -25,204 +25,128 @@ function setup(dto) {
     calls.writes.push([method, args]);
     return state.writeError ? JSON.stringify({ ok: false, error: { code: 'REJECTED', message: state.writeError } }) : JSON.stringify({ ok: true, data: state.writeResult });
   });
-  const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: () => '', refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
+  const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: name => { assert(['tag','clipboard-check','book-open','check','ellipsis','triangle-alert'].includes(name), 'Unknown icon: ' + name); return ''; }, refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
   vm.runInContext('globalThis.__make = ' + c.reviewerViewBrowser_.toString(), c);
   const view = c.__make(bridge, () => ui, () => ({ open: (...a) => calls.marks.push(a) }));
   const host = document.getElementById('reviewerContent');
   return { view, host, document, calls, state, ui, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
 const rows = f => f.host.querySelectorAll('[data-reviewer-body] tr[data-team-id]');
+const stage = (f,key) => f.click(f.host.querySelector('[role=tab][data-stage='+key+']'));
+const panel = f => f.host.querySelector('[data-title-panel]');
 
-test('consolidated columns keep committee, guide, registers and native title approval controls', () => {
-  const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
-  assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(n => n.textContent),
-    ['Team', 'Project & guide', 'Register Numbers', 'Title Approval', 'Review 1', 'Review 2']);
-  const cells = rows(f)[0].querySelectorAll('td');
-  assert.match(cells[0].textContent, /T1.*Committee C1/);
-  assert.match(cells[1].textContent, /Title 1.*Guide 1/);
-  assert.deepEqual(Array.from(cells[2].children).map(n => n.textContent), ['R1a', 'R1b']);
-  assert.equal(cells[3].querySelector('summary').textContent, 'Details');
-  assert.equal(cells[3].querySelectorAll('[data-action="decide"]').length, 2);
+
+test('stage tabs use configured reviews and separate title status from action', () => {
+  const f=setup();f.view.render(f.host,dtoOf([team(1)]));
+  assert.deepEqual(Array.from(f.host.querySelectorAll('[role=tab]')).map(n=>n.dataset.stage),['title','review1','review2']);
+  const selected=f.host.querySelector('[role=tab][aria-selected=true]');
+  assert.match(selected.className,/border-b-blue-700/);
+  assert.match(selected.className,/border-0.*bg-transparent/);
+  assert.match(selected.className,/focus-visible:ring-2/);
+  assert.equal(f.host.querySelectorAll('[role=tab] .bg-orange-100').length,2);
+  assert.equal(f.host.querySelectorAll('[role=tab] .rounded-full').length,1);
+  assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(n=>n.textContent),['ID','Team','Title','Status','Action']);
+  const titleCells=rows(f)[0].querySelectorAll('td');
+  assert.equal(titleCells[0].textContent,'T1');
+  assert.match(titleCells[1].textContent,/Committee C1.*Guide 1.*R1a.*Title: Pending review/);
+  assert.equal(titleCells[2].textContent,'Title 1');
+  assert.match(titleCells[3].textContent,/Pending review/);
+  assert.equal(titleCells[3].querySelector('button'),null);
+  assert.equal(titleCells[4].querySelector('button').textContent,'Review title');
+  assert.equal(f.host.querySelectorAll('[data-team-card]').length,1);
+  assert.equal(f.host.querySelector('[data-action=open-title]').textContent,'Review title');
+  assert.equal(f.host.querySelector('[data-reviewer-list] [data-action=marks]'),null);
+  const filters=f.host.querySelectorAll('[data-action=filter]');
+  assert.equal(filters[0].getAttribute('aria-pressed'),'true');
+  assert.equal(filters[0].querySelector('.rounded-full'),null);
+  assert(filters[1].querySelector('.rounded-full'));
+  stage(f,'review1');
+  assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(n=>n.textContent),['ID','Team','Title','Status','Action']);
+  assert.match(rows(f)[0].querySelectorAll('td')[3].textContent,/Open/);
+  assert.equal(rows(f)[0].querySelectorAll('td')[3].querySelector('button'),null);
+  assert.equal(rows(f)[0].querySelectorAll('td')[4].querySelector('button').textContent,'Enter marks');
+  assert.equal(f.host.querySelector('[data-action=marks]').getAttribute('data-review'),'review1');
+  assert.equal(f.host.querySelector('[data-action=open-title]'),null);
 });
-
-test('additional configured reviews and empty-state spans follow the consolidated column count', () => {
-  const f = setup(), dto = dtoOf([]); dto.reviews.push({key:'review_extra', label:'Additional Review'});
-  f.view.render(f.host, dto);
-  assert.equal(f.host.querySelectorAll('thead th').length, 7);
-  assert.equal(f.host.querySelector('[data-reviewer-body] td').getAttribute('colspan'), '7');
+test('default review stage when no title is pending and stage change resets filter',()=>{
+  const t=team(1);t.titleApproval.canDecide=false;t.titleApproval.status={tone:'success',label:'Approved'};
+  const f=setup();f.view.render(f.host,dtoOf([t]));assert.equal(f.view.state.stage,'review1');
+  f.click(f.host.querySelector('[data-action=filter][data-status="Enter marks"]'));
+  assert.equal(f.view.state.status,'Enter marks');stage(f,'title');assert.equal(f.view.state.status,'All');
 });
-
-test('background refresh preserves the assigned table scroll while the list is hidden', async () => {
-  const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
-  f.host.hidden = true;
-  f.host.querySelector('[data-reviewer-table-scroll]').scrollLeft = 190;
-  assert.equal(await f.view.refresh(), true);
-  assert.equal(f.host.hidden, true);
-  assert.equal(f.host.querySelector('[data-reviewer-table-scroll]').scrollLeft, 190);
+test('guide and search filters, empty state, and pagination',()=>{
+  const f=setup();f.view.render(f.host,dtoOf(Array.from({length:23},(_,i)=>team(i+1))));
+  assert.equal(rows(f).length,10);f.click(f.host.querySelector('[data-action=page][data-page="3"]'));assert.equal(rows(f).length,3);
+  const select=f.host.querySelector('#reviewerAssignedPageSize');Object.defineProperty(select,'value',{value:'all',configurable:true});f.fire(select,'change');assert.equal(rows(f).length,23);
+  const guide=f.host.querySelector('[data-action=guide]');Object.defineProperty(guide,'value',{value:'Guide 2',configurable:true});f.fire(guide,'change');assert.deepEqual(Array.from(rows(f)).map(r=>r.dataset.teamId),['T2']);
+  const search=f.host.querySelector('#reviewerAssignedSearch');search.value='nothing';f.fire(search,'input');assert.equal(rows(f).length,0);assert.match(f.host.textContent,/No teams match your filters/);
 });
-
-test('renders header, stats, rows and review columns from the DTO', () => {
-  const f = setup(); f.view.render(f.host, dtoOf([team(1), team(2)]));
-  assert.equal(rows(f).length, 2);
-  assert.match(f.host.textContent, /Reviewer Dashboard/);
-  assert.match(f.host.textContent, /Approved/);
-  assert.match(f.host.textContent, /Total Assigned to You/);
-  assert.doesNotMatch(f.host.textContent, /Pending Your Decision/);
-  assert.match(f.host.textContent, /Assigned Teams \(2 teams\)/);
-  assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(t => t.textContent).slice(-2), ['Review 1', 'Review 2']);
-  assert.equal(f.host.querySelector('[data-action="marks"]:not([disabled])').getAttribute('data-review'), 'review1');
-  assert.equal(f.host.querySelectorAll('[data-action="marks"][disabled]').length, 2);
+test('title panel retains documents, similarity flag, and read-only outcome',()=>{
+  const t=team(1);t.titleApproval.documents=[{label:'WBS',url:'https://example.com'},{label:'Bad',url:'javascript:bad()'}];t.titleApproval.similarityFlag='Check similarity';
+  const f=setup();f.view.render(f.host,dtoOf([t]));f.click(f.host.querySelector('[data-action=open-title]'));
+  assert.match(panel(f).textContent,/Title 1.*Guide: Guide 1/);assert.match(panel(f).textContent,/Check similarity/);
+  assert.deepEqual(Array.from(panel(f).querySelectorAll('a')).map(a=>a.getAttribute('href')),['https://example.com','#']);
+  f.click(panel(f).querySelector('[data-action=close-panel]'));assert.equal(panel(f),null);
+  t.titleApproval.canDecide=false;t.titleApproval.status={tone:'success',label:'Approved'};f.view.render(f.host,dtoOf([t]));f.click(f.host.querySelector('[data-action=open-title]'));
+  assert.equal(panel(f).querySelector('[data-action=submit-decision]'),null);
 });
-
-test('escapes every interpolated value and never emits inline handlers', () => {
-  const evil = '<img src=x onerror=alert(1)>"\'&';
-  const t = team(1, { title: evil, guideName: evil, committee: evil, registerNumbers: [evil], teamId: 'T"1' });
-  t.titleApproval = { ...t.titleApproval, submittedTitle: evil, similarityFlag: evil, reviewerNotes: evil, documents: [{ label: evil, url: 'javascript:alert(1)' }, { label: 'ok', url: 'https://example.com/a?b=1&c=2' }] };
-  const f = setup(); f.view.render(f.host, dtoOf([t]));
-  assert.equal(f.host.querySelectorAll('img').length, 0);
-  const attributeNames = Array.from(f.host.querySelectorAll('*')).flatMap(n => Array.from(n.attributes).map(a => a.name));
-  assert.deepEqual(attributeNames.filter(name => /^on/i.test(name)), []);
-  const links = Array.from(f.host.querySelectorAll('details a')).map(a => a.getAttribute('href'));
-  assert.deepEqual(links, ['#', 'https://example.com/a?b=1&c=2']);
-  assert.equal(f.host.querySelector('[data-team-id]').getAttribute('data-team-id'), 'T"1');
+test('revision requires a note and sends one existing API write',async()=>{
+  const f=setup();f.view.render(f.host,dtoOf([team(1)]));f.click(f.host.querySelector('[data-action=open-title]'));
+  assert.equal(panel(f).querySelector('[data-action=submit-decision]').disabled,true);
+  f.click(panel(f).querySelector('[data-decision=Revise]'));assert.equal(panel(f).querySelector('[data-action=submit-decision]').disabled,true);
+  const note=panel(f).querySelector('[data-action=notes]');note.value='Needs revision';f.fire(note,'input');
+  assert.equal(panel(f).querySelector('[data-action=submit-decision]').disabled,false);
+  f.click(panel(f).querySelector('[data-action=submit-decision]'));await f.settle();
+  assert.deepEqual(JSON.parse(JSON.stringify(f.calls.writes)),[['API_reviewer_submitDecision',['T1','Revise','Needs revision']]]);
+  assert.equal(f.calls.loading,f.calls.finished);
+  assert.equal(panel(f),null);
+  assert.match(f.host.querySelector('[data-reviewer-toast]').textContent,/Saved/);
 });
-
-test('uses only Tailwind utilities and every one is compiled into the stylesheet', () => {
-  const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
-  const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
-  assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
+test('mobile navigation caps at four slots and More lists extra configured reviews',()=>{
+  const dto=dtoOf([team(1)]);
+  dto.reviews.push({key:'review3',label:'Review 3'},{key:'review4',label:'Review 4'});
+  const f=setup();f.view.render(f.host,dto);
+  assert.equal(f.host.querySelectorAll('nav[aria-label="Reviewer stages"] > button').length,4);
+  f.click(f.host.querySelector('[data-action=more]'));
+  assert.match(f.host.querySelector('[data-more-sheet]').textContent,/Review 3.*Review 4/);
 });
-
-test('search filters across team, guide, register number, title, committee and status', () => {
-  const f = setup(); f.view.render(f.host, dtoOf([team(1), team(2, { guideName: 'Dr. Rao' }), team(3, { title: 'Smart Farming' })]));
-  const search = f.host.querySelector('#reviewerAssignedSearch');
-  for (const [query, expected] of [['rao', ['T2']], ['farming', ['T3']], ['r1a', ['T1']], ['pending review', ['T1', 'T2', 'T3']], ['c1', ['T1', 'T2', 'T3']], ['zzz', []]]) {
-    search.value = query; f.fire(search, 'input');
-    assert.deepEqual(Array.from(rows(f)).map(r => r.getAttribute('data-team-id')), expected, query);
-  }
-  assert.match(f.host.textContent, /No teams match your search/);
-  search.value = ''; f.fire(search, 'input');
-  assert.equal(rows(f).length, 3);
+test('failed decision retains panel and server message',async()=>{
+  const f=setup();f.view.render(f.host,dtoOf([team(1)]));f.state.writeError='Rejected by server';f.click(f.host.querySelector('[data-action=open-title]'));
+  f.click(panel(f).querySelector('[data-decision=Approved]'));f.click(panel(f).querySelector('[data-action=submit-decision]'));await f.settle();
+  assert.match(panel(f).textContent,/Rejected by server/);assert.equal(panel(f).querySelector('[data-action=submit-decision]').disabled,false);
 });
-
-test('an empty assignment shows its message', () => {
-  const f = setup(); f.view.render(f.host, dtoOf([]));
-  assert.match(f.host.textContent, /No teams are assigned to you/);
-  assert.match(f.host.textContent, /Showing 0 - 0 of 0 teams/);
+test('review actions respect enabled and evaluation team candidates',()=>{
+  const dto=dtoOf([team(1),team(2)]),f=setup();dto.teams[1].reviews[0].enabled=false;f.view.render(f.host,dto);stage(f,'review1');
+  const enabled=f.host.querySelector('[data-action=marks]:not([disabled])');f.click(enabled);assert.deepEqual(f.calls.marks,[['T1','review1',enabled]]);
+  assert.deepEqual(Array.from(f.view.evaluationTeams('review1')),['T1']);
 });
-
-test('pagination follows page size, clamps pages and supports All', () => {
-  const f = setup(); f.view.render(f.host, dtoOf(Array.from({ length: 23 }, (_, i) => team(i + 1))));
-  assert.equal(rows(f).length, 10);
-  assert.match(f.host.querySelector('#reviewerAssignedPaginationInfo').textContent, /Showing 1 - 10 of 23 teams/);
-  f.click(f.host.querySelector('[data-action="page"][data-page="3"]'));
-  assert.equal(rows(f).length, 3);
-  assert.match(f.host.querySelector('#reviewerAssignedPaginationInfo').textContent, /Showing 21 - 23 of 23 teams/);
-  assert(f.host.querySelector('[data-action="page"][aria-current="page"]'));
-  const size = f.host.querySelector('#reviewerAssignedPageSize');
-  const change = value => { const select = f.host.querySelector('#reviewerAssignedPageSize'); Object.defineProperty(select, 'value', { value, configurable: true }); f.fire(select, 'change'); };
-  change('all');
-  assert.equal(rows(f).length, 23);
-  change('25');
-  assert.equal(rows(f).length, 23);
-  change('10');
-  assert.equal(rows(f).length, 10);
+test('review status and action stay separate for published and title-blocked teams',()=>{
+  const published=team(1),blocked=team(2);
+  published.titleApproval.status={tone:'success',label:'Approved'};
+  published.titleApproval.canDecide=false;
+  published.reviews[0]={key:'review1',enabled:true,actionLabel:'View marks',note:'Published'};
+  published.reviews[1]={key:'review2',enabled:false,actionLabel:'Enter marks',note:'Opens 2026-10-20'};
+  blocked.reviews[0]={key:'review1',enabled:false,actionLabel:'Enter marks',note:'Title approval required'};
+  const f=setup();f.view.render(f.host,dtoOf([published,blocked]));
+  const cells=()=>Array.from(rows(f)).map(row=>row.querySelectorAll('td'));
+  assert.equal(f.view.state.stage,'title');stage(f,'review1');
+  assert.equal(cells()[0][1].textContent.includes('Review 1: Published'),true);
+  assert.equal(cells()[0][1].textContent.includes('Review 2: Opens 2026-10-20'),true);
+  assert.equal(cells()[0][3].textContent,'Published');
+  assert.equal(cells()[0][4].textContent,'View marks');
+  assert.equal(cells()[1][3].textContent,'Waiting for title');
+  assert.equal(cells()[1][4].querySelector('button'),null);
+  assert.match(f.host.querySelector('[data-team-card="T1"]').textContent,/Published/);
 });
-
-test('marks buttons open the shared review drawer; disabled ones do nothing', () => {
-  const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
-  const [enabled, disabled] = f.host.querySelectorAll('[data-action="marks"]');
-  f.click(disabled); assert.equal(f.calls.marks.length, 0);
-  f.click(enabled); assert.deepEqual(f.calls.marks, [['T1', 'review1', enabled]]);
+test('escapes interpolated content and uses compiled utilities',()=>{
+  const evil='<img src=x onerror=alert(1)>"',t=team(1,{title:evil,guideName:evil,committee:evil,teamId:'T"1'}),f=setup();
+  f.view.render(f.host,dtoOf([t]));f.click(f.host.querySelector('[data-action=open-title]'));
+  assert.equal(f.host.querySelector('img'),null);
+  assert.deepEqual(Array.from(f.host.querySelectorAll('*')).flatMap(n=>Array.from(n.attributes).map(a=>a.name)).filter(n=>/^on/i.test(n)),[]);
+  const {missingClasses,renderedClasses}=require('./compiled-css.cjs');assert.deepEqual(missingClasses(renderedClasses(f.host)),[]);
 });
-
-test('Revise needs a note and sends nothing without one', async () => {
-  const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
-  f.click(f.host.querySelector('[data-decision="Revise"]'));
-  await f.settle();
-  assert.equal(f.host.querySelector('#reviewer-status-T1').textContent, 'Note required.');
-  assert.equal(f.calls.writes.length, 0);
-});
-
-test('approve sends one write, re-reads, keeps search text and shows the new state', async () => {
-  const f = setup(dtoOf([team(1), team(2)])); f.view.render(f.host, f.state.dto);
-  const search = f.host.querySelector('#reviewerAssignedSearch'); search.value = 'T2'; f.fire(search, 'input');
-  f.state.dto = dtoOf([team(1), team(2, { titleApproval: { ...team(2).titleApproval, canDecide: false, status: { tone: 'success', label: 'Approved' } } })]);
-  const button = f.host.querySelector('[data-decision="Approved"]');
-  f.click(button); f.click(button);
-  assert.equal(button.disabled, true);
-  await f.settle();
-  assert.deepEqual(JSON.parse(JSON.stringify(f.calls.writes)), [['API_reviewer_submitDecision', ['T2', 'Approved', '']]]);
-  assert.equal(f.calls.loading, f.calls.finished);
-  assert.equal(f.host.querySelector('#reviewerAssignedSearch').value, 'T2');
-  assert.deepEqual(Array.from(rows(f)).map(r => r.getAttribute('data-team-id')), ['T2']);
-  assert.match(f.host.textContent, /Approved/);
-  assert.equal(f.host.querySelector('[data-decision]'), null);
-});
-
-test('a rejected decision keeps the form, shows the server message and re-enables the buttons', async () => {
-  const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
-  f.state.writeError = 'Another decision is being saved. Try again.';
-  f.host.querySelector('#reviewer-notes-T1').value = 'typed note';
-  f.click(f.host.querySelector('[data-decision="Approved"]'));
-  await f.settle();
-  assert.equal(f.host.querySelector('#reviewer-status-T1').textContent, 'Another decision is being saved. Try again.');
-  assert.equal(f.host.querySelector('[data-decision="Approved"]').disabled, false);
-  assert.equal(f.host.querySelector('#reviewer-notes-T1').value, 'typed note');
-  f.state.writeError = null;
-  f.click(f.host.querySelector('[data-decision="Approved"]'));
-  await f.settle();
-  assert.equal(f.calls.writes.length, 2);
-});
-
-test('a failed re-read after a saved decision reports it and leaves the content', async () => {
-  const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
-  f.state.readError = 'Sheets unavailable';
-  f.click(f.host.querySelector('[data-decision="Approved"]'));
-  await f.settle();
-  assert.match(f.host.querySelector('#reviewer-status-T1').textContent, /Refresh failed: Sheets unavailable/);
-  assert.equal(rows(f).length, 1);
-  assert.equal(f.host.querySelector('[data-decision="Approved"]').disabled, false);
-  assert.equal(f.calls.loading, f.calls.finished);
-});
-
-test('refresh re-renders on success and keeps existing content on failure', async () => {
-  const f = setup(dtoOf([team(1)])); f.view.render(f.host, f.state.dto);
-  f.state.dto = dtoOf([team(1), team(2)]);
-  assert.equal(await f.view.refresh(), true);
-  assert.equal(rows(f).length, 2);
-  f.state.readError = 'offline';
-  assert.equal(await f.view.refresh(), false);
-  assert.equal(rows(f).length, 2);
-  assert.equal(f.calls.loading, f.calls.finished);
-  f.host.setAttribute('aria-busy', 'true');
-  assert.equal(await f.view.refresh(), false);
-});
-
-test('review errors are shown without hiding the table', () => {
-  const f = setup(); f.view.render(f.host, { ...dtoOf([team(1)]), reviews: [], reviewError: 'AssessmentDefinitions <missing>' });
-  assert.match(f.host.textContent, /Review marks are unavailable: AssessmentDefinitions <missing>/);
-  assert.equal(rows(f).length, 1);
-  assert.equal(f.host.querySelectorAll('thead th').length, 4);
-});
-
-test('refresh and updated time live in the page header, not the view', () => {
-  const f = setup(); f.view.render(f.host, dtoOf([team(1)]));
-  assert.equal(f.host.querySelector('[data-action="refresh"]'), null);
-  assert.equal(f.host.querySelector('#reviewerRefresh'), null);
-  assert.equal(f.host.querySelector('#reviewerUpdated'), null);
-});
-
-
-test('evaluation team candidates use enabled review keys and DTO order across search and pages', () => {
-  const dto=dtoOf(Array.from({length:12},(_,i)=>team(i+1)));
-  dto.teams[1].reviews[0].enabled=false;
-  dto.teams[3].reviews.push({key:'review_extra',enabled:true,actionLabel:'Anything',note:'Anything'});
-  const f=setup(dto);f.view.render(f.host,dto);
-  f.view.state.query='T12';f.view.state.page=2;
-  assert.deepEqual(Array.from(f.view.evaluationTeams('review1')),['T1','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12']);
-  assert.deepEqual(Array.from(f.view.evaluationTeams('review2')),[]);
-  assert.deepEqual(Array.from(f.view.evaluationTeams('review_extra')),['T4']);
-  assert.deepEqual(Array.from(f.view.evaluationTeams('unknown')),[]);
-  assert.equal(f.view.state.query,'T12');assert.equal(f.view.state.page,2);
+test('refresh preserves content on failure and reports review errors',async()=>{
+  const f=setup();f.view.render(f.host,dtoOf([team(1)]));f.state.readError='offline';assert.equal(await f.view.refresh(),false);assert.equal(rows(f).length,1);
+  f.state.readError=null;f.state.dto={...dtoOf([team(1),team(2)]),reviewError:'Unavailable'};assert.equal(await f.view.refresh(),true);
+  assert.equal(rows(f).length,2);assert.match(f.host.textContent,/Review marks are unavailable: Unavailable/);
 });

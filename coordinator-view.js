@@ -178,8 +178,8 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
   function filterButtons() {
     const dto = effective(), teams = dto.teams, anyLoading = dto.healthStatus !== 'ready', failed = dto.healthStatus === 'failed';
     const count = (predicate, label) => anyLoading ? (failed ? 'Unavailable' : skeleton('Loading ' + label)) : teams.filter(predicate).length;
-    const tab = (filter, html, disabled, title) => '<button type="button" class="border-0 rounded-md px-3 py-1.5 text-sm font-semibold text-ink-2 aria-pressed:bg-paper aria-pressed:text-primary aria-pressed:shadow-selected disabled:opacity-50" data-action="filter" data-filter="' + escape(filter) + '" aria-pressed="' + (state.filter === filter) + '"' + (disabled ? ' disabled' : '') + (title ? ' title="' + escape(title) + '"' : '') + '>' + html + '</button>';
-    return tab('all', 'All (' + teams.length + ')', false) + tab('attention', 'Attention (' + count(t => t.health === 'attention', 'attention count') + ')', anyLoading) + tab('ontrack', 'On Track (' + count(t => t.health === 'ontrack', 'on-track count') + ')', anyLoading);
+    const tab = (filter, label, value, symbol, disabled) => '<button type="button" class="inline-flex min-h-11 shrink-0 items-center gap-3 border-b-2 px-5 text-sm font-semibold ' + (state.filter === filter ? 'border-blue-700 text-blue-700' : 'border-transparent text-gray-900 hover:text-blue-700') + ' disabled:opacity-50" data-action="filter" data-filter="' + filter + '" aria-pressed="' + (state.filter === filter) + '"' + (disabled ? ' disabled' : '') + '>' + icon(symbol) + '<span>' + label + '</span><span class="rounded-md border border-orange-200 bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">' + value + '</span></button>';
+    return tab('all', 'All', teams.length, 'users', false) + tab('attention', 'Attention', count(t => t.health === 'attention', 'attention count'), 'triangle-alert', anyLoading) + tab('ontrack', 'On Track', count(t => t.health === 'ontrack', 'on-track count'), 'check', anyLoading);
   }
   function headMarkup(reviewColumns) {
     const sort = persistent.sort;
@@ -219,11 +219,10 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
     q('[data-tracker-pagination]').innerHTML = paginationMarkup(found.length, bounds);
   }
   function trackerMarkup() {
-    return '<div class="rounded-card border border-edge bg-paper p-4 shadow-card" data-team-tracker="coordinator"><div><h3 class="text-base font-semibold text-ink" data-tracker-heading></h3></div>' +
-      '<div class="mt-3 inline-flex flex-wrap gap-1 rounded-xl bg-tint p-1" data-tracker-filters></div>' +
+    return '<div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" data-team-tracker="coordinator"><div class="flex overflow-x-auto border-b border-gray-200" data-tracker-filters aria-label="Team tracker filters"></div><div class="p-4"><h3 class="text-base font-semibold text-gray-900" data-tracker-heading></h3>' +
       '<div class="mt-2"><button class="' + BUTTON + '" type="button" id="weeklyActivityRetry" data-action="activity-retry" hidden>Retry activity</button><p id="weeklyActivityStatus" class="text-xs text-muted" role="status" aria-live="polite"></p></div>' +
       '<div class="mt-3 flex flex-wrap gap-2"><input type="text" id="trackerSearch" class="w-full max-w-md rounded-md border border-control px-3 py-2 text-sm" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" data-action="search"><button class="' + BUTTON + '" type="button" data-action="reset">Reset</button></div>' +
-      '<div class="max-w-full overflow-x-auto overscroll-x-contain mt-3 rounded-card border border-edge" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="w-full border-collapse text-sm"><thead class="bg-soft"></thead><tbody id="trackerBody"></tbody></table></div><div data-tracker-pagination></div></div>';
+      '<div class="max-w-full overflow-x-auto overscroll-x-contain mt-3 rounded-card border border-edge" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="w-full border-collapse text-sm"><thead class="bg-soft"></thead><tbody id="trackerBody"></tbody></table></div><div data-tracker-pagination></div></div></div>';
   }
 
   // ---- frame ----

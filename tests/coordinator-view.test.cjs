@@ -50,6 +50,18 @@ const rowIds = f => Array.from(f.host.querySelectorAll('#trackerBody tr[data-tea
 const norm = n => n.textContent.replace(/\s+/g, ' ').trim();
 const card = (f, label) => Array.from(f.host.querySelectorAll('[data-stat-card]')).find(c => norm(c).startsWith(label));
 
+test('tracker filters use top icon tabs with an underline for the selected filter', async () => {
+  const f = setup(); await f.start();
+  const tracker = f.host.querySelector('[data-team-tracker="coordinator"]');
+  const tabs = tracker.querySelector('[data-tracker-filters]');
+  assert.equal(tracker.firstElementChild, tabs);
+  assert.deepEqual(Array.from(tabs.querySelectorAll('button')).map(button => button.dataset.filter), ['all', 'attention', 'ontrack']);
+  assert.match(tabs.querySelector('[data-filter="all"]').className, /border-blue-700/);
+  assert(tabs.querySelector('[data-filter="attention"] svg.lucide-triangle-alert'));
+  f.click(tabs.querySelector('[data-filter="attention"]'));
+  assert.match(f.host.querySelector('[data-filter="attention"]').className, /border-blue-700/);
+});
+
 test('the overview renders at once with progress-dependent values still loading', async () => {
   const f = setup(); holdAll(f);
   const overview = await f.view.load(); f.view.render(f.host, overview); await f.flush();
