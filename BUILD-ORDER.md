@@ -22,6 +22,23 @@ Nothing in the table has been built yet. "Needs" means the item cannot start, or
 | 13 | The AGENTS.md **policy decision** about column layouts (migration phase 6) and dropping the transitional rules | SHEET-HEADER-MATCHING-PLAN.md | 11, 12 | none |
 | 14 | **Student identity** work, later, rebased on the header-name `GitHubAccounts` | [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md) | 12 | none |
 
+## Branching rule
+
+All of this work is done on **one branch, `main`**, with one commit per item or sub-step. There is nothing to merge. The
+owner pushes `main` to the remote when ready.
+
+The cost of a single branch is that `main` will hold unfinished title code between Release 0 (item 5) and the cutover
+(item 10), and `npm run push` pushes the working tree. So:
+
+- **Tag Release 0.** When Release 0 is committed, it is tagged `release-0` (`git tag release-0`). The tag marks the code that
+  is in production until the cutover.
+- **No `npm run push` between Release 0 and cutover step 0**, except for a hotfix. Cutover step 0 is the first push of the
+  new code.
+- **A hotfix in that period** is made from the tag, not from `main`: check out `release-0` in a separate working copy,
+  apply the fix, push from there, and apply the same fix to `main` afterwards.
+- **Items 1 to 4 are safe on `main` and in any push**: they only add code that nothing calls yet, and repair is off until
+  item 2's second commit.
+
 ## Reading the table
 
 - **Parallel work.** Item 5 can run any time before item 10. Items 11 and 12 can overlap once item 10 is done, because the

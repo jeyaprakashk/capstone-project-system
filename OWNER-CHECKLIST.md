@@ -71,6 +71,10 @@ Follow the order. Stop and ask if any step does not behave as written.
 
 ## E. Rules to keep
 
+- Everything is committed on `main`; there is nothing to merge. After Release 0 is deployed, **do not run `npm run push`**
+  until cutover step 0, except for a hotfix made from the `release-0` tag (see [BUILD-ORDER.md](BUILD-ORDER.md), "Branching
+  rule"). `main` holds unfinished title code in that period.
+
 - Do not edit `TitleLog` after cutover.
 - Never edit the `TITLE_CUTOVER` property by hand; only `setTitleCutover(...)` and `clearTitleCutover()` change it. To pause title writes later, run
   `setTitleCutover('PAUSED')`, then `setTitleCutover('LIVE')`.
