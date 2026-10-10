@@ -106,8 +106,9 @@ function dataBridgeBrowser_() {
 function getMigratedViewsClientScript_(roles) {
   const has = role => !roles || roles.indexOf(role) >= 0;
   return [
-    `const DataBridge = (${dataBridgeBrowser_.toString()})();`,
-    has('reviewer') ? `const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations);` : '',
+    `const DataBridge = (${dataBridgeBrowser_.toString()})();
+const SharedTabs = (${sharedTabsBrowser_.toString()})(() => DashboardUI);`,
+    has('reviewer') ? `const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations, () => SharedTabs);` : '',
     has('coord') ? `const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => InternalAssessmentPublishing, () => SystemStatusActions);
 const CoordinatorView = (${coordinatorViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TeamDrawerView);
 const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI);` : '',
@@ -118,7 +119,7 @@ const SharedRubricsView = (${sharedRubricsViewBrowser_.toString()})(() => Dashbo
 const StudentResults = (${studentResultsViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentWeekly = (${studentWeeklyViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI, {weekly: StudentWeekly, results: StudentResults, github: StudentGithub});` : '',
-    has('guide') ? `const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly);` : ''
+    has('guide') ? `const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly, () => SharedTabs);` : ''
   ].filter(Boolean).join('\n');
 }
 

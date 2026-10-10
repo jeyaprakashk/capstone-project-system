@@ -17,7 +17,7 @@ const dtoOf = teams => ({ summary: { pending: teams.length, approved: 0, awaitin
 function setup(dto) {
   const { document, window } = parseHTML('<html><body><div id="reviewerContent"></div></body></html>');
   const calls = { marks: [], refresh: 0, loading: 0, finished: 0, writes: [] };
-  const c = loadSources(['data-bridge-client.js', 'reviewer-view.js'], { document, Promise, setTimeout, clearTimeout, Intl, Date });
+  const c = loadSources(['data-bridge-client.js', 'shared-tabs.js', 'reviewer-view.js'], { document, Promise, setTimeout, clearTimeout, Intl, Date });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const state = { dto: dto || dtoOf([team(1)]), writeResult: { message: 'Saved' }, writeError: null, readError: null };
   bridge.useTransport(async (method, args) => {
@@ -25,11 +25,12 @@ function setup(dto) {
     calls.writes.push([method, args]);
     return state.writeError ? JSON.stringify({ ok: false, error: { code: 'REJECTED', message: state.writeError } }) : JSON.stringify({ ok: true, data: state.writeResult });
   });
-  const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: name => { assert(['tag','clipboard-check','book-open','check','ellipsis','triangle-alert'].includes(name), 'Unknown icon: ' + name); return ''; }, refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
+  const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: name => { assert(['tag','clipboard-check','ellipsis','triangle-alert'].includes(name), 'Unknown icon: ' + name); return ''; }, refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
   vm.runInContext('globalThis.__make = ' + c.reviewerViewBrowser_.toString(), c);
-  const view = c.__make(bridge, () => ui, () => ({ open: (...a) => calls.marks.push(a) }));
+  const tabs = c.sharedTabsBrowser_(() => ui);
+  const view = c.__make(bridge, () => ui, () => ({ open: (...a) => calls.marks.push(a) }), () => tabs);
   const host = document.getElementById('reviewerContent');
-  return { view, host, document, calls, state, ui, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), settle: () => new Promise(r => setImmediate(r)) };
+  return { view, host, document, window, calls, state, ui, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
 const rows = f => f.host.querySelectorAll('[data-reviewer-body] tr[data-team-id]');
 const stage = (f,key) => f.click(f.host.querySelector('[role=tab][data-stage='+key+']'));
@@ -40,11 +41,12 @@ test('stage tabs use configured reviews and separate title status from action', 
   const f=setup();f.view.render(f.host,dtoOf([team(1)]));
   assert.deepEqual(Array.from(f.host.querySelectorAll('[role=tab]')).map(n=>n.dataset.stage),['title','review1','review2']);
   const selected=f.host.querySelector('[role=tab][aria-selected=true]');
-  assert.match(selected.className,/border-b-blue-700/);
-  assert.match(selected.className,/border-0.*bg-transparent/);
-  assert.match(selected.className,/focus-visible:ring-2/);
-  assert.equal(f.host.querySelectorAll('[role=tab] .bg-orange-100').length,2);
-  assert.equal(f.host.querySelectorAll('[role=tab] .rounded-full').length,1);
+  assert.equal(selected.dataset.stage,'title');
+  assert.deepEqual(Array.from(f.host.querySelectorAll('[role=tab]')).map(n=>n.getAttribute('tabindex')),['0','-1','-1']);
+  assert.equal(f.host.querySelector('[role=tabpanel][data-reviewer-content]').getAttribute('aria-labelledby'),selected.id);
+  assert.equal(f.host.querySelector('[role=tablist]').getAttribute('aria-label'),'Reviewer stages');
+  assert.equal(f.host.querySelectorAll('[role=tab] [data-tab-badge]').length,2);
+  assert.equal(f.host.querySelector('[role=tab][data-stage=review2] [data-tab-badge]'),null,'nothing pending shows no badge');
   assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(n=>n.textContent),['ID','Team','Title','Status','Action']);
   const titleCells=rows(f)[0].querySelectorAll('td');
   assert.equal(titleCells[0].textContent,'T1');
@@ -102,13 +104,26 @@ test('revision requires a note and sends one existing API write',async()=>{
   assert.equal(panel(f),null);
   assert.match(f.host.querySelector('[data-reviewer-toast]').textContent,/Saved/);
 });
-test('mobile navigation caps at four slots and More lists extra configured reviews',()=>{
+test('mobile bar shows four stages and More opens a sheet with the extra configured reviews',()=>{
   const dto=dtoOf([team(1)]);
   dto.reviews.push({key:'review3',label:'Review 3'},{key:'review4',label:'Review 4'});
   const f=setup();f.view.render(f.host,dto);
-  assert.equal(f.host.querySelectorAll('nav[aria-label="Reviewer stages"] > button').length,4);
-  f.click(f.host.querySelector('[data-action=more]'));
-  assert.match(f.host.querySelector('[data-more-sheet]').textContent,/Review 3.*Review 4/);
+  const tablist=f.host.querySelector('[role=tablist]'),strip=()=>f.host.querySelector('[data-tabs]');
+  assert.deepEqual(Array.from(tablist.children).filter(n=>n.getAttribute('role')==='tab').map(n=>n.dataset.stage),['title','review1','review2','review3']);
+  assert.deepEqual(Array.from(tablist.querySelectorAll('[data-tab-sheet] [role=tab]')).map(n=>n.dataset.stage),['review4']);
+  const more=f.host.querySelector('[data-tab-more]');
+  assert.equal(tablist.contains(more),false,'More sits outside the tablist');
+  f.click(more);assert.equal(more.getAttribute('aria-expanded'),'true');assert.equal(strip().hasAttribute('data-more-open'),true);
+  f.click(more);assert.equal(strip().hasAttribute('data-more-open'),false);
+  f.click(more);stage(f,'review4');
+  assert.equal(f.host.querySelector('[role=tab][aria-selected=true]').dataset.stage,'review4');
+  assert.equal(strip().hasAttribute('data-more-open'),false);
+});
+test('stage tabs follow the ARIA tabs keys: arrows select and wrap, Home and End jump',()=>{
+  const f=setup();f.view.render(f.host,dtoOf([team(1)]));
+  const press=key=>{const event=new f.window.Event('keydown',{bubbles:true,cancelable:true});Object.defineProperty(event,'key',{value:key});f.host.querySelector('[role=tab][aria-selected=true]').dispatchEvent(event);return f.host.querySelector('[role=tab][aria-selected=true]').dataset.stage;};
+  assert.deepEqual(['ArrowRight','ArrowRight','ArrowRight','ArrowLeft','Home','End'].map(press),['review1','review2','title','review2','title','review2']);
+  assert.equal(f.host.querySelector('[role=tab][aria-selected=true]').getAttribute('tabindex'),'0');
 });
 test('failed decision retains panel and server message',async()=>{
   const f=setup();f.view.render(f.host,dtoOf([team(1)]));f.state.writeError='Rejected by server';f.click(f.host.querySelector('[data-action=open-title]'));

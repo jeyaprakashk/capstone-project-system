@@ -1,9 +1,9 @@
 /** Reviewer dashboard view. The DTO and review actions remain authoritative. */
-function reviewerViewBrowser_(bridge, getUi, getMarking) {
+function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs) {
   'use strict';
   const delegated = new WeakSet();
   const PAGE_SIZES = [10, 25, 50, 'all'];
-  const state = {dto:null, host:null, query:'', guide:'', status:'All', stage:null, page:1, size:10, busyTeam:null, panelTeam:null, decision:'', notes:'', more:false, toast:''};
+  const state = {dto:null, host:null, query:'', guide:'', status:'All', stage:null, page:1, size:10, busyTeam:null, panelTeam:null, decision:'', notes:'', toast:''};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
   const icon = (name, label) => getUi().renderIcon(name, label);
@@ -62,10 +62,9 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
     return '<nav aria-label="Pagination" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 p-4 text-sm text-gray-500"><span id="reviewerAssignedPaginationInfo">Showing ' + start + ' - ' + bounds.end + ' of ' + total + ' teams</span><label class="flex items-center gap-2">Rows per page <select id="reviewerAssignedPageSize" data-action="size" class="' + FIELD + '">' + PAGE_SIZES.map(s => '<option value="' + s + '"' + (String(s)===String(state.size)?' selected':'') + '>' + (s==='all'?'All':s) + '</option>').join('') + '</select></label><div class="flex items-center gap-1">' + button('Previous',state.page-1,state.page===1,false) + numbers.join('') + button('Next',state.page+1,state.page===bounds.pages,false) + '</div></nav>';
   }
   function tabsMarkup() {
-    const items=stages();
-    const tab=s => '<button type="button" role="tab" aria-selected="' + (s.key===state.stage) + '" class="inline-flex min-h-11 shrink-0 items-center gap-2 border-0 border-b-2 bg-transparent px-4 py-3 text-sm font-semibold hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ' + (s.key===state.stage?'border-b-blue-700 text-blue-700':'border-b-transparent text-gray-900 hover:text-blue-700') + '" data-action="stage" data-stage="' + escape(s.key) + '">' + icon(s.key==='title'?'tag':'clipboard-check') + '<span>' + escape(s.label) + '</span>' + (count(s.key)?'<span class="rounded-md border border-orange-200 bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">' + count(s.key) + '</span>':'<span class="inline-flex items-center justify-center rounded-full bg-gray-100 p-1 text-gray-600">' + icon('check','No pending work') + '</span>') + '</button>';
-    const mobile=s => '<button type="button" class="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-xs ' + (s.key===state.stage?'text-blue-700':'text-gray-600') + '" data-action="stage" data-stage="' + escape(s.key) + '">' + icon(s.key==='title'?'clipboard-check':'book-open') + '<span class="truncate">' + escape(s.key==='title'?'Title':s.label) + '</span>' + (count(s.key)?'<span class="' + PILL + '">' + count(s.key) + '</span>':'') + '</button>';
-    return '<div class="hidden overflow-x-auto border-b border-gray-200 bg-white md:flex md:gap-1 md:px-4" role="tablist">' + items.map(tab).join('') + '</div><nav aria-label="Reviewer stages" class="fixed inset-x-0 bottom-0 z-30 flex border-t border-gray-200 bg-white md:hidden">' + items.slice(0,items.length>4?3:4).map(mobile).join('') + (items.length>4?'<button type="button" class="flex flex-1 flex-col items-center justify-center text-xs text-gray-600" data-action="more">' + icon('ellipsis') + 'More</button>':'') + '</nav>' + (state.more?'<div class="fixed inset-0 z-40 bg-black/40 md:hidden" data-action="close-more"><div class="absolute inset-x-0 bottom-0 rounded-t-lg bg-white p-4" data-more-sheet><h3 class="mb-3 font-semibold">More stages</h3>' + items.slice(3).map(tab).join('') + '<button type="button" class="mt-3 ' + SECONDARY + '" data-action="close-more">Close</button></div></div>':'');
+    return getTabs().markup({id:'reviewerStage', label:'Reviewer stages', activation:'auto', tabs:stages().map(s => ({
+      key:s.key, icon:s.key==='title'?'tag':'clipboard-check', label:s.label, short:s.key==='title'?'Title':'', count:count(s.key), countLabel:'Teams awaiting your action',
+      selected:s.key===state.stage, attrs:{'data-action':'stage', 'data-stage':s.key}}))});
   }
   function toolbarMarkup(found) {
     const guides=[...new Set(state.dto.teams.map(t=>t.guideName).filter(Boolean))].sort();
@@ -100,8 +99,9 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
     state.host=host;state.dto=dto;
     if(!stages().some(s=>s.key===state.stage)) state.stage=dto.teams.some(t=>t.titleApproval.canDecide)?'title':(dto.reviews[0]?.key||'title');
     if(!filters().includes(state.status))state.status='All';
-    host.innerHTML='<div class="min-w-0 pb-24 md:pb-0"><h2 class="text-xl font-semibold text-gray-900">Reviewer Dashboard</h2><p class="mt-1 text-sm text-gray-500">Review titles and assessments for your assigned teams.</p><p id="reviewerRefreshStatus" class="mt-1 text-sm text-gray-500" data-refresh-status role="status" aria-live="polite"></p>' + (dto.reviewError?'<p class="mt-3 text-sm text-red-700" role="status">Review marks are unavailable: ' + escape(dto.reviewError) + '</p>':'') + '<section class="mt-4 min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" aria-label="Assigned teams">' + tabsMarkup() + '<div data-reviewer-content>' + listMarkup() + '</div></section><div data-reviewer-panel>' + panelMarkup() + '</div>' + (state.toast?'<div class="fixed right-4 top-4 z-50 rounded-md bg-green-700 px-4 py-3 text-sm text-white shadow-lg" role="status" data-reviewer-toast>' + escape(state.toast) + '</div>':'') + '</div>';
+    host.innerHTML='<div class="min-w-0 max-md:pb-16"><h2 class="text-xl font-semibold text-gray-900">Reviewer Dashboard</h2><p class="mt-1 text-sm text-gray-500">Review titles and assessments for your assigned teams.</p><p id="reviewerRefreshStatus" class="mt-1 text-sm text-gray-500" data-refresh-status role="status" aria-live="polite"></p>' + (dto.reviewError?'<p class="mt-3 text-sm text-red-700" role="status">Review marks are unavailable: ' + escape(dto.reviewError) + '</p>':'') + '<section class="mt-4 min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" aria-label="Assigned teams">' + tabsMarkup() + '<div ' + getTabs().panelAttributes('reviewerStage', state.stage) + ' data-reviewer-content>' + listMarkup() + '</div></section><div data-reviewer-panel>' + panelMarkup() + '</div>' + (state.toast?'<div class="fixed right-4 top-4 z-50 rounded-md bg-green-700 px-4 py-3 text-sm text-white shadow-lg" role="status" data-reviewer-toast>' + escape(state.toast) + '</div>':'') + '</div>';
     if(!delegated.has(host)){delegated.add(host);host.addEventListener('click',onClick);host.addEventListener('input',onInput);host.addEventListener('change',onChange);host.addEventListener('keydown',onKeydown);}
+    getTabs().bind(host);
   }
   function updateList() { q('[data-reviewer-content]').innerHTML=listMarkup(); }
   function updatePanel() { q('[data-reviewer-panel]').innerHTML=panelMarkup(); }
@@ -114,8 +114,7 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
     const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;
     const action=target.dataset.action;
     if(action==='close-panel' && event.target.closest('[data-title-panel]') && event.target!==target)return;
-    if(action==='close-more' && event.target.closest('[data-more-sheet]') && event.target!==target)return;
-    if(action==='stage'){state.stage=target.dataset.stage;state.status='All';state.page=1;state.more=false;render(state.host,state.dto);}
+    if(action==='stage'){state.stage=target.dataset.stage;state.status='All';state.page=1;render(state.host,state.dto);}
     else if(action==='filter'){state.status=target.dataset.status;state.page=1;updateList();}
     else if(action==='page'){state.page=Number(target.dataset.page);updateList();}
     else if(action==='marks')getMarking().open(target.dataset.team,target.dataset.review,target);
@@ -123,10 +122,8 @@ function reviewerViewBrowser_(bridge, getUi, getMarking) {
     else if(action==='close-panel'){if(state.busyTeam)return;state.panelTeam=null;updatePanel();}
     else if(action==='choice'){state.decision=target.dataset.decision;updatePanel();}
     else if(action==='submit-decision')decide(state.panelTeam,state.decision);
-    else if(action==='more'){state.more=true;render(state.host,state.dto);}
-    else if(action==='close-more'){state.more=false;render(state.host,state.dto);}
   }
-  function onKeydown(event){if(event.key==='Escape'&&state.panelTeam&&!state.busyTeam){state.panelTeam=null;updatePanel();}else if(event.key==='Escape'&&state.more){state.more=false;render(state.host,state.dto);}}
+  function onKeydown(event){if(event.key==='Escape'&&state.panelTeam&&!state.busyTeam){state.panelTeam=null;updatePanel();}}
   function statusElement(team){return state.host.ownerDocument.getElementById('reviewer-status-'+team);}
   function setStatus(team,text){const el=statusElement(team);if(el)el.textContent=text;}
   function load(){return bridge.read('role:reviewer','API_reviewer_getDashboard',[]);}

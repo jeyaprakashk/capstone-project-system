@@ -1,5 +1,5 @@
 /* Serialized browser module; all reads use the common loading lifecycle. */
-function guideWeeklyBrowser_(bridge) {
+function guideWeeklyBrowser_(bridge, getTabs) {
   const host = ()=>document.getElementById('guideWeeklyProgress');
   const esc = value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const ATTENTION_BADGE='inline-flex items-center rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/20';
@@ -54,12 +54,8 @@ function guideWeeklyBrowser_(bridge) {
     });
     const actions=teamActions(selectedTeam);
     root.querySelectorAll('[data-guide-tab]').forEach(button=>{
-      let badge=button.querySelector('[data-guide-tab-attention]');
-      if(!badge){badge=document.createElement('span');badge.dataset.guideTabAttention='';badge.className=ATTENTION_BADGE+' ml-1';(button.querySelector('strong') || button).appendChild(badge);}
       const action=actions.find(action=>action.key===button.dataset.guideTab);
-      badge.hidden=!action;badge.textContent=action?String(action.count):'';
-      badge.title=action?(action.key==='documents'?'Documents supporting pending title review':action.label+' requiring action')+': '+action.count:'';
-      badge.setAttribute('aria-label',badge.title);
+      getTabs().setBadge(button,action?action.count:0,action?(action.key==='documents'?'Documents supporting pending title review':action.label+' requiring action')+': '+action.count:'');
     });
   }
   function evaluationStatus(team,statuses) {
@@ -142,7 +138,7 @@ function guideWeeklyBrowser_(bridge) {
     }
     if(editor)editor.hidden=view!=='evaluation';
     selectedView=view;
-    root.querySelectorAll('[data-guide-tab]').forEach(button=>{const active=button.dataset.guideTab===view;button.setAttribute('aria-pressed',String(active));});
+    getTabs().select(root.querySelectorAll('[data-guide-tab]'),button=>button.dataset.guideTab===view);
     root.querySelectorAll('[data-guide-view]').forEach(panel=>{panel.hidden=panel.dataset.guideView!==view;});
     host().hidden=view!=='weekly';
     selectTeam(selectedTeam,true);
@@ -415,6 +411,6 @@ function weeklyPhase2SetupBrowser_(bridge) {
   }
   return {load};
 }
-function getGuideWeeklyClientScript_() { return 'const GuideWeekly = ('+guideWeeklyBrowser_.toString()+')(DataBridge);'; }
+function getGuideWeeklyClientScript_() { return 'const GuideWeekly = ('+guideWeeklyBrowser_.toString()+')(DataBridge, () => SharedTabs);'; }
 /** Coordinator weekly setup, used by System Status; serialized separately from the Guide workspace. */
 function getWeeklySetupClientScript_() { return 'const WeeklyPhase2Setup = ('+weeklyPhase2SetupBrowser_.toString()+')(DataBridge);'; }

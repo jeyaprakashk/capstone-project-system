@@ -20,7 +20,7 @@ function firstPaintFromServer(options) {
 function setup(dto = dtoFromServer()) {
   const { document, window } = parseHTML('<html><body><div id="guideContent"></div></body></html>');
   const calls = { reads: [], weekly: [], loads: 0, refresh: 0, writes: [], toggles: [], github: 0 };
-  const c = loadSources(['data-bridge-client.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
+  const c = loadSources(['data-bridge-client.js', 'shared-tabs.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const s = { dto, writeError: null, readError: null };
   bridge.useTransport(async (method, args) => {
@@ -34,9 +34,10 @@ function setup(dto = dtoFromServer()) {
   const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: () => '', renderSkeleton: (v, label) => '<span data-skeleton>' + label + '</span>', refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => () => {} };
   const weekly = { selectTeam: (t) => calls.weekly.push(['team', t]), selectView: (v) => calls.weekly.push(['view', v]), load: () => calls.loads++, positionTitleInfo: (e, el) => calls.toggles.push(el.id) };
   vm.runInContext('globalThis.__make = ' + c.guideViewBrowser_.toString(), c);
-  const view = c.__make(bridge, () => ui, () => weekly);
+  const tabs = c.sharedTabsBrowser_(() => ui);
+  const view = c.__make(bridge, () => ui, () => weekly, () => tabs);
   const host = document.getElementById('guideContent');
-  return { view, host, document, calls, s, ui, weekly, c, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), settle: () => new Promise(r => setImmediate(r)) };
+  return { view, host, document, window, calls, s, ui, weekly, tabs, c, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
 const byAttr = (f, attr, value) => f.host.querySelector('[' + attr + '="' + value + '"]');
 
@@ -57,8 +58,8 @@ test('renders the workspace contract GuideWeekly and GuideEvaluation depend on',
   assert.equal(byAttr(f, 'data-guide-select', 'T1').getAttribute('aria-pressed'), 'false');
   assert.equal(byAttr(f, 'data-guide-select', 'T2').querySelector('[data-team-attention]'), null);
   assert.deepEqual(Array.from(root.querySelectorAll('[data-guide-tab]')).map(n => n.getAttribute('data-guide-tab')), ['github', 'title', 'weekly', 'documents', 'evaluation']);
-  assert.equal(byAttr(f, 'data-guide-tab', 'title').getAttribute('aria-pressed'), 'true');
-  assert(byAttr(f, 'data-guide-tab', 'title').querySelector('strong'), 'GuideWeekly appends attention badges into the tab strong element');
+  assert.equal(byAttr(f, 'data-guide-tab', 'title').getAttribute('aria-selected'), 'true');
+  assert(byAttr(f, 'data-guide-tab', 'title').querySelector('[data-tab-label]'), 'GuideWeekly appends attention badges into the tab label');
   const evalTab = byAttr(f, 'data-guide-tab', 'evaluation');
   assert.equal(evalTab.disabled, false); assert.equal(evalTab.hasAttribute('data-evaluation-locked'), true);
   assert.equal(evalTab.getAttribute('title'), null); assert.doesNotMatch(evalTab.textContent, /Available/);
@@ -162,7 +163,7 @@ test('a normal load starts the weekly and GitHub reads with the dashboard read; 
   const bridge = vm.runInContext('(' + f.c.dataBridgeBrowser_.toString() + ')()', f.c);
   bridge.useTransport(async method => { sent.push(method); return JSON.stringify({ ok: true, data: method === 'API_guide_getGithub' ? github : method === 'API_guide_getDashboard' ? dto : { entries: [], weeks: [] } }); });
   vm.runInContext('globalThis.__make2 = ' + f.c.guideViewBrowser_.toString(), f.c);
-  const view = f.c.__make2(bridge, () => f.ui, () => f.weekly);
+  const view = f.c.__make2(bridge, () => f.ui, () => f.weekly, () => f.tabs);
   const loaded = await view.load();
   assert.deepEqual(sent.slice().sort(), ['API_guide_getDashboard', 'API_guide_getGithub', 'API_guide_getWeekly']);
   view.render(f.host, loaded); await f.settle(); await f.settle();
@@ -288,7 +289,7 @@ test('a failed re-read after a saved decision reports it and leaves the content'
 test('the real GuideWeekly module drives the rendered workspace (team and tab selection)', () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
   const c = loadSources(['guide-weekly-client.js'], { document: f.document, Date, JSON, DashboardUI: { busy:require('./busy-fixture.cjs')(), renderSkeleton: () => '', beginContentLoading: () => () => {}, guideRun: () => ({}) } });
-  const api = c.guideWeeklyBrowser_();
+  const api = c.guideWeeklyBrowser_(undefined, () => f.tabs);
   api.selectTeam('T1');
   assert.equal(byAttr(f, 'data-guide-select', 'T1').getAttribute('aria-pressed'), 'true');
   assert.equal(byAttr(f, 'data-guide-select', 'T2').getAttribute('aria-pressed'), 'false');
@@ -296,7 +297,9 @@ test('the real GuideWeekly module drives the rendered workspace (team and tab se
   assert.equal(byAttr(f, 'data-guide-team', 'T2').hasAttribute('hidden'), true);
   assert.equal(byAttr(f, 'data-guide-heading', 'T1').hasAttribute('hidden'), false);
   api.selectView('documents');
-  assert.equal(byAttr(f, 'data-guide-tab', 'documents').getAttribute('aria-pressed'), 'true');
+  assert.equal(byAttr(f, 'data-guide-tab', 'documents').getAttribute('aria-selected'), 'true');
+  assert.equal(byAttr(f, 'data-guide-tab', 'documents').getAttribute('tabindex'), '0');
+  assert.equal(f.host.querySelector('[role=tabpanel]').getAttribute('aria-labelledby'), byAttr(f, 'data-guide-tab', 'documents').id);
   assert.equal(byAttr(f, 'data-guide-team', 'T1').querySelector('[data-guide-view="documents"]').hasAttribute('hidden'), false);
   assert.equal(byAttr(f, 'data-guide-team', 'T1').querySelector('[data-guide-view="title"]').hasAttribute('hidden'), true);
   // Once the weekly read has finished the team pill carries its action count as an accessible description (no visible badge).

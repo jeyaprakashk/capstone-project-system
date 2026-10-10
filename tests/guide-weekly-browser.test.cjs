@@ -14,7 +14,8 @@ function fixture() {
     return()=>{if(!done){done=true;finishes++;target.removeAttribute('aria-busy');}};
   },guideRun:()=>{const request={};const runner=new Proxy({withSuccessHandler(fn){request.success=fn;return runner;},withFailureHandler(fn){request.failure=fn;return runner;}},{get(target,key){return target[key]||((...args)=>{request.method=key;request.args=args;requests.push(request);});}});return runner;}}});
   vm.runInContext(fs.readFileSync('guide-weekly-client.js','utf8'),c);
-  new vm.Script(c.getGuideWeeklyClientScript_());const api=c.guideWeeklyBrowser_(bridge);
+  vm.runInContext(fs.readFileSync('shared-tabs.js','utf8'),c);const tabs=c.sharedTabsBrowser_(()=>c.DashboardUI);
+  new vm.Script(c.getGuideWeeklyClientScript_());const api=c.guideWeeklyBrowser_(bridge,()=>tabs);
   const data={weeks:['W2','W1'],checkedAt:'2026-01-08T12:00:00Z',timezone:'Asia/Kolkata',entries:[
     {entryId:'e2',weekId:'W2',student:'Student <script>alert(1)</script>',regNo:'001',discussion:'Measured <b>signal</b>',status:'PENDING',score:null},
     {entryId:'e1',weekId:'W1',student:'Student',regNo:'001',discussion:'Decision',status:'DISCUSSED',score:0}]};
@@ -257,7 +258,7 @@ test('team workspace filters weekly cards, preserves title drafts and retains se
   assert.equal(f.host.querySelectorAll('[data-entry]').length,1);
   assert.equal(f.host.querySelector('[data-entry]').dataset.entry,'e2');
   f.api.selectTeam('B');assert.equal(f.host.querySelector('[data-entry]').dataset.entry,'other');
-  assert.equal(root.querySelector('[data-guide-tab="weekly"]').getAttribute('aria-pressed'),'true');
+  assert.equal(root.querySelector('[data-guide-tab="weekly"]').getAttribute('aria-selected'),'true');
   f.api.selectView('documents');assert.equal(f.host.hidden,true);
   assert.equal(refresh.hidden,false);assert.equal(updated.hidden,false);
   assert.equal(root.querySelector('[data-guide-team="B"]').hidden,false);
@@ -266,7 +267,7 @@ test('team workspace filters weekly cards, preserves title drafts and retains se
   assert.equal(root.querySelector('[data-guide-select="B"]').getAttribute('aria-pressed'),'true');
   f.api.selectTeam('A');f.api.selectView('title');assert.equal(draft.value,'Unsaved title');
   f.api.selectTeam('A');assert.equal(f.host.hidden,false);
-  assert.equal(root.querySelector('[data-guide-tab="weekly"]').getAttribute('aria-pressed'),'true');
+  assert.equal(root.querySelector('[data-guide-tab="weekly"]').getAttribute('aria-selected'),'true');
   f.api.selectTeam('missing');assert.equal(root.querySelector('[data-guide-select="A"]').getAttribute('aria-pressed'),'true');
 });
 
@@ -351,9 +352,9 @@ test('team attention combines only guide actions, updates after decisions and di
   const pill=id=>root.querySelector('[data-guide-select="'+id+'"] [data-team-attention]');
   f.api.load();assert.match(pill('A').textContent,/Skeleton/);assert.equal(pill('B').hidden,false);assert.equal(pill('A').getAttribute('aria-busy'),'true');
   f.reply();assert.equal(pill('A').textContent,'Title review · 1');assert.equal(pill('A').getAttribute('aria-busy'),'false');assert.equal(pill('A').hasAttribute('title'),false);assert.equal(root.querySelector('[data-guide-select="A"]').hasAttribute('title'),false);assert.equal(pill('B').hidden,true);assert.equal(f.requests.length,1);
-  const tabBadge=key=>root.querySelector('[data-guide-tab="'+key+'"] [data-guide-tab-attention]');
+  const tabBadge=key=>root.querySelector('[data-guide-tab="'+key+'"] [data-tab-badge]');
   assert.equal(tabBadge('weekly').textContent,'1');assert.equal(tabBadge('documents').textContent,'2');
-  assert.equal(root.querySelector('[data-guide-tab="title"]').getAttribute('aria-pressed'),'true');
+  assert.equal(root.querySelector('[data-guide-tab="title"]').getAttribute('aria-selected'),'true');
   f.host.querySelector('[data-sign="DISCUSSED"]').click();f.flush();f.requests.at(-1).success({status:'DISCUSSED',message:'Saved'});
   assert.equal(pill('A').textContent,'Title review · 1');assert.equal(tabBadge('weekly').hidden,true);
   root.querySelector('[data-guide-tab="evaluation"]').disabled=false;

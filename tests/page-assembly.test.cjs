@@ -74,6 +74,8 @@ for(const views of COMBINATIONS) {
   complete.ui().showRoleTab('rubrics');
   assert.equal(activePanel(complete.document),'rubrics');
   assert(complete.calls.includes('API_shared_getTimeline')&&complete.calls.includes('API_shared_getRubrics'));
+  // Shared modules ship on every page.
+  assert.equal(vm.runInContext('typeof SharedTabs',complete.page),'object','SharedTabs on a '+name+' page');
   // Each role's modules ship exactly when the page includes that role.
   const shipped=SHIPPED(views);
   for(const [role,modules] of Object.entries(ROLE_MODULES)) for(const module of modules) {

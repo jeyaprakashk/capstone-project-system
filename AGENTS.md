@@ -65,6 +65,9 @@ or removing any class. Do not add inline `<style>` blocks or hand-written CSS fi
   modules do not assign per-element `onclick`/`onchange`; each host gets one delegated listener.
   Tests should find elements through `data-*` hooks, not styling classes.
 - Do not put a display utility (`flex`, `grid`, ...) on an element scripts toggle with `hidden`.
+- Workspace tab strips (Guide and Reviewer) come from `SharedTabs` (`shared-tabs.js`): its markup, classes,
+  More sheet and WAI-ARIA Tabs keyboard handling. Views pass tab data and their own `data-*` hooks; they
+  keep no tab classes or key handling of their own. Selection is `aria-selected`, never a class.
 - No preflight: the base rules in the input file are the dashboard's reset.
 
 Every dashboard, panel and card reads and writes through the bridge; no module calls
@@ -89,8 +92,8 @@ Each page ships only the browser modules of the roles `doGet` detected for that 
 page is about 43 KB compressed instead of about 113 KB for all roles; on slow mobile data that saved
 about 0.44 s per load (measured at Regular 3G).
 
-- `getDashboardPageScript_(roles)` assembles the page: the shared modules (bridge, `DashboardUI`,
-  Timeline, Rubrics), each included role's modules, then `getDashboardStartScript_(roles)`, which
+- `getDashboardPageScript_(roles)` assembles the page: the shared modules (bridge, `SharedTabs`,
+  `DashboardUI`, Timeline, Rubrics), each included role's modules, then `getDashboardStartScript_(roles)`, which
   registers only those roles and starts the dashboard last. Roles come from the server's role
   detection, never from the browser.
 - `DashboardUI` owns generic UI interactions and never names a role's module. Role tabs register with
