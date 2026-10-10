@@ -228,6 +228,17 @@ function getColumnMap_(sheetName, fieldMap) {
   return _columnMapCache[cacheKey];
 }
 
+/** After a sheet is created or its header row changes: drop this execution's handle, column maps and read snapshots for it. */
+function invalidateSheetCaches_(sheetName) {
+  const key = normalizeText_(sheetName);
+  delete sheetExecutionHandles_[key];
+  Object.keys(_columnMapCache).forEach(cacheKey => {
+    if (normalizeText_(cacheKey.slice(0, cacheKey.indexOf('{'))) === key) delete _columnMapCache[cacheKey];
+  });
+  if (dashboardReadSnapshot_) delete dashboardReadSnapshot_[key];
+  if (dashboardHeaderSnapshot_) delete dashboardHeaderSnapshot_[key];
+}
+
 // ===================================================================
 // EMAIL UTILITIES
 // ===================================================================
