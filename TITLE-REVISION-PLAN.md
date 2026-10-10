@@ -2,18 +2,14 @@
 
 Title submission, approval and coordinator reopening in the dashboard, with configurable submission requirements.
 
-Status: **plan (revision 7), not implemented.** Revision 4 addressed the Codex review of revision 3 (nine findings and
-two validator gaps), adopted the standard envelope error codes and kept the existing title status names. Revision 5
-addresses the Codex review of revision 4: a locked cutover barrier, upload retries and fingerprints, upload
-concurrency, the upload requirement deadlock, stricter history validation, and committed-request recognition on the
-requirement-failure path. Revision 6 addresses the Codex review of revision 5: a superseded-upload retry never touches
-files, uploads recheck title state under the lock, the repository-only GitHub item is withdrawn, the removal check
-targets runtime code only, and uploads get their own result and per-action capabilities. Revision 7 addresses the
-Codex review of revision 6: committed uploads are recognized before requirements, title and problem are mandatory
-with explicit empty-input rules, and the effective title and problem are always shown as one approved or proposed
-pair. Each spreadsheet holds one
-semester, so Team ID alone identifies a team in the log. Nothing
-described here exists in the code yet.
+Status: **final plan (revision 9), not implemented.** Nothing described here exists in the code yet. Each spreadsheet
+holds one semester, so Team ID alone identifies a team in the log.
+
+Review history: revisions 3 to 8 were each reviewed independently (Codex) against the code, and every finding is
+addressed here. The reviews covered the cutover write barrier, request-ID recovery for title writes and uploads,
+upload replacement and concurrency, requirement deadlocks, history validation, the standard envelope error codes and
+existing status names, input rules for title and problem, the effective title and problem pair, and legacy baselines
+with a blank problem. Revision 9 is revision 8 marked final, with no design change.
 
 ## 1. Goal and scope
 
@@ -153,6 +149,16 @@ never disagree about whether or when a team was approved.
   - The problem statement is **mandatory**: after trimming it must be non-empty and at most 5,000 characters.
   - A guide's edited title, when given, follows the title rule. An empty `editedTitle` means "no edit", never "clear
     the title".
+- **Legacy baselines with a blank problem.** The Form period allowed an empty problem statement; this plan does not.
+  - **Pending** (`NEEDS_REVIEW` or `AWAITING_REVIEWER` baseline with a blank problem): approval is refused at both
+    stages. `can.approve` is `{allowed: false, reason: "The problem statement is missing. Return the title so the
+    team can resubmit it with one."}`, and the endpoint refuses the same way with `REJECTED`. Return stays available,
+    and the team's resubmission must include a problem (input rules), after which the normal path applies. No
+    decision endpoint accepts a replacement problem; only the team supplies it.
+  - **Approved** (`APPROVED` baseline with a blank problem): the blank approved problem stays valid (section 4, rule
+    5) and is shown as "Not recorded". It survives a reopening and a cancel unchanged: the cancel restores the
+    proposal to the approved title with the blank problem. A resubmission during the reopening must include a
+    problem, so the next approval replaces the blank.
 - **Effective title and problem.** The title and problem shown together are always one pair from one source, never
   mixed:
   - when `approved` is `true` (including during a reopening): the approved title **and** the approved problem;
@@ -599,6 +605,13 @@ step 8 copied back to TeamStatus by hand.
 - **Effective pair:** during a reopening with a different proposed problem, `titleGate_`, review marking details,
   results, the team drawer and lists all show the approved title **with the approved problem**, never the proposed
   problem; before the first approval they show the proposed pair; title panels show both pairs labelled.
+- **Legacy blank problems:** a `NEEDS_REVIEW` baseline with a blank problem gives `can.approve.allowed = false` with
+  the missing-problem reason for its guide, the guide approve endpoint refuses with `REJECTED` and writes nothing, and
+  Return succeeds; the same for an `AWAITING_REVIEWER` baseline and its reviewers; after Return, a resubmission
+  without a problem is `INVALID_INPUT` and one with a problem follows the normal path to approval. An `APPROVED`
+  baseline with a blank problem validates, shows "Not recorded", keeps the blank through reopen and cancel (cancel
+  restores the approved title with the blank problem, and history validation passes), and a re-approval after a
+  resubmission replaces it.
 - **Write order and concurrency:**
   - a committed submission retried after its documents disappear or GitHub is unavailable returns the stored result,
     not `REJECTED`;
@@ -652,7 +665,9 @@ step 8 copied back to TeamStatus by hand.
   requirement returns `REJECTED` only after a second lookup still finds nothing**; **upload A succeeds, upload B replaces A, then A is retried: the retry
   returns success with `replaced: true`, B stays the one live file, and no file is created or trashed**; **an upload
   that passes its early checks, then reaches the lock after a title submission has committed, refuses with
-  `REJECTED` and creates or trashes nothing (the same for a retry of an earlier upload)**; two uploads in sequence keep
+  `REJECTED` and creates or trashes nothing; so does an incomplete retry (its file live with older copies still to
+  trash) that reaches the lock after that submission**; **a completed upload retried while the title is under review
+  returns its stored success from the pre-lock lookup and creates or trashes nothing**; two uploads in sequence keep
   the later file and its uploader; the `drive` check sees the
   uploaded file; the description records the session student's email and time; a student can only ever write to their
   own team's folder; if trashing the old file fails (for example, insufficient shared drive role), the upload reports
