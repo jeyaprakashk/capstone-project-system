@@ -11,6 +11,8 @@ upload replacement and concurrency, requirement deadlocks, history validation, t
 existing status names, input rules for title and problem, the effective title and problem pair, and legacy baselines
 with a blank problem. Revision 9 is revision 8 marked final, with no design change.
 
+**Position in the build order:** items 5, 6, 8, 9 and 10. Phase 1 needs `ensureSheet_` and catalog v1 (items 1 to 4); Phase 2 is the engine (item 7). The full order is in [BUILD-ORDER.md](BUILD-ORDER.md).
+
 ## 1. Goal and scope
 
 Move title submission from the Google Form into the dashboard, hold all title state in one append-only log, let the
@@ -68,14 +70,21 @@ old title data.
 - **Deliberate changes, reviewed, in their own commit, never inside a UI migration:** the two new sheets (`TitleLog`,
   `ActivityDependencies`), the Return action and `RETURNED`/`REOPENED` statuses, unified normalization, the reopen
   rule, the length limits, guide edits only on approval, the submission requirements and document upload.
-- `npm run test:invariants` stays green. A snapshot changes only for the new sheet names, and only with explicit
-  approval.
+- `npm run test:invariants` stays green. The new sheet names (`TitleLog`, `ActivityDependencies`) and their headers are kept
+  in the sheet catalog (`sheet-columns.js`, [SHEET-HEADER-MATCHING-PLAN.md](SHEET-HEADER-MATCHING-PLAN.md)) and are **not**
+  added to `SHEET_NAMES` or `FIELD_DEFINITIONS`, so no snapshot changes for them; each is pinned by the catalog test and its
+  own test. The only snapshot change in this work is the removal of `TEAM_INTAKE_RAW` from `SHEET_NAMES`,
+  a deliberate, reviewed commit with explicit approval (step 9 of
+  [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md)).
 - The deliberate differences are listed in [section 12](#12-acceptance-tests) and tested separately from the
   equivalence checks.
 
 ## 4. Title storage: `TitleLog`
 
-Script-owned and append-only. Protected so only the coordinator can edit it (needed for the baseline).
+Script-owned and append-only. Created through `ensureSheet_` (call mode `setup`) with access `view`: visible, with a red tab, and **no sheet
+protection** (only coordinators can open the spreadsheet; [ENSURE-SHEET-PLAN.md](ENSURE-SHEET-PLAN.md) decision 1). It is
+visible and editable because the coordinator enters the baseline rows by hand before cutover (section 11); after cutover
+nobody edits it (section 13, rule 2), and the red tab marks it as read-only in practice.
 
 | Column | Content |
 |---|---|
@@ -91,8 +100,9 @@ Script-owned and append-only. Protected so only the coordinator can edit it (nee
 - Each row is the team's complete state after one action, so the latest row is the current state. A team with no
   row is `NOT_SUBMITTED` (a team added to the roster after cutover).
 - Rows are never edited after cutover. Text starting with `=`, `+`, `@` or `-` is escaped.
-- Missing or duplicated headers make every title read and write fail with `UNAVAILABLE`. Headers are never created
-  silently.
+- Missing or duplicated headers make every title read and write fail with `UNAVAILABLE`. **Runtime reads and writes never
+  create, append or repair a header.** The only code that may append a missing header is the editor-run setup
+  (`setupTitleStorage`, through `ensureSheet_`; see "Setup" below), and it reports what it added.
 
 **Validation of a team's history** (on every read; a failure makes only that team `UNAVAILABLE`, and coordinator
 health lists it):
@@ -125,7 +135,9 @@ With these rules `titleGate_` (from the approved fields) and the eligibility cal
 never disagree about whether or when a team was approved.
 
 **Setup:** `setupTitleStorage()` is editor-run, starts with `requireTriggerOrOperator_()`, creates `TitleLog` and
-`ActivityDependencies` with headers if they are absent, and is safe to rerun.
+`ActivityDependencies` through `ensureSheet_` ([ENSURE-SHEET-PLAN.md](ENSURE-SHEET-PLAN.md)), and is safe to rerun. Each
+sheet is created with its headers if absent; a missing header on an existing sheet is appended at setup; a possible typo,
+a duplicate header or unlabelled content is refused and nothing is changed.
 
 ## 5. Title workflow
 
@@ -240,7 +252,8 @@ never retries. The title and upload views own their request IDs:
 
 ### `ActivityDependencies`
 
-Coordinator-edited and protected. One row per required item; an activity has several items by having several rows.
+Coordinator-edited. Only coordinators can open the spreadsheet, and the sheet has no sheet protection. One row per
+required item; an activity has several items by having several rows.
 
 | Activity | Kind | Item | Label | Active |
 |---|---|---|---|---|
@@ -292,7 +305,7 @@ gated actions, `activityPreconditions_`, so they cannot disagree.
 4. **Checked only at the moment of the action, never retroactively.** A committed request is recognized before the
    requirements are checked (section 6, step 3).
 5. **No caching between requests.** A sheet change takes effect on the next request.
-6. **Misconfiguration denies.** A missing sheet, a wrong header, or a row with an unknown activity, unknown kind or
+6. **Misconfiguration denies.** A missing sheet, a missing or duplicated required header, or a row with an unknown activity, unknown kind or
    invalid item denies every gated activity: "Submission requirements are misconfigured. Contact the coordinator."
 7. **No active rows allows.**
 8. **Unverifiable is unmet:** "Could not verify: <label>."
@@ -434,6 +447,11 @@ added there deliberately.
 
 Guide and reviewer views show a link to the team's Drive folder in place of document links.
 
+The `TeamIntakeRaw` sheet is not deleted by this plan. Its archive copy, the verification, the rename test and the deletion
+(and the later removal of the `TEAM_INTAKE_RAW` constant, a deliberate schema-snapshot change) are in
+[FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md). The guide dashboard's document-submission date comes from
+the Drive upload record after this plan, with "Date unavailable" for older files.
+
 ## 10. Endpoints, DTO and phases
 
 | Endpoint | Role | Input |
@@ -501,7 +519,7 @@ DATA-CONTRACTS.md, the endpoint, its contract test and its view change together.
 each capability's `requirements`) and `documents`. New modules are registered under their role in `getMigratedViewsClientScript_` and in
 `ROLE_MODULES` in `tests/page-assembly.test.cjs`; their tests go into the `test` and `test:migration` scripts.
 Rebuild Tailwind after any class change. [tests/entry-point-guard.test.cjs](tests/entry-point-guard.test.cjs) gains
-`setupTitleStorage`, `setTitleCutover` (from Release 0) and the new `API_*` functions, and loses `onTeamIntakeSubmit` and the two old decision endpoints.
+`setupTitleStorage`, `setTitleCutover` and `clearTitleCutover` (both from Release 0) and the new `API_*` functions, and loses `onTeamIntakeSubmit` and the two old decision endpoints.
 
 ### Phases
 
@@ -513,15 +531,15 @@ release, so no old and new code coexist in production.
 | Phase | Work |
 |---|---|
 | 0 | Fixtures and golden masters of today's downstream results (weekly, review marking, eligibility, coordinator health, digests) for every TeamStatus decision combination; `getTeamGithubSetup_` and `findTeamFolder_` stubs |
-| R0 | **Release 0** (deployed to production on its own, at least a day before cutover): the old guide decision path and the Form handler take the script lock (the reviewer path already does); all three reread `TITLE_CUTOVER` under the lock immediately before writing and refuse when it is set; the editor-run `setTitleCutover(value)` is added (section 11) and listed in the entry-point guard. Tests for both states and for the barrier |
-| 1 | `setupTitleStorage`, the title service, `titleGate_`, history validation, `API_coordinator_validateTitleLog`. Deliberate schema commit. Nothing calls them yet |
+| R0 | **Release 0** (deployed to production on its own, at least a day before cutover): the old guide decision path and the Form handler take the script lock (the reviewer path already does); all three reread `TITLE_CUTOVER` under the lock immediately before writing and refuse when it is set; the editor-run `setTitleCutover(value)` and `clearTitleCutover()` are added (section 11) and listed in the entry-point guard. Tests for both states and for the barrier |
+| 1 | `setupTitleStorage`, the title service, `titleGate_`, history validation, `API_coordinator_validateTitleLog`. `TitleLog` and `ActivityDependencies` are created from the sheet catalog (catalog v1, built earlier; [SHEET-HEADER-MATCHING-PLAN.md](SHEET-HEADER-MATCHING-PLAN.md)). Deliberate schema commit. Nothing calls them yet |
 | 2 | Precondition engine, `API_coordinator_getRequirements`, document upload endpoint |
 | 3 | Downstream server readers (weekly, review marking, eligibility, digests, coordinator health) switch to `titleGate_`, with equivalence tests from Phase 0 fixtures translated to `TitleLog` fixtures |
 | 4 | **Student slice:** `API_student_submitTitle`, the upload endpoint's contract, student view, contract and view tests; `buildTeamIntakeLink_`, the Form link and `onTeamIntakeSubmit` removed |
 | 5 | **Guide slice:** `API_guide_decideTitle`, guide view, tests; old guide decision path removed |
 | 6 | **Reviewer slice:** `API_reviewer_decideTitle`, reviewer view, tests; old reviewer decision path removed |
 | 7 | **Coordinator slice:** reopen, cancel, history, requirements card and drawer; tests |
-| 8 | Remove `getTeamStatus_` and the remaining old readers; add the removal-check test from section 9 (no runtime matches, with its exclusion list) |
+| 8 | Remove `getTeamStatus_` and the remaining old readers; add the removal-check test from section 9 (no runtime matches, with its exclusion list). The `TeamIntakeRaw` sheet itself is archived and deleted after this phase under FORM-SHEET-RETIREMENT-PLAN.md |
 | 9 | Rehearse the cutover on a copy of the spreadsheet |
 
 ## 11. Cutover
@@ -532,7 +550,7 @@ One script property, read on every title write by both old and new code:
 
 | Value | Old code (Release 0) | New code |
 |---|---|---|
-| unset | Works as today | Not deployed yet |
+| unset | Works as today | **Refuses writes with `UNAVAILABLE`; reads work** (fails closed, the same as `PAUSED`) |
 | `PAUSED` | Refuses: "Title updates are paused. Reload the dashboard shortly." | Refuses writes with `UNAVAILABLE`; reads work |
 | `LIVE` | Refuses permanently: "Reload the dashboard." | Works |
 
@@ -549,6 +567,12 @@ for up to six minutes. The barrier is the script lock instead:
   lock (`waitLock(30000)`, retried by the coordinator if it times out).
 - So when `setTitleCutover('PAUSED')` returns, any write that held the lock earlier has finished, and every later
   write will read `PAUSED` under the lock and refuse. No write can be in progress or start after that point.
+- **The one authorized rollback operation is `clearTitleCutover()`.** Editor-run, starting with
+  `requireTriggerOrOperator_()`, taking the script lock (`waitLock(30000)`), rereading the property under it, and then
+  deleting the property **only if it is `PAUSED` or unset**, and it is run only as the last step of a rollback, after the
+  previous deployment and saved code are restored. If the value is `LIVE` it refuses with "Cutover is LIVE; fix
+  forward", changes nothing, and the rollback is not available. It is in Release 0 so that it exists in the code that a
+  rollback re-pushes. No other way of changing the property is allowed, by hand or by any other function.
 
 ### Baseline row
 
@@ -573,11 +597,42 @@ One per team on the roster at cutover, including teams that have not submitted:
 - every history check failure from section 4, per team;
 - `APPROVED` baselines without `Approved At`.
 
+### Code availability before the web app is deployed
+
+`setTitleCutover` and `clearTitleCutover` are part of Release 0 and are already in the deployed and saved code. The other
+editor-run functions (`setupTitleStorage` and the retirement plan's preflight, archive and verification functions) are
+**not** in Release 0, so they must be available in the Apps Script editor before the new web-app version is deployed. How:
+
+- Apps Script runs an editor-run function from the project's **saved code**, serves the web app to users from a
+  **deployed version** until a new deployment is created, and runs installable triggers from the **saved code**. (The
+  README already treats "update the web-app deployment" as a separate administrator action.) This is confirmed in the
+  rehearsal (Phase 9), not assumed.
+- So the new functions become available when the new code is **pushed** (`npm run push`) **without creating a new
+  deployment version**. Pushing does not change what users get.
+
+**What runs during the interval between the push and step 5:**
+
+| Who or what | Runs |
+|---|---|
+| Students, guides, reviewers, coordinators using the web app | The **Release 0 deployed version** (old title flow, locks and `TITLE_CUTOVER` checks) |
+| Editor-run functions | The **new saved code** |
+| Time-driven and other installable triggers | The **new saved code** from the moment of the push, so every trigger whose handler reads title state is **paused before the push** (step 0). None of them runs the new code in the interval. Downstream readers use `titleGate_`, which has no data until the baseline is copied in step 4 |
+
 ### Steps
 
-1. Release 0 is in production. Check the shared drive's members: the deploying account is a Content manager, and no
-   student is a member (directly or through a group). Run `setupTitleStorage`. Enter the `ActivityDependencies` rows
-   with `Active = Yes`.
+0. **Pause the triggers, then push without deploying.** In this order:
+   1. **Pause first.** Pause every time-driven trigger whose handler reads title state (at least
+      `processWeeklySubmissionSchedule`, the weekly AI trigger, and the guide and reviewer digests; Phase 0 lists them
+      all) from the Triggers page, under every account that installed one. Record each trigger's handler, schedule and
+      owner so it can be restored. Where the page offers no disable option, delete it and recreate it from the record
+      (or with its existing setup function) in step 6. The commit-fetch trigger does not read titles and keeps running.
+   2. **Verify the pause.** Reopen the Triggers page and confirm that none of the listed triggers is active.
+   3. **Then push.** With the full suite green, run `npm run push`. Do **not** create a new deployment version; check
+      that the web-app deployment still points at the Release 0 version.
+   The triggers stay paused through steps 1 to 5 and are restored only in step 6.
+1. Release 0 is in production and the new code is pushed (step 0). Check the shared drive's members: the deploying account
+   is a Content manager, and no student is a member (directly or through a group). Run `setupTitleStorage`. Enter the
+   `ActivityDependencies` rows with `Active = Yes`.
 2. Run `setTitleCutover('PAUSED')` and wait for it to return. From then on no old writer can change TeamStatus
    titles, and none is still running (the barrier above).
 3. Close the Form (`setAcceptingResponses(false)`) and delete its trigger. Copy each team's existing Form-uploaded
@@ -585,13 +640,32 @@ One per team on the roster at cutover, including teams that have not submitted:
 4. Copy the baseline into `TitleLog` from TeamStatus as it now stands. Every decision made before step 2 is
    included, and none can arrive after it.
 5. Deploy the new version. Reads work; writes still refuse because of `PAUSED`.
-6. Run `API_coordinator_validateTitleLog` and check the requirements card. Fix the baseline until both are clean.
+6. Run `API_coordinator_validateTitleLog` and check the requirements card. Fix the baseline until both are clean. Then
+   **restore the triggers paused in step 0**, and only now (check before restoring that none was re-enabled earlier, by
+   hand or by a setup function); reads are correct from here on.
 7. Check the requirement checklists of teams at `NOT_SUBMITTED` or `RETURNED`; they now need GitHub setup complete and
    both documents in their folder before they can submit. Tell the teams that are not ready.
 8. Check each role's dashboard read-only, then run `setTitleCutover('LIVE')` and announce.
 
-**Rollback before step 8:** delete the `TITLE_CUTOVER` property and redeploy the previous version; nothing has been
-written to `TitleLog` by users. **After step 8:** fix forward. Rolling back would need every `TitleLog` row since
+**Rollback before step 8.** The write barrier stays in place until the old version is fully restored, and is cleared only after that (the paused triggers are restored after it is cleared, step 6 below).
+In this order:
+
+1. Leave `TITLE_CUTOVER` at `PAUSED`. No writer, old or new, can write.
+2. Redeploy the previous web-app version.
+3. Push the previous code again (the saved code changed in step 0, and editor-run functions and triggers use it).
+4. Verify that the deployment and the saved code are both the previous ones (Release 0).
+5. Only then run `clearTitleCutover()`, the only authorized way to remove the property. It clears it under the lock, and
+   Release 0 then works as it did before.
+6. **Conditional: restore the triggers paused in step 0.** If the cutover is rolled back before the normal restoration in
+   step 6, those triggers are still paused and the weekly jobs and digests are stopped. After steps 4 and 5 have
+   verified that Release 0 is back, restore every trigger recorded in step 0 that is still paused, from the recorded
+   handler, schedule and owner, and check the Triggers page. If the cutover had already restored them, there is nothing
+   to do.
+
+If the property is unset at any point while the **new** code is still the deployed or saved code, the new code treats it as
+`PAUSED` (the table above): it refuses writes with `UNAVAILABLE`. So an early or mistaken clear cannot reopen writes
+through the new version. It would reopen them only through Release 0, which is why step 5 comes after steps 2 to 4.
+Nothing has been written to `TitleLog` by users before step 8. **After step 8:** fix forward. Rolling back would need every `TitleLog` row since
 step 8 copied back to TeamStatus by hand.
 
 ## 12. Acceptance tests
@@ -689,11 +763,13 @@ step 8 copied back to TeamStatus by hand.
 
 1. Deploy Release 0 at least a day before cutover, so open pages have reloaded.
 2. Do not edit `TitleLog` after cutover.
-3. Keep `TeamIntakeRaw` and the TeamStatus title columns as they are; they are the record of the Form period.
+3. Keep the TeamStatus title columns as they are; they are the record of the Form period. `TeamIntakeRaw` is not kept:
+   after cutover it is copied in full to a values-only archive sheet, verified row by row, renamed, and then deleted, as set
+   out in [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md). Do not edit it meanwhile.
 4. Each semester uses its own spreadsheet. Before starting the next semester's spreadsheet, run the registry export
    (F2) on this one, so its final approved titles are in the master registry.
 5. To pause title writes later (for example to fix a bad row), run `setTitleCutover('PAUSED')`, then
-   `setTitleCutover('LIVE')`. Never edit the property by hand; only the function sets it under the lock.
+   `setTitleCutover('LIVE')`. Never edit the property by hand; only `setTitleCutover` and `clearTitleCutover` change it, under the lock.
 6. Never add students, or a group that contains students, to the shared drive that holds `Team Documents`.
 
 **Known limits**
@@ -793,6 +869,7 @@ visibility in coordinator health. Until then `Active = No` is the only relaxatio
 
 ### F12. Retiring the frozen TeamStatus columns
 
-In a later semester, once nothing reads them, the TeamStatus title, decision, similarity and document-link columns and
-`TeamIntakeRaw` can be removed from `FIELD_DEFINITIONS` and the sheets. This is a deliberate, reviewed schema change
-with its own snapshot update.
+In a later semester, once nothing reads them, the TeamStatus title, decision, similarity and document-link columns can be
+removed from `FIELD_DEFINITIONS` and the sheets. This is a deliberate, reviewed schema change with its own snapshot
+update. `TeamIntakeRaw` is not part of F12: its archive, rename test and deletion are in
+[FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md).

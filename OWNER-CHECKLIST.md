@@ -1,0 +1,83 @@
+# Owner checklist
+
+What **you** do by hand, in order. Everything else is developer work and is not listed. The steps come from
+[TITLE-REVISION-PLAN.md](TITLE-REVISION-PLAN.md) (section 11) and [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md);
+if they differ from this page, those plans win. Your steps belong to items 9 to 11 of [BUILD-ORDER.md](BUILD-ORDER.md); the order of the whole work is there. Nothing here applies until the code is built. Nothing has been built yet.
+
+## A. Now: checks in the live spreadsheet (read-only, no changes)
+
+1. **Tabs.** Look at every tab. Confirm that `TeamIntakeRaw` is the only tab a Google Form fills.
+2. **Typed formulas.** In Sheets, press `Ctrl+F`, tick "Search within formulas", search for `=`. Note any formula, chart or
+   pivot table that points at a column of a sheet the system reads.
+3. **Duplicate headers.** On each sheet the system reads, check that no two column titles are the same.
+4. **Shared drive.** Confirm no student is a member of the shared drive that holds `Team Documents`, directly or through a
+   group.
+5. **Triggers.** In Apps Script, open Triggers (under every account that installed any). Write down each time-driven
+   trigger and confirm the old Form-submit trigger is **deleted**.
+6. **Team folders.** Open each team folder and confirm it has `Step1_Work_Breakdown.docx` and `Step2_Need_Analysis.docx`.
+
+## B. Before cutover
+
+7. **Release 0.** After the developer pushes it, create the deployment version yourself. Do it **at least a day before**
+   cutover so open pages reload.
+8. **Rehearsal on a copy.** Make a copy of the spreadsheet and run the whole cutover on it (the developer prepares this).
+   Confirm three things: editor-run functions use the pushed code, the web-app deployment stays on the old version, and
+   triggers pick up the new code.
+9. **Backup.** Make a full copy of the live spreadsheet. Write down the number of rows in `TeamIntakeRaw` and the number of
+   rows per team.
+
+## C. Cutover day
+
+Follow the order. Stop and ask if any step does not behave as written.
+
+| Step | You do |
+|---|---|
+| 0 | **You pause first:** each time-driven trigger that reads title state (weekly schedule, weekly AI, guide and reviewer digests), under every account that installed one. Write down each one's handler, schedule and owner, then reopen the Triggers page and confirm none of them is active. **Only then** does the developer run `npm run push` (no new deployment) |
+| 1 | In the editor, run `setupTitleStorage`. Type the three `ActivityDependencies` rows with `Active = Yes` (the developer gives you the exact rows) |
+| 2 | Run `setTitleCutover('PAUSED')` and wait for it to return |
+| 3 | Run the archive **preflight**. If it reports bad headers, stop and decide with the developer |
+| 4 | Run the archive **copy**, then the **verification**. It must report **zero mismatches**. Keep the report |
+| 5 | Copy the baseline into `TitleLog` from `TeamStatus` as it stands |
+| 6 | **Deploy the new version** (new deployment version of the web app) |
+| 7 | Run `API_coordinator_validateTitleLog` and check the requirements card until both are clean. Then **restore the triggers** you paused in step 0 (they stay paused until now) |
+| 8 | Check the requirement list of teams at `NOT_SUBMITTED` or `RETURNED` and tell teams that are not ready |
+| 9 | Open each role's dashboard read-only, then run `setTitleCutover('LIVE')` and announce |
+
+**If something goes wrong before step 9, do this in order** (the barrier stays on until the old version is back):
+1. Leave `TITLE_CUTOVER` at `PAUSED`.
+2. Redeploy the previous web-app version.
+3. Have the developer push the previous code again.
+4. Check that the deployment and the saved code are both the previous ones.
+5. Run `clearTitleCutover()`. Never delete the property by hand; it refuses once the value is `LIVE`.
+6. **If you had paused triggers in step 0 and not yet restored them (before step 7 of the cutover), restore them now,**
+   from your record of each trigger's handler, schedule and owner, and reopen the Triggers page to check. Do this only
+   after step 4 confirmed that the previous version is back. Otherwise the weekly jobs and digests stay stopped. After step 9 the fix goes forward; there is no easy rollback.
+
+## D. After cutover
+
+10. **Rename the old sheet.** When the developer says the old-reader removal check has passed, rename `TeamIntakeRaw` to
+    `TeamIntakeRaw_retired`.
+11. **Wait.** At least **14 days**, and until **a weekly submission deadline has passed** and **one reviewer decision has been
+    made**, whichever is later. During that time, with the sheet renamed:
+    - open the student, guide, reviewer and coordinator dashboards at least once and look for "unavailable" or blank values
+      that used to show data;
+    - make a **weekly submission** (and a revision) from the student dashboard and confirm it saves;
+    - confirm the **weekly job** has run (the weekly schedule trigger) and the **guide and reviewer digests** have run, and
+      that none of them reported an error in the Apps Script execution log.
+12. **Delete.** If all is normal: unlink the Form from its response sheet (Form, Responses tab), then delete
+    `TeamIntakeRaw_retired`. The developer then makes the final code change.
+13. **Config.** Remove the old Form settings (`TEAM_INTAKE_FORM_URL_BASE`, `TEAM_INTAKE_TEAMID_ENTRY`) from the `Config` tab.
+14. **Archive.** Keep the Form archive sheet for one semester, then delete it.
+
+## E. Rules to keep
+
+- Do not edit `TitleLog` after cutover.
+- Never edit the `TITLE_CUTOVER` property by hand; only `setTitleCutover(...)` and `clearTitleCutover()` change it. To pause title writes later, run
+  `setTitleCutover('PAUSED')`, then `setTitleCutover('LIVE')`.
+- Never add students, or a group that contains students, to the shared drive.
+- Before starting the next semester's spreadsheet, run the registry export on this one.
+- Do not move, rename or delete columns on the sheets. The code will tolerate it later, but that is a separate decision.
+
+## F. Questions that are still open
+
+- Whether to accept the migration phase order (journals last) and the fake GitHub and Drive test layers. Say "accept".

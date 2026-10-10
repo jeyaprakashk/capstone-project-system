@@ -4,6 +4,8 @@ Status: proposal. This file frames the engine only. It refines section 7 of
 [TITLE-REVISION-PLAN.md](TITLE-REVISION-PLAN.md) (Phase 2) and changes nothing in it. Where the two differ, the title
 plan wins until this file is merged into it.
 
+**Position in the build order:** item 7 (the title plan's Phase 2). Its step 1 is the sheet in item 4; steps 2 to 6 need only the catalog and the test doubles; steps 7 and 8 need the endpoint and the upload. The full order is in [BUILD-ORDER.md](BUILD-ORDER.md).
+
 ## 1. Purpose
 
 Decide whether a student action may proceed by checking that its dependencies are complete. A dependency belongs to the
@@ -52,7 +54,8 @@ verified is code. The engine is small and plain: load rules, run checks, combine
 
 ## 4. Sheet: `ActivityDependencies`
 
-Coordinator-edited and protected. One row per required item.
+Coordinator-edited. Only coordinators can open the spreadsheet, and the sheet has no sheet protection (decided in
+[ENSURE-SHEET-PLAN.md](ENSURE-SHEET-PLAN.md) section 11). One row per required item.
 
 | Column | Meaning |
 |---|---|
@@ -62,8 +65,10 @@ Coordinator-edited and protected. One row per required item.
 | Label | What the student sees |
 | Active | `Yes` or `No` |
 
-- Created with headers by `setupTitleStorage` if absent; safe to rerun. **The layout is frozen once introduced**, so this
-  is the one part to review before it ships.
+- Created through `ensureSheet_` ([ENSURE-SHEET-PLAN.md](ENSURE-SHEET-PLAN.md)), called by `setupTitleStorage`; safe to
+  rerun. The sheet is specified in [ACTIVITY-DEPENDENCIES-SHEET-PLAN.md](ACTIVITY-DEPENDENCIES-SHEET-PLAN.md). **The header
+  text and order are frozen once introduced**, so this is the one part to review before it ships. Setup may append a
+  missing header; runtime code (the loader and every decision) never changes the sheet.
 - **Kind** is matched after trim and lowercase. **Item is matched exactly and is not trimmed**, so an accidental
   leading or trailing space makes `validItem` fail and is reported as a misconfiguration. Activity is matched exactly.
 - **Active** accepts `Yes` and `No` (trimmed, case-insensitive). Any other value, including blank, is a
@@ -176,7 +181,8 @@ loadActivityRules_(ctx)                → parseActivityRules_(readActivityDepen
 
 The parser validates:
 
-- sheet present and headers correct
+- sheet present and every required header present by name (extra columns are ignored; a missing or duplicated required
+  header is a misconfiguration at runtime, because only setup repairs a sheet)
 - per row (section 4): all five cells valid for any row that is not entirely blank; known activity; registered kind;
   `validItem(item)` true with the exact, untrimmed Item; non-blank Label; valid `Active`
 - no cycle (rule 10 below)
@@ -264,7 +270,7 @@ snapshots are not regenerated for this work.
 
 | Step | Phase | Work | Tests |
 |---|---|---|---|
-| 1 | 1 | Sheet creation inside `setupTitleStorage` (already a Phase 1 deliverable) | Created with headers; rerun is a no-op; a wrong header is detected |
+| 1 | 1 | Sheet creation through `ensureSheet_` from `setupTitleStorage` (already a Phase 1 deliverable; see ACTIVITY-DEPENDENCIES-SHEET-PLAN.md) | Created with headers; rerun is a no-op; a missing header is appended once repair is enabled; a typo or duplicate throws |
 | 2 | 2 | Registry and check contract | Registering, lookup, unknown kind; registry-completeness test |
 | 3 | 2 | `readActivityDependencyRows_`, `parseActivityRules_`, `loadActivityRules_` | Each misconfiguration case; `Active` parsing; blank Label; untrimmed Item with a stray space; partially filled row; fully blank row ignored; both cycle rules; sheet read once per request |
 | 4 | 2 | `activityPreconditions_` with fake checks | All met; each unmet listed; `Active = No` ignored; no rows allows; check throws gives "Could not verify"; no early stop |
@@ -297,9 +303,10 @@ readiness summary.
 
 ## 12. Open decisions
 
-1. **Seeding.** Whether `setupTitleStorage` seeds the three release rows or leaves the sheet empty. An empty sheet means
-   "no rows allows", so the gate is off until the coordinator enters the rows. This plan assumes the coordinator enters
-   them at cutover, as the title plan says.
+1. **Seeding. Decided: the coordinator fills the sheet.** `setupTitleStorage` creates the sheet empty and never inserts
+   rows. An empty sheet means "no rows allows", so the gate is off until the coordinator enters the three release rows at
+   cutover, as the title plan says. The cutover checklist therefore includes entering and checking those rows before the
+   first student submission under the new flow.
 2. **File.** The engine and each check as separate files, for example `activity-preconditions.js` plus one file per kind.
    All function names end in `_`.
 3. **Test doubles.** Fake GitHub and Drive layers from the start, matching the Phase 0 stubs for `getTeamGithubSetup_`

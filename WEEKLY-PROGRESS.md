@@ -158,9 +158,10 @@ weekly processing. The following describes storage and the existing hourly sched
 4. Inventory installed triggers under every account that previously installed
    weekly triggers: Apps Script trigger enumeration only exposes the caller's
    installations. Remove retired weekly installations owned by other accounts.
-5. Stop accepting responses on the retired weekly Google Form. Remove Config
-   `WEEKLY_LOG_FORM_URL_BASE` and `WEEKLY_LOG_TEAMID_ENTRY`. Keep its historical
-   responses and RawLog untouched as archives.
+5. This spreadsheet has no weekly Google Form, no weekly Form response sheet and no
+   `RawLog`. If any of them is ever found, retire it under
+   [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md). Remove Config
+   `WEEKLY_LOG_FORM_URL_BASE` and `WEEKLY_LOG_TEAMID_ENTRY` if they are present.
 6. Verify a student submission and revision in the deployed dashboard and inspect
    the installed hourly trigger. No local tests install triggers or deploy code.
 
