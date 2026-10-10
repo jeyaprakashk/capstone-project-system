@@ -2,8 +2,18 @@
 
 Title submission, approval and coordinator reopening in the dashboard, with configurable submission requirements.
 
-Status: **plan (revision 3), not implemented.** It replaces the earlier gate-layer plan (log columns in `TeamIntakeRaw`,
-amendment snapshots, dual writes). Nothing described here exists in the code yet.
+Status: **plan (revision 7), not implemented.** Revision 4 addressed the Codex review of revision 3 (nine findings and
+two validator gaps), adopted the standard envelope error codes and kept the existing title status names. Revision 5
+addresses the Codex review of revision 4: a locked cutover barrier, upload retries and fingerprints, upload
+concurrency, the upload requirement deadlock, stricter history validation, and committed-request recognition on the
+requirement-failure path. Revision 6 addresses the Codex review of revision 5: a superseded-upload retry never touches
+files, uploads recheck title state under the lock, the repository-only GitHub item is withdrawn, the removal check
+targets runtime code only, and uploads get their own result and per-action capabilities. Revision 7 addresses the
+Codex review of revision 6: committed uploads are recognized before requirements, title and problem are mandatory
+with explicit empty-input rules, and the effective title and problem are always shown as one approved or proposed
+pair. Each spreadsheet holds one
+semester, so Team ID alone identifies a team in the log. Nothing
+described here exists in the code yet.
 
 ## 1. Goal and scope
 
@@ -12,39 +22,47 @@ coordinator reopen an approved title, and give every later step of the system on
 have an approved title?**
 
 Title submission opens for a team only when its configured requirements are met. At release these are a completed
-GitHub setup and two documents in the team's Drive folder.
+GitHub setup and two documents in the team's Drive folder. Students put those documents there through a minimal
+dashboard upload that ships with this plan.
 
-**In scope:** student submission, guide and reviewer decisions, coordinator reopen and cancel, `titleGate_`, the
-precondition engine (`ActivityDependencies`, the loader, the `github` and `drive` checks, the decision function), a
-validator for the hand-entered baseline, and the release.
+**In scope:** student title submission, minimal document upload, guide and reviewer decisions, coordinator reopen and
+cancel, `titleGate_`, the precondition engine (`ActivityDependencies`, the loader, the `github` and `drive` checks, the
+decision function), a validator for the hand-entered baseline, a preparatory release (Release 0) that lets the old
+title writers be stopped, and the cutover.
 
-**Out of scope:** everything in [section 14](#14-future-features). In particular: how documents reach the team folder,
-the end-of-semester registry export, gating any activity other than title submission, and any code that reads,
-converts or imports the old title data.
+**Out of scope:** everything in [section 14](#14-future-features), in particular the end-of-semester registry export,
+gating activities other than title submission and document upload, and any code that reads, converts or imports the
+old title data.
 
 ## 2. Decisions
 
-1. **`titleGate_(teamId, index?)` returns `{approved, title, approvedAt}`.** `approved` becomes `true` at the first
-   final approval and stays `true`, including while the title is reopened. `title` is the effective approved title.
+1. **`titleGate_(teamId, index?)` returns `{approved, title, problem, approvedAt}`.** `approved` becomes `true` at the
+   first final approval and stays `true`, including while the title is reopened. `title` and `problem` are the
+   effective pair: the approved title and problem once approved, otherwise the current proposal (section 5).
    `approvedAt` is the date of the first approval and never moves, so reopening can never shift eligibility.
-2. **`TitleLog` is the only title store.** After release no code reads or writes the TeamStatus title, decision,
+2. **`TitleLog` is the only title store.** After cutover no code reads or writes the TeamStatus title, decision,
    similarity or document-link columns, or `TeamIntakeRaw`. Those columns stay in the sheet and in
    `FIELD_DEFINITIONS`, unchanged, because they are frozen. TeamStatus still supplies roster, guide, committee and
    repository.
-3. **No legacy code.** No read-source switch, no import script, no old and new endpoints side by side. Every title
-   reader and writer changes in one release.
-4. **The baseline is entered by hand.** The coordinator copies each team's current state into `TitleLog` as one row
-   in the format of [section 11](#11-baseline-and-release). A read-only validator checks it before release.
-5. **No maintenance mode.** Deploying the new version is the switch. A recheck afterwards catches any decision made
-   on the old version in between.
-6. **One Return action, with required notes,** replaces Rejected and Revise for both guide and reviewer. The guide may
-   edit the title only when approving. Any one assigned reviewer's approval is final, as today.
-7. **Reopening keeps the approved title in effect** until a new reviewer approval replaces it or the coordinator
+3. **No legacy code in the release.** No read-source switch, no import script, no old and new endpoints side by side
+   in production. The one exception is Release 0 (decision 5), a small change to the old writers that is deleted by
+   the release itself.
+4. **The baseline is entered by hand.** The coordinator copies every team's current state into `TitleLog` as one
+   `BASELINE` row, including teams that have not submitted. A read-only validator checks completeness and consistency.
+5. **No maintenance mode.** Only title writes are stopped, and only for the minutes of the cutover, by one script
+   property, `TITLE_CUTOVER` ([section 11](#11-cutover)). Every other part of the system keeps working.
+6. **Standard codes and names.** Errors use the existing envelope codes. Title statuses keep the existing names where
+   the meaning is the same (`NOT_SUBMITTED`, `NEEDS_REVIEW`, `AWAITING_REVIEWER`, `APPROVED`) and add only
+   `RETURNED` and `REOPENED`.
+7. **One Return action, with required notes,** replaces Rejected and Revise for both guide and reviewer, so
+   `RETURNED` replaces `REJECTED_BY_GUIDE` and `REVISE_AWAITING_STUDENT`. The guide may edit the title only when
+   approving. Any one assigned reviewer's approval is final, as today.
+8. **Reopening keeps the approved title in effect** until a new reviewer approval replaces it or the coordinator
    cancels.
-8. **Similarity uses the existing `similarity_` and thresholds,** with one normalization for student and guide titles.
-9. **Submission requirements are data, not code.** The kinds of check (`github`, `drive`) are code. Which checks apply
-   to which activity is rows in `ActivityDependencies`. At release: `github`/`READY` and the two documents.
-10. **This plan lands before [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md),** which is rebased afterwards
+9. **Similarity uses the existing `similarity_` and thresholds,** with one normalization for student and guide titles.
+10. **Submission requirements are data, not code.** The kinds of check (`github`, `drive`) are code. Which checks
+    apply to which activity is rows in `ActivityDependencies`. At release: `github`/`READY` and the two documents.
+11. **This plan lands before [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md),** which is rebased afterwards
     (section 14, F8).
 
 ## 3. Frozen and deliberate changes
@@ -52,10 +70,12 @@ converts or imports the old title data.
 - **Frozen and untouched:** existing sheets, columns and `FIELD_DEFINITIONS`; review rubrics, attendance, the
   eligibility calculation and weights; role detection.
 - **Deliberate changes, reviewed, in their own commit, never inside a UI migration:** the two new sheets (`TitleLog`,
-  `ActivityDependencies`), the Return action, unified normalization, the reopen rule, the length limits, guide edits
-  only on approval, and the submission requirements.
+  `ActivityDependencies`), the Return action and `RETURNED`/`REOPENED` statuses, unified normalization, the reopen
+  rule, the length limits, guide edits only on approval, the submission requirements and document upload.
 - `npm run test:invariants` stays green. A snapshot changes only for the new sheet names, and only with explicit
   approval.
+- The deliberate differences are listed in [section 12](#12-acceptance-tests) and tested separately from the
+  equivalence checks.
 
 ## 4. Title storage: `TitleLog`
 
@@ -66,21 +86,47 @@ Script-owned and append-only. Protected so only the coordinator can edit it (nee
 | Timestamp, Team ID, Revision | Revision runs 1, 2, 3 … per team |
 | Action | `BASELINE`, `SUBMIT`, `GUIDE_APPROVE`, `RETURN`, `REVIEWER_APPROVE`, `REOPEN`, `CANCEL_REOPEN` |
 | Actor, Request ID, Fingerprint | The fingerprint is a hash of the action and its normalized input; blank on `BASELINE` |
-| Status | `SUBMITTED`, `GUIDE_APPROVED`, `RETURNED`, `APPROVED`, `REOPENED` |
+| Status | `NOT_SUBMITTED` (baseline only), `NEEDS_REVIEW`, `AWAITING_REVIEWER`, `RETURNED`, `APPROVED`, `REOPENED` |
 | Proposed Title, Proposed Problem | The current proposal |
 | Notes, Similarity Note | Return notes or a reason; the closest similarity match |
 | Reopened | `Yes` while a reopening is open |
 | Approved Title, Approved Problem, Approved At, Approved By | The effective approval, copied forward on every row |
 
-- Each row is the team's complete state after one action, so the latest row is the current state. No row means "not
-  submitted".
-- Rows are never edited after release. Text starting with `=`, `+`, `@` or `-` is escaped.
-- **Validation per team:** revisions run 1…n with no gaps; revision 1 is `BASELINE` or `SUBMIT`; only revision 1 may
-  be `BASELINE`; the status is known; the approved fields are consistent (all set when the team has ever been
-  approved, all blank otherwise). A failure gives that team a `STORAGE` error; other teams keep working, and
-  coordinator health lists it.
-- Missing or duplicated headers give a `STORAGE` error for everything. Headers are never created silently.
-- The log is read once per request into an index by team that every caller reuses.
+- Each row is the team's complete state after one action, so the latest row is the current state. A team with no
+  row is `NOT_SUBMITTED` (a team added to the roster after cutover).
+- Rows are never edited after cutover. Text starting with `=`, `+`, `@` or `-` is escaped.
+- Missing or duplicated headers make every title read and write fail with `UNAVAILABLE`. Headers are never created
+  silently.
+
+**Validation of a team's history** (on every read; a failure makes only that team `UNAVAILABLE`, and coordinator
+health lists it):
+
+1. Revisions run 1…n with no gaps or duplicates.
+2. Revision 1 is `BASELINE` or `SUBMIT`; only revision 1 may be `BASELINE`; `NOT_SUBMITTED` appears only on a
+   `BASELINE`.
+3. Every later row is a legal transition: the previous row's status and this row's action are a row of the table in
+   [section 5](#5-title-workflow), and this row's status is that row's result.
+4. The `Reopened` flag is set by `REOPEN`, kept by `SUBMIT`, `GUIDE_APPROVE` and `RETURN`, and cleared by
+   `REVIEWER_APPROVE` and `CANCEL_REOPEN`.
+5. The approved fields are copied forward unchanged on every row except `REVIEWER_APPROVE`, which replaces the title,
+   problem and approver. `Approved At`, once set, never changes. Approved Title, Approved At and Approved By are all
+   set or all blank. Approved Problem is set whenever they are, with one exception: an `APPROVED` baseline whose
+   Form-period problem statement was empty may carry a blank Approved Problem until the next `REVIEWER_APPROVE`.
+   Every `SUBMIT`, `GUIDE_APPROVE` and `REVIEWER_APPROVE` row has a non-empty Proposed Title and Proposed Problem.
+   (A pending baseline with a blank problem therefore cannot be approved; it must go through Return and a
+   resubmission, section 5.)
+6. **Approval consistency.** The approved fields are set exactly when the team has been approved: from an `APPROVED`
+   baseline or the first `REVIEWER_APPROVE` onward, and on no row before that. So they are always set when the
+   status is `APPROVED` or `REOPENED`, or `Reopened` is `Yes`, and always blank on a team that was never approved.
+7. **Approver row content.** On a `REVIEWER_APPROVE` row, Approved Title and Approved Problem equal that row's Proposed
+   Title and Proposed Problem, and Approved By equals its Actor. On the first such row (no approved baseline),
+   Approved At equals that row's Timestamp.
+8. **Valid dates.** Every Timestamp, and every populated Approved At, is a real date, not in the future (Approved At
+   is blank on rows of a team never approved, as rule 6 requires), and Timestamps never decrease
+   from one revision to the next. Approved At is not later than the Timestamp of the row that first carries it.
+
+With these rules `titleGate_` (from the approved fields) and the eligibility calculation (from `Approved At`) can
+never disagree about whether or when a team was approved.
 
 **Setup:** `setupTitleStorage()` is editor-run, starts with `requireTriggerOrOperator_()`, creates `TitleLog` and
 `ActivityDependencies` with headers if they are absent, and is safe to rerun.
@@ -89,19 +135,32 @@ Script-owned and append-only. Protected so only the coordinator can edit it (nee
 
 | Action | Who | From | Result | Rules |
 |---|---|---|---|---|
-| Submit | A member of the team, derived from the session | none, `RETURNED`, `REOPENED` | `SUBMITTED` | Title at most 200 characters, problem at most 5,000; similarity check; requirements met ([section 7](#7-precondition-engine)) |
-| Guide approve | The team's recorded guide | `SUBMITTED` | `GUIDE_APPROVED` | Optional title edit, which reruns the similarity check |
-| Return | The guide (from `SUBMITTED`) or an assigned reviewer (from `GUIDE_APPROVED`) | as stated | `RETURNED` | Notes required |
-| Reviewer approve | Any assigned committee reviewer | `GUIDE_APPROVED` | `APPROVED`, reopening closed | Sets the approved title, problem and approver; sets `Approved At` only on the first approval |
+| Submit | A member of the team, derived from the session | `NOT_SUBMITTED`, `RETURNED`, `REOPENED` | `NEEDS_REVIEW` | Title and problem both required (see input rules below); similarity check; requirements met ([section 7](#7-precondition-engine)) |
+| Guide approve | The team's recorded guide | `NEEDS_REVIEW` | `AWAITING_REVIEWER` | Optional title edit, under the same input rules, which reruns the similarity check. Refused while the proposed problem is blank (legacy baselines only) |
+| Return | The guide (from `NEEDS_REVIEW`) or an assigned reviewer (from `AWAITING_REVIEWER`) | as stated | `RETURNED` | Notes required |
+| Reviewer approve | Any assigned committee reviewer | `AWAITING_REVIEWER` | `APPROVED`, reopening closed | Sets the approved title, problem and approver; sets `Approved At` only on the first approval. Refused while the proposed problem is blank (legacy baselines only) |
 | Reopen | Coordinator | `APPROVED` | `REOPENED` | Reason required, at most 500 characters. Approved fields unchanged |
 | Cancel reopen | Coordinator | any status while a reopening is open | `APPROVED` | Reason required. Proposal reverts to the approved title and problem |
 
 - A reopening is open from `REOPEN` until the next `REVIEWER_APPROVE` or `CANCEL_REOPEN`. Returns and resubmissions
   inside it do not close it.
-- Submitting is blocked while the status is `SUBMITTED` or `GUIDE_APPROVED`.
-- **Displayed title:** wherever a team's title is shown outside the title panel (reviews, results, team drawer, lists),
-  it is the approved title when `approved` is `true`, otherwise the proposal. Title panels show both during a
-  reopening.
+- Submitting is blocked while the status is `NEEDS_REVIEW` or `AWAITING_REVIEWER`.
+- **Input rules** (submissions and guide edits, checked on the server before similarity):
+  - The title is normalized first (trim, strip surrounding quotes, uppercase). The normalized title must be
+    non-empty and at most 200 characters. Whitespace-only and quote-only titles (for example `"  "` or `'""'`) are
+    refused with `INVALID_INPUT`. `similarity_` returns 0 for an empty string, so it must never be relied on to
+    catch this.
+  - The problem statement is **mandatory**: after trimming it must be non-empty and at most 5,000 characters.
+  - A guide's edited title, when given, follows the title rule. An empty `editedTitle` means "no edit", never "clear
+    the title".
+- **Effective title and problem.** The title and problem shown together are always one pair from one source, never
+  mixed:
+  - when `approved` is `true` (including during a reopening): the approved title **and** the approved problem;
+  - otherwise: the proposed title and the proposed problem.
+
+  `titleGate_` returns this pair (section 2) and every screen outside the title panel uses it: reviews, review
+  marking (the `title` and `problem` details at [review-evaluation.js:32](review-evaluation.js#L32)), results, the
+  team drawer and lists. Title panels show both pairs during a reopening, labelled "Approved" and "Proposed".
 
 **Similarity** (submissions and guide edits):
 
@@ -114,23 +173,62 @@ Script-owned and append-only. Protected so only the coordinator can edit it (nee
 
 ## 6. Writes
 
-Every write carries `requestId` and `expectedRevision`.
+Every title write carries `requestId` and `expectedRevision`.
 
-1. **Submit only: requirements first, outside the lock.** They need GitHub and Drive calls, which must not hold the
-   shared script lock. A failure returns `REQUIREMENTS` with every unmet item.
-2. Take the script lock with `waitLock(10000)`. The lock is shared with GitHub and logbook jobs; a timeout returns
-   `BUSY` ("Busy, try again").
-3. Recheck authorization from the session, roster and committee.
-4. If the `requestId` is already logged: the same fingerprint returns the stored result; a different one returns
-   `CONFLICT`.
-5. Refuse with `STALE` when `expectedRevision` is not the current revision.
-6. `titleCanDo_` (role and state), input validation and similarity, then append one row and `SpreadsheetApp.flush()`.
-7. If the append throws, reread by `requestId`. If the row is there, the write succeeded. If not, return an error;
-   the user resubmits and the bridge reuses the same `requestId` for the same content.
-8. Release the lock, then send mail. A mail failure is logged and returned as `warning`; the save stands. A
-   duplicate request sends no mail.
+**Order of checks:**
 
-The bridge never times out or retries a write.
+1. Authenticate and authorize from the session (role, and for staff the team assignment).
+2. If `TITLE_CUTOVER` is not `LIVE`, refuse with `UNAVAILABLE`: "Title updates are paused for a short update." This
+   is only a fast early answer; the binding check is step 7.
+3. **Committed request first.** Read the log (read-only, no lock). If the `requestId` is already logged, return the
+   stored result when the fingerprint matches, or `CONFLICT` when it does not. A retry of a committed write therefore
+   never reaches the requirement check.
+4. **Requirements, outside the lock (submit only).** GitHub and Drive calls must not hold the shared script lock.
+5. **If a requirement is unmet, look for a committed copy before refusing.** Reread the log (read-only) for the
+   `requestId`. If another copy of this request committed while the requirements were being checked, return its
+   stored result (or `CONFLICT` if the fingerprint differs). Only if it is still absent, return `REJECTED` with every
+   unmet item in the message.
+6. Take the script lock with `waitLock(10000)`. A timeout returns `UNAVAILABLE` ("Busy, try again").
+7. **Under the lock, immediately before any change:** reread `TITLE_CUTOVER` and refuse with `UNAVAILABLE` unless it
+   is `LIVE`; reread the team's log rows, the roster row and the committee. Nothing read before the lock may decide
+   anything from here on.
+8. Recheck authorization and the committed request ID against the fresh data (a concurrent duplicate may have
+   committed during step 4), then refuse with `CONFLICT` when `expectedRevision` is not the fresh current revision.
+9. `titleCanDo_` on the fresh state, input validation and similarity, then append one row with revision = fresh
+   current + 1, and `SpreadsheetApp.flush()`.
+10. If the append throws, reread by `requestId`. If the row is there, the write succeeded. If not, return
+    `UNAVAILABLE`; the user retries manually with the same request ID (below).
+11. Release the lock, then send mail. A mail failure is logged and returned as `warning`; the save stands. A
+    duplicate request sends no mail.
+
+**Error codes** (the existing envelope codes in [api-envelope.js](api-envelope.js); no new codes):
+
+| Situation | Code | View behaviour |
+|---|---|---|
+| Wrong role or not assigned | `UNAUTHORIZED` | Show the message |
+| Bad input (length, empty notes, unknown decision) | `INVALID_INPUT` | Show the message; keep the form |
+| Similar to a registry title | `REJECTED` | Show the message naming the match; keep the form |
+| Requirements not met | `REJECTED` | Show the message listing unmet items; reload the title DTO so the checklist updates |
+| Wrong state for the action | `REJECTED` | Show the message; reload |
+| Stale revision, or request ID reused with different content | `CONFLICT` | "This title changed since you opened it."; reload |
+| Lock timeout, cutover pause, storage error, uncertain append | `UNAVAILABLE` | Show the message; keep the form for a manual retry |
+
+The precise reason is written to the server log for diagnosis. The envelope, the bridge and the error section of
+DATA-CONTRACTS.md do not change.
+
+**Request IDs in the browser.** The bridge stays as it is: it only merges identical in-flight writes and
+never retries. The title and upload views own their request IDs:
+
+- A view creates a request ID the first time the user submits a given content, and keeps it in the view's state with
+  that content (title and problem; decision, notes and edited title; reason; or document key and file hash).
+- It **reuses** the ID when the user retries the same content after `TRANSPORT`, `TIMEOUT`, `BAD_RESPONSE` or
+  `UNAVAILABLE`.
+- It **replaces** the ID when the content changes, and **drops** it after success or after `UNAUTHORIZED`,
+  `INVALID_INPUT`, `REJECTED` or `CONFLICT`.
+- **Title writes:** if the page is reloaded the ID is lost. That is safe: a new ID carries the revision the user last
+  saw, so a write that already committed makes the retry fail with `CONFLICT` rather than apply twice.
+- **Uploads** have no revision. After a reload, a retry with a new ID simply uploads the same file again, which is
+  harmless because the last successful upload wins ([section 8](#8-document-upload-minimal)).
 
 ## 7. Precondition engine
 
@@ -145,7 +243,8 @@ Coordinator-edited and protected. One row per required item; an activity has sev
 | `title.submit` | `drive` | `Step2_Need_Analysis.docx` | Need Analysis document | Yes |
 
 - **Activity:** an ID the code knows. In this plan: `title.submit` (any submission before the first approval,
-  including after a Return) and `title.resubmit` (a submission during a reopening; with no rows it is unrestricted).
+  including after a Return), `title.resubmit` (a submission during a reopening) and `document.upload`. With no rows,
+  an activity is unrestricted.
 - **Kind:** a check provided by code. **Item:** its meaning depends on the kind. **Label:** what the student sees.
   **Active = No:** turns the row off for everyone.
 
@@ -154,14 +253,16 @@ Coordinator-edited and protected. One row per required item; an activity has sev
 | Kind | Item | Met when | Data used |
 |---|---|---|---|
 | `github` | `READY` | Every member's GitHub username is submitted and valid, the repository exists and is verified, every member has active or invited access, and template setup has finished | `getTeamGithubSetup_` with access inspection, `ready` |
-| `github` | `REPOSITORY` | The repository URL is saved and the repository is verified on GitHub | `getTeamGithubSetup_`, `repositoryAvailable` |
 | `drive` | a file name | Exactly one non-trashed file with that exact name is in the team folder | `findTeamFolder_`, then a name lookup in that folder |
 
-- An unmet `github` item uses the existing `githubSetupMessage_` text as its reason, so students see the same
-  guidance as on their GitHub card.
-- `REPOSITORY` is valid in code but not used at release.
-- Coordinator health warns when a `drive` item matches none of `TEAM_DOCUMENT_FILE_NAMES_`
-  ([team-folders.js:11](team-folders.js#L11)), the names the upload feature will write.
+- An unmet `github` item uses the existing `githubSetupMessage_` text as its reason.
+- `READY` is the only `github` item. A repository-only check is not offered: `getTeamGithubSetup_` verifies the
+  repository only once every username is complete ([team-github-setup.js:116](team-github-setup.js#L116)), so it
+  cannot answer "does the repository exist?" on its own. Any other `github` item is a misconfiguration (F3 lists an
+  independent repository check as a possible later kind).
+- A `drive` item must be one of the upload names in `TEAM_DOCUMENT_FILE_NAMES_`
+  ([team-folders.js:11](team-folders.js#L11)); any other name is a misconfiguration, because students could never
+  satisfy it.
 
 ### Loader and decision
 
@@ -169,93 +270,213 @@ Coordinator-edited and protected. One row per required item; an activity has sev
 loadActivityRules_(ctx)                         → { rules: {activityId: [{kind, item, label}]}, errors: [] }
 check = { kind, needsApprovedTitle, perStudent, validItem(item), isMet(team, item, ctx) → {met, reason} }
 activityPreconditions_(activityId, team, ctx)   → { allowed, requirements: [{label, met, reason}], reason }
-titleCanDo_(state, action, user, ctx)           → { allowed, reason }
+titleCanDo_(state, action, user)                → { allowed, reason }
 ```
 
-`ctx` is built once per request (`now`, the log index, roster, registry, the loaded rules, a GitHub and Drive result
-cache for that request). An endpoint and its DTO flag both call `titleCanDo_` and, for submit,
-`activityPreconditions_`, so they cannot disagree.
+`ctx` holds the request's loaded rules and a GitHub and Drive result cache for that request. It never holds title
+state used for a write decision (section 6, step 7). An endpoint and its DTO flag both call `titleCanDo_` and, for
+gated actions, `activityPreconditions_`, so they cannot disagree.
 
 ### Fixed rules
 
-1. **Only student submit actions are gated.** Guide and reviewer decisions, returns and coordinator actions are never
-   gated, so a team can never be stuck halfway through a review.
-2. **Built-in rules run first; the sheet only adds requirements.** It can never relax role, state, eligibility or
-   review rules.
+1. **Only student submit actions are gated** (title submission and document upload). Guide and reviewer decisions,
+   returns and coordinator actions are never gated.
+2. **Built-in rules run first; the sheet only adds requirements.**
 3. **All-of only.** Every active row must be met. No any-of, no expressions, no per-team waivers.
-4. **Checked only at the moment of submission, never retroactively.** A title already submitted or approved is not
-   affected by later file, repository or sheet changes.
+4. **Checked only at the moment of the action, never retroactively.** A committed request is recognized before the
+   requirements are checked (section 6, step 3).
 5. **No caching between requests.** A sheet change takes effect on the next request.
 6. **Misconfiguration denies.** A missing sheet, a wrong header, or a row with an unknown activity, unknown kind or
    invalid item denies every gated activity: "Submission requirements are misconfigured. Contact the coordinator."
-7. **No active rows allows.** An existing sheet with no active rows for an activity allows it.
-8. **Unverifiable is unmet.** If GitHub, Drive or the team folder cannot be read, the item is unmet with "Could not
-   verify: <label>."
-9. **A missing team folder** makes every `drive` item unmet with "Team folder not created yet." Only the coordinator
-   creates folders, from System Status.
-10. **No cycles.** A check with `needsApprovedTitle` cannot be required by `title.*`; the loader refuses such rows.
+7. **No active rows allows.**
+8. **Unverifiable is unmet:** "Could not verify: <label>."
+9. **A missing team folder** makes every `drive` item unmet: "Team folder not created yet."
+10. **No cycles.** A check with `needsApprovedTitle` cannot be required by `title.*` or `document.upload`, and the
+    `drive` kind cannot be required by `document.upload`, because the upload is how those files are created. The
+    loader treats either as a misconfiguration.
 11. **Per-student kinds** (later kinds only) are met when every obligated current member has done the item. If no
     member is obligated, the item is unmet.
 12. **A denial lists every unmet item,** and the student DTO carries the full checklist.
-13. **Cost.** Requirements are evaluated only for the student's own team when the built-in rules would allow a
-    submission, once more at submission, and for one team on demand in the coordinator drawer. Guide, reviewer and
-    coordinator lists never evaluate them on load.
-14. **Administration.** Only the coordinator edits the sheet. Coordinator health shows the parsed rules, validation
-    errors and `drive` names that match no upload name. The sheet layout is fixed once introduced.
+13. **Cost.** Requirements are evaluated only for the student's own team when the built-in rules would allow the
+    action, once more at the action, and for one team on demand in the coordinator drawer.
+14. **Administration.** Only the coordinator edits the sheet. Coordinator health shows the parsed rules and errors.
+    The sheet layout is fixed once introduced.
 
-## 8. Downstream readers
+## 8. Document upload (minimal)
 
-These all move to `titleGate_`, or to the title DTO for display, in the release:
+The `drive` requirements need a way for files to reach the team folder. Folder creation does not share
+folders with anyone ([team-folders.js:111](team-folders.js#L111)), so students cannot place files themselves.
+
+- **Endpoint:** `API_student_uploadDocument({requestId, documentKey, fileName, mimeType, dataBase64})`. The team comes
+  from the session. `documentKey` is a key of `TEAM_DOCUMENT_FILE_NAMES_` (`work`, `need`); the stored name is that
+  constant's value, whatever the uploaded file was called.
+- **Rules:** `.docx` only (checked by extension and MIME type); at most 10 MB; the team folder must exist (it is never
+  created here); blocked while the title is `NEEDS_REVIEW` or `AWAITING_REVIEWER`, so documents do not change under
+  review; gated by `document.upload` rows (none at release).
+- **Fingerprint.** The server decodes the content and computes `fingerprint = SHA-256(documentKey + SHA-256(bytes))`.
+  The browser's own hash only decides when to reuse a request ID; the server never trusts it.
+- **Before the lock** (read-only):
+  1. Authenticate, the early `TITLE_CUTOVER` check, decode and fingerprint the content.
+  2. **Committed upload first.** Look in the team folder (live files and trash) for a file whose description carries
+     this `requestId`:
+     - different fingerprint: return `CONFLICT`;
+     - same fingerprint and **complete** (the file is in the trash because a newer upload replaced it, or it is live
+       and is the only live file with that name): return success at once (with `replaced: true` in the first case).
+       The requirements are not evaluated, so a retry of a finished upload never fails because GitHub became
+       unavailable or a rule changed;
+     - same fingerprint but **incomplete** (live, with other live files of the same name still to trash): skip the
+       requirements and go to the lock to finish the cleanup;
+     - not found: continue.
+  3. **Requirements** (`document.upload`), only for a request not found in step 2. If one is unmet, repeat the step 2
+     lookup once before refusing, in case another copy of this request finished meanwhile; only if it is still absent,
+     return `REJECTED` with the unmet items.
+- **Under the script lock** (`waitLock(10000)`), in this order:
+  1. **Fresh checks under the lock, before touching any file:** reread `TITLE_CUTOVER` (refuse unless `LIVE`),
+     re-derive the student's team from the session and the fresh roster, and reread that team's title state from
+     `TitleLog`. If the status is now `NEEDS_REVIEW` or `AWAITING_REVIEWER` (for example, a title submission committed
+     while this upload waited for the lock), refuse with `REJECTED` and change nothing. These checks also apply to
+     retries, so a retry never runs cleanup on a team whose documents are now under review.
+  2. Look again, on fresh data, in the team folder (live files and trash) for a file whose description carries this
+     `requestId`. The pre-lock lookup only short-cuts finished requests; this one decides.
+  3. **Found, with a different fingerprint:** return `CONFLICT` and change nothing.
+  4. **Found, same fingerprint, and that file is in the trash:** a later upload replaced it, so this request had
+     already succeeded. Return success with `replaced: true` and the note "A newer upload has since replaced this
+     file." **Change no files**; above all, never trash the newer file.
+  5. **Found, same fingerprint, and that file is live (a retry):** do not upload again; go to step 7.
+  6. **Not found:** create the new file with the fixed name and a description of
+     `{"requestId", "fingerprint", "uploadedBy", "uploadedAt"}`.
+  7. **Finish and verify.** Trash every *other* live file with the same name (never this request's file), then reread
+     the folder. Return success only if exactly one live file has the name and it is this request's file. If cleanup
+     fails, return `UNAVAILABLE` (the user retries and the retry finishes the cleanup); the `drive` check, seeing two
+     files, stays unmet meanwhile.
+- **Concurrency: the last successful upload wins.** Uploads carry no version precondition. Two members replacing the
+  same document one after the other both succeed, and the later file is kept; the DTO shows who uploaded the current
+  file and when, so the team can see it. This is acceptable because a document is not under review while uploads are
+  allowed (rules above), and the lock makes each replacement whole.
+- **Only students upload.** Guides and reviewers only open the folder link.
+- **Server-side write as the deploying account.** The web app runs as `USER_DEPLOYING`, so every file is created by
+  that account and students need no Drive access. Consequences:
+  - Drive's creator and "last modified by" are always the deploying account, so the upload records its own audit in
+    the file description: `{"requestId", "fingerprint", "uploadedBy", "uploadedAt"}`, where `uploadedBy` is the
+    session email.
+  - Drive permissions do not separate teams, because the deploying account can write to every folder. The server alone
+    enforces it: the target folder is always the session student's own team folder, and no team or folder ID is ever
+    taken from the request.
+  - Uploads depend on that account keeping Content manager access to the shared drive. Without it they fail with
+    `UNAVAILABLE` and the `drive` check stays unmet.
+- **DTO:** the student title DTO lists each document key with its label, whether it is present, and who uploaded it
+  and when (from the description). A file placed by hand, such as a copied Form upload, shows as present with the
+  uploader unknown.
+- **Who can open the files:** the spreadsheet and `Team Documents` are in a shared drive. Guides and reviewers get view
+  access to the team folders from the shared drive's own permissions, so the folder link shown to them opens without
+  any sharing step. This plan never changes Drive sharing.
+- **Shared drive requirements:** files in a shared drive belong to the drive, not to the deploying account. The
+  deploying account (the web app runs as `USER_DEPLOYING`) must be a shared drive member with at least **Content
+  manager** access, because the upload moves the replaced file to trash, which the Contributor role cannot do.
+  Students need no shared drive membership; the upload writes for them.
+- **Students must not be shared drive members.** The web app is their only way to write to a team folder, which is
+  what keeps each student to their own team's folder. A student with shared drive membership could open or edit any
+  team's folder directly in Drive, bypassing every check here. Keep membership to staff (coordinator, guides,
+  reviewers) and the deploying account.
+
+**Existing documents.** Documents uploaded through the Form are not moved by code. Before cutover the coordinator
+copies each team's existing Form uploads into its team folder under the fixed names (section 11, step 3) and checks
+them on the requirements card.
+
+## 9. Downstream readers
+
+These all move to `titleGate_`, or to the title DTO for display:
 
 | Area | Sites |
 |---|---|
 | Weekly submission | [logbook-tracker.js:424](logbook-tracker.js#L424), [logbook-tracker.js:454](logbook-tracker.js#L454) |
-| Review marking | [review-evaluation.js:15](review-evaluation.js#L15), [reviewer-api.js:16](reviewer-api.js#L16) |
+| Review marking | [review-evaluation.js:15](review-evaluation.js#L15), [review-evaluation.js:32](review-evaluation.js#L32) (title and problem details: the effective pair), [reviewer-evaluation.js:3-13](reviewer-evaluation.js#L3-L13) (`reviewerTeamContext_` title), [reviewer-api.js:16](reviewer-api.js#L16) |
 | Eligibility | [progress-eligibility.js:93-104](progress-eligibility.js#L93-L104), [progress-eligibility.js:221-261](progress-eligibility.js#L221-L261): `titleStatus` and `titleDate` come from the gate; the `ProgressEligibility` columns and calculation are unchanged |
 | Guide | [guide-dashboard.js:22](guide-dashboard.js#L22), [guide-dashboard.js:38-75](guide-dashboard.js#L38-L75) (approval and document dates), [guide-api.js:73](guide-api.js#L73), [guide-api.js:155](guide-api.js#L155) |
 | Reviewer | [reviewer-api.js:5-50](reviewer-api.js#L5-L50), [reviewer-dashboard.js:7-31](reviewer-dashboard.js#L7-L31) |
-| Coordinator | [coordinator-dashboard.js](coordinator-dashboard.js) lines 57, 97, 165, 275, 307, 317; the team drawer |
+| Coordinator | [coordinator-dashboard.js](coordinator-dashboard.js) lines 57, 97, 165, 275, 307, 317; [coordinator-view.js:163](coordinator-view.js#L163); the team drawer |
 | Student | [student-dashboard.js:42](student-dashboard.js#L42), [student-api.js:36](student-api.js#L36) (Form link) |
-| Digests | `sendGuideReminderDigest` (status `SUBMITTED`), `sendReviewerApprovalDigest` (status `GUIDE_APPROVED`) |
+| Digests | `sendGuideReminderDigest` (status `NEEDS_REVIEW`), `sendReviewerApprovalDigest` (status `AWAITING_REVIEWER`) |
 
-Grep every use of `getTeamStatus_`, `REVIEWER_DECISION`, `GUIDE_DECISION`, `TS.TITLE`, `TS.PROBLEM`,
-`SIMILARITY_FLAG`, `TITLE_APPROVED_BY`, the document-link fields and `TEAM_INTAKE_RAW` to confirm the list is complete.
+Before Phase 1 ends, grep every use of `getTeamStatus_`, `REVIEWER_DECISION`, `GUIDE_DECISION`, `TS.TITLE`,
+`columns.TITLE`, `TS.PROBLEM`, `SIMILARITY_FLAG`, `TITLE_APPROVED_BY`, the document-link fields, `TEAM_INTAKE_RAW`,
+`submitDecision` and `buildTeamIntakeLink_` across server code, views, tests and DATA-CONTRACTS.md, and add any site
+missing from this table.
 
-**Removed in the same release:** `getTeamStatus_`; the registry date matching (`progressTitleDate_`,
-`readGuideApprovals_`); the `TeamIntakeRaw` document-date reader; `onTeamIntakeSubmit`, `applyGuideDecision_`,
-`applyReviewerDecision_`, `submitReviewerDecision_`, `submitGuideDecision_` and `API_guide_submitDecision`;
-`buildTeamIntakeLink_` and the `TEAM_INTAKE_FORM_URL_BASE` and `TEAM_INTAKE_TEAMID_ENTRY` config keys; the Form links.
+**Removal check (Phase 8 and section 12).** The goal is zero *runtime* readers or writers of the old title data, not
+zero mentions. The same grep must find no match in server code (`*.js` run by Apps Script) or browser modules, with
+these exclusions, which keep their mentions:
+
+- the frozen definitions: `SHEET_NAMES`, `FIELD_DEFINITIONS` and the column-map helpers in `common-constants.js`;
+- `tests/invariants/` and its snapshots, and the Phase 0 golden-master fixtures;
+- tests that assert the old columns are untouched or unread;
+- documentation (`*.md`), including this plan and the "Form period" notes in DATA-CONTRACTS.md.
+
+The check is a test that greps the runtime files with the exclusion list written in it, so a new exclusion has to be
+added there deliberately.
+
+**Removed by the end of the work**, each in the phase of the dashboard that used it:
+
+| Removed | Callers removed with it |
+|---|---|
+| `API_guide_submitDecision`, `submitGuideDecision_`, `applyGuideDecision_` | [guide-view.js:333](guide-view.js#L333); its DATA-CONTRACTS.md row; its tests |
+| `API_reviewer_submitDecision`, `submitReviewerDecision_`, `applyReviewerDecision_` | [reviewer-view.js:135](reviewer-view.js#L135); its DATA-CONTRACTS.md row; its tests |
+| `onTeamIntakeSubmit` | its `GUARDED` entry; `tests/title-intake.test.cjs`; the intake cases in `tests/team-github-setup.test.cjs` |
+| `buildTeamIntakeLink_`, `TEAM_INTAKE_FORM_URL_BASE`, `TEAM_INTAKE_TEAMID_ENTRY` | [student-api.js:36](student-api.js#L36); `tests/student-fixture.cjs` |
+| `getTeamStatus_`, `progressTitleDate_`, `readGuideApprovals_`, the `TeamIntakeRaw` document-date reader | every site in the table above |
+| The `CHAPTER1_LATEX_LINK` read in `reviewer-api.js` (a field not in `FIELD_DEFINITIONS`) | the reviewer documents list |
 
 Guide and reviewer views show a link to the team's Drive folder in place of document links.
 
-## 9. Endpoints and DTO
+## 10. Endpoints, DTO and phases
 
 | Endpoint | Role | Input |
 |---|---|---|
 | `API_title_get(teamId?)` | Any; the server limits which teams are visible | — |
-| `API_student_submitTitle(input)` | Student | `{requestId, expectedRevision, title, problem}`; the team comes from the session |
+| `API_student_submitTitle(input)` | Student | `{requestId, expectedRevision, title, problem}` |
+| `API_student_uploadDocument(input)` | Student | `{requestId, documentKey, fileName, mimeType, dataBase64}` |
 | `API_guide_decideTitle(input)` | Guide | `{requestId, expectedRevision, teamId, decision: 'approve' \| 'return', notes, editedTitle?}` |
 | `API_reviewer_decideTitle(input)` | Reviewer | `{requestId, expectedRevision, teamId, decision: 'approve' \| 'return', notes}` |
 | `API_coordinator_reopenTitle(input)` / `API_coordinator_cancelReopen(input)` | Coordinator | `{requestId, expectedRevision, teamId, reason}` |
 | `API_coordinator_getRequirements(teamId?)` | Coordinator | Parsed rules and errors; with `teamId`, that team's checklist |
-| `API_coordinator_validateTitleLog()` | Coordinator | Read-only report of the section 4 checks for every team |
+| `API_coordinator_validateTitleLog()` | Coordinator | Read-only report (section 11) |
 
 **Title DTO:**
 
 ```
 { teamId, revision, status, reopened,
   proposal: {title, problem}, notes, similarityNote,
-  approved: {value, title, at, by},
+  approved: {value, title, problem, at, by},
   reopen: {reason, by, at} | null,
-  folderUrl,                                    // team Drive folder, '' when absent
-  requirements: [{label, met, reason}],         // student's own team only; [] elsewhere
-  history: [{revision, action, actor, at, notes}],   // coordinator only
-  can: { submit: {allowed, reason}, approve, return, reopen, cancel } }
+  folderUrl,                                          // team Drive folder, '' when absent
+  documents: [{key, label, present, uploadedBy, uploadedAt}],   // student's own team; staff see presence only
+  history: [{revision, action, actor, at, notes}],     // coordinator only
+  can: {
+    submit:  Capability,             // the server picks title.submit or title.resubmit; activity says which
+    upload:  {work: Capability, need: Capability},   // one per document key
+    approve: Capability, return: Capability,         // guide or reviewer, for this team
+    reopen:  Capability, cancel: Capability          // coordinator
+  } }
+
+Capability = { allowed: boolean,
+               reason: string,                       // '' when allowed; otherwise the first reason to show
+               activity: string | null,              // 'title.submit', 'title.resubmit', 'document.upload'; null if not gated
+               requirements: [{label, met, reason}] } // that activity's checklist; [] when not gated or not evaluated
 ```
 
-Write results are `{ok, revision, status, message, warning?}`. Errors use the existing envelope with the codes `BUSY`,
-`STALE`, `CONFLICT`, `FORBIDDEN`, `INVALID`, `SIMILAR`, `REQUIREMENTS` and `STORAGE`. DATA-CONTRACTS.md, the endpoints,
-their contract tests and the views change together.
+Every action has its own capability, so the view can say exactly why each button is disabled: a built-in reason
+(role, state, under review) in `reason`, or unmet items in that action's own `requirements`. Requirements are filled
+only for the student's own team, and only when the built-in rules would allow the action (section 7, rule 13);
+otherwise `requirements` is `[]` and `reason` explains the built-in refusal.
+
+**Write results:**
+
+- Title writes: `{ok, revision, status, message, warning?}`.
+- Uploads (no revision): `{ok, documentKey, present: true, uploadedBy, uploadedAt, replaced, message, warning?}`.
+  `replaced` is `true` only for a retry whose file a newer upload has since replaced (section 8, step 4); then
+  `uploadedBy` and `uploadedAt` describe the current file.
+
+DATA-CONTRACTS.md, the endpoint, its contract test and its view change together.
 
 **Notifications:**
 
@@ -270,158 +491,238 @@ their contract tests and the views change together.
 | Reopen, cancel | Guide and students |
 | Refused authorization attempt | Coordinator |
 
-**Views.** Student (title form, requirements checklist, folder link), guide, reviewer and coordinator (drawer actions,
-history and requirements; a requirements card in System Status). Each is built and tested in its own commit and all
-ship in the one release. Bridge only, Tailwind utilities, `data-*` hooks and delegated listeners; views render only
-`can.*` and `requirements`. New modules are registered under their role in `getMigratedViewsClientScript_` and in
+**Views.** Bridge only, Tailwind utilities, `data-*` hooks and delegated listeners; views render only `can.*` (with
+each capability's `requirements`) and `documents`. New modules are registered under their role in `getMigratedViewsClientScript_` and in
 `ROLE_MODULES` in `tests/page-assembly.test.cjs`; their tests go into the `test` and `test:migration` scripts.
-Rebuild Tailwind after any class change.
+Rebuild Tailwind after any class change. [tests/entry-point-guard.test.cjs](tests/entry-point-guard.test.cjs) gains
+`setupTitleStorage`, `setTitleCutover` (from Release 0) and the new `API_*` functions, and loses `onTeamIntakeSubmit` and the two old decision endpoints.
 
-**Entry points.** [tests/entry-point-guard.test.cjs](tests/entry-point-guard.test.cjs) gains `setupTitleStorage` and
-the new `API_*` functions, and drops `onTeamIntakeSubmit`. Every other server function ends in `_`.
+### Phases
 
-## 10. Phases
-
-Each phase passes `npm test`, `npm run test:migration`, `npm run test:invariants` and `npm run check:tailwind`
-before the next starts. All phases ship together in one release.
+Phases are commits on the development branch, and every one passes `npm test`, `npm run test:migration`,
+`npm run test:invariants` and `npm run check:tailwind`. Old code stays in the branch until the dashboard that uses it
+has switched, so nothing breaks between phases. Production receives Release 0 early and everything else in one
+release, so no old and new code coexist in production.
 
 | Phase | Work |
 |---|---|
-| 0 | Fixtures and golden masters of today's downstream results (weekly, review, eligibility, coordinator health, digests) for every TeamStatus decision combination, plus `getTeamGithubSetup_` and `findTeamFolder_` stubs |
-| 1 | `setupTitleStorage`, the title service, `titleGate_`, log validation. Deliberate schema commit |
-| 2 | Precondition engine: loader, `github` and `drive` checks, decision function, `API_coordinator_getRequirements` |
-| 3 | Title endpoints, `API_coordinator_validateTitleLog`, DATA-CONTRACTS.md, contract tests |
-| 4 | Downstream readers moved to `titleGate_`; old code removed (section 8) |
-| 5 | Views, one dashboard per commit: student, guide, reviewer, coordinator |
-| 6 | Rehearse the baseline, the requirement rows and the release steps on a copy of the spreadsheet |
+| 0 | Fixtures and golden masters of today's downstream results (weekly, review marking, eligibility, coordinator health, digests) for every TeamStatus decision combination; `getTeamGithubSetup_` and `findTeamFolder_` stubs |
+| R0 | **Release 0** (deployed to production on its own, at least a day before cutover): the old guide decision path and the Form handler take the script lock (the reviewer path already does); all three reread `TITLE_CUTOVER` under the lock immediately before writing and refuse when it is set; the editor-run `setTitleCutover(value)` is added (section 11) and listed in the entry-point guard. Tests for both states and for the barrier |
+| 1 | `setupTitleStorage`, the title service, `titleGate_`, history validation, `API_coordinator_validateTitleLog`. Deliberate schema commit. Nothing calls them yet |
+| 2 | Precondition engine, `API_coordinator_getRequirements`, document upload endpoint |
+| 3 | Downstream server readers (weekly, review marking, eligibility, digests, coordinator health) switch to `titleGate_`, with equivalence tests from Phase 0 fixtures translated to `TitleLog` fixtures |
+| 4 | **Student slice:** `API_student_submitTitle`, the upload endpoint's contract, student view, contract and view tests; `buildTeamIntakeLink_`, the Form link and `onTeamIntakeSubmit` removed |
+| 5 | **Guide slice:** `API_guide_decideTitle`, guide view, tests; old guide decision path removed |
+| 6 | **Reviewer slice:** `API_reviewer_decideTitle`, reviewer view, tests; old reviewer decision path removed |
+| 7 | **Coordinator slice:** reopen, cancel, history, requirements card and drawer; tests |
+| 8 | Remove `getTeamStatus_` and the remaining old readers; add the removal-check test from section 9 (no runtime matches, with its exclusion list) |
+| 9 | Rehearse the cutover on a copy of the spreadsheet |
 
-## 11. Baseline and release
+## 11. Cutover
 
-**Baseline row**, one per team that has a title. Teams with no title get no row.
+### `TITLE_CUTOVER`
+
+One script property, read on every title write by both old and new code:
+
+| Value | Old code (Release 0) | New code |
+|---|---|---|
+| unset | Works as today | Not deployed yet |
+| `PAUSED` | Refuses: "Title updates are paused. Reload the dashboard shortly." | Refuses writes with `UNAVAILABLE`; reads work |
+| `LIVE` | Refuses permanently: "Reload the dashboard." | Works |
+
+Because the old code refuses for any value once set, a page still open on the old version can never write again,
+whichever version its calls reach. The Form handler, which is old code too, refuses the same way.
+
+**The write barrier.** Waiting for running writes to finish is not reliable, because an Apps Script execution can run
+for up to six minutes. The barrier is the script lock instead:
+
+- Every title writer, old (from Release 0) and new, takes the script lock and rereads `TITLE_CUTOVER` under it
+  immediately before changing anything. Uploads do the same.
+- The property is only ever changed by `setTitleCutover(value)`: editor-run, starting with
+  `requireTriggerOrOperator_()`, accepting only `PAUSED` or `LIVE`, and setting the property while holding the script
+  lock (`waitLock(30000)`, retried by the coordinator if it times out).
+- So when `setTitleCutover('PAUSED')` returns, any write that held the lock earlier has finished, and every later
+  write will read `PAUSED` under the lock and refuse. No write can be in progress or start after that point.
+
+### Baseline row
+
+One per team on the roster at cutover, including teams that have not submitted:
 
 | Field | Value |
 |---|---|
 | Revision, Action | `1`, `BASELINE` |
 | Timestamp, Actor | When entered; the coordinator's email |
 | Request ID | `baseline:<TeamID>` |
-| Status | `SUBMITTED`, `GUIDE_APPROVED`, `RETURNED` or `APPROVED` |
-| Proposed Title, Proposed Problem | The current title and problem |
+| Status | `NOT_SUBMITTED`, `NEEDS_REVIEW`, `AWAITING_REVIEWER`, `RETURNED` or `APPROVED` |
+| Proposed Title, Proposed Problem | The current title and problem (blank for `NOT_SUBMITTED`) |
 | Notes, Similarity Note | Carried over as the coordinator chooses |
-| Approved fields | For `APPROVED`: title, problem, approver and **Approved At (required)**. Otherwise blank |
+| Approved fields | For `APPROVED`: title, approver and **Approved At (required)**, and the problem (left blank only if the Form-period problem statement was empty; section 4, rule 5). Otherwise blank |
 
-**Release:**
+### Validator
 
-1. Merge with every suite green. Run `setupTitleStorage` and enter the `ActivityDependencies` rows.
-2. Close the Form (`setAcceptingResponses(false)`) and delete its trigger.
-3. Copy the baseline into `TitleLog`. Note the time.
-4. Deploy the new version. This is the switch.
-5. Run `API_coordinator_validateTitleLog` and check the requirements card. Fix errors by correcting baseline rows.
-   Revision 1 is the only row the coordinator may edit, and only before that team has a later revision.
-6. **Recheck:** compare the TeamStatus decision columns with the baseline. A guide or reviewer decision made on the
-   old version after step 3 shows as a difference. Apply it through the new dashboard, or correct the team's
-   baseline if it has no later rows.
-7. Check the requirement checklists of teams at `RETURNED` or with no title. They now need GitHub setup complete and
-   both documents in their Drive folder before they can submit. Tell the teams that are not ready.
-8. Check each role, then announce.
+`API_coordinator_validateTitleLog()` reports, without writing:
 
-**Rollback:** redeploy the previous version. TeamStatus is untouched, so it works as before, but anything saved in
-`TitleLog` after release must be copied back by hand. That is why step 8 comes before announcing.
+- every team on the TeamStatus roster that has no row (an error during cutover, information afterwards);
+- every Team ID in the log that is not on the roster;
+- every history check failure from section 4, per team;
+- `APPROVED` baselines without `Approved At`.
+
+### Steps
+
+1. Release 0 is in production. Check the shared drive's members: the deploying account is a Content manager, and no
+   student is a member (directly or through a group). Run `setupTitleStorage`. Enter the `ActivityDependencies` rows
+   with `Active = Yes`.
+2. Run `setTitleCutover('PAUSED')` and wait for it to return. From then on no old writer can change TeamStatus
+   titles, and none is still running (the barrier above).
+3. Close the Form (`setAcceptingResponses(false)`) and delete its trigger. Copy each team's existing Form-uploaded
+   documents into its team folder under the fixed names.
+4. Copy the baseline into `TitleLog` from TeamStatus as it now stands. Every decision made before step 2 is
+   included, and none can arrive after it.
+5. Deploy the new version. Reads work; writes still refuse because of `PAUSED`.
+6. Run `API_coordinator_validateTitleLog` and check the requirements card. Fix the baseline until both are clean.
+7. Check the requirement checklists of teams at `NOT_SUBMITTED` or `RETURNED`; they now need GitHub setup complete and
+   both documents in their folder before they can submit. Tell the teams that are not ready.
+8. Check each role's dashboard read-only, then run `setTitleCutover('LIVE')` and announce.
+
+**Rollback before step 8:** delete the `TITLE_CUTOVER` property and redeploy the previous version; nothing has been
+written to `TitleLog` by users. **After step 8:** fix forward. Rolling back would need every `TitleLog` row since
+step 8 copied back to TeamStatus by hand.
 
 ## 12. Acceptance tests
 
 - **Transitions:** every row of section 5; refusals for the wrong role, wrong team or wrong state; submitting while
   under review.
-- **Concurrency:** `STALE`; a repeated `requestId` gives one row and one mail; a reused `requestId` with different
-  content gives `CONFLICT`; `BUSY`; an append that throws but whose row exists counts as success.
+- **Input rules:** `INVALID_INPUT` for an empty, whitespace-only or quote-only title (`""`, `"   "`, `'""'`,
+  `"' '"`), for one over 200 characters after normalization, and for an empty, whitespace-only or over-long problem;
+  the same title rules for a guide's edited title; an empty `editedTitle` approves without changing the title; none of
+  these reaches the similarity check or writes a row.
+- **Effective pair:** during a reopening with a different proposed problem, `titleGate_`, review marking details,
+  results, the team drawer and lists all show the approved title **with the approved problem**, never the proposed
+  problem; before the first approval they show the proposed pair; title panels show both pairs labelled.
+- **Write order and concurrency:**
+  - a committed submission retried after its documents disappear or GitHub is unavailable returns the stored result,
+    not `REJECTED`;
+  - a log row appended by another request while requirements are being checked makes the slower request return
+    `CONFLICT`, never a duplicate revision;
+  - a duplicate request committed during the requirement check is recognized under the lock when the requirements
+    pass, and is still recognized (stored result, not `REJECTED`) when this copy finds a requirement unmet;
+  - a write that passed the early `TITLE_CUTOVER` check but reaches the lock after `PAUSED` was set refuses with
+    `UNAVAILABLE` and writes nothing;
+  - a reused request ID with different content gives `CONFLICT`; a repeated one gives one row and one mail;
+  - lock timeout gives `UNAVAILABLE`; an append that throws but whose row exists counts as success.
+- **Browser request IDs:** after a `TRANSPORT` failure, a manual retry of the same content sends the same request ID
+  and gets the stored result; changed content gets a new ID; a reload followed by a retry gets `CONFLICT`, not a
+  second row.
+- **Error codes:** every situation in the section 6 table returns its standard code, and none returns `INTERNAL`.
 - **Gate:** `approved` and `approvedAt` unchanged through reopen, return, resubmit and cancel; a new approval replaces
-  the title, not the date; weekly submission and review marking stay available during a reopening; the displayed
-  title is the approved one during a reopening.
-- **Downstream equivalence:** for each Phase 0 golden master, an equivalent `TitleLog` fixture gives identical
-  weekly, review, eligibility, coordinator-health and digest results.
-- **Baseline validation:** a valid `BASELINE` for each status is accepted; refused: `APPROVED` without
-  `Approved At`, `BASELINE` at revision 2, gaps or duplicates, an unknown status, inconsistent approved fields; one bad
-  team does not fail the others.
-- **Similarity:** a registry match of 75% or more blocks both the student and the guide path; the team's own registry
-  rows are excluded; this semester's matches only flag; one normalization on both paths; a registry read failure
-  refuses the save.
-- **Engine:** all rows met allows; each unmet row is listed with its label; `Active = No` is ignored; no rows allows;
-  a missing sheet, bad header, unknown activity or kind, or invalid `github` item denies with the misconfiguration
-  message; GitHub or Drive unavailable gives "Could not verify"; a missing folder gives "Team folder not created
-  yet"; a duplicate or trashed file does not count; `READY` is unmet for a missing or invalid username, missing
-  access, pending template setup or unavailable GitHub, each with the setup message; requirements are re-evaluated at
-  submission (a file removed after page load gives `REQUIREMENTS`); `title.resubmit` with no rows is allowed; a
-  `needsApprovedTitle` check under `title.*` is refused; non-submit actions never call the engine.
-- **Storage:** missing headers fail everything; text that would start a formula is escaped.
-- **DTO:** `can.*` and `requirements` match the endpoint's decision for each role and state.
-- **Mail:** a failure gives a warning and keeps the save; recipients match the notification table.
-- **Removal:** no code reads the TeamStatus title, decision, similarity or document-link columns or `TeamIntakeRaw`;
-  no Form handler, Form link or Form config key remains; the entry-point guard matches.
+  the title, not the date; weekly submission and review marking stay available during a reopening; the displayed title
+  is the approved one during a reopening.
+- **Equivalence:** for each Phase 0 golden master whose state means the same in both models (`NOT_SUBMITTED`,
+  `NEEDS_REVIEW`, `AWAITING_REVIEWER`, `APPROVED`), the `TitleLog` fixture gives identical weekly, review marking,
+  eligibility, coordinator-health and digest results.
+- **Deliberate differences,** tested on their own: guide `Rejected` or `Revise` and reviewer `Revise` or `Rejected`
+  all become `RETURNED` (status, label and digests); guide title edits only on approval; reviewers have no Reject.
+- **History validation:** each rule of section 4 refuses its broken case: an illegal transition, a changed
+  `Approved At`, approved fields changed by anything other than `REVIEWER_APPROVE`, a wrong `Reopened` flag, blank
+  approved fields on an `APPROVED` or `REOPENED` row or while `Reopened` is `Yes`, approved fields set before any
+  approval, a `REVIEWER_APPROVE` row whose approved fields differ from its proposal or actor, a first approval whose
+  `Approved At` differs from its Timestamp, an invalid or future date, and decreasing Timestamps. One bad team does not
+  affect the others.
+- **Validator:** an omitted roster team, an unknown Team ID, and an `APPROVED` baseline without a date are each
+  reported.
+- **Cutover:** old guide, reviewer and Form writers refuse under `PAUSED` and `LIVE`; new writers and uploads refuse
+  under `PAUSED` with `UNAVAILABLE` and work under `LIVE`; reads work in both; every writer reads the property under
+  the lock immediately before its change; `setTitleCutover` sets the property only while holding the lock, waits for a
+  writer holding the lock, and accepts only `PAUSED` and `LIVE`.
+- **Similarity:** a registry match of 75% or more blocks both paths; own registry rows excluded; this semester's
+  matches only flag; one normalization on both paths; a registry read failure refuses the save.
+- **Engine:** all rows met allows; each unmet row listed; `Active = No` ignored; no rows allows; a missing sheet, bad
+  header, unknown activity or kind, invalid `github` item or a `drive` name outside the upload names denies with the
+  misconfiguration message; unavailable GitHub or Drive gives "Could not verify"; a missing folder gives "Team folder
+  not created yet"; a duplicate or trashed file does not count; `READY` unmet for a missing username, missing access,
+  pending template or unavailable GitHub, each with the setup message; a `github` item other than `READY` (for example
+  `REPOSITORY`) is a misconfiguration; a `drive` row or a `needsApprovedTitle` check
+  under `document.upload` is a misconfiguration; non-gated actions never call the engine.
+- **Upload:** wrong type or size refused; missing folder refused; blocked under review; the new file replaces the old
+  one and leaves exactly one; a retry with the same request ID does not upload twice; a retry after a failed cleanup
+  finishes the cleanup and succeeds only when exactly one live file remains; a reused request ID with another document
+  key or different bytes returns `CONFLICT`; **a completed upload whose response was lost, retried after its
+  requirements became unmet (GitHub unavailable, or a new active rule), returns its stored success without evaluating
+  the requirements; an incomplete one is finished under the lock instead; a request not found and with an unmet
+  requirement returns `REJECTED` only after a second lookup still finds nothing**; **upload A succeeds, upload B replaces A, then A is retried: the retry
+  returns success with `replaced: true`, B stays the one live file, and no file is created or trashed**; **an upload
+  that passes its early checks, then reaches the lock after a title submission has committed, refuses with
+  `REJECTED` and creates or trashes nothing (the same for a retry of an earlier upload)**; two uploads in sequence keep
+  the later file and its uploader; the `drive` check sees the
+  uploaded file; the description records the session student's email and time; a student can only ever write to their
+  own team's folder; if trashing the old file fails (for example, insufficient shared drive role), the upload reports
+  `UNAVAILABLE` and the `drive` check, seeing two files, stays unmet rather than passing.
+- **Capabilities:** for each role and title state, every `can.*` capability's `allowed` matches what its endpoint
+  decides; a disabled action gives either a built-in `reason` or its own unmet `requirements`, never another action's;
+  `can.submit.activity` is `title.submit` or `title.resubmit` as the server chose; `can.upload.work` and
+  `can.upload.need` are independent; requirements are `[]` for staff and when a built-in rule already refuses.
+- **Results:** title writes return `{ok, revision, status, message, warning?}`; uploads return the upload result shape
+  of section 10 with no `revision`.
+- **Removal:** the section 9 removal-check test passes (no runtime reader or writer of the old title data; frozen
+  definitions, invariant snapshots, golden fixtures and documentation excluded); no Form handler, Form link or Form config key remains; the entry-point guard
+  and DATA-CONTRACTS.md match the endpoints.
 - **Suite:** `npm test`, `npm run test:migration`, `npm run test:invariants`, `npm run check:tailwind`.
 
 ## 13. Operator rules and known limits
 
 **Operator rules**
 
-1. Run `setupTitleStorage` and enter the requirement rows before deploying.
-2. Do not edit `TitleLog` after release, except a baseline row before that team has a later revision.
+1. Deploy Release 0 at least a day before cutover, so open pages have reloaded.
+2. Do not edit `TitleLog` after cutover.
 3. Keep `TeamIntakeRaw` and the TeamStatus title columns as they are; they are the record of the Form period.
-4. Do not roll TeamStatus over to the next semester until the registry export (F2) has run.
+4. Each semester uses its own spreadsheet. Before starting the next semester's spreadsheet, run the registry export
+   (F2) on this one, so its final approved titles are in the master registry.
+5. To pause title writes later (for example to fix a bad row), run `setTitleCutover('PAUSED')`, then
+   `setTitleCutover('LIVE')`. Never edit the property by hand; only the function sets it under the lock.
+6. Never add students, or a group that contains students, to the shared drive that holds `Team Documents`.
 
 **Known limits**
 
-- The script lock is shared with long GitHub and logbook jobs. A title save during one of them can return `BUSY`. It
-  fails safely.
-- Until the registry export runs, this semester's approvals made after release are not in the master registry. Their
+- The script lock is shared with long GitHub and logbook jobs. A title save during one of them can return
+  `UNAVAILABLE`. It fails safely.
+- Until the registry export runs, this semester's approvals made after cutover are not in the master registry. Their
   similarity within the semester comes from `TitleLog`.
 - Titles replaced by a reopening are not checked for similarity.
-- Results published before a reopening show the new approved title once it is approved, because results show the
-  effective title.
-- `reviewer-api.js` reads a `CHAPTER1_LATEX_LINK` field that is not in `FIELD_DEFINITIONS`. It is removed with the
-  other document links in this release.
+- Results published before a reopening show the new approved title once it is approved.
 
 ## 14. Future features
 
-None of these is built in this plan. Each is a separate plan. The rules fixed in section 7 apply to all of them, so
-each one adds code behind an existing signature and does not change the title service.
+None of these is built in this plan. Each is a separate plan. The rules in section 7 apply to all of them, so each one
+adds code behind an existing signature and does not change the title service.
 
-### F1. Document upload to the team folder
+### F1. Document upload, extended
 
-**Purpose.** Let students put the required documents into their team's Drive folder from the dashboard, so the `drive`
-checks can be met without Drive access or coordinator help.
-
-**Shape.**
-- A student endpoint, for example `API_student_uploadDocument({requestId, documentKey, file})`, that writes into the
-  folder found by `findTeamFolder_` under the fixed name from `TEAM_DOCUMENT_FILE_NAMES_`. It never creates the folder;
-  folder creation stays in System Status.
-- One file per name. A new upload replaces the content of the existing file (Drive keeps its revisions), so there is
-  never more than one file with the name and the `drive` check stays simple.
-- The student dashboard shows each document's state from the same `drive` check, so "uploaded" and "requirement
-  met" can never disagree.
-
-**Decisions it needs.** Allowed file types and size; whether uploads are allowed after title approval; whether a guide
-can also upload; whether a later upload is blocked once a review has started.
-
-**Plugs in as** an ordinary student submit activity (`document.upload`), so it can itself be gated by
-`ActivityDependencies` rows (for example `github`/`READY`).
+The minimal upload of section 8 ships with this plan. Later additions: more document keys (each also an upload name
+and, if required, a `drive` row); an upload history per document; other file types. Uploads stay student-only.
 
 ### F2. End-of-semester registry export
 
-**Purpose.** Add this semester's approved titles to the master registry so later semesters' similarity checks see
-them.
+**Purpose.** Put this semester's final approved titles into the master registry so later semesters' similarity checks
+see them.
 
 **Shape.** A coordinator-run function starting with `requireTriggerOrOperator_()`, listed in the entry-point guard.
 
 **Rules.**
-- Exports, for each team with `approved = true`, the approved title in the existing registry column order: year,
-  semester, team, guide, title, repository, members, approval date, approver.
-- Skips teams the registry already has for this academic year and semester (approvals made before release), so a
-  rerun never duplicates.
+- The registry holds **one row per team per academic year and semester**, keyed by those three values.
+- For each team with `approved = true`: if no row exists, append one in the existing column order (year, semester,
+  team, guide, title, repository, members, approval date, approver). If one row exists and its title differs from the
+  current approved title (a team approved before cutover and later reopened and re-approved), update that row's title,
+  approval date and approver in place. If it matches, skip it.
+- The approval date written is the timestamp of the team's latest `REVIEWER_APPROVE`, or the baseline's `Approved At`
+  if there is none.
+- If a team has more than one existing row for the semester, refuse that team and list it.
 - Refuses while any reopening is open, and lists those teams.
-- Writes a summary (exported, skipped, refused) to the run log and to coordinator health.
+- A rerun changes nothing. It writes a summary (appended, updated, skipped, refused) to the run log and coordinator
+  health.
 
 ### F3. More requirement kinds
 
-Each is one check in code (`kind`, `validItem`, `isMet`, `needsApprovedTitle`, `perStudent`) and rows in the sheet.
+Each is one check in code and rows in the sheet.
 
 | Kind | Item | Met when | `needsApprovedTitle` | `perStudent` |
 |---|---|---|---|---|
@@ -429,71 +730,54 @@ Each is one check in code (`kind`, `validItem`, `isMet`, `needsApprovedTitle`, `
 | `title` | `APPROVED` | `titleGate_().approved` | Yes | No |
 | `weekly` | week ID, for example `W03` | every obligated member submitted that week | Yes | Yes |
 | `review` | review key | marks for that review are complete for the team | Yes | No |
-| `document` | document key | the uploaded document exists (via F1) | No | No |
-
-`opens` covers "submission opens on a date". `title` lets later activities require an approved title explicitly
-instead of in code.
+| `github` | `REPOSITORY` | the saved repository exists on GitHub, regardless of member usernames; needs its own check, because `getTeamGithubSetup_` verifies the repository only when every username is complete | No | No |
 
 ### F4. Gating more student activities
 
-**Purpose.** Use the same engine for other student submissions: `document.upload` (F1), `weekly.submit`, and later
-assessment submissions.
-
-**Rules.**
-- Each activity gets an ID, and its endpoint and DTO flag call `activityPreconditions_` after their own built-in
-  checks, exactly as title submission does.
-- Built-in rules stay in code. For example, weekly submission keeps its approved-title and eligibility checks; the
-  sheet can only add to them.
-- Activities owned by guides, reviewers or the coordinator are never gated (rule 1).
+Use the same engine for other student submissions, such as `weekly.submit` and later assessment submissions. Each gets
+an activity ID, and its endpoint and DTO flag call `activityPreconditions_` after their own built-in checks. Built-in
+rules stay in code. Activities owned by guides, reviewers or the coordinator are never gated.
 
 ### F5. Full cycle detection
 
 Once more than two kinds exist, the loader builds a graph from each activity to the activities its required kinds
-depend on, including built-in dependencies (weekly and review need an approved title), and refuses the whole rule set
-on any cycle, with the cycle named in coordinator health. A depth-first search is enough at this size.
+depend on, including built-in dependencies, and refuses the whole rule set on any cycle, naming it in coordinator
+health.
 
 ### F6. Batch readiness for coordinators
 
-**Purpose.** Show every team's requirement status in System Status without slow live checks on page load.
-
-**Shape.** A scheduled, coordinator-guarded job evaluates every team's requirements and stores a timestamped summary.
-The dashboard shows that summary with its age. Submissions still evaluate live (rule 4); the summary is never used to
-allow an action.
+A scheduled, coordinator-guarded job evaluates every team's requirements and stores a timestamped summary for System
+Status. Actions still evaluate live; the summary never allows anything.
 
 ### F7. "Any of" requirements (only if needed)
 
-A `Mode` column on `ActivityDependencies`, `ALL` (default) or `ANY`, with rows grouped by a `Group` value. Add it only
-when a real rule needs alternatives; until then all-of stays the only mode.
+A `Mode` column (`ALL` by default, or `ANY`) with rows grouped by a `Group` value. Add it only when a real rule needs
+alternatives.
 
 ### F8. Rebase of the student identity plan
 
-After this release, [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md) changes as follows:
-- drop the `'maintenance-reply'` exception, since `onTeamIntakeSubmit` no longer exists;
-- migrate `TitleLog` (team IDs and actor emails) alongside its other sheets;
-- move the title service's single membership lookup and its eligibility lookup to `Students` and `TeamRoster`;
-- move the `github` check's member list to the same identity source;
-- add the new title endpoints, the engine checks and the digests to its guarded and reader lists.
+After this release, [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md) changes as follows: drop the
+`'maintenance-reply'` exception; migrate `TitleLog` (team IDs and actor emails); move the title service's membership
+and eligibility lookups and the `github` check's member list to `Students` and `TeamRoster`; add the new endpoints,
+the upload and the engine checks to its guarded and reader lists; consider replacing `TITLE_CUTOVER` with its general
+maintenance mechanism.
 
 ### F9. Shared lock cleanup
 
-**Purpose.** Stop short user saves failing with `BUSY` while long background jobs hold the one script lock.
-
-**Options to evaluate.** Shorter critical sections in the GitHub and logbook jobs; moving long network work outside
-the lock as this plan does for requirements; one shared lock helper with consistent waits and messages.
+Stop short user saves failing while long background jobs hold the one script lock: shorter critical sections in the
+GitHub and logbook jobs, network work outside the lock, and one shared lock helper with consistent waits and messages.
 
 ### F10. Similarity against replaced titles
 
-Optionally include titles replaced by a reopening (from `TitleLog`) in the same-semester similarity flag, so a team
-cannot take a title another team gave up. Flag only, never block.
+Optionally include titles replaced by a reopening in the same-semester similarity flag. Flag only, never block.
 
 ### F11. Per-team waivers (not planned)
 
-Not planned. If a real need appears, it needs its own audited plan: coordinator only, a reason, an expiry, its own
-log, and visibility in coordinator health. Until then, `Active = No` on a row is the only relaxation, and it applies
-to every team.
+If a real need appears, it needs its own audited plan: coordinator only, a reason, an expiry, its own log, and
+visibility in coordinator health. Until then `Active = No` is the only relaxation, and it applies to every team.
 
 ### F12. Retiring the frozen TeamStatus columns
 
-In a later semester, once nothing reads them, the TeamStatus title, decision, similarity and document-link columns
-and `TeamIntakeRaw` can be removed from `FIELD_DEFINITIONS` and the sheets. This is a deliberate, reviewed schema
-change with its own snapshot update, never part of a feature migration.
+In a later semester, once nothing reads them, the TeamStatus title, decision, similarity and document-link columns and
+`TeamIntakeRaw` can be removed from `FIELD_DEFINITIONS` and the sheets. This is a deliberate, reviewed schema change
+with its own snapshot update.
