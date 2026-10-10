@@ -209,7 +209,9 @@ This plan changes no AGENTS.md text itself. It depends on, and is gated by, thes
 | 1 | Policy item 7 of SHEET-HEADER-MATCHING-PLAN section 3: `ensureSheet_` may append a missing header to an existing sheet, never move, rename or delete a column | Owner decision recorded there; AGENTS.md edit made with this helper's commit |
 | 2 | Proposed new rule for AGENTS.md: "New sheets are created through `ensureSheet_`; setup may repair a missing header, request paths may not" | Proposed here, approved with item 1 |
 
-Until item 1 is applied to AGENTS.md, the helper's repair branch stays **disabled** and throws like the "refuses" rows
+**Status: applied** (BUILD-ORDER.md item 2): AGENTS.md has the "Creating and repairing sheets" section and the frozen-rule
+exception, and `ENSURE_SHEET_REPAIR_ENABLED_` is `true`; a test fails if repair is on while AGENTS.md lacks that section.
+Until item 1 was applied to AGENTS.md, the helper's repair branch stayed **disabled** and throws like the "refuses" rows
 (the constant `ENSURE_SHEET_REPAIR_ENABLED_` is `false`), so the code never contradicts the written policy. Tab colour and visibility apply only to new
 sheets and conflict with no existing rule.
 

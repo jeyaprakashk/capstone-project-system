@@ -10,9 +10,9 @@
  * Headers are read through readSheetRows_ only.
  */
 
-// Repair (appending a missing header to an existing sheet) is off until the AGENTS.md policy items in
-// ENSURE-SHEET-PLAN.md section 7 are applied. While false, a missing header on an existing sheet throws like a refusal.
-const ENSURE_SHEET_REPAIR_ENABLED_ = false;
+// Repair (appending a missing header to an existing sheet) is permitted by AGENTS.md ("Creating and repairing sheets"). It is
+// a switch so that it can be turned off: while false, a missing header on an existing sheet throws like a refusal.
+const ENSURE_SHEET_REPAIR_ENABLED_ = true;
 const ENSURE_SHEET_LOCK_WAIT_MS_ = 30000;
 const ENSURE_SHEET_RED_ = '#d93025';
 const ENSURE_SHEET_GREEN_ = '#188038';

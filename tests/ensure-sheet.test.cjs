@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const SOURCE = fs.readFileSync('ensure-sheet.js', 'utf8');
-const REPAIR_FLAG = 'const ENSURE_SHEET_REPAIR_ENABLED_ = false;';
+const REPAIR_FLAG = 'const ENSURE_SHEET_REPAIR_ENABLED_ = true;';
 const HEADERS = ['Activity', 'Kind', 'Item', 'Label', 'Active'];
 const plain = value => JSON.parse(JSON.stringify(value));
 const WRITE_CALLS = ['setValues', 'insertColumnsAfter', 'setTabColor', 'hideSheet'];
@@ -77,10 +77,11 @@ function makeEnv(options = {}) {
     LockService: {getScriptLock: () => lock}
   });
   ['common-helpers.js', 'sheet-reads.js'].forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), context, {filename: file}));
+  // Repair ships enabled; a test can switch it off with { repair: false } to check the refusal path.
   let source = SOURCE;
-  if (options.repair) {
+  if (options.repair === false) {
     assert.ok(SOURCE.includes(REPAIR_FLAG), 'the repair flag line changed; update this test');
-    source = SOURCE.replace(REPAIR_FLAG, 'const ENSURE_SHEET_REPAIR_ENABLED_ = true;');
+    source = SOURCE.replace(REPAIR_FLAG, 'const ENSURE_SHEET_REPAIR_ENABLED_ = false;');
   }
   vm.runInContext(source, context, {filename: 'ensure-sheet.js'});
   return {context, spreadsheet, lock, logs, ensure: spec => context.ensureSheet_(spec), sheet: name => spreadsheet.getSheetByName(name)};
@@ -197,9 +198,9 @@ test('extra columns with nothing missing are left alone', () => {
   assert.equal(existing.writes().length, 0);
 });
 
-test('with repair disabled, a missing header on an existing sheet throws and changes nothing', () => {
+test('with repair switched off, a missing header on an existing sheet throws and changes nothing', () => {
   const existing = new FakeSheet('ActivityDependencies', [HEADERS.slice(0, 3), ['a', 'b', 'c']]);
-  const env = makeEnv({sheets: [new FakeSheet('Home', [['x']]), existing]});
+  const env = makeEnv({repair: false, sheets: [new FakeSheet('Home', [['x']]), existing]});
   assert.throws(() => env.ensure(setupSpec()), /ActivityDependencies header mismatch\. Missing: Label, Active\. Fix the header row by hand; nothing was changed\./);
   assert.equal(existing.writes().length, 0);
   assert.equal(env.lock.acquired, 0);
@@ -343,10 +344,13 @@ test('the helper never deletes, clears or reorders: the fake sheet has no such m
   }
 });
 
-test('source rules: headers are read only through the shared reader, no public function is added, repair ships disabled', () => {
+test('source rules: headers are read only through the shared reader, no public function is added, repair ships enabled under AGENTS.md', () => {
   assert.doesNotMatch(SOURCE, /\.(?:getValue|getValues|getDisplayValue|getDisplayValues|getFormula|getFormulas)\s*\(/);
   const publicFunctions = [...SOURCE.matchAll(/^function ([A-Za-z0-9$]+)\s*\(/gm)].map(match => match[1]).filter(name => !name.endsWith('_'));
   assert.deepEqual(publicFunctions, []);
-  assert.ok(SOURCE.includes(REPAIR_FLAG), 'ENSURE_SHEET_REPAIR_ENABLED_ must be false until the AGENTS.md items are applied');
+  assert.ok(SOURCE.includes(REPAIR_FLAG));
+  const agents = fs.readFileSync('AGENTS.md', 'utf8');
+  assert.ok(agents.includes('## Creating and repairing sheets'), 'repair may be enabled only while AGENTS.md permits it');
+  assert.match(agents, /ensureSheet_\` may initialize an empty existing sheet or append missing headers/);
   assert.ok(SOURCE.includes('waitLock(ENSURE_SHEET_LOCK_WAIT_MS_)') && SOURCE.includes('const ENSURE_SHEET_LOCK_WAIT_MS_ = 30000;'));
 });

@@ -7,7 +7,9 @@ or spreadsheet data while doing so.
 ## Frozen — do not change
 
 - Spreadsheet sheet names, headers, column layouts and stored data
-  (`SHEET_NAMES`, `FIELD_DEFINITIONS`, fixed-layout journals and logs).
+  (`SHEET_NAMES`, `FIELD_DEFINITIONS`, fixed-layout journals and logs). For a sheet whose code uses header
+  names, editor-run `ensureSheet_` may initialize an empty existing sheet or append missing headers during
+  setup, under the "Creating and repairing sheets" rules below.
 - Academic rules: Review rubrics, attendance/makeup policy, eligibility,
   deadlines, publishing, weights and prerequisites.
 - Role detection and server-side authorization.
@@ -15,6 +17,23 @@ or spreadsheet data while doing so.
 `tests/invariants/` guards these. `npm run test:invariants` must stay green and its
 snapshots must not be regenerated for a migration. Regenerate (`UPDATE_GOLDEN=1`)
 only for a deliberate, reviewed rule or schema change made outside a migration.
+
+## Creating and repairing sheets
+
+`ensureSheet_` (`ensure-sheet.js`) creates new catalog sheets and manages headers for sheets whose readers and writers use
+header names. Existing sheets move to it in the same commit as their header-name migration; until then their existing
+creation and validation paths remain in place. Every call names its `mode`.
+
+- `mode: 'setup'` runs only in editor-run setup paths. It creates an absent sheet, writes the header row of an existing sheet
+  that has no rows, and may append a missing header at the right end of an existing sheet. It never moves, renames or
+  deletes a column and never writes a data row. It refuses, and changes nothing, when a header is missing together with an
+  unrecognised one (a possible typo), when a required header is duplicated, or when there is a blank header cell or
+  unlabelled content to the right of the last header.
+- `mode: 'runtime'` is only for a sheet whose catalog entry has `createAtRuntime: true`. It creates an absent sheet (or writes
+  the header row of an empty one) and validates the headers; it never repairs.
+- Request paths never repair a header.
+- New sheets are defined in the catalog (`sheet-columns.js`), not in `SHEET_NAMES` or `FIELD_DEFINITIONS`. `SHEETS.md` is
+  generated from it with `npm run build:sheets-doc`.
 
 ## Layers
 
@@ -123,4 +142,5 @@ refresh and settle loading on every path. This lives in the bridge, not in views
 
 `npm test` runs everything; `npm run test:migration` runs the bridge, view and DTO tests. All tests pass (the 7
 `tests/team-github-setup.test.cjs` failures recorded at Version 127 no longer occur); no test may regress. A test file
-that is not listed in the `test` script in `package.json` never runs.
+that is not listed in the `test` script in `package.json` never runs. `npm run check:sheets-doc` must also pass
+(`SHEETS.md` is generated from the catalog).
