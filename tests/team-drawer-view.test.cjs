@@ -147,3 +147,8 @@ test('a reopened title offers only cancelling the reopening', async () => {
   assert.equal(f.writes[0][0], 'API_coordinator_cancelReopen');
   assert.match(text(section(f, 'title')), /ReopenedScope/);
 });
+
+test('opening the drawer shows no message in the title section (the list position is not a message)', async () => {
+  const f = setup(); f.view.mount(f.host, 'T1', () => f.open.value); await f.flush();
+  assert.equal(section(f, 'title').querySelector('[data-title-status]').textContent, '');
+});

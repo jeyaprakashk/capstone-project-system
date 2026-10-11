@@ -169,7 +169,7 @@ function teamDrawerViewBrowser_(bridge, getUi, getRequests) {
       });
     }
     active = {request, load};
-    Object.keys(SECTIONS).forEach(load);
+    Object.keys(SECTIONS).forEach(name => load(name));
   }
 
   /** Invalidates every read still in flight, e.g. when the drawer closes. */
