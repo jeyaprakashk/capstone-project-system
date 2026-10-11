@@ -14,7 +14,7 @@ Create one sheet, `ActivityDependencies`, with the header row `Activity | Kind |
 
 ## What was implemented
 
-`activity-dependencies-sheet.js` holds `ensureActivityDependenciesSheet_` (one `ensureSheet_` call in setup mode, with `onCreate` formatting) and `formatActivityDependenciesSheet_`. The sheet is defined in the catalog (`activityDependencies`, access `edit`). `setupTitleStorage` creates it together with `TitleLog`. `tests/activity-dependencies-sheet.test.cjs` covers the specification, the helper call, the formatting and its absence. The schema snapshot was not changed for it. The rule rows have not been entered: a check of the live sheet (2026-10-11) found it header-only, so no requirement is enforced yet (an empty sheet means "no rows allows"). The three release rows are listed in OWNER-CHECKLIST.md, section D.
+`activity-dependencies-sheet.js` holds `ensureActivityDependenciesSheet_` (one `ensureSheet_` call in setup mode, with `onCreate` formatting) and `formatActivityDependenciesSheet_`. The sheet is defined in the catalog (`activityDependencies`, access `edit`). `setupTitleStorage` creates it together with `TitleLog`. `tests/activity-dependencies-sheet.test.cjs` covers the specification, the helper call, the formatting and its absence. The schema snapshot was not changed for it. No rule rows are entered: the live sheet is header-only (checked 2026-10-11), so no requirement is enforced. An empty sheet means "no rows allows", as planned.
 
 ### Differences from the plan, with the reason
 

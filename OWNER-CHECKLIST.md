@@ -96,7 +96,7 @@ Follow the order. Stop and ask if any step does not behave as written.
 | Step | You do |
 |---|---|
 | 0 | **You pause and delete first**, on the Triggers page, under every account that installed one. **Pause** `reconcileProgressEligibility` (the one installed trigger that reads title state; the other time-driven ones keep running). **Delete** the `onTeamIntakeSubmit` form-submit trigger and the `sendGuideReminderDigest` trigger (that function is removed from the code). Write down each paused trigger's handler, schedule and owner, then reopen the Triggers page and confirm the paused one is not active and the two deleted ones are gone. **Only then** does the developer run `npm run push` (no new deployment) |
-| 1 | In the editor, run `setupTitleStorage`. Type the three `ActivityDependencies` rows with `Active = Yes` (the developer gives you the exact rows). **Not done:** a check of the live sheet found it header-only. See section D, item 15 |
+| 1 | In the editor, run `setupTitleStorage`. (The plan also had you type three `ActivityDependencies` rows. They were not entered and are not needed: the `ActivityDependencies` tab stays header-only, so no submission requirement is enforced.) |
 | 2 | Run `setTitleCutover('PAUSED')` and wait for it to return |
 | 3 | **Documents.** Copy each team's existing Form-uploaded documents into its team folder (`Team Documents`) under the fixed names `Step1_Work_Breakdown.docx` and `Step2_Need_Analysis.docx` (the folders must exist first: System Status, Team folders). Close the Form if it is still accepting responses |
 | 4 | **Superseded: never built, and not needed.** The owner took a full backup and deleted the `TeamIntakeRaw` tab. Original text: the archive preflight, copy and verification functions of [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md) do not exist in the code. Skip this step; `TeamIntakeRaw` stays exactly as it is and is not renamed or deleted until the archive is built and verified (part D) |
@@ -132,18 +132,6 @@ full backup and deleted the tab and the Forms directly, so there is no archive s
 14. **Config.** Remove the unused keys from the `Config` tab: `TEAM_INTAKE_FORM_URL_BASE`, `TEAM_INTAKE_TEAMID_ENTRY`, `WEEKLY_LOG_FORM_URL_BASE`,
     `WEEKLY_LOG_TEAMID_ENTRY`, `ANNOUNCEMENTS_FORM_URL`, `GUIDE_DASHBOARD_URL`, `SUBMISSION_REMINDER_HOURS`, `GUIDE_REPO_PERMISSION`,
     `COLLABORATOR_REPO_PERMISSION`, `COLLABORATOR_GITHUB_USERNAME`, `COLLABORATOR_REPOS_ACCESS`. Keep `Key`, `Value` and `Description` as the headers.
-15. **Enter the submission requirements** in the `ActivityDependencies` tab. A check on 2026-10-11 found the tab header-only, which means no
-    requirement is enforced: a student can submit a title without a ready GitHub setup or the documents. To switch the requirements on, type
-    these rows (the tab has a Yes/No list in the last column), then open `API_coordinator_getRequirements` through a team's drawer to check:
-
-    | Activity | Kind | Item | Label | Active |
-    |---|---|---|---|---|
-    | `title.submit` | `github` | `READY` | GitHub setup complete | Yes |
-    | `title.submit` | `drive` | `Step1_Work_Breakdown.docx` | Work Breakdown document | Yes |
-    | `title.submit` | `drive` | `Step2_Need_Analysis.docx` | Need Analysis document | Yes |
-
-    A row naming an activity other than `title.submit` or `title.resubmit` is a configuration error and stops all title submissions, so type the
-    names exactly. If you decide not to enforce requirements, leave the tab as it is.
 
 ## E. Rules to keep
 
