@@ -1,0 +1,40 @@
+{
+  "guideReminder": [
+    {
+      "to": "guide@example.com",
+      "subject": "Reminder: 4 title(s) awaiting your review",
+      "states": [
+        "title=yes guide=- reviewer=-",
+        "title=yes guide=- reviewer=Approved",
+        "title=yes guide=- reviewer=Revise",
+        "title=yes guide=- reviewer=Rejected"
+      ]
+    }
+  ],
+  "reviewerApproval": [
+    {
+      "to": "rev1@example.com",
+      "subject": "Capstone Title Approvals — 6 pending",
+      "states": [
+        "title=no guide=Approved reviewer=-",
+        "title=no guide=Approved reviewer=Revise",
+        "title=no guide=Approved reviewer=Rejected",
+        "title=yes guide=Approved reviewer=-",
+        "title=yes guide=Approved reviewer=Revise",
+        "title=yes guide=Approved reviewer=Rejected"
+      ]
+    },
+    {
+      "to": "rev2@example.com",
+      "subject": "Capstone Title Approvals — 6 pending",
+      "states": [
+        "title=no guide=Approved reviewer=-",
+        "title=no guide=Approved reviewer=Revise",
+        "title=no guide=Approved reviewer=Rejected",
+        "title=yes guide=Approved reviewer=-",
+        "title=yes guide=Approved reviewer=Revise",
+        "title=yes guide=Approved reviewer=Rejected"
+      ]
+    }
+  ]
+}

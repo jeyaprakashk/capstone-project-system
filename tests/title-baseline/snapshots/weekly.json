@@ -1,0 +1,274 @@
+{
+  "title=no guide=- reviewer=-": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=- reviewer=Approved": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=- reviewer=Revise": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=- reviewer=Rejected": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Approved reviewer=-": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Approved reviewer=Approved": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Approved reviewer=Revise": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Approved reviewer=Rejected": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Rejected reviewer=-": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Rejected reviewer=Approved": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Rejected reviewer=Revise": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Rejected reviewer=Rejected": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Revise reviewer=-": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Revise reviewer=Approved": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Revise reviewer=Revise": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=no guide=Revise reviewer=Rejected": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=- reviewer=-": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=- reviewer=Approved": {
+    "editableWeeks": [
+      "W1"
+    ],
+    "actions": 1,
+    "submit": {
+      "saved": true,
+      "entryStatus": "SUBMITTED",
+      "timeliness": "ON_TIME",
+      "weekId": "W1"
+    }
+  },
+  "title=yes guide=- reviewer=Revise": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=- reviewer=Rejected": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=Approved reviewer=-": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=Approved reviewer=Approved": {
+    "editableWeeks": [
+      "W1"
+    ],
+    "actions": 1,
+    "submit": {
+      "saved": true,
+      "entryStatus": "SUBMITTED",
+      "timeliness": "ON_TIME",
+      "weekId": "W1"
+    }
+  },
+  "title=yes guide=Approved reviewer=Revise": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=Approved reviewer=Rejected": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=Rejected reviewer=-": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=Rejected reviewer=Approved": {
+    "editableWeeks": [
+      "W1"
+    ],
+    "actions": 1,
+    "submit": {
+      "saved": true,
+      "entryStatus": "SUBMITTED",
+      "timeliness": "ON_TIME",
+      "weekId": "W1"
+    }
+  },
+  "title=yes guide=Rejected reviewer=Revise": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=Rejected reviewer=Rejected": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=Revise reviewer=-": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=Revise reviewer=Approved": {
+    "editableWeeks": [
+      "W1"
+    ],
+    "actions": 1,
+    "submit": {
+      "saved": true,
+      "entryStatus": "SUBMITTED",
+      "timeliness": "ON_TIME",
+      "weekId": "W1"
+    }
+  },
+  "title=yes guide=Revise reviewer=Revise": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  },
+  "title=yes guide=Revise reviewer=Rejected": {
+    "editableWeeks": [],
+    "actions": 0,
+    "submit": {
+      "saved": false,
+      "error": "Your title must be approved before weekly submission."
+    }
+  }
+}

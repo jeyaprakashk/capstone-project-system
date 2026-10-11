@@ -1,0 +1,755 @@
+{
+  "titleApproved": 8,
+  "total": 34,
+  "needsAttention": 34,
+  "teams": {
+    "title=no guide=- reviewer=-": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "",
+        "reviewerDecision": "",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "",
+        "reviewerDecision": ""
+      }
+    },
+    "title=no guide=- reviewer=Approved": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "monitor",
+        "severity": "low",
+        "issue": "",
+        "daysOverdue": 0
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "",
+        "reviewerDecision": "Approved",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "",
+        "reviewerDecision": "Approved"
+      }
+    },
+    "title=no guide=- reviewer=Revise": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "",
+        "reviewerDecision": "Revise",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "",
+        "reviewerDecision": "Revise"
+      }
+    },
+    "title=no guide=- reviewer=Rejected": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "",
+        "reviewerDecision": "Rejected",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "",
+        "reviewerDecision": "Rejected"
+      }
+    },
+    "title=no guide=Approved reviewer=-": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Approved",
+        "reviewerDecision": "",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Approved",
+        "reviewerDecision": ""
+      }
+    },
+    "title=no guide=Approved reviewer=Approved": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "monitor",
+        "severity": "low",
+        "issue": "",
+        "daysOverdue": 0
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Approved",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Approved"
+      }
+    },
+    "title=no guide=Approved reviewer=Revise": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Revise",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Revise"
+      }
+    },
+    "title=no guide=Approved reviewer=Rejected": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Rejected",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Rejected"
+      }
+    },
+    "title=no guide=Rejected reviewer=-": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Rejected",
+        "reviewerDecision": ""
+      }
+    },
+    "title=no guide=Rejected reviewer=Approved": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "monitor",
+        "severity": "low",
+        "issue": "",
+        "daysOverdue": 0
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Approved",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Approved"
+      }
+    },
+    "title=no guide=Rejected reviewer=Revise": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Revise",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Revise"
+      }
+    },
+    "title=no guide=Rejected reviewer=Rejected": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Rejected",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Rejected"
+      }
+    },
+    "title=no guide=Revise reviewer=-": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Revise",
+        "reviewerDecision": "",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Revise",
+        "reviewerDecision": ""
+      }
+    },
+    "title=no guide=Revise reviewer=Approved": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "monitor",
+        "severity": "low",
+        "issue": "",
+        "daysOverdue": 0
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Approved",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Approved"
+      }
+    },
+    "title=no guide=Revise reviewer=Revise": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Revise",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Revise"
+      }
+    },
+    "title=no guide=Revise reviewer=Rejected": {
+      "trackerTitleStatus": "NOT_SUBMITTED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Rejected",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "",
+        "titleStatus": "NOT_SUBMITTED",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Rejected"
+      }
+    },
+    "title=yes guide=- reviewer=-": {
+      "trackerTitleStatus": "NEEDS_REVIEW",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NEEDS_REVIEW",
+        "guideDecision": "",
+        "reviewerDecision": "",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "NEEDS_REVIEW",
+        "guideDecision": "",
+        "reviewerDecision": ""
+      }
+    },
+    "title=yes guide=- reviewer=Approved": {
+      "trackerTitleStatus": "APPROVED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "monitor",
+        "severity": "low",
+        "issue": "",
+        "daysOverdue": 0
+      },
+      "drawerProgress": {
+        "titleStatus": "APPROVED",
+        "guideDecision": "",
+        "reviewerDecision": "Approved",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "APPROVED",
+        "guideDecision": "",
+        "reviewerDecision": "Approved"
+      }
+    },
+    "title=yes guide=- reviewer=Revise": {
+      "trackerTitleStatus": "REVISE_AWAITING_STUDENT",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "guideDecision": "",
+        "reviewerDecision": "Revise",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "guideDecision": "",
+        "reviewerDecision": "Revise"
+      }
+    },
+    "title=yes guide=- reviewer=Rejected": {
+      "trackerTitleStatus": "NEEDS_REVIEW",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NEEDS_REVIEW",
+        "guideDecision": "",
+        "reviewerDecision": "Rejected",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "NEEDS_REVIEW",
+        "guideDecision": "",
+        "reviewerDecision": "Rejected"
+      }
+    },
+    "title=yes guide=Approved reviewer=-": {
+      "trackerTitleStatus": "AWAITING_REVIEWER",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "AWAITING_REVIEWER",
+        "guideDecision": "Approved",
+        "reviewerDecision": "",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "AWAITING_REVIEWER",
+        "guideDecision": "Approved",
+        "reviewerDecision": ""
+      }
+    },
+    "title=yes guide=Approved reviewer=Approved": {
+      "trackerTitleStatus": "APPROVED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "monitor",
+        "severity": "low",
+        "issue": "",
+        "daysOverdue": 0
+      },
+      "drawerProgress": {
+        "titleStatus": "APPROVED",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Approved",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "APPROVED",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Approved"
+      }
+    },
+    "title=yes guide=Approved reviewer=Revise": {
+      "trackerTitleStatus": "REVISE_AWAITING_STUDENT",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Revise",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Revise"
+      }
+    },
+    "title=yes guide=Approved reviewer=Rejected": {
+      "trackerTitleStatus": "AWAITING_REVIEWER",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "AWAITING_REVIEWER",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Rejected",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "AWAITING_REVIEWER",
+        "guideDecision": "Approved",
+        "reviewerDecision": "Rejected"
+      }
+    },
+    "title=yes guide=Rejected reviewer=-": {
+      "trackerTitleStatus": "REJECTED_BY_GUIDE",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "REJECTED_BY_GUIDE",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "REJECTED_BY_GUIDE",
+        "guideDecision": "Rejected",
+        "reviewerDecision": ""
+      }
+    },
+    "title=yes guide=Rejected reviewer=Approved": {
+      "trackerTitleStatus": "APPROVED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "monitor",
+        "severity": "low",
+        "issue": "",
+        "daysOverdue": 0
+      },
+      "drawerProgress": {
+        "titleStatus": "APPROVED",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Approved",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "APPROVED",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Approved"
+      }
+    },
+    "title=yes guide=Rejected reviewer=Revise": {
+      "trackerTitleStatus": "REVISE_AWAITING_STUDENT",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Revise",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Revise"
+      }
+    },
+    "title=yes guide=Rejected reviewer=Rejected": {
+      "trackerTitleStatus": "REJECTED_BY_GUIDE",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "REJECTED_BY_GUIDE",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Rejected",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "REJECTED_BY_GUIDE",
+        "guideDecision": "Rejected",
+        "reviewerDecision": "Rejected"
+      }
+    },
+    "title=yes guide=Revise reviewer=-": {
+      "trackerTitleStatus": "NEEDS_REVIEW",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NEEDS_REVIEW",
+        "guideDecision": "Revise",
+        "reviewerDecision": "",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "NEEDS_REVIEW",
+        "guideDecision": "Revise",
+        "reviewerDecision": ""
+      }
+    },
+    "title=yes guide=Revise reviewer=Approved": {
+      "trackerTitleStatus": "APPROVED",
+      "health": "attention",
+      "titleHealth": {
+        "health": "monitor",
+        "severity": "low",
+        "issue": "",
+        "daysOverdue": 0
+      },
+      "drawerProgress": {
+        "titleStatus": "APPROVED",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Approved",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "APPROVED",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Approved"
+      }
+    },
+    "title=yes guide=Revise reviewer=Revise": {
+      "trackerTitleStatus": "REVISE_AWAITING_STUDENT",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Revise",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "REVISE_AWAITING_STUDENT",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Revise"
+      }
+    },
+    "title=yes guide=Revise reviewer=Rejected": {
+      "trackerTitleStatus": "NEEDS_REVIEW",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "NEEDS_REVIEW",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Rejected",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "NEEDS_REVIEW",
+        "guideDecision": "Revise",
+        "reviewerDecision": "Rejected"
+      }
+    },
+    "extra 1: title=yes guide=Approved reviewer=-": {
+      "trackerTitleStatus": "AWAITING_REVIEWER",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "AWAITING_REVIEWER",
+        "guideDecision": "Approved",
+        "reviewerDecision": "",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "AWAITING_REVIEWER",
+        "guideDecision": "Approved",
+        "reviewerDecision": ""
+      }
+    },
+    "extra 2: title=yes guide=Approved reviewer=-": {
+      "trackerTitleStatus": "AWAITING_REVIEWER",
+      "health": "attention",
+      "titleHealth": {
+        "health": "attention",
+        "severity": "medium",
+        "issue": "Title approval overdue",
+        "daysOverdue": 10
+      },
+      "drawerProgress": {
+        "titleStatus": "AWAITING_REVIEWER",
+        "guideDecision": "Approved",
+        "reviewerDecision": "",
+        "health": "attention"
+      },
+      "drawerBasic": {
+        "title": "Project",
+        "titleStatus": "AWAITING_REVIEWER",
+        "guideDecision": "Approved",
+        "reviewerDecision": ""
+      }
+    }
+  }
+}

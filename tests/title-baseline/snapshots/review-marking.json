@@ -1,0 +1,814 @@
+{
+  "title=no guide=- reviewer=-": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=- reviewer=Approved": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [
+        "T1"
+      ],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=- reviewer=Revise": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=- reviewer=Rejected": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=Approved reviewer=-": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [
+        "T1"
+      ],
+      "approved": [],
+      "notYetGuideApproved": []
+    }
+  },
+  "title=no guide=Approved reviewer=Approved": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [
+        "T1"
+      ],
+      "notYetGuideApproved": []
+    }
+  },
+  "title=no guide=Approved reviewer=Revise": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [
+        "T1"
+      ],
+      "approved": [],
+      "notYetGuideApproved": []
+    }
+  },
+  "title=no guide=Approved reviewer=Rejected": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [
+        "T1"
+      ],
+      "approved": [],
+      "notYetGuideApproved": []
+    }
+  },
+  "title=no guide=Rejected reviewer=-": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=Rejected reviewer=Approved": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [
+        "T1"
+      ],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=Rejected reviewer=Revise": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=Rejected reviewer=Rejected": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=Revise reviewer=-": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=Revise reviewer=Approved": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [
+        "T1"
+      ],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=Revise reviewer=Revise": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=no guide=Revise reviewer=Rejected": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Not submitted"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Not submitted"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=- reviewer=-": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Awaiting guide"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Awaiting guide"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=- reviewer=Approved": {
+    "reviewEligibility": {
+      "eligible": true,
+      "reason": ""
+    },
+    "reviewerStatus": {
+      "tone": "success",
+      "label": "Approved"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "success",
+        "label": "Approved"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": true,
+    "dashboard": {
+      "pending": [],
+      "approved": [
+        "T1"
+      ],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=- reviewer=Revise": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "warning",
+      "label": "Revision requested"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "warning",
+        "label": "Revision requested"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=- reviewer=Rejected": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Awaiting guide"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Awaiting guide"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=Approved reviewer=-": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "warning",
+      "label": "Pending review"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "warning",
+        "label": "Pending review"
+      },
+      "canDecide": true
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [
+        "T1"
+      ],
+      "approved": [],
+      "notYetGuideApproved": []
+    }
+  },
+  "title=yes guide=Approved reviewer=Approved": {
+    "reviewEligibility": {
+      "eligible": true,
+      "reason": ""
+    },
+    "reviewerStatus": {
+      "tone": "success",
+      "label": "Approved"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "success",
+        "label": "Approved"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": true,
+    "dashboard": {
+      "pending": [],
+      "approved": [
+        "T1"
+      ],
+      "notYetGuideApproved": []
+    }
+  },
+  "title=yes guide=Approved reviewer=Revise": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "warning",
+      "label": "Revision requested"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "warning",
+        "label": "Revision requested"
+      },
+      "canDecide": true
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [
+        "T1"
+      ],
+      "approved": [],
+      "notYetGuideApproved": []
+    }
+  },
+  "title=yes guide=Approved reviewer=Rejected": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "warning",
+      "label": "Pending review"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "warning",
+        "label": "Pending review"
+      },
+      "canDecide": true
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [
+        "T1"
+      ],
+      "approved": [],
+      "notYetGuideApproved": []
+    }
+  },
+  "title=yes guide=Rejected reviewer=-": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Awaiting guide"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Awaiting guide"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=Rejected reviewer=Approved": {
+    "reviewEligibility": {
+      "eligible": true,
+      "reason": ""
+    },
+    "reviewerStatus": {
+      "tone": "success",
+      "label": "Approved"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "success",
+        "label": "Approved"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": true,
+    "dashboard": {
+      "pending": [],
+      "approved": [
+        "T1"
+      ],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=Rejected reviewer=Revise": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "warning",
+      "label": "Revision requested"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "warning",
+        "label": "Revision requested"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=Rejected reviewer=Rejected": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Awaiting guide"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Awaiting guide"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=Revise reviewer=-": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Awaiting guide"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Awaiting guide"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=Revise reviewer=Approved": {
+    "reviewEligibility": {
+      "eligible": true,
+      "reason": ""
+    },
+    "reviewerStatus": {
+      "tone": "success",
+      "label": "Approved"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "success",
+        "label": "Approved"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": true,
+    "dashboard": {
+      "pending": [],
+      "approved": [
+        "T1"
+      ],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=Revise reviewer=Revise": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "warning",
+      "label": "Revision requested"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "warning",
+        "label": "Revision requested"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  },
+  "title=yes guide=Revise reviewer=Rejected": {
+    "reviewEligibility": {
+      "eligible": false,
+      "reason": "Approve the project title before entering review marks."
+    },
+    "reviewerStatus": {
+      "tone": "neutral",
+      "label": "Awaiting guide"
+    },
+    "titleApproval": {
+      "status": {
+        "tone": "neutral",
+        "label": "Awaiting guide"
+      },
+      "canDecide": false
+    },
+    "marksCellEnabled": false,
+    "dashboard": {
+      "pending": [],
+      "approved": [],
+      "notYetGuideApproved": [
+        "T1"
+      ]
+    }
+  }
+}

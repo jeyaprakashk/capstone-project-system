@@ -1,0 +1,322 @@
+{
+  "title=no guide=- reviewer=-": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=- reviewer=Approved": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=- reviewer=Revise": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=- reviewer=Rejected": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Approved reviewer=-": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Approved reviewer=Approved": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Approved reviewer=Revise": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Approved reviewer=Rejected": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Rejected reviewer=-": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Rejected reviewer=Approved": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Rejected reviewer=Revise": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Rejected reviewer=Rejected": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Revise reviewer=-": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Revise reviewer=Approved": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Revise reviewer=Revise": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=no guide=Revise reviewer=Rejected": {
+    "titleStatus": "NOT_SUBMITTED",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=- reviewer=-": {
+    "titleStatus": "NEEDS_REVIEW",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=- reviewer=Approved": {
+    "titleStatus": "APPROVED",
+    "titleDate": "2026-01-01T00:00:00.000Z",
+    "eligibility": {
+      "status": "FIXED",
+      "eligibleFrom": "W1",
+      "enforcedFrom": "W1",
+      "error": ""
+    }
+  },
+  "title=yes guide=- reviewer=Revise": {
+    "titleStatus": "REVISE_AWAITING_STUDENT",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=- reviewer=Rejected": {
+    "titleStatus": "NEEDS_REVIEW",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=Approved reviewer=-": {
+    "titleStatus": "AWAITING_REVIEWER",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=Approved reviewer=Approved": {
+    "titleStatus": "APPROVED",
+    "titleDate": "2026-01-01T00:00:00.000Z",
+    "eligibility": {
+      "status": "FIXED",
+      "eligibleFrom": "W1",
+      "enforcedFrom": "W1",
+      "error": ""
+    }
+  },
+  "title=yes guide=Approved reviewer=Revise": {
+    "titleStatus": "REVISE_AWAITING_STUDENT",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=Approved reviewer=Rejected": {
+    "titleStatus": "AWAITING_REVIEWER",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=Rejected reviewer=-": {
+    "titleStatus": "REJECTED_BY_GUIDE",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=Rejected reviewer=Approved": {
+    "titleStatus": "APPROVED",
+    "titleDate": "2026-01-01T00:00:00.000Z",
+    "eligibility": {
+      "status": "FIXED",
+      "eligibleFrom": "W1",
+      "enforcedFrom": "W1",
+      "error": ""
+    }
+  },
+  "title=yes guide=Rejected reviewer=Revise": {
+    "titleStatus": "REVISE_AWAITING_STUDENT",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=Rejected reviewer=Rejected": {
+    "titleStatus": "REJECTED_BY_GUIDE",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=Revise reviewer=-": {
+    "titleStatus": "NEEDS_REVIEW",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=Revise reviewer=Approved": {
+    "titleStatus": "APPROVED",
+    "titleDate": "2026-01-01T00:00:00.000Z",
+    "eligibility": {
+      "status": "FIXED",
+      "eligibleFrom": "W1",
+      "enforcedFrom": "W1",
+      "error": ""
+    }
+  },
+  "title=yes guide=Revise reviewer=Revise": {
+    "titleStatus": "REVISE_AWAITING_STUDENT",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  },
+  "title=yes guide=Revise reviewer=Rejected": {
+    "titleStatus": "NEEDS_REVIEW",
+    "titleDate": "",
+    "eligibility": {
+      "status": "WAITING_TITLE",
+      "eligibleFrom": "",
+      "enforcedFrom": "",
+      "error": ""
+    }
+  }
+}
