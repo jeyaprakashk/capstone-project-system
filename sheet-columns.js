@@ -241,6 +241,19 @@ function sheetCatalog_() {
           {file: 'title-log.js', role: 'read', functions: ['readTitleLog_']},
           {file: 'title-log.js', role: 'write', functions: ['appendTitleLogRow_']}
         ]
+      },
+      templateFiles: {
+        name: 'TemplateFiles',
+        access: 'view',
+        headers: ['Document ID', 'Folder', 'File Name', 'Extension', 'First Seen', 'Last Seen', 'Active', 'In Team Template', 'Name Conflict'],
+        status: 'new',
+        purpose: 'The Office and PDF files of the capstone template repository, kept by a daily scan. A Document ID is given once and never reused. Rows are never deleted.',
+        createAtRuntime: false,
+        code: [
+          {file: 'document-setup.js', role: 'setup', functions: ['setupDocumentStorage']},
+          {file: 'template-files.js', role: 'read', functions: ['readTemplateFiles_']},
+          {file: 'template-files.js', role: 'write', functions: ['writeTemplateFiles_']}
+        ]
       }
     });
   }

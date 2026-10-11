@@ -10,7 +10,7 @@ function weeklyFixture() {
   const sheets = new Map(), properties = new Map(), mails=[], errors=[], triggers=[];
   const config = {SUBMISSION_REMINDER_HOURS:24};
   function sheet(name, rows) {
-    const value={rows,getName:()=>name,getLastRow:()=>rows.length,getLastColumn:()=>Math.max(0,...rows.map(r=>r.length)),getMaxRows:()=>1000,insertRowsAfter(){},getMaxColumns:()=>40,insertColumnsAfter(){},setTabColor(){},hideSheet(){this.hidden=true;},isSheetHidden(){return !!this.hidden;},
+    const value={rows,getName:()=>name,getLastRow:()=>rows.length,getLastColumn:()=>Math.max(0,...rows.map(r=>r.length)),getMaxRows:()=>1000,insertRowsAfter(){},getMaxColumns:()=>40,insertColumnsAfter(){},setTabColor(){},hideSheet(){this.hidden=true;},setFrozenRows(){},isSheetHidden(){return !!this.hidden;},
       getDataRange:()=>({getValues:()=>rows.map(r=>r.slice())}),
       getRange:(r,c,n=1,w=1)=>({getValues:()=>Array.from({length:n},(_,i)=>Array.from({length:w},(_,j)=>rows[r+i-1]?.[c+j-1]??'')),
         setNumberFormat(){return this;},setValue(v){return this.setValues([[v]]);},setValues(values){values.forEach((row,i)=>row.forEach((cell,j)=>{rows[r+i-1] ||= [];rows[r+i-1][c+j-1]=typeof cell==='string' && cell.startsWith("'")?cell.slice(1):cell;}));},
