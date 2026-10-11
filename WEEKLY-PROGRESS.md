@@ -158,15 +158,15 @@ weekly processing. The following describes storage and the existing hourly sched
 4. Inventory installed triggers under every account that previously installed
    weekly triggers: Apps Script trigger enumeration only exposes the caller's
    installations. Remove retired weekly installations owned by other accounts.
-5. Weekly entry no longer uses a Google Form, and no code reads `RawLog`. The live
-   spreadsheet still has a `RawLog` tab with a linked Form (found on 2026-10-11); it is
-   handled under [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md), section 2a.
+5. Weekly entry no longer uses a Google Form, and no code reads `RawLog`. The `RawLog` tab
+   and its Form were removed by the owner (2026-10-11; see
+   [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md)).
    Remove Config `WEEKLY_LOG_FORM_URL_BASE` and `WEEKLY_LOG_TEAMID_ENTRY` if they are present.
 6. Verify a student submission and revision in the deployed dashboard and inspect
    the installed hourly trigger. No local tests install triggers or deploy code.
 
-Keep title/intake Google Forms, `onTeamIntakeSubmit`, their configuration and
-unrelated notifications unchanged. Existing commit-fetch triggers are untouched;
+The title/intake Google Form and `onTeamIntakeSubmit` have since been removed (title work); the project
+sends no e-mail. Existing commit-fetch triggers are untouched;
 Phase 1 does not add or expand them. The retired `setupLogbookTriggers` installer
 and weekly-analysis/priority mechanism are no longer used.
 

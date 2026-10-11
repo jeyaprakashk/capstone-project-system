@@ -17,7 +17,7 @@ const TITLE = {
     approved: { value: true, title: 'SMART FARMING', problem: 'p', at: '2026-01-02T10:00:00.000Z', by: 'rev@example.com' }, reopen: null, folderUrl: 'https://drive.example.com/T1',
     documents: [{ key: 'work', label: 'Work Breakdown document', present: true, uploadedBy: null, uploadedAt: null }, { key: 'need', label: 'Need Analysis document', present: false, uploadedBy: null, uploadedAt: null }],
     history: [{ revision: 1, action: 'SUBMIT', actor: 'ann@x.edu', at: '2026-01-01T10:00:00.000Z', notes: '' }, { revision: 3, action: 'REVIEWER_APPROVE', actor: 'rev@example.com', at: '2026-01-02T10:00:00.000Z', notes: 'ok' }],
-    can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(true), cancel: cap(false), upload: { work: cap(false), need: cap(false) } } },
+    can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(true), cancel: cap(false) } },
   requirements: { errors: [], activities: { 'title.submit': { allowed: false, reason: 'x', requirements: [{ label: 'GitHub setup complete', met: false, reason: 'Could not verify: GitHub setup complete.', diagnostic: 'GITHUB_ERROR' }] },
     'title.resubmit': { allowed: true, requirements: [], reason: '' } } }
 };

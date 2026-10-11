@@ -35,6 +35,7 @@ All phases were built and the cutover was run:
 | `TeamIntakeRaw` archived and deleted after Phase 8. | Deleted by the owner with a backup; code references removed. | See FORM-SHEET-RETIREMENT-PLAN.md. |
 | F2: end-of-semester registry export into the master registry. | Not built. | It is future work; this semester's approvals made after the cutover are not yet in the master registry. |
 | F3 to F11 (more requirement kinds, gating more activities, batch readiness, and so on). | Not built. | Listed in the plan as future work. |
+| The coordinator enters the three release rows in `ActivityDependencies` at cutover, switching the requirements on. | Not done as of 2026-10-11: the live sheet is header-only, so no requirement is enforced (an empty sheet allows). The rows to enter are in OWNER-CHECKLIST.md, section D. | An owner step that was not carried out; the code treats an empty sheet as "no requirements", as planned. |
 | Behaviour found in the rehearsal and live use matched the acceptance tests. | Fixes were made after the rehearsal: the reviewer's approve action in its modal, the pending-review badge counts, a reopened title opens the student's Title screen first with a notice on every screen, and the guide's Documents tab no longer shows a count (it counted a folder link, not work to do). | They were found by using the screens on the rehearsal copy and on the live sheet. |
 
 ---

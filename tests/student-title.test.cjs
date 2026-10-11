@@ -57,11 +57,11 @@ test('the states: not submitted, under review, approved, reopened and unavailabl
   const f = setup({ dto: dto({ status: 'NOT_SUBMITTED', notes: '', proposal: { title: '', problem: '' }, statusText: 'Not submitted yet' }) });
   assert.equal(text(f.host.querySelector('[data-title-form] button[type="submit"]')), 'Submit title');
   assert.doesNotMatch(text(f.host), /Feedback/);
-  f.render(dto({ status: 'NEEDS_REVIEW', statusText: "Submitted — awaiting your guide's review", state: 'waiting', can: { submit: cap(false, 'The title is under review and cannot be changed now.'), upload: { work: cap(false, 'x'), need: cap(false, 'x') } } }));
+  f.render(dto({ status: 'NEEDS_REVIEW', statusText: "Submitted — awaiting your guide's review", state: 'waiting', can: { submit: cap(false, 'The title is under review and cannot be changed now.') } }));
   assert.equal(f.host.querySelector('[data-title-form]'), null);
   assert(text(f.host).includes('The title is under review and cannot be changed now.'));
   f.render(dto({ status: 'APPROVED', state: 'done', statusText: 'Approved', approved: { value: true, title: 'GOOD IDEA', problem: 'p', at: '2026-01-02T00:00:00.000Z', by: 'r@x' }, notes: '',
-    can: { submit: cap(false, 'The title is approved. Ask the coordinator to reopen it to change it.'), upload: { work: cap(false), need: cap(false) } } }));
+    can: { submit: cap(false, 'The title is approved. Ask the coordinator to reopen it to change it.') } }));
   assert(text(f.host).includes('Approved title: GOOD IDEA'));
   assert.equal(f.host.querySelector('[data-title-form]'), null);
   f.render(dto({ status: 'REOPENED', reopened: true, state: 'active', statusText: 'Reopened by the coordinator — you may submit a change', approved: { value: true, title: 'GOOD IDEA', problem: 'p', at: 'x', by: 'r' }, proposal: { title: 'GOOD IDEA', problem: 'p' }, notes: '',

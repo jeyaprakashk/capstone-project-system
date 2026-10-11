@@ -3,7 +3,13 @@
 The single, authoritative order in which the planned work is built and run. Every plan points here and states its own
 position. If a plan and this page disagree about order, this page is corrected first, then the plan.
 
-Items 1 to 8 are built and committed on `main`; items 9 onward are rehearsal, deployment and owner steps. "Needs" means the item cannot start, or cannot go live, until those are done.
+**Status (2026-10-11): items 1 to 13 are done.** The rehearsal (9) and the cutover (10) were run by the owner. Item 11 was
+executed differently from the table: the archive copy, the rename and the 14-day wait were skipped because the owner took a
+full backup and deleted the `TeamIntakeRaw` tab; the final code change (`TEAM_INTAKE_RAW` removed, schema snapshot
+regenerated) is done. Item 12 is done for every sheet, and the AGENTS.md decision of item 13 was taken (column order is no
+longer frozen; "Sheet access" section). Item 14 (student identity) is the only unbuilt plan. The table below is the order
+as planned; each plan's own "What was implemented" section lists the differences. "Needs" means the item cannot start, or
+cannot go live, until those are done.
 
 | # | Work | Plan | Needs | Enables |
 |---|---|---|---|---|
@@ -16,8 +22,8 @@ Items 1 to 8 are built and committed on `main`; items 9 onward are rehearsal, de
 | 7 | **Engine**: the title plan's Phase 2 (`activityPreconditions_`, the two checks, `API_coordinator_getRequirements`, the upload integration) **Built:** `activity-engine.js`, the `github` and `drive` checks, the read-only GitHub option, `API_coordinator_getRequirements`. The document upload (`API_student_uploadDocument`) was built and then removed on request: documents will reach the team folder outside this system, and `team-documents.js` only reads their presence. | [ACTIVITY-DEPENDENCIES-PLAN.md](ACTIVITY-DEPENDENCIES-PLAN.md) (section 10) | 6 | 8 |
 | 8 | Title plan **Phases 3 to 8**: downstream readers, the student, guide, reviewer and coordinator slices, old-reader removal and the removal check **Built** (Phases 3 to 8): the weekly, eligibility, review-marking, digest and dashboard readers use `TitleLog`; `API_student_submitTitle`, `API_guide_decideTitle`, `API_reviewer_decideTitle`, `API_coordinator_reopenTitle` and `API_coordinator_cancelReopen`; the student title card (`student-title.js`), the guide and reviewer views and the coordinator drawer Title section; the old Form handler, decision endpoints and status helper are removed and `tests/title-removal.test.cjs` guards it. `validateTitleLog` supports cutover step 7 (the one-time baseline import was deleted after the cutover). Not built: the Form archive functions of item 10 (preflight, copy, verification). | TITLE-REVISION-PLAN.md | 7 | 9 |
 | 9 | Title plan **Phase 9**: rehearsal on a copy of the spreadsheet, including a dry run of the archive steps and the three Apps Script behaviours to confirm | TITLE-REVISION-PLAN.md, [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md) | 5, 8 | 10 |
-| 10 | **Cutover** (owner steps 0 to 9), with retirement steps 2 to 5 (backup, preflight, archive copy, full verification) inside it | TITLE-REVISION-PLAN.md section 11, FORM-SHEET-RETIREMENT-PLAN.md, [OWNER-CHECKLIST.md](OWNER-CHECKLIST.md) | 9, Release 0 deployed | 11, 12 |
-| 11 | **Retirement tail:** rename `TeamIntakeRaw`, the verification period, unlink and delete, the final schema-snapshot commit | FORM-SHEET-RETIREMENT-PLAN.md (steps 7 to 9) | 10 | 13 |
+| 10 | **Cutover** (owner steps 0 to 9), with retirement steps 2 to 5 (backup, preflight, archive copy, full verification) inside it. **Done;** only the backup was made, the archive steps were not built | TITLE-REVISION-PLAN.md section 11, FORM-SHEET-RETIREMENT-PLAN.md, [OWNER-CHECKLIST.md](OWNER-CHECKLIST.md) | 9, Release 0 deployed | 11, 12 |
+| 11 | **Retirement tail:** rename `TeamIntakeRaw`, the verification period, unlink and delete, the final schema-snapshot commit. **Done without the rename and the wait** (the owner deleted the tab after a backup) | FORM-SHEET-RETIREMENT-PLAN.md (steps 7 to 9) | 10 | 13 |
 | 12 | **Header-name migration**, phases 0 to 5. Phase 1 completes the catalog. The retiring Form sheet stays out of scope until step 11 removes it | SHEET-HEADER-MATCHING-PLAN.md | 10 | 13, 14 |
 | 13 | The AGENTS.md **policy decision** about column layouts (migration phase 6) and dropping the transitional rules | SHEET-HEADER-MATCHING-PLAN.md | 11, 12 | none |
 | 14 | **Student identity** work, later, rebased on the header-name `GitHubAccounts` | [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md) | 12 | none |

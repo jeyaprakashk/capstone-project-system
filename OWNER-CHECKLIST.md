@@ -2,7 +2,7 @@
 
 What **you** do by hand, in order. Everything else is developer work and is not listed. The steps come from
 [TITLE-REVISION-PLAN.md](TITLE-REVISION-PLAN.md) (section 11) and [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md);
-if they differ from this page, those plans win. Your steps belong to items 9 to 11 of [BUILD-ORDER.md](BUILD-ORDER.md); the order of the whole work is there. Nothing here applies until the code is built. Nothing has been built yet.
+if they differ from this page, those plans win. Your steps belong to items 9 to 11 of [BUILD-ORDER.md](BUILD-ORDER.md); the order of the whole work is there. **Status (2026-10-11): the code is built and the cutover is done. Sections A to C are history; section D was rewritten and lists what is still for you to do.** Steps in A to C that mention an archive, a rename or a wait were not carried out (see D).
 
 ## A. Now: checks in the live spreadsheet (read-only, no changes)
 
@@ -96,10 +96,10 @@ Follow the order. Stop and ask if any step does not behave as written.
 | Step | You do |
 |---|---|
 | 0 | **You pause and delete first**, on the Triggers page, under every account that installed one. **Pause** `reconcileProgressEligibility` (the one installed trigger that reads title state; the other time-driven ones keep running). **Delete** the `onTeamIntakeSubmit` form-submit trigger and the `sendGuideReminderDigest` trigger (that function is removed from the code). Write down each paused trigger's handler, schedule and owner, then reopen the Triggers page and confirm the paused one is not active and the two deleted ones are gone. **Only then** does the developer run `npm run push` (no new deployment) |
-| 1 | In the editor, run `setupTitleStorage`. Type the three `ActivityDependencies` rows with `Active = Yes` (the developer gives you the exact rows) |
+| 1 | In the editor, run `setupTitleStorage`. Type the three `ActivityDependencies` rows with `Active = Yes` (the developer gives you the exact rows). **Not done:** a check of the live sheet found it header-only. See section D, item 15 |
 | 2 | Run `setTitleCutover('PAUSED')` and wait for it to return |
 | 3 | **Documents.** Copy each team's existing Form-uploaded documents into its team folder (`Team Documents`) under the fixed names `Step1_Work_Breakdown.docx` and `Step2_Need_Analysis.docx` (the folders must exist first: System Status, Team folders). Close the Form if it is still accepting responses |
-| 4 | **Archive of the Form sheet: not built yet.** The archive preflight, copy and verification functions of [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md) do not exist in the code. Skip this step; `TeamIntakeRaw` stays exactly as it is and is not renamed or deleted until the archive is built and verified (part D) |
+| 4 | **Superseded: never built, and not needed.** The owner took a full backup and deleted the `TeamIntakeRaw` tab. Original text: the archive preflight, copy and verification functions of [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md) do not exist in the code. Skip this step; `TeamIntakeRaw` stays exactly as it is and is not renamed or deleted until the archive is built and verified (part D) |
 | 5 | (Done at the cutover; the function was deleted afterwards.) Run `importTitleBaseline` in the editor. It copies each team's current title state from `TeamStatus` into `TitleLog` (one `BASELINE` row per team) and refuses unless the cutover is `PAUSED`. Read its report: `problems` lists teams it could not write (an approved team with no approval date in the master registry, for example; type that row by hand), `invalid` must be empty. It is safe to run again; teams that already have rows are skipped |
 | 6 | **Deploy the new version** (new deployment version of the web app) |
 | 7 | In the editor run `validateTitleLog` and read the execution log: `errors` must be empty. Then open a team's drawer (Coordinator, the team row, **Title**) and check its requirements card. Fix and repeat until both are clean. Then **restore the triggers** you paused in step 0 (they stay paused until now) |
@@ -116,21 +116,34 @@ Follow the order. Stop and ask if any step does not behave as written.
    from your record of each trigger's handler, schedule and owner, and reopen the Triggers page to check. Do this only
    after step 4 confirmed that the previous version is back. Otherwise the weekly jobs and digests stay stopped. After step 9 the fix goes forward; there is no easy rollback.
 
-## D. After cutover
+## D. After cutover: what is still for you to do
 
-10. **Rename the old sheet.** When the developer says the old-reader removal check has passed, rename `TeamIntakeRaw` to
-    `TeamIntakeRaw_retired`.
-11. **Wait.** At least **14 days**, and until **a weekly submission deadline has passed** and **one reviewer decision has been
-    made**, whichever is later. During that time, with the sheet renamed:
-    - open the student, guide, reviewer and coordinator dashboards at least once and look for "unavailable" or blank values
-      that used to show data;
-    - make a **weekly submission** (and a revision) from the student dashboard and confirm it saves;
-    - confirm the **weekly job** has run (the weekly schedule trigger) and the **guide and reviewer digests** have run, and
-      that none of them reported an error in the Apps Script execution log.
-12. **Delete.** If all is normal: unlink the Form from its response sheet (Form, Responses tab), then delete
-    `TeamIntakeRaw_retired`. The developer then makes the final code change.
-13. **Config.** Remove the old Form settings (`TEAM_INTAKE_FORM_URL_BASE`, `TEAM_INTAKE_TEAMID_ENTRY`) from the `Config` tab.
-14. **Archive.** Keep the Form archive sheet for one semester, then delete it.
+The old steps 10 to 14 (rename `TeamIntakeRaw`, wait at least 14 days, unlink and delete, keep a Form archive) were **not carried out**: you took a
+full backup and deleted the tab and the Forms directly, so there is no archive sheet and no wait. Remaining, in this order:
+
+10. **Push and deploy** the latest `main` (`clasp push`, then a new deployment version).
+11. **Run `setupTeamStatusColumns` once** in the editor. It adds the `Repo URL` header to `TeamStatus` if it is missing; a repository write no
+    longer adds it. Do this before the next repository is created.
+12. **Delete the old title columns from the `TeamStatus` tab**, after step 10 and only by header name: Title, Problem Statement, Similarity Flag,
+    Guide Decision, Guide Notes, Reviewer Decision, Reviewer Notes, Title Approved By, Work Breakdown Link, Need Analysis Link. Keep
+    `Review Committee Number` and every other column. The code no longer asks for them. (If you do this first, run step 11 first: setup refuses
+    when a header is missing together with an unrecognised one.)
+13. **Delete the `WeeklyReminders` tab** if it still exists.
+14. **Config.** Remove the unused keys from the `Config` tab: `TEAM_INTAKE_FORM_URL_BASE`, `TEAM_INTAKE_TEAMID_ENTRY`, `WEEKLY_LOG_FORM_URL_BASE`,
+    `WEEKLY_LOG_TEAMID_ENTRY`, `ANNOUNCEMENTS_FORM_URL`, `GUIDE_DASHBOARD_URL`, `SUBMISSION_REMINDER_HOURS`, `GUIDE_REPO_PERMISSION`,
+    `COLLABORATOR_REPO_PERMISSION`, `COLLABORATOR_GITHUB_USERNAME`, `COLLABORATOR_REPOS_ACCESS`. Keep `Key`, `Value` and `Description` as the headers.
+15. **Enter the submission requirements** in the `ActivityDependencies` tab. A check on 2026-10-11 found the tab header-only, which means no
+    requirement is enforced: a student can submit a title without a ready GitHub setup or the documents. To switch the requirements on, type
+    these rows (the tab has a Yes/No list in the last column), then open `API_coordinator_getRequirements` through a team's drawer to check:
+
+    | Activity | Kind | Item | Label | Active |
+    |---|---|---|---|---|
+    | `title.submit` | `github` | `READY` | GitHub setup complete | Yes |
+    | `title.submit` | `drive` | `Step1_Work_Breakdown.docx` | Work Breakdown document | Yes |
+    | `title.submit` | `drive` | `Step2_Need_Analysis.docx` | Need Analysis document | Yes |
+
+    A row naming an activity other than `title.submit` or `title.resubmit` is a configuration error and stops all title submissions, so type the
+    names exactly. If you decide not to enforce requirements, leave the tab as it is.
 
 ## E. Rules to keep
 
@@ -142,9 +155,9 @@ Follow the order. Stop and ask if any step does not behave as written.
 - Never edit the `TITLE_CUTOVER` property by hand; only `setTitleCutover(...)` and `clearTitleCutover()` change it. To pause title writes later, run
   `setTitleCutover('PAUSED')`, then `setTitleCutover('LIVE')`.
 - Never add students, or a group that contains students, to the shared drive.
-- Before starting the next semester's spreadsheet, run the registry export on this one.
-- Do not move, rename or delete columns on the sheets. The code will tolerate it later, but that is a separate decision.
+- The end-of-semester registry export (title plan F2) has **not** been built. Before starting the next semester's spreadsheet, ask for it, or this semester's approved titles will not be in the master registry for the similarity check.
+- Column order does not matter to the code (AGENTS.md, "Sheet access"), so you may move or add columns. Do not rename a header or delete a column the code uses.
 
 ## F. Questions that are still open
 
-- Whether to accept the migration phase order (journals last) and the fake GitHub and Drive test layers. Say "accept".
+- None. The migration order and the test layers were accepted and built.
