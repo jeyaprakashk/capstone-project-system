@@ -491,94 +491,12 @@ function appendMissedWeeklyEntries_(students, windows, now) {
   });
 }
 
-/** Reminder receipts are authoritative in this tab; callers hold the weekly lock. */
-function weeklyReminderSheet_(create) {
-  const name = SHEET_NAMES.WEEKLY_REMINDERS, headers = Object.values(FIELD_DEFINITIONS.WEEKLY_REMINDERS);
-  let sheet = getSheet_(name);
-  if (!sheet && create) sheet = getSpreadsheet_().insertSheet(name);
-  if (!sheet) throw new Error('WeeklyReminders storage is missing. Run setupWeeklySubmissionStorage.');
-  if (!sheet.getLastRow() && create) sheet.getRange(1,1,1,headers.length).setValues([headers]);
-  const actual = readSheetRows_(sheet,1,1)[0] || [];
-  if (actual.length !== headers.length || headers.some((header,index)=>!textEquals_(header,actual[index]))) {
-    throw new Error('WeeklyReminders header mismatch. Expected: '+headers.join(' | '));
-  }
-  return sheet;
-}
-
-function weeklyReminderKey_(regNo,weekId) {
-  return normalizeText_(regNo)+'\u0000'+normalizeText_(weekId);
-}
-
-function weeklyReminderReceipts_(sheet) {
-  const seen = new Set();
-  readSheetRows_(sheet,2).forEach(row=>{
-    if (!row.some(value=>value !== '')) return;
-    const regNo = normalizeText_(row[0]), weekId = normalizeText_(row[1]);
-    const at = row[2];
-    if (!regNo || !weekId || Object.prototype.toString.call(at) !== '[object Date]' || !Number.isFinite(at.getTime())) {
-      throw new Error('Invalid WeeklyReminders receipt.');
-    }
-    const key = weeklyReminderKey_(regNo,weekId);
-    if (seen.has(key)) throw new Error('Duplicate WeeklyReminders receipt.');
-    seen.add(key);
-  });
-  return seen;
-}
-
-/** One-time transfer of previously sent reminders; repeatable after partial failure. */
-function migrateWeeklyReminderProperties_(sheet,seen) {
-  const properties = PropertiesService.getScriptProperties();
-  const old = Object.entries(properties.getProperties()).filter(([key])=>key.startsWith('weekly-reminder:'));
-  const pending = [];
-  old.forEach(([key,value])=>{
-    const match = /^weekly-reminder:([^:]+):([^:]+)$/.exec(key);
-    if (!match) throw new Error('Invalid weekly reminder property key.');
-    let regNo;
-    try { regNo = decodeURIComponent(match[1]); } catch(error) { throw new Error('Invalid weekly reminder property identity.'); }
-    const weekId = match[2], sentAt = new Date(value), identity = weeklyReminderKey_(regNo,weekId);
-    if (!normalizeText_(regNo) || !normalizeText_(weekId) || !Number.isFinite(sentAt.getTime())) throw new Error('Invalid weekly reminder property receipt.');
-    if (!seen.has(identity)) { pending.push([regNo,weekId,sentAt]); seen.add(identity); }
-  });
-  if (pending.length) {
-    const first = sheet.getLastRow()+1, last = first+pending.length-1;
-    if (last > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(),last-sheet.getMaxRows());
-    sheet.getRange(first,1,pending.length,3).setValues(pending);
-    SpreadsheetApp.flush();
-  }
-  old.forEach(([key])=>properties.deleteProperty(key));
-  return {migrated:pending.length,deleted:old.length};
-}
-
+/** Hourly: records a MISSED entry for each required week a student did not submit by its late cutoff. It sends no e-mail. */
 function processWeeklySubmissionSchedule() {
   requireTriggerOrOperator_();
   const windows = getWeeklySubmissionWindows_();
-  const hours = Number(getConfig_('SUBMISSION_REMINDER_HOURS'));
-  if (!Number.isFinite(hours) || hours <= 0) throw new Error('SUBMISSION_REMINDER_HOURS must be positive.');
   return weeklyLock_(() => {
-    const currentStudents = weeklyStudents_(), now = new Date();
-    const reminderSheet = weeklyReminderSheet_(false), reminders = weeklyReminderReceipts_(reminderSheet);
-    appendMissedWeeklyEntries_(currentStudents,windows,now);
-    const records = readLogEntries_(), eligibilities = readProgressEligibility_();
-    currentStudents.forEach(student => {
-      const eligibility = progressStudentEligibility_(student,eligibilities);
-      eligibleWeeklyWindows_(eligibility.eligibleFrom ? eligibility.enforcedFrom : '',windows).forEach(window => {
-        const at = Date.now();
-        if (at < window.opens_at || at < window.deadline_at-hours*3600000 || at >= window.deadline_at) return;
-        if (records.some(r=>textEquals_(r.regNo,student.regNo) && r.weekId === window.weekId && r.entryStatus !== 'MISSED')) return;
-        const key = weeklyReminderKey_(student.regNo,window.weekId);
-        if (reminders.has(key)) return;
-        const due = Utilities.formatDate(new Date(window.deadline_at),getSpreadsheet_().getSpreadsheetTimeZone(),'dd MMM yyyy HH:mm z');
-        try {
-          MailApp.sendEmail(student.email,'Weekly progress reminder — ' + window.weekId,
-            'Submit your weekly progress by ' + due + '.\n\nOpen your Student Dashboard:\n' + getDashboardUrl_());
-          const rowNumber = reminderSheet.getLastRow()+1;
-          if (rowNumber > reminderSheet.getMaxRows()) reminderSheet.insertRowsAfter(reminderSheet.getMaxRows(),1);
-          reminderSheet.getRange(rowNumber,1).setNumberFormat('@');
-          reminderSheet.getRange(rowNumber,1,1,3).setValues([[student.regNo,window.weekId,new Date()]]);
-          reminders.add(key);
-        } catch (error) { console.error('Weekly reminder failed for ' + student.regNo + ': ' + error.message); }
-      });
-    });
+    appendMissedWeeklyEntries_(weeklyStudents_(), windows, new Date());
   });
 }
 
@@ -587,15 +505,11 @@ function setupWeeklySubmissionStorage() {
   const email = Session.getActiveUser().getEmail();
   if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
   getWeeklySubmissionWindows_();
-  const hours = Number(getConfig_('SUBMISSION_REMINDER_HOURS'));
-  if (!Number.isFinite(hours) || hours <= 0) throw new Error('SUBMISSION_REMINDER_HOURS must be positive.');
   return weeklyLock_(() => {
     let sheet = getSheet_(SHEET_NAMES.LOG_ENTRIES);
     if (!sheet) sheet = getSpreadsheet_().insertSheet(SHEET_NAMES.LOG_ENTRIES);
     if (!sheet.getLastRow()) sheet.getRange(1,1,1,Object.keys(FIELD_DEFINITIONS.LOG_ENTRIES).length).setValues([Object.values(FIELD_DEFINITIONS.LOG_ENTRIES)]);
     weeklyLogColumns_(sheet);
-    const reminderSheet = weeklyReminderSheet_(true);
-    migrateWeeklyReminderProperties_(reminderSheet,weeklyReminderReceipts_(reminderSheet));
     setupProgressEligibilityStorage();
     SpreadsheetApp.flush();
     return {ok:true};
