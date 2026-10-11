@@ -19,7 +19,7 @@ const TITLE = {
     history: [{ revision: 1, action: 'SUBMIT', actor: 'ann@x.edu', at: '2026-01-01T10:00:00.000Z', notes: '' }, { revision: 3, action: 'REVIEWER_APPROVE', actor: 'rev@example.com', at: '2026-01-02T10:00:00.000Z', notes: 'ok' }],
     can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(true), cancel: cap(false), upload: { work: cap(false), need: cap(false) } } },
   requirements: { errors: [], activities: { 'title.submit': { allowed: false, reason: 'x', requirements: [{ label: 'GitHub setup complete', met: false, reason: 'Could not verify: GitHub setup complete.', diagnostic: 'GITHUB_ERROR' }] },
-    'title.resubmit': { allowed: true, requirements: [], reason: '' }, 'document.upload': { allowed: true, requirements: [], reason: '' } } }
+    'title.resubmit': { allowed: true, requirements: [], reason: '' } } }
 };
 
 function setup(data = { basic: BASIC, title: TITLE, progress: PROGRESS, activity: ACTIVITY }) {

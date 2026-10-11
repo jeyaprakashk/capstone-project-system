@@ -6,7 +6,7 @@
  *
  * The registry is a function, not a top-level list the check files add to, so it does not depend on the order the files load in.
  */
-const ACTIVITY_IDS_ = Object.freeze(['title.submit', 'title.resubmit', 'document.upload']);
+const ACTIVITY_IDS_ = Object.freeze(['title.submit', 'title.resubmit']);
 const ACTIVITY_MISCONFIGURED_ = 'Submission requirements are misconfigured. Contact the coordinator.';
 
 /**
@@ -58,9 +58,7 @@ function parseActivityRules_(data, checks) {
     if (!label) problems.push('the label is blank');
     if (active !== 'yes' && active !== 'no') problems.push('Active must be Yes or No');
     if (check && ACTIVITY_IDS_.includes(activity)) {
-      const gated = activity.indexOf('title.') === 0 || activity === 'document.upload';
-      if (check.needsApprovedTitle && gated) problems.push('kind ' + kind + ' needs an approved title, which this activity is what produces');
-      if (kind === 'drive' && activity === 'document.upload') problems.push('kind drive cannot gate document.upload, because uploading is how those files are created');
+      if (check.needsApprovedTitle) problems.push('kind ' + kind + ' needs an approved title, which this activity is what produces');
     }
     if (problems.length) { errors.push(where + problems.join('; ') + '.'); return; }
     if (active === 'yes') (rules[activity] = rules[activity] || []).push({kind, item, label});

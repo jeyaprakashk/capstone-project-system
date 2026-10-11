@@ -88,7 +88,7 @@ test('every kind of misconfiguration is reported with its row and the whole gate
     'blank Active': [['title.submit', 'github', 'READY', 'L', ''], /Active must be Yes or No/],
     'bad Active': [['title.submit', 'github', 'READY', 'L', 'maybe'], /Active must be Yes or No/],
     'partially filled row': [['title.submit', '', '', '', ''], /unknown kind/],
-    'drive under document.upload': [['document.upload', 'drive', WORK, 'L', 'Yes'], /cannot gate document\.upload/]
+    'the removed document.upload activity': [['document.upload', 'github', 'READY', 'L', 'Yes'], /unknown activity/]
   };
   for (const [name, [row, pattern]] of Object.entries(bad)) {
     const result = parse([RULE.github, row]);
@@ -100,11 +100,11 @@ test('every kind of misconfiguration is reported with its row and the whole gate
   assert.equal(wrongInactive.errors.length, 1, 'an inactive row is still validated');
 });
 
-test('a Needs-approved-title check under a title or upload activity is a misconfiguration', () => {
+test('a Needs-approved-title check under a title activity is a misconfiguration', () => {
   const {c} = setup();
   const checks = c.activityChecks_();
   checks.later = {needsApprovedTitle: true, perStudent: false, validItem: () => true, isMet: () => ({met: true})};
-  for (const activity of ['title.submit', 'title.resubmit', 'document.upload']) {
+  for (const activity of ['title.submit', 'title.resubmit']) {
     const result = plain(c.parseActivityRules_({present: true, headers: HEADERS, rows: [[activity, 'later', 'x', 'L', 'Yes']]}, checks));
     assert.match(result.errors[0], /needs an approved title/, activity);
   }
@@ -128,7 +128,6 @@ test('the sheet is read once per request and never cached between requests', () 
   const ctx = env.c.activityContext_();
   env.c.activityPreconditions_('title.submit', TEAM, ctx);
   env.c.activityPreconditions_('title.resubmit', TEAM, ctx);
-  env.c.activityPreconditions_('document.upload', TEAM, ctx);
   assert.equal(env.reads.sheet, 1);
   env.c.activityPreconditions_('title.submit', TEAM, env.c.activityContext_());
   assert.equal(env.reads.sheet, 2, 'a new request reads again');
@@ -138,8 +137,8 @@ test('the sheet is read once per request and never cached between requests', () 
 
 test('no rows for an activity allows it, and any misconfiguration denies every activity', () => {
   assert.deepEqual(decide({rows: []}).result, {allowed: true, requirements: [], reason: ''});
-  assert.deepEqual(decide({rows: [RULE.github]}, 'document.upload').result, {allowed: true, requirements: [], reason: ''});
-  const denied = decide({rows: [RULE.github, ['title.submit', 'weekly', 'x', 'L', 'Yes']]}, 'document.upload').result;
+  assert.deepEqual(decide({rows: [RULE.github]}, 'title.resubmit').result, {allowed: true, requirements: [], reason: ''}, 'rows of another activity do not apply');
+  const denied = decide({rows: [RULE.github, ['title.submit', 'weekly', 'x', 'L', 'Yes']]}, 'title.resubmit').result;
   assert.equal(denied.allowed, false);
   assert.equal(denied.reason, 'Submission requirements are misconfigured. Contact the coordinator.');
   assert.deepEqual(denied.requirements, []);
@@ -313,11 +312,10 @@ test('API_coordinator_getRequirements with a team returns each activity\'s check
   const env = setup({rows: [RULE.github, RULE.work], github: 'verificationUnavailable', drive: {teams: {T1: {files: []}}}});
   const data = JSON.parse(env.c.API_coordinator_getRequirements(' t1 ')).data;
   assert.equal(data.teamId, 'T1');
-  assert.deepEqual(Object.keys(data.activities).sort(), ['document.upload', 'title.resubmit', 'title.submit']);
+  assert.deepEqual(Object.keys(data.activities).sort(), ['title.resubmit', 'title.submit']);
   assert.equal(data.activities['title.submit'].allowed, false);
   assert.equal(data.activities['title.submit'].requirements[0].diagnostic, 'GITHUB_MEMBER_UNVERIFIED');
   assert.equal(data.activities['title.submit'].requirements[1].reason, 'Not uploaded yet.');
-  assert.deepEqual(data.activities['document.upload'], {allowed: true, requirements: [], reason: ''});
   assert.equal(env.reads.github, 1, 'GitHub is asked once for the whole report');
 });
 

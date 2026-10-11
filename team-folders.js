@@ -3,11 +3,11 @@
  * Layout in Drive: <the spreadsheet's folder>/Team Documents/<year>_<semester>_team_<teamid>.
  * Spreadsheet data is never touched: whether a team has a folder is answered from Drive by exact folder name.
  * Reads never create anything; only createTeamFolders_ does. findTeamFolder_ is the shared lookup the
- * upload feature reuses, so the naming rule exists once and folders are only ever created from System Status.
+ * documents check reads, so the naming rule exists once and folders are only ever created from System Status.
  */
 const TEAM_DOCUMENTS_FOLDER_NAME_ = 'Team Documents';
 const TEAM_FOLDER_BATCH_ = 25;
-/** Fixed file names inside a team folder; the upload feature uses the same names. */
+/** Fixed file names inside a team folder; the documents check (team-documents.js) reads the same names. */
 const TEAM_DOCUMENT_FILE_NAMES_ = Object.freeze({work: 'Step1_Work_Breakdown.docx', need: 'Step2_Need_Analysis.docx'});
 
 /** Lowercase; each run of characters other than a-z, 0-9 and _ becomes one _; repeated _ collapse; ends trimmed. */
