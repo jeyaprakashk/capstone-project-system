@@ -82,51 +82,14 @@ function titleSimilarityContext_(teamId, index, semester) {
   return {registryRows: titleRegistryRows_(), academicYear: getAcademicYear_(), semester, others: titleOtherTeamTitles_(index, teamId)};
 }
 
-/** Mail for an event (TITLE-REVISION-PLAN.md section 10). Runs after the lock is released; a failure becomes a warning. */
-function titleNotify_(event) {
-  const {TS, row} = titleTeamRow_(event.teamId);
-  const students = titleStudentEmails_(row, TS), guide = String(row[TS.GUIDE_EMAIL] || '').trim();
-  const url = getDashboardUrl_(), teamId = event.teamId, after = event.row;
-  const send = (to, subject, body) => { const list = [].concat(to).filter(Boolean); if (list.length) MailApp.sendEmail(list.join(','), subject, body + '\n\nOpen the dashboard: ' + url); };
-  const noted = after.notes ? '\n\nNote: ' + after.notes : '';
-  if (event.action === 'submit') {
-    send(guide, 'New/Updated Title Submission - Team ' + teamId, 'Team ' + teamId + ' submitted "' + after.title + '" for your review.');
-  } else if (event.action === 'guideApprove') {
-    send(getCoordinatorEmail_(), 'Guide-Approved Title - Team ' + teamId, 'Team ' + teamId + "'s title \"" + after.title + '" has been approved by the guide.');
-    if (after.title !== event.state.proposal.title) {
-      send(students, 'Your Guide Updated Your Project Title - Team ' + teamId, 'Original: "' + event.state.proposal.title + '"\nUpdated: "' + after.title + '"');
-    }
-  } else if (event.action === 'return') {
-    const byReviewer = event.state.status === 'AWAITING_REVIEWER';
-    send(byReviewer ? [guide, ...students] : students, (byReviewer ? 'Reviewer Requested Revision' : 'Title Returned by Guide') + ' - Team ' + teamId,
-      'The title "' + after.title + '" was returned for changes. Please update it and resubmit.' + noted);
-  } else if (event.action === 'reviewerApprove') {
-    send([guide, ...students], 'Project Title Approved - Team ' + teamId, 'Your project title "' + after.approvedTitle + '" has final approval. Begin weekly logging.');
-  } else if (event.action === 'reopen') {
-    send([guide, ...students], 'Project Title Reopened - Team ' + teamId, 'The approved title was reopened by the coordinator so it can be changed.' + noted);
-  } else if (event.action === 'cancelReopen') {
-    send([guide, ...students], 'Title Reopening Cancelled - Team ' + teamId, 'The approved title "' + after.approvedTitle + '" stays in effect.' + noted);
-  }
-}
-
-/** Tells the coordinator about an attempt by someone who is not allowed (the old paths did the same). Never fails the request. */
-function titleReportRefusal_(error, label, teamId) {
-  if (!error || error.apiCode !== 'UNAUTHORIZED') return;
-  try {
-    MailApp.sendEmail(getCoordinatorEmail_(), 'Unauthorized Title Attempt - Team ' + teamId,
-      (Session.getActiveUser().getEmail() || 'Someone') + ' tried to ' + label + ' for Team ' + teamId + ' and was refused: ' + error.message);
-  } catch (mailError) { console.error('Could not report a refused title attempt: ' + (mailError && mailError.message || mailError)); }
-}
-
 /** Runs one title action as `as`. `input` is the browser's object: {requestId, expectedRevision, ...fields}. */
-function titleRun_(as, action, teamId, input, label) {
+function titleRun_(as, action, teamId, input) {
   input = input && typeof input === 'object' ? input : {};
   const team = titleTeamRowFor_(teamId, as);
   const semester = team.row[team.TS.SEMESTER], resolved = String(team.row[team.TS.TEAM_ID]).trim();
   const deps = {
     authorize: titleAuthorizer_(as),
-    similarityContext: (id, index) => titleSimilarityContext_(id, index, semester),
-    notify: titleNotify_
+    similarityContext: (id, index) => titleSimilarityContext_(id, index, semester)
   };
   if (action === 'submit') {
     deps.unmetRequirements = state => {
@@ -134,18 +97,13 @@ function titleRun_(as, action, teamId, input, label) {
       return activityUnmetMessages_(activityPreconditions_(activity, {teamId: resolved, semester}, activityContext_()));
     };
   }
-  try {
-    return titleWrite_({action, teamId: resolved, requestId: input.requestId, expectedRevision: input.expectedRevision, input}, deps);
-  } catch (error) {
-    titleReportRefusal_(error, label, resolved);
-    throw error;
-  }
+  return titleWrite_({action, teamId: resolved, requestId: input.requestId, expectedRevision: input.expectedRevision, input}, deps);
 }
 
 function API_student_submitTitle(input) {
   return apiHandle_(() => {
     const student = studentAccessOrThrow_();
-    return titleRun_('student', 'submit', student.teamId, input, 'submit a title');
+    return titleRun_('student', 'submit', student.teamId, input);
   });
 }
 
@@ -158,19 +116,19 @@ function titleDecisionAction_(as, input) {
 }
 
 function API_guide_decideTitle(input) {
-  return apiHandle_(() => titleRun_('guide', titleDecisionAction_('guide', input), input && input.teamId, input, 'decide a title'));
+  return apiHandle_(() => titleRun_('guide', titleDecisionAction_('guide', input), input && input.teamId, input));
 }
 
 function API_reviewer_decideTitle(input) {
-  return apiHandle_(() => titleRun_('reviewer', titleDecisionAction_('reviewer', input), input && input.teamId, input, 'decide a title'));
+  return apiHandle_(() => titleRun_('reviewer', titleDecisionAction_('reviewer', input), input && input.teamId, input));
 }
 
 function API_coordinator_reopenTitle(input) {
-  return apiHandle_(() => titleRun_('coordinator', 'reopen', input && input.teamId, input, 'reopen a title'));
+  return apiHandle_(() => titleRun_('coordinator', 'reopen', input && input.teamId, input));
 }
 
 function API_coordinator_cancelReopen(input) {
-  return apiHandle_(() => titleRun_('coordinator', 'cancelReopen', input && input.teamId, input, 'cancel a reopening'));
+  return apiHandle_(() => titleRun_('coordinator', 'cancelReopen', input && input.teamId, input));
 }
 
 // ---- reading ---------------------------------------------------------------------------------------------------------------

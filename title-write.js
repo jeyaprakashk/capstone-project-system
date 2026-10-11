@@ -8,9 +8,8 @@
  *                                          Called before and again under the lock, so it must read the roster and committee fresh.
  *     unmetRequirements(state, user)    -> [string]   optional; submit only; runs outside the lock (GitHub and Drive calls).
  *     similarityContext(teamId, index)  -> {registryRows, academicYear, semester, others}   required for submit and a guide edit.
- *     notify(event)                     -> void       optional; runs after the lock is released. event = {action, teamId, actor, state, row}.
  *   }
- * Returns {ok, revision, status, message, warning?}. A repeated request that already committed returns the stored result and sends no mail.
+ * Returns {ok, revision, status, message}. A repeated request that already committed returns the stored result. No e-mail is sent.
  */
 const TITLE_REQUEST_ID_MAX_ = 100;
 const TITLE_LOCK_WAIT_MS_ = 10000;
@@ -115,13 +114,5 @@ function titleWrite_(request, deps) {
     if (!owned) lock.releaseLock();
   }
 
-  // 11. Mail goes after the lock is released; a mail failure never undoes the save.
-  if (deps.notify) {
-    try { deps.notify({action, teamId: state.teamId || teamId, actor: user.actor, state, row}); }
-    catch (error) {
-      console.error('Title notification failed for ' + teamId + ': ' + (error && error.stack || error));
-      result.warning = 'The title was saved, but the notification email could not be sent.';
-    }
-  }
   return result;
 }

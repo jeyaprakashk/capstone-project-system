@@ -66,17 +66,14 @@ let counter = 0;
 const rid = () => 'req-' + (++counter);
 const SUBMIT = (extra = {}) => ({requestId: rid(), expectedRevision: 0, title: 'Smart campus', problem: 'A real problem', ...extra});
 
-test('a student submits: the row is written for the session team and the guide is mailed', () => {
+test('a student submits: the row is written for the session team and nobody is mailed', () => {
   const {c, mails, rows, env} = setup();
   const frame = call(c, 'API_student_submitTitle', SUBMIT());
   assert.deepEqual(frame.data, {ok: true, revision: 1, status: 'NEEDS_REVIEW', message: 'Title submitted for guide review.'});
   assert.equal(rows().length, 1);
   assert.equal(c.readTitleLog_().rows[0].teamId, 'T1');
   assert.equal(c.readTitleLog_().rows[0].actor, 'ann@x.edu');
-  assert.equal(mails.length, 1);
-  assert.equal(mails[0].to, 'guide@x.edu');
-  assert.match(mails[0].subject, /New\/Updated Title Submission - Team T1/);
-  assert.match(mails[0].body, /SMART CAMPUS/);
+  assert.equal(mails.length, 0);
   assert.deepEqual(env.asked, [['title.submit', 'T1']]);
 });
 
@@ -118,7 +115,7 @@ test('a reopened title is checked against title.resubmit', () => {
   assert.deepEqual(env.asked, [['title.resubmit', 'T1']]);
 });
 
-test('the whole workflow through the endpoints, with the mails of the plan', () => {
+test('the whole workflow through the endpoints, and it sends no e-mail', () => {
   const {c, as, env, mails} = setup();
   let revision = 0;
   const act = (email, name, input) => { as(email); env.next(); const frame = call(c, name, {requestId: rid(), expectedRevision: revision, ...input}); assert.equal(frame.ok, true, name + ': ' + JSON.stringify(frame.error)); revision = frame.data.revision; return frame.data; };
@@ -134,19 +131,7 @@ test('the whole workflow through the endpoints, with the mails of the plan', () 
   act('coord@x.edu', 'API_coordinator_reopenTitle', {teamId: 'T1', reason: 'Scope change'});
   act('coord@x.edu', 'API_coordinator_cancelReopen', {teamId: 'T1', reason: 'No change'});
   assert.equal(revision, 10);
-  const bySubject = prefix => mails.filter(m => m.subject.startsWith(prefix));
-  assert.equal(bySubject('New/Updated Title Submission').length, 3);
-  assert.equal(bySubject('Title Returned by Guide')[0].to, 'ann@x.edu,bob@x.edu');
-  assert.equal(bySubject('Your Guide Updated Your Project Title').length, 1, 'only the edited approval tells the students');
-  assert.match(bySubject('Your Guide Updated')[0].body, /Original: "SECOND"\nUpdated: "SECOND EDITED"/);
-  assert.equal(bySubject('Guide-Approved Title').length, 2);
-  assert.equal(bySubject('Guide-Approved Title')[0].to, 'coord@x.edu');
-  assert.equal(bySubject('Reviewer Requested Revision')[0].to, 'guide@x.edu,ann@x.edu,bob@x.edu');
-  assert.equal(bySubject('Project Title Approved')[0].to, 'guide@x.edu,ann@x.edu,bob@x.edu');
-  assert.match(bySubject('Project Title Approved')[0].body, /"THIRD"/);
-  assert.equal(bySubject('Project Title Reopened').length, 1);
-  assert.equal(bySubject('Title Reopening Cancelled').length, 1);
-  assert.equal(mails.every(m => m.body.includes('https://dash.example')), true);
+  assert.equal(mails.length, 0, 'the workflow sends no e-mail');
   assert.deepEqual(Array.from(c.validateTitleHistory_(c.readTitleLog_().rows, Date.now())), []);
 });
 
@@ -162,7 +147,7 @@ test('a decision needs approve or return, and only a guide approval may edit the
   assert.equal(call(c, 'API_guide_decideTitle', {requestId: rid(), expectedRevision: 1, teamId: 'T1', decision: 'return'}).error.code, 'INVALID_INPUT', 'a return needs notes');
 });
 
-test('the wrong person is refused, nothing is saved, and the coordinator is told', () => {
+test('the wrong person is refused and nothing is saved or mailed', () => {
   const {c, as, mails, rows, env} = setup();
   call(c, 'API_student_submitTitle', SUBMIT());
   const mailsBefore = mails.length;
@@ -179,9 +164,7 @@ test('the wrong person is refused, nothing is saved, and the coordinator is told
     assert.match(frame.error.message, pattern);
   }
   assert.equal(rows().length, 1);
-  const reports = mails.slice(mailsBefore);
-  assert.equal(reports.length, attempts.length);
-  assert.ok(reports.every(m => m.to === 'coord@x.edu' && /Unauthorized Title Attempt - Team T1/.test(m.subject)));
+  assert.equal(mails.length, mailsBefore, 'a refused attempt sends no report either');
   as('guide@x.edu'); env.next();
   assert.equal(call(c, 'API_guide_decideTitle', {requestId: rid(), expectedRevision: 1, teamId: 'T2', decision: 'approve'}).error.code, 'UNAUTHORIZED', 'a team of another guide');
 });

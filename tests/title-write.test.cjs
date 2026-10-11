@@ -137,16 +137,14 @@ test('a stale revision is a CONFLICT and writes nothing', () => {
   assert.equal(rowsOf(env).length, 1);
 });
 
-test('a repeated request returns the stored result, writes nothing more and sends no mail', () => {
+test('a repeated request returns the stored result and writes nothing more', () => {
   const {env, c} = setup();
-  let mails = 0;
-  const deps = depsFor('student', {notify: () => { mails++; }});
+  const deps = depsFor('student');
   const first = plain(c.titleWrite_(request('submit', SUBMIT), deps));
   env.next();
   const again = plain(c.titleWrite_(request('submit', SUBMIT), deps));
   assert.deepEqual(again, first);
   assert.equal(rowsOf(env).length, 1);
-  assert.equal(mails, 1);
   fails(() => c.titleWrite_(request('submit', {title: 'Different', problem: 'p'}), deps), 'CONFLICT', /different request/);
   fails(() => c.titleWrite_(request('submit', SUBMIT, {teamId: 'T2'}), deps), 'CONFLICT', /different request/);
 });
@@ -247,19 +245,13 @@ test('if the append throws and the row is not there, the answer is UNAVAILABLE a
   assert.equal(rowsOf(env).length, 1);
 });
 
-test('mail goes after the lock is released; a mail failure is a warning and the save stands', () => {
-  const {env, c, lockState} = setup();
-  const seen = [];
-  const notify = event => seen.push({held: lockState.held, action: event.action, teamId: event.teamId, actor: event.actor, revision: event.row.revision});
-  const ok = plain(c.titleWrite_(request('submit', SUBMIT), depsFor('student', {notify})));
-  assert.equal(ok.warning, undefined);
-  assert.deepEqual(seen, [{held: false, action: 'submit', teamId: 'T1', actor: 'student@example.com', revision: 1}]);
-  env.next();
-  c.console = {error() {}, log() {}};
-  const failing = plain(c.titleWrite_(request('return', {notes: 'n'}, {expectedRevision: 1, requestId: 'g'}), depsFor('guide', {notify: () => { throw new Error('mail down'); }})));
-  assert.equal(failing.ok, true);
-  assert.match(failing.warning, /notification email could not be sent/);
-  assert.equal(rowsOf(env).length, 2);
+test('no e-mail is sent and there is no notification callback or warning', () => {
+  const { c } = setup();
+  const result = plain(c.titleWrite_(request('submit', SUBMIT), depsFor('student', {notify: () => { throw new Error('must not be called'); }})));
+  assert.equal(result.ok, true);
+  assert.equal(result.warning, undefined);
+  const text = fs.readFileSync('title-write.js', 'utf8');
+  assert.doesNotMatch(text, /MailApp|deps\.notify|warning/);
 });
 
 test('a team whose history is invalid is UNAVAILABLE and nothing is added to it', () => {

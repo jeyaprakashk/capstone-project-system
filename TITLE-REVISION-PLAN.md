@@ -502,18 +502,7 @@ otherwise `requirements` is `[]` and `reason` explains the built-in refusal.
 
 DATA-CONTRACTS.md, the endpoint, its contract test and its view change together.
 
-**Notifications:**
-
-| Event | Recipients |
-|---|---|
-| Submit | Guide |
-| Guide edit | Students |
-| Guide approve | Coordinator |
-| Guide return | Students |
-| Reviewer return | Guide and students |
-| Reviewer approve | Guide and students |
-| Reopen, cancel | Guide and students |
-| Refused authorization attempt | Coordinator |
+**Notifications:** none. The title workflow sends no e-mail (removed on request: the faculty use the dashboard regularly), and a refused authorization attempt is not reported by mail; the server log keeps the refusal reason.
 
 **Views.** Bridge only, Tailwind utilities, `data-*` hooks and delegated listeners; views render only `can.*` (with
 each capability's `requirements`) and `documents`. New modules are registered under their role in `getMigratedViewsClientScript_` and in

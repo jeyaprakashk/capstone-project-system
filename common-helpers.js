@@ -489,10 +489,6 @@ function getCommitteeNumbersForReviewer_(email) {
 // ===================================================================
 // STUDENT ROSTER LOOKUP
 // ===================================================================
-function getDashboardUrl_() {
-  return getConfig_('GUIDE_DASHBOARD_URL');
-}
-
 function getHubRegistrySheet_() {
   const HUB_SHEET_ID = getConfig_('HUB_SHEET_ID');
   return getNamedSheet_(SpreadsheetApp.openById(HUB_SHEET_ID), SHEET_NAMES.MASTER_REGISTRY);

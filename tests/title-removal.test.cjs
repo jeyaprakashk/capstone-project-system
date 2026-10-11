@@ -45,3 +45,9 @@ test('the removed entry points are gone from the server and from the contract', 
   assert.doesNotMatch(contracts, /`API_(guide|reviewer)_submitDecision`/);
   assert.doesNotMatch(contracts, /`API_guide_getApprovals/);
 });
+
+test('the project sends no e-mail: no runtime module uses MailApp or GmailApp', () => {
+  const users = runtimeFiles.filter(file => /\b(MailApp|GmailApp)\b/.test(fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')));
+  assert.deepEqual(users, []);
+  assert.ok(!runtimeFiles.some(file => /getDashboardUrl_/.test(fs.readFileSync(file, 'utf8'))), 'the dashboard-link helper only served e-mail');
+});
