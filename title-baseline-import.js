@@ -5,8 +5,9 @@
  *
  *  - Runs only while TITLE_CUTOVER is PAUSED, so no old writer can change a decision while it copies (cutover step 2).
  *  - Idempotent: a team that already has rows in TitleLog is left alone; run it again after fixing a reported team.
- *  - An approved team needs its approval date. It is read from the master registry (the same match the old eligibility code used);
- *    a team without one is reported and not written, and the coordinator enters its row by hand.
+ *  - An approved team needs its approval date, read from the master registry by year, semester and team. The guide, title (ignoring case
+ *    and spaces) and approver should match too; when only the team matches, the date is used and the team is listed under `relaxed` to
+ *    check. A team with no registry row at all is reported and not written, and the coordinator enters its row by hand.
  *  - It writes nothing but TitleLog rows, in one batch, and then checks every team it wrote with the history rules.
  */
 const TITLE_BASELINE_LOCK_WAIT_MS_ = 30000;
@@ -22,12 +23,16 @@ function legacyTitleStatus_(row, TS) {
 
 /** The approval date of an approved team from the registry rows, or null: year, semester, team, guide, title and approver must all match. */
 function legacyApprovalDate_(registryRows, row, TS, academicYear) {
-  const matches = registryRows.filter(record => textEquals_(record[0], academicYear) && textEquals_(record[1], row[TS.SEMESTER]) &&
-    textEquals_(record[2], row[TS.TEAM_ID]) && emailsMatch_(record[3], row[TS.GUIDE_EMAIL]) && String(record[4]) === String(row[TS.TITLE]) &&
-    emailsMatch_(record[8], row[TS.TITLE_APPROVED_BY]));
-  if (!matches.length) return null;
-  const ms = titleDateMs_(matches[matches.length - 1][7]);
-  return Number.isFinite(ms) ? ms : null;
+  const sameTeam = registryRows.filter(record => textEquals_(record[0], academicYear) && textEquals_(record[1], row[TS.SEMESTER]) && textEquals_(record[2], row[TS.TEAM_ID]));
+  const sameText = (a, b) => String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
+  // Exact: the guide, the title (ignoring case and surrounding spaces) and the approver all match, as the old eligibility code required.
+  const exact = sameTeam.filter(record => emailsMatch_(record[3], row[TS.GUIDE_EMAIL]) && sameText(record[4], row[TS.TITLE]) && emailsMatch_(record[8], row[TS.TITLE_APPROVED_BY]));
+  const pick = list => { const ms = titleDateMs_(list[list.length - 1][7]); return Number.isFinite(ms) ? ms : null; };
+  if (exact.length) { const at = pick(exact); return at === null ? null : {at, relaxed: false}; }
+  // Relaxed: the registry has the team for this year and semester but its guide, title or approver text differs (a title edited since,
+  // a trailing space). The date is still that team's approval; the report lists it so the coordinator can check it.
+  if (sameTeam.length) { const at = pick(sameTeam); return at === null ? null : {at, relaxed: true}; }
+  return null;
 }
 
 /**
@@ -35,7 +40,7 @@ function legacyApprovalDate_(registryRows, row, TS, academicYear) {
  * Pure: it takes plain data. `existing` is a map of normalized Team IDs that already have rows.
  */
 function buildTitleBaseline_(statusRows, TS, registryRows, existing, context) {
-  const rows = [], skipped = [], problems = [];
+  const rows = [], skipped = [], problems = [], relaxed = [];
   const seen = Object.create(null);
   statusRows.forEach(source => {
     const teamId = String(source[TS.TEAM_ID] || '').trim();
@@ -55,7 +60,9 @@ function buildTitleBaseline_(statusRows, TS, registryRows, existing, context) {
       approvedTitle: '', approvedProblem: '', approvedAt: null, approvedBy: ''
     };
     if (status === 'APPROVED') {
-      const approvedAt = legacyApprovalDate_(registryRows, source, TS, context.academicYear);
+      const found = legacyApprovalDate_(registryRows, source, TS, context.academicYear);
+      const approvedAt = found ? found.at : null;
+      if (found && found.relaxed) relaxed.push(teamId);
       if (approvedAt === null) { problems.push({teamId, message: 'Approved, but no matching approval date was found in the master registry. Enter its TitleLog row by hand.'}); return; }
       if (approvedAt > context.now) { problems.push({teamId, message: 'The approval date in the master registry is in the future.'}); return; }
       Object.assign(row, {approvedTitle: title, approvedProblem: problem, approvedAt, approvedBy: String(source[TS.TITLE_APPROVED_BY] || '').trim()});
@@ -63,7 +70,7 @@ function buildTitleBaseline_(statusRows, TS, registryRows, existing, context) {
     }
     rows.push(row);
   });
-  return {rows, skipped, problems};
+  return {rows, skipped, problems, relaxed: relaxed.filter(id => rows.some(row => row.teamId === id))};
 }
 
 /** Editor-run. See the header. Returns {written, skipped, problems, invalid}. */
@@ -93,7 +100,7 @@ function importTitleBaseline() {
     const index = titleIndex_(readTitleLog_().rows, Date.now());
     const invalid = plan.rows.map(row => ({teamId: row.teamId, errors: (index.teams[titleTeamKey_(row.teamId)] || {errors: ['The row was not found after writing.']}).errors}))
       .filter(item => item.errors.length);
-    return {written: plan.rows.length, skipped: plan.skipped, problems: plan.problems, invalid};
+    return {written: plan.rows.length, skipped: plan.skipped, problems: plan.problems, relaxed: plan.relaxed, invalid};
   } finally {
     lock.releaseLock();
   }

@@ -109,15 +109,26 @@ test('a team listed twice is reported once and written once; a blank Team ID is 
   assert.match(report.problems[0].message, /more than once/);
 });
 
-test('the match of the registry date uses year, semester, team, guide, title and approver together', () => {
+test('the registry date needs the year, semester and team; the guide, title and approver are checked and reported when they differ', () => {
   const approved = team('T1', {TITLE: 'GOOD TITLE', PROBLEM: 'p', GUIDE_DECISION: 'Approved', REVIEWER_DECISION: 'Approved', TITLE_APPROVED_BY: 'rev@x.edu'});
   const base = registry('T1');
-  const variants = [[0, '2025-26'], [1, 'Even'], [2, 'T9'], [3, 'other@x.edu'], [4, 'OTHER TITLE'], [8, 'other@x.edu']];
-  for (const [at, value] of variants) {
+  // The year, the semester and the team must match: a different one is a different registry row, so there is no date.
+  for (const [at, value] of [[0, '2025-26'], [1, 'Even'], [2, 'T9']]) {
     const record = base.slice(); record[at] = value;
     const { c } = setup({teams: [approved], registryRows: [record]});
     assert.equal(JSON.parse(JSON.stringify(c.importTitleBaseline())).problems.length, 1, 'column ' + at);
   }
+  // The guide, the title and the approver may differ in text: the date is used and the team is listed to be checked.
+  for (const [at, value] of [[3, 'other@x.edu'], [4, 'OTHER TITLE'], [8, 'other@x.edu']]) {
+    const record = base.slice(); record[at] = value;
+    const { c } = setup({teams: [approved], registryRows: [record]});
+    const report = JSON.parse(JSON.stringify(c.importTitleBaseline()));
+    assert.deepEqual([report.written, report.problems.length, report.relaxed], [1, 0, ['T1']], 'column ' + at);
+  }
+  // Case and surrounding spaces in the title are not a difference at all.
+  const spaced = base.slice(); spaced[4] = '  good title ';
+  const spacedRun = setup({teams: [approved], registryRows: [spaced]});
+  assert.deepEqual(JSON.parse(JSON.stringify(spacedRun.c.importTitleBaseline())).relaxed, []);
   const later = base.slice(); later[7] = new Date(NOW - 2 * 24 * HOUR);
   const { c } = setup({teams: [approved], registryRows: [base, later]});
   c.importTitleBaseline();
