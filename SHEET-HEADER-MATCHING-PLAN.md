@@ -400,7 +400,8 @@ Owner decision: every form-bound sheet will be retired. Until each one is remove
 - Known today: `TeamIntakeRaw` (filled by the intake Form), read at
   [intake-approval-workflow.js:16](intake-approval-workflow.js#L16) (`onTeamIntakeSubmit`) and
   [guide-dashboard.js:60](guide-dashboard.js#L60). The title plan (Phase 4) removes `onTeamIntakeSubmit`; the other read
-  goes when the sheet does. Phase 0 confirms the full list and whether any other sheet is Form-filled.
+  goes when the sheet does. The live check (2026-10-11) found two more Form-linked tabs, `RawLog` and `Announcements`,
+  which no code reads (FORM-SHEET-RETIREMENT-PLAN.md section 2a); they are out of scope here for the same reason.
   `GitHubAccounts` is **not** form-bound: the owner confirms it no longer depends on a Form (students register through the
   dashboard), so it is application-owned and is migrated in phase 3.
 - These are the only positional reads allowed to remain, and only until the sheet is removed. The "done" check for this

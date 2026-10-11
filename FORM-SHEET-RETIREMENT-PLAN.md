@@ -14,8 +14,9 @@ Where the two differ, the title plan wins until the changes in section 4 are app
 1. The title plan's new sheets (`TitleLog`, `ActivityDependencies`) are defined and working first.
 2. The data that is still needed is then copied out of `TeamIntakeRaw`.
 3. `TeamIntakeRaw` is then **deleted**.
-4. There is no other Form. The owner confirms the weekly Form mentioned in WEEKLY-PROGRESS.md was never created by them
-   and its archive sheets do not exist. Section 2 checks the repository against this.
+4. **Corrected 2026-10-11:** there are two more Form-bound sheets than the owner expected, `RawLog` and
+   `Announcements`, each with a linked Form (found by the read-only check of OWNER-CHECKLIST section A). The owner did not
+   create the weekly Form behind `RawLog`. Section 2a sets out what is known and what the owner must decide.
 5. The intake Form is already **closed**, and the uploaded files have already been moved into the individual team folders
    under the shared drive; every eligible existing file was moved.
 6. The guide dashboard's document-submission date comes from the Drive upload record, with "Date unavailable" for older
@@ -43,13 +44,42 @@ confirmed).
 **Not provable from the repository, so the owner must check the live spreadsheet and Drive:**
 
 - **The weekly Google Form in WEEKLY-PROGRESS.md.** That document (lines 98 to 99 and 161 to 163) refers to a retired weekly
-  Form, "its historical responses and RawLog". The owner confirms that Form was never created and those sheets do not
-  exist, so nothing here applies to them; the wording in that document describes an environment this spreadsheet never
-  had (section 4, item 4).
-- Any response sheet with a default name such as `Form Responses 1`: the owner should glance at the sheet tabs once
-  during step 2 to confirm none other than `TeamIntakeRaw` is Form-filled.
-- The intake Form's trigger: the owner states the Form is closed, but the plan records no statement that its trigger was
-  deleted. Step 3 below checks it.
+  Form, "its historical responses and RawLog". The live check found a `RawLog` tab with a linked Form, so the sheet does
+  exist (section 2a).
+- Any response sheet with a default name such as `Form Responses 1`: the live check found none with that name; the Form-linked
+  tabs are `Announcements`, `TeamIntakeRaw` and `RawLog`.
+- The intake Form's trigger: the live Triggers page still shows `onTeamIntakeSubmit` (a spreadsheet form-submit trigger).
+  Although the owner states the Form is closed, the trigger is installed. It is deleted at cutover step 0 (TITLE-REVISION-PLAN.md
+  section 11), before the new code is pushed.
+
+## 2a. Other Form-bound sheets found on the live spreadsheet (2026-10-11)
+
+A read-only check of the live spreadsheet (23 tabs) showed linked Forms on **three** tabs, not one.
+
+| Tab | Linked Form | Read or written by the code | Known about it |
+|---|---|---|---|
+| `TeamIntakeRaw` | Yes | Yes (section 2) | The intake Form; retired by this plan |
+| `RawLog` | Yes | **No.** Nothing in the source reads or writes it; only a test fixture names it | WEEKLY-PROGRESS.md calls it the archive of a retired weekly Google Form. The owner did not create that Form and does not know who did |
+| `Announcements` | Yes | **No.** The name does not appear anywhere in the source or the documents | Purpose unknown |
+
+Only one Form trigger is installed (`onTeamIntakeSubmit`), so no handler processes responses to the other two Forms: any
+response just lands in its sheet.
+
+**How the plan treats them.** The same retirement procedure applies to each sheet, with these differences:
+
+- No reader or writer exists in the code, so the removal-check step for them is trivial (nothing to remove) and they add
+  nothing to the title plan's phases.
+- Steps 3a to 5 (preflight, archive copy, full verification) apply to each sheet whose history the owner wants to keep.
+- The rename test (step 7) is still done, as a safety net for any human use of the tab, and the sheet is deleted only after
+  the owner agrees.
+- Each linked Form is closed (stops accepting responses) and unlinked before its sheet is deleted, as in step 8.
+
+**Decisions for the owner (open).** For each of `RawLog` and `Announcements`:
+1. What is it for, and who uses it? (`Announcements` in particular.)
+2. Is its Form still accepting responses? Does anyone read the responses?
+3. Archive and delete, keep as it is, or delete without an archive?
+
+Until these are decided the two sheets are left exactly as they are, and they do not block the title work or the cutover.
 
 ## 3. What data is still needed, and where it goes
 
@@ -70,7 +100,7 @@ confirmed).
 | 1 | TITLE-REVISION-PLAN.md, section 13, rule 3 ("Keep `TeamIntakeRaw` ... they are the record of the Form period") | Reword: the Form-period record is copied (open decision 2) and `TeamIntakeRaw` is then deleted. The TeamStatus title columns are unaffected |
 | 2 | TITLE-REVISION-PLAN.md, section 9 removal table and Phase 8 | Add the deletion of the sheet as a step after the verification period (section 5, step 8), and the removal of the `TeamIntakeRaw` document-date reader as already listed |
 | 3 | AGENTS.md "Frozen" bullet (sheet names) and the invariants snapshot | **Policy item.** Removing `TEAM_INTAKE_RAW` from `SHEET_NAMES` changes `tests/invariants/snapshots/schema.json`. AGENTS.md allows `UPDATE_GOLDEN=1` only for a deliberate, reviewed change made outside a migration, so this is its own reviewed commit (section 5, step 9). AGENTS.md text itself needs no edit: the frozen rule already allows a deliberate, reviewed schema change |
-| 4 | WEEKLY-PROGRESS.md | Lines 98 to 99 and 161 to 163 describe a retired weekly Form and archives that this spreadsheet never had. Reword or delete those lines so the documentation matches the environment. Documentation only |
+| 4 | WEEKLY-PROGRESS.md | Step 5 was reworded to say the spreadsheet has no `RawLog`; the live check found a `RawLog` tab with a linked Form. The wording is corrected to match (done with this plan update). Documentation only |
 | 5 | SHEET-HEADER-MATCHING-PLAN.md | Already says retirement comes first. After this plan runs, the "Retiring sheets" section there shrinks to a note that none remain |
 
 ## 5. Procedure and order
@@ -91,7 +121,7 @@ because users never ran them.
 |---|---|---|
 | 1 | Title plan Phases 1 to 2 | `TitleLog` and `ActivityDependencies` exist (through `ensureSheet_`) and are tested. Nothing reads them yet |
 | 2 | Before cutover | **Back up** the whole spreadsheet (a full copy). Record the row count of `TeamIntakeRaw` and a per-team count of rows |
-| 3 | Cutover (title plan section 11) | The Form is already closed and the uploads are already in the team folders (owner confirmed), so those two actions are done. **Remaining:** confirm the Form's trigger is deleted (Apps Script, Triggers), and check each team folder for the two fixed file names, as the title plan's cutover step requires |
+| 3 | Cutover (title plan section 11) | The Form is already closed and the uploads are already in the team folders (owner confirmed), so those two actions are done. **Remaining:** confirm the Form's trigger is gone (it is deleted at cutover step 0 of the title plan; the live Triggers page still showed it on 2026-10-11), and check each team folder for the two fixed file names, as the title plan's cutover step requires |
 | 3a | Cutover | **Preflight (read-only).** Check the live source before anything is created, as set out in "Preflight" below. If the source headers are not acceptable, stop; nothing has been changed |
 | 4 | Cutover | **Copy.** Create the archive sheet with `ensureSheet_({...sheetSpec_('formArchive', verifiedHeaders), mode: 'setup'})` (access `view`; the
 preflight's header row, the source's own or the recorded de-duplicated one, is the `verifiedHeaders` argument), because the archive's catalog entry has `headersFrom: 'runtime'` and no fixed
@@ -216,7 +246,7 @@ by restoring a sheet alone, which is why it is separate and comes last.
 | The Form's headers are blank or repeat, so `ensureSheet_` would reject them | The step 3a preflight finds this before anything is created; the archive uses recorded de-duplicated headers or the process stops; the source is never edited |
 | The Form recreates a response sheet | The Form is already closed (owner); step 3 confirms its trigger is deleted; step 8 unlinks it before deleting the sheet |
 | Uploaded files are lost with the Form | Files live in Drive, not in the sheet; they are already in the team folders; the Form's folder is left alone |
-| A forgotten second Form or response sheet | The owner confirms there is none; step 2 includes a glance at the sheet tabs |
+| A Form-bound sheet nobody knows about | Found: `RawLog` and `Announcements` (section 2a). They are left untouched until the owner decides; a read-only check of the live tabs is repeated before the cutover |
 | A trigger on the closed Form still exists | Step 3 checks the trigger list |
 | A reader is missed and breaks after deletion | The removal check plus the step 7 rename, which makes a missed reader fail while the sheet still exists; the period is only the time in which to exercise it; the backup remains |
 | The stale sheet is mistaken for live data during the verification period | Only coordinators can open the spreadsheet; the archive copy is clearly named; the sheet is deleted at the end of the period |
@@ -230,7 +260,7 @@ Decided by the owner (or delegated and recorded):
    assistant's recommendation.)
 2. **Form-period record:** a values-only archive, kept for one semester, as a `view` sheet created through `ensureSheet_`
    (for example `TitleFormArchive`). After a semester it can be deleted.
-3. **Weekly archive sheets:** none exist. Nothing to do.
+3. **Weekly archive sheets:** corrected - `RawLog` exists with a linked Form, and so does `Announcements` (section 2a). Both are open decisions for the owner.
 5. **The Form and its Drive folder:** already closed, with the files moved. Left closed and unlinked.
 
 4. **Verification period (step 7). Decided: 14 days, or until both a weekly submission deadline has passed and one reviewer

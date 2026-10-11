@@ -16,6 +16,17 @@ if they differ from this page, those plans win. Your steps belong to items 9 to 
    trigger and confirm the old Form-submit trigger is **deleted**.
 6. **Team folders.** Open each team folder and confirm it has `Step1_Work_Breakdown.docx` and `Step2_Need_Analysis.docx`.
 
+### Results of the Section A check (Codex, read-only, 2026-10-11)
+
+| # | Result | What it means, and what you do |
+|---|---|---|
+| 1 | **Not as expected.** 23 tabs; linked Forms on `Announcements`, `TeamIntakeRaw` and `RawLog` | Two more Form-bound sheets. No code reads either. **You decide** what `RawLog` and `Announcements` are for and whether to keep, archive or delete them (FORM-SHEET-RETIREMENT-PLAN.md, section 2a). They do not block the cutover |
+| 2 | **No formulas** in any of the 23 tabs; no named ranges or charts. Pivot tables and filter views were not established | Good for the migration's write rule (no formulas to flatten). **You glance** at each tab's menu for pivot tables and filter views |
+| 3 | **Pass.** No duplicate or blank titles in row 1 of any tab | Nothing to do |
+| 4 | **Pass, with a gap.** 2 direct users and 1 group on the shared drive; no direct student. The group's members were not inspected | **You confirm** the group is faculty only. A group that contains students is forbidden (TITLE-REVISION-PLAN.md, operator rule 6) |
+| 5 | **Not as expected.** Six triggers; `onTeamIntakeSubmit` (form submit) is still installed | Deleted at cutover step 0. The two title-reading triggers to pause are `reconcileProgressEligibility` and `sendGuideReminderDigest`; the reviewer digest is not scheduled |
+| 6 | **Not complete.** 62 team folders; 55 have both files. Missing both: `g8`, `g45`, `g35`, `g34`, `g32`, `g11`. Missing `Step2_Need_Analysis.docx`: `g46`. No duplicates | These seven teams cannot submit a title under the new flow until they upload the missing documents (the requirement rows). Cutover step 8 tells them. **You decide** whether to chase the documents before cutover |
+
 ## B. Before cutover
 
 7. **Release 0.** After the developer pushes it, create the deployment version yourself. Do it **at least a day before**
@@ -32,7 +43,7 @@ Follow the order. Stop and ask if any step does not behave as written.
 
 | Step | You do |
 |---|---|
-| 0 | **You pause first:** each time-driven trigger that reads title state (weekly schedule, weekly AI, guide and reviewer digests), under every account that installed one. Write down each one's handler, schedule and owner, then reopen the Triggers page and confirm none of them is active. **Only then** does the developer run `npm run push` (no new deployment) |
+| 0 | **You pause and delete first**, on the Triggers page, under every account that installed one. **Pause** `reconcileProgressEligibility` and `sendGuideReminderDigest` (the two installed triggers that read title state; the other time-driven ones keep running). **Delete** the `onTeamIntakeSubmit` form-submit trigger. Write down each paused trigger's handler, schedule and owner, then reopen the Triggers page and confirm the two are not active and the Form trigger is gone. **Only then** does the developer run `npm run push` (no new deployment) |
 | 1 | In the editor, run `setupTitleStorage`. Type the three `ActivityDependencies` rows with `Active = Yes` (the developer gives you the exact rows) |
 | 2 | Run `setTitleCutover('PAUSED')` and wait for it to return |
 | 3 | Run the archive **preflight**. If it reports bad headers, stop and decide with the developer |

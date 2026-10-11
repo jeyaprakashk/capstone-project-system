@@ -621,11 +621,18 @@ editor-run functions (`setupTitleStorage` and the retirement plan's preflight, a
 ### Steps
 
 0. **Pause the triggers, then push without deploying.** In this order:
-   1. **Pause first.** Pause every time-driven trigger whose handler reads title state (at least
-      `processWeeklySubmissionSchedule`, the weekly AI trigger, and the guide and reviewer digests; Phase 0 lists them
-      all) from the Triggers page, under every account that installed one. Record each trigger's handler, schedule and
-      owner so it can be restored. Where the page offers no disable option, delete it and recreate it from the record
-      (or with its existing setup function) in step 6. The commit-fetch trigger does not read titles and keeps running.
+   1. **Pause and delete first.** On the Triggers page, under every account that installed one. The live project has six
+      triggers (checked 2026-10-11): `processWeeklySubmissionSchedule` (hourly), `reconcileProgressEligibility` (daily),
+      `processWeeklyProgressAI` (hourly), `fetchAllCommits` (hourly), `sendGuideReminderDigest` (daily) and
+      `onTeamIntakeSubmit` (spreadsheet form submit).
+      - **Pause** the handlers that read title state: `reconcileProgressEligibility` (it calls `getTeamStatus_` and reads the
+        registry title date) and `sendGuideReminderDigest` (it reads the title and the Guide Decision). The other three
+        time-driven triggers read no title state and keep running. Record each paused trigger's handler, schedule and owner
+        so it can be restored. Where the page offers no disable option, delete it and recreate it from the record (or with its
+        existing setup function) in step 6. Re-derive this list from the code before the cutover, because a handler added
+        since would need classifying.
+      - **Delete** the `onTeamIntakeSubmit` form-submit trigger. The Form is closed, and Phase 4 removes the function, so a
+        trigger left in place would fail on its next event. (A rollback does not need it back: the Form stays closed.)
    2. **Verify the pause.** Reopen the Triggers page and confirm that none of the listed triggers is active.
    3. **Then push.** With the full suite green, run `npm run push`. Do **not** create a new deployment version; check
       that the web-app deployment still points at the Release 0 version.
@@ -635,7 +642,7 @@ editor-run functions (`setupTitleStorage` and the retirement plan's preflight, a
    `ActivityDependencies` rows with `Active = Yes`.
 2. Run `setTitleCutover('PAUSED')` and wait for it to return. From then on no old writer can change TeamStatus
    titles, and none is still running (the barrier above).
-3. Close the Form (`setAcceptingResponses(false)`) and delete its trigger. Copy each team's existing Form-uploaded
+3. Close the Form (`setAcceptingResponses(false)`) if it is not already closed; its trigger was deleted in step 0. Copy each team's existing Form-uploaded
    documents into its team folder under the fixed names.
 4. Copy the baseline into `TitleLog` from TeamStatus as it now stands. Every decision made before step 2 is
    included, and none can arrive after it.
