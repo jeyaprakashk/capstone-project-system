@@ -118,7 +118,7 @@ function fixture(system=false,shipped=false) {
  function runner(success,failure) { return new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,failure):key==='withFailureHandler'?fn=>runner(success,fn):(...args)=>{
   // Migrated reviewer role: log it like the role-content request, answering with an envelope.
   if(key==='API_coordinator_getSystemStatus')return requests.push({key:'loadCoordinatorSystemStatus',args,success:html=>success(JSON.stringify({ok:true,data:{html}})),failure});
-  const legacy={API_coordinator_getCommitteeConfiguration:'getCoordinatorCommitteeConfiguration_',API_coordinator_getReviewConfiguration:'getCoordinatorReviewConfiguration_',API_coordinator_createDefinitions:'createAssessmentDefinitions_',API_coordinator_prepareStorage:'prepareReviewAssessmentStorage_',API_coordinator_syncGithub:'syncCoordinatorGithubAccess_',API_coordinator_resendInvitations:'resendExpiredStudentInvitations_',API_shared_getTimeline:'loadSharedProjectTimeline_',API_shared_getRubrics:'loadSharedRubrics_',API_coordinator_getTeamDrawer:'loadCoordinatorDrawerSection_'}[key];
+  const legacy={API_coordinator_getCommitteeConfiguration:'getCoordinatorCommitteeConfiguration_',API_coordinator_getReviewConfiguration:'getCoordinatorReviewConfiguration_',API_coordinator_createDefinitions:'createAssessmentDefinitions_',API_coordinator_prepareStorage:'prepareReviewAssessmentStorage_',API_coordinator_resendInvitations:'resendExpiredStudentInvitations_',API_shared_getTimeline:'loadSharedProjectTimeline_',API_shared_getRubrics:'loadSharedRubrics_',API_coordinator_getTeamDrawer:'loadCoordinatorDrawerSection_'}[key];
   if(legacy)return requests.push({key:legacy,args,success:value=>success(JSON.stringify({ok:true,data:value})),failure});
   // The Guide role starts these two reads together with its dashboard read; they never block the role request.
   if(key==='API_guide_getWeekly'||key==='API_guide_getGithub'){early.push(key);return Promise.resolve().then(()=>success(JSON.stringify({ok:true,data:null})));}
@@ -674,7 +674,7 @@ test('readiness cards render server rubric and overall states and preserve both 
 function configurationCardsFixture(){
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body></body></html>');
  const viewContext=vm.createContext({});vm.runInContext(fs.readFileSync('system-status-view.js','utf8'),viewContext);
- viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>'<span>Skeleton</span>'}),()=>null).render(document.body,{github:{coordUsername:'',reposWithAccess:0,totalRepos:0},publishing:{configured:false,items:[]}});
+ viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>'<span>Skeleton</span>'}),()=>null).render(document.body,{publishing:{configured:false,items:[]}});
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
  return {...f,document,ui:vm.runInContext('DashboardUI',f.c),actions:vm.runInContext('SystemStatusActions',f.c),node:id=>document.getElementById(id)};
 }

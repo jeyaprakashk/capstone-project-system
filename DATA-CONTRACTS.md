@@ -56,7 +56,7 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_coordinator_getWeeklySetup()` / `API_coordinator_setupWeekly(kind)` | Coordinator | `kind` is `storage` or `triggers` | the existing readiness report (`storageReady, triggerReady, canSetupStorage, canSetupTriggers, issues`) / the existing setup result | `getWeeklyProgressPhase2Readiness_` / `setupWeeklyProgressPhase2Storage` / `setupWeeklyProgressPhase2Triggers` called directly |
 | `API_coordinator_getCommitteeConfiguration()` / `API_coordinator_getReviewConfiguration()` | Coordinator | none | the existing readiness reports (`valid, state, summary, issues, links, checkedAt`, plus `committees` or `storage`) | `getCoordinatorCommitteeConfiguration_` / `getCoordinatorReviewConfiguration_` called directly |
 | `API_coordinator_createDefinitions()` / `API_coordinator_prepareStorage()` | Coordinator | none | `{created}` / `{journals:[{label,journal,created,initialized}]}` | `createAssessmentDefinitions_` / `prepareReviewAssessmentStorage_` called directly |
-| `API_coordinator_syncGithub()` / `API_coordinator_resendInvitations(cursor)` | Coordinator | `cursor` is `''` for the first batch, then the returned `nextCursor` | the existing sync summary / `{results, nextCursor, stopped}` | `syncCoordinatorGithubAccess_` / `resendExpiredStudentInvitations_` called directly |
+| `API_coordinator_resendInvitations(cursor)` | Coordinator | `cursor` is `''` for the first batch, then the returned `nextCursor` | `{results, nextCursor, stopped}` | `resendExpiredStudentInvitations_` called directly |
 | `API_publishing_get(assessmentId)` / `API_publishing_run(method, input)` | Coordinator | `method` is `publishInternalAssessment_` or `reopenInternalAssessment_`; `input` carries `requestId`, so a retry is safe | the existing publication report (`ready, config, teams, error`) / the existing publish or reopen result | `loadInternalAssessmentPublishing_` / `publishInternalAssessment_` / `reopenInternalAssessment_` called directly |
 | `API_student_previewGithub(profileUrl)` / `API_student_confirmGithub(token)` / `API_student_completeGithubSetup()` | Student | profile URL; the signed `token` returned by the preview | `{token, account:{githubId, username, displayName, profileUrl, avatarUrl}}` / `{ok, message}` / `{message}` | `previewStudentGithubAccount_` / `confirmStudentGithubAccount_` / `completeStudentGithubSetup_` called directly |
 | `API_shared_getTimeline()` / `API_shared_getRubrics()` | Any dashboard role | none | the existing project timeline (`schedule, milestones …`) / shared rubrics (`assessments …`) | `loadSharedProjectTimeline_` / `loadSharedRubrics_` called directly |
@@ -116,13 +116,12 @@ from `WeeklyWindows`, independently of the title deadline.
 ### SystemStatus
 
 ```
-{ github:{ coordUsername:string, reposWithAccess:number, totalRepos:number },
-  publishing:{ configured:boolean, items:[{key,title}] } }       // configured:false when assessment definitions are invalid
+{ publishing:{ configured:boolean, items:[{key,title}] } }       // configured:false when assessment definitions are invalid
 ```
 
-This is only the frame: GitHub access, the invitation-resend card, one collapsed publishing card per assessment, and the
+This is only the frame: the invitation-resend card, one collapsed publishing card per assessment, and the
 committee and assessment-readiness cards. Each card's own checks (`getCoordinatorCommitteeConfiguration_`,
-`getCoordinatorReviewConfiguration_`, publishing reads, weekly setup, invitation resend, GitHub sync) are separate calls made
+`getCoordinatorReviewConfiguration_`, publishing reads, weekly setup, invitation resend) are separate calls made
 by their dashboard modules against hooks the view renders. `getCoordinatorCommitteeConfiguration_` returns structured
 `committees:[{number, members:[{name,email}], teams:[string]}]`; the view builds the directory (no server HTML).
 Contract tests: `tests/system-status-view.test.cjs` and the System Status cases in `tests/project-schedule.test.cjs`.

@@ -275,48 +275,6 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     });
   }
 
-  function runGithubSync() {
-    const btn = document.getElementById('githubSyncButton');
-
-    const stopBusy = btn ? getUi().busy.write(btn, 'Syncing…', [btn]) : function() {};
-
-    bridge.write('API_coordinator_syncGithub',[])
-      .then(function(result) {
-
-        // Update the displayed repository access count
-        // without reloading the Apps Script page.
-        const accessValue = document.getElementById('githubReposAccess');
-
-        if (accessValue) {
-          accessValue.textContent =
-            result.verifiedAccess + ' / ' + result.totalRepos;
-        }
-
-        let message =
-          'GitHub access sync completed.\n\n' +
-          'Coordinator: ' + result.username + '\n' +
-          'Verified access: ' +
-          result.verifiedAccess + ' / ' + result.totalRepos + '\n' +
-          'Already accessible: ' + result.alreadyAccessible + '\n' +
-          'Repaired: ' + result.repaired + '\n' +
-          'Failed: ' + result.failedCount;
-
-        getUi().notify(message, result.failedCount ? 'warning' : 'success');
-
-        stopBusy('Run Sync');
-      }, function(error) {
-
-        getUi().notify(
-          'GitHub access sync failed.\n\n' +
-          (error && error.message
-            ? error.message
-            : 'Unknown error')
-        );
-
-        stopBusy('Run Sync');
-      });
-  }
-
   let studentInvitationResendBusy = false;
   function runStudentInvitationResend() {
     if (studentInvitationResendBusy) return;
@@ -374,5 +332,5 @@ function systemStatusActionsBrowser_(bridge, getUi) {
   function resetChecks() { checkingReviewConfiguration = false; checkingCommitteeConfiguration = false; checkingTeamFolders = false; teamFoldersReport = null; reviewConfigurationValid = false; }
   function recheckAll() { recheckReviewConfiguration(); recheckCommitteeConfiguration(); recheckTeamFolders(); }
 
-  return {renderTeamPagination, resetChecks, recheckAll, recheckTeamFolders, createTeamFolders, recheckCommitteeConfiguration, recheckReviewConfiguration, bootstrapAssessmentDefinitions, initializeAssessmentStorage, runGithubSync, runStudentInvitationResend, changeTeamPageSize};
+  return {renderTeamPagination, resetChecks, recheckAll, recheckTeamFolders, createTeamFolders, recheckCommitteeConfiguration, recheckReviewConfiguration, bootstrapAssessmentDefinitions, initializeAssessmentStorage, runStudentInvitationResend, changeTeamPageSize};
 }

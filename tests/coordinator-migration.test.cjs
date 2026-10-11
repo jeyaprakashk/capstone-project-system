@@ -163,7 +163,7 @@ test('weekly setup endpoints check access, keep the existing rules and reject un
 
 test('System Status card endpoints delegate to the existing functions and keep their messages', () => {
   const g = coordinatorFixture(), seen = [];
-  const map = { API_coordinator_getCommitteeConfiguration: 'getCoordinatorCommitteeConfiguration_', API_coordinator_getReviewConfiguration: 'getCoordinatorReviewConfiguration_', API_coordinator_createDefinitions: 'createAssessmentDefinitions_', API_coordinator_prepareStorage: 'prepareReviewAssessmentStorage_', API_coordinator_syncGithub: 'syncCoordinatorGithubAccess_' };
+  const map = { API_coordinator_getCommitteeConfiguration: 'getCoordinatorCommitteeConfiguration_', API_coordinator_getReviewConfiguration: 'getCoordinatorReviewConfiguration_', API_coordinator_createDefinitions: 'createAssessmentDefinitions_', API_coordinator_prepareStorage: 'prepareReviewAssessmentStorage_' };
   for (const [endpoint, legacy] of Object.entries(map)) {
     g.c[legacy] = () => { seen.push(legacy); return { from: legacy }; };
     assert.deepEqual(JSON.parse(g.c[endpoint]()).data, { from: legacy });
@@ -173,7 +173,7 @@ test('System Status card endpoints delegate to the existing functions and keep t
   assert.deepEqual(JSON.parse(g.c.API_coordinator_resendInvitations()).data, { cursor: '' });
   g.c.createAssessmentDefinitions_ = () => { throw new Error('Coordinator access is required.'); };
   assert.deepEqual(JSON.parse(g.c.API_coordinator_createDefinitions()).error, { code: 'REJECTED', message: 'Coordinator access is required.' });
-  assert.equal(seen.length, 5);
+  assert.equal(seen.length, 4);
   const fs = require('node:fs'), src = fs.readFileSync('dashboard-client-scripts.js', 'utf8');
   for (const name of Object.values(map).concat('resendExpiredStudentInvitations_')) assert.equal(src.includes('.' + name + '('), false, name + ' must go through the bridge');
 });

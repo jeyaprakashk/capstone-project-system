@@ -1,8 +1,7 @@
 /**
  * SYSTEM STATUS VIEW — browser module serialized into the dashboard shell as `SystemStatusView`.
  * Renders the System Status frame from the coordinator DTO (DATA-CONTRACTS.md) with Tailwind utilities.
- * Each card keeps the DOM contract its dashboard module attaches to (#githubSyncButton,
- * #studentInvitationResend, [data-publishing], #committeeConfigurationCard, #reviewConfigurationCard,
+ * Each card keeps the DOM contract its dashboard module attaches to (#studentInvitationResend, [data-publishing], #committeeConfigurationCard, #reviewConfigurationCard,
  * #assessmentStorageSetup, #weeklyPhase2Setup ...). It never calls google.script.run.
  */
 function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions) {
@@ -20,12 +19,6 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions) {
   const note = text => '<p class="mt-2 text-sm text-ink-2">' + text + '</p>';
   const link = (id, text) => '<a id="' + id + '" class="text-sm text-primary underline" hidden target="_blank" rel="noopener">' + text + ' ' + icon('external-link') + '</a>';
 
-  function githubCard(g) {
-    return '<div class="' + CARD + '"><div class="flex items-center justify-between gap-3"><div class="flex items-center gap-2"><h3 class="text-base font-semibold text-ink">GitHub Access for Coordinator</h3><span class="' + BADGE + '">Configured</span></div>' +
-      '<button id="githubSyncButton" class="' + PRIMARY + '" type="button" data-action="github-sync">Run Sync</button></div>' +
-      '<dl class="mt-3 grid gap-2 text-sm sm:grid-cols-2"><div class="flex flex-col"><dt class="text-muted">Coordinator GitHub Username</dt><dd class="m-0 font-semibold">' + escape(g.coordUsername) + '</dd></div>' +
-      '<div class="flex flex-col"><dt class="text-muted">Repositories with access</dt><dd class="m-0 font-semibold" id="githubReposAccess">' + g.reposWithAccess + ' / ' + g.totalRepos + '</dd></div></dl></div>';
-  }
   function invitationsCard() {
     return '<section class="' + CARD + '" id="studentInvitationResend"><h3 class="text-base font-semibold text-ink">Student GitHub invitations</h3>' +
       note('Renew expired or missing invitations for students in existing team repositories. Joined students and pending invitations are skipped.') +
@@ -146,7 +139,7 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions) {
 
   function render(target, dto) {
     const items = dto.publishing.configured ? dto.publishing.items.map(publishingCard).join('') : '<p role="status" class="text-sm text-warning">Assessment configuration needs attention. Use Assessment readiness below.</p>';
-    target.innerHTML = '<div data-status-cards class="flex flex-col gap-4"><div data-status-primary class="grid gap-4 lg:grid-cols-2">' + githubCard(dto.github) + invitationsCard() + '</div>' + items + teamFoldersCard() + committeeCard() + reviewCard() + '</div>';
+    target.innerHTML = '<div data-status-cards class="flex flex-col gap-4"><div data-status-primary class="grid gap-4 lg:grid-cols-2">' + invitationsCard() + '</div>' + items + teamFoldersCard() + committeeCard() + reviewCard() + '</div>';
     if (!delegated.has(target)) { delegated.add(target); target.addEventListener('click', onClick); target.addEventListener('change', onChange); }
   }
 
@@ -158,8 +151,7 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions) {
     const el = event.target.closest ? event.target.closest('[data-action]') : null;
     if (!el || el.disabled) return;
     const actions = getActions(), action = el.getAttribute('data-action'), key = el.getAttribute('data-key');
-    if (action === 'github-sync') actions.runGithubSync();
-    else if (action === 'resend') actions.runStudentInvitationResend();
+    if (action === 'resend') actions.runStudentInvitationResend();
     else if (action === 'publishing-toggle') getPublishing().toggle(key);
     else if (action === 'publishing-refresh') getPublishing().refresh(key);
     else if (action === 'team-folders-recheck') actions.recheckTeamFolders();

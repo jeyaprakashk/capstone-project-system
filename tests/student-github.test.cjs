@@ -122,22 +122,6 @@ test('repository backfill writes only exact current-team matches to TeamStatus',
   assert.equal(f.locked(),false);
 });
 
-test('coordinator access sync reads and deduplicates TeamStatus repository URLs', () => {
-  const f=fixture();
-  vm.runInContext(fs.readFileSync('github-provisioning.js','utf8'),f.c);
-  const checked=[];
-  Object.assign(f.c,{
-    getConfig_:key=>key==='COLLABORATOR_GITHUB_USERNAME'?'coordinator':'maintain',
-    getRepoUrlMap_:()=>({t1:'https://github.com/org/one',t2:'https://github.com/org/one',t3:'https://github.com/org/two'}),
-    getSheetRows_:()=>{throw Error('Sync must use the TeamStatus repository map');},
-    getCollaboratorPermission_:slug=>{checked.push(slug);return {status:200};},
-    setConfig_(){},Logger:{log(){}}
-  });
-  f.c.syncCoordinatorGithubAccess_();
-  assert.deepEqual(checked,['org/one','org/two']);
-  assert.equal(f.locked(),false);
-});
-
 test('with the team row the student check runs through the batched reader; without it the serial reader is used', () => {
   const f = fixture(), seen = [];
   f.c.normalizeText_ = value => String(value || '').trim().toLowerCase();

@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { parseHTML } = require('linkedom');
 const { loadSources } = require('./invariants/golden.cjs');
 
-const DTO = { github: { coordUsername: 'coord-gh', reposWithAccess: 7, totalRepos: 9 }, publishing: { configured: true, items: [{ key: 'review1', title: 'Review 1' }, { key: 'guide_eval', title: 'Guide Evaluation' }] } };
+const DTO = { publishing: { configured: true, items: [{ key: 'review1', title: 'Review 1' }, { key: 'guide_eval', title: 'Guide Evaluation' }] } };
 
 function setup(dto = DTO) {
   const { document, window } = parseHTML('<html><body><div id="systemStatusContent"></div></body></html>');
@@ -15,7 +15,7 @@ function setup(dto = DTO) {
   bridge.useFixtures({ API_coordinator_getSystemStatus: () => { calls.push('read'); return dto; } });
   const record = name => (...args) => calls.push([name, ...args]);
   const ui = { renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton>' + String(l).replace(/[&<>"']/g, ch => '&#' + ch.charCodeAt(0) + ';') + '</span>' };
-  const actions = { runGithubSync: record('sync'), runStudentInvitationResend: record('resend'), recheckCommitteeConfiguration: record('committee'), recheckReviewConfiguration: record('review'),
+  const actions = { runStudentInvitationResend: record('resend'), recheckCommitteeConfiguration: record('committee'), recheckReviewConfiguration: record('review'),
     bootstrapAssessmentDefinitions: record('bootstrap'), initializeAssessmentStorage: record('storage'), changeTeamPageSize: record('size') };
   const publishing = { toggle: record('toggle'), refresh: record('refresh') };
   vm.runInContext('globalThis.__make = ' + c.systemStatusViewBrowser_.toString(), c);
@@ -28,12 +28,10 @@ const norm = n => n.textContent.replace(/\s+/g, ' ').trim();
 
 test('renders every card with the hooks its dashboard module attaches to', () => {
   const f = setup();
-  for (const id of ['githubSyncButton', 'githubReposAccess', 'studentInvitationResend', 'committeeConfigurationCard', 'committeeConfigurationSummary', 'committeeConfigurationIssues', 'committeeDirectoryContent', 'committeeConfigLink', 'committeeAssignmentsLink', 'committeeConfigurationCheckedAt',
+  for (const id of ['studentInvitationResend', 'committeeConfigurationCard', 'committeeConfigurationSummary', 'committeeConfigurationIssues', 'committeeDirectoryContent', 'committeeConfigLink', 'committeeAssignmentsLink', 'committeeConfigurationCheckedAt',
     'reviewConfigurationCard', 'reviewConfigurationSummary', 'reviewConfigurationIssues', 'createAssessmentDefinitionsButton', 'reviewAssessmentReadiness', 'assessmentStorageSetup', 'initializeAssessmentStorageButton', 'assessmentStorageStatus', 'assessmentStorageResults',
     'weeklyPhase2Setup', 'reviewDefinitionsLink', 'reviewConfigLink', 'reviewRubricsLink', 'reviewConfigurationCheckedAt', 'studentInvitationsPaginationInfo', 'studentInvitationsPageSize', 'studentInvitationsPaginationButtons']) assert(f.host.querySelector('#' + id), id);
   for (const hook of ['[data-resend-status]', '[data-resend-log]', '[data-resend-results]', '[data-weekly-setup-read]', '[data-weekly-setup-status]', '[data-status-cards]', '[data-status-primary]']) assert(f.host.querySelector(hook), hook);
-  assert.equal(norm(f.host.querySelector('#githubReposAccess')), '7 / 9');
-  assert.match(norm(f.host.querySelector('[data-status-primary]')), /coord-gh/);
   assert.equal(f.host.querySelector('#committeeConfigurationCard').getAttribute('aria-busy'), 'true');
   assert.equal(f.host.querySelector('#reviewConfigurationCard').parentNode, f.host.querySelector('#committeeConfigurationCard').parentNode);
   assert.equal(f.host.querySelector('#initializeAssessmentStorageButton').disabled, true);
@@ -57,12 +55,12 @@ test('each configured assessment gets a collapsed publishing card; a missing con
 
 test('buttons hand off to the dashboard modules without inline handlers', () => {
   const f = setup(), pick = a => f.host.querySelector('[data-action="' + a + '"]');
-  for (const action of ['github-sync', 'resend', 'committee-recheck', 'review-recheck']) f.click(pick(action));
+  for (const action of ['resend', 'committee-recheck', 'review-recheck']) f.click(pick(action));
   const bootstrap = pick('bootstrap-definitions'); bootstrap.removeAttribute('hidden'); bootstrap.removeAttribute('disabled'); f.click(bootstrap);
   const storage = pick('storage-init'); storage.removeAttribute('disabled'); f.click(storage);
   f.click(f.host.querySelector('[data-action="publishing-toggle"][data-key="review1"]'));
   f.click(f.host.querySelector('[data-action="publishing-refresh"][data-key="guide_eval"]'));
-  assert.deepEqual(JSON.parse(JSON.stringify(f.calls)), [['sync'], ['resend'], ['committee'], ['review'], ['bootstrap'], ['storage'], ['toggle', 'review1'], ['refresh', 'guide_eval']]);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.calls)), [['resend'], ['committee'], ['review'], ['bootstrap'], ['storage'], ['toggle', 'review1'], ['refresh', 'guide_eval']]);
   f.click(pick('storage-init').cloneNode(true)); // a detached clone is not a registered action target
   const select = f.host.querySelector('#studentInvitationsPageSize');
   Object.defineProperty(select, 'value', { value: '25', configurable: true }); select.dispatchEvent(new f.window.Event('change', { bubbles: true }));
@@ -97,7 +95,7 @@ test('the committee directory lists reviewers and teams, with empty states and a
 
 test('values are escaped and every class is compiled into the stylesheet', () => {
   const evil = '<img src=x onerror=alert(1)>"\'&';
-  const bad = setup({ github: { coordUsername: evil, reposWithAccess: 1, totalRepos: 2 }, publishing: { configured: true, items: [{ key: 'k"1', title: evil }] } });
+  const bad = setup({ publishing: { configured: true, items: [{ key: 'k"1', title: evil }] } });
   bad.host.querySelector('#committeeDirectoryContent').innerHTML = bad.view.committeeDirectory([{ number: evil, members: [{ name: evil, email: evil }], teams: [evil] }]);
   assert.equal(bad.host.querySelectorAll('img').length, 0);
   const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
@@ -110,5 +108,5 @@ test('load reads once per request and a newer read supersedes an older one', asy
   const f = setup();
   const first = f.view.load(), second = f.view.load();
   await assert.rejects(first, e => e.superseded === true);
-  assert.equal((await second).github.totalRepos, 9);
+  assert.equal((await second).publishing.items.length, DTO.publishing.items.length);
 });

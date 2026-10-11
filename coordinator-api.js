@@ -116,17 +116,10 @@ function API_coordinator_getActivity() {
 
 /** System Status frame data; every card's own readiness checks load separately. */
 function buildSystemStatusDto_() {
-  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const rows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID]);
-  const repos = getRepoUrlMap_();
   let publishing = {configured:true, items:[]};
   try { publishing.items = publicationDefinitions_().map(d => ({key:String(d.key), title:String(internalPublishingConfig_(d.key).title)})); }
   catch (err) { publishing = {configured:false, items:[]}; }
-  return {
-    github:{coordUsername:String(getConfig_('COLLABORATOR_GITHUB_USERNAME') || '').trim(), reposWithAccess:Number(getConfig_('COLLABORATOR_REPOS_ACCESS')) || 0,
-      totalRepos:rows.filter(row => repos[normalizeText_(row[TS.TEAM_ID])]).length},
-    publishing
-  };
+  return {publishing};
 }
 
 function API_coordinator_getSystemStatus() {
@@ -162,7 +155,6 @@ function API_coordinator_getCommitteeConfiguration() { return apiHandle_(() => {
 function API_coordinator_getReviewConfiguration() { return apiHandle_(() => { coordinatorAccessOrThrow_(); return getCoordinatorReviewConfiguration_(); }); }
 function API_coordinator_createDefinitions() { return apiHandle_(() => { coordinatorAccessOrThrow_(); return createAssessmentDefinitions_(); }); }
 function API_coordinator_prepareStorage() { return apiHandle_(() => { coordinatorAccessOrThrow_(); return prepareReviewAssessmentStorage_(); }); }
-function API_coordinator_syncGithub() { return apiHandle_(() => { coordinatorAccessOrThrow_(); return syncCoordinatorGithubAccess_(); }); }
 function API_coordinator_resendInvitations(cursor) { return apiHandle_(() => { coordinatorAccessOrThrow_(); return resendExpiredStudentInvitations_(cursor === undefined || cursor === null ? '' : String(cursor)); }); }
 
 /** Team drawer sections (basic, progress, activity): the existing read, which authorizes and validates the section. */

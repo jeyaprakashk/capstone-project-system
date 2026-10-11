@@ -707,14 +707,13 @@ test('System Status is coordinator-only and its endpoint avoids marks and dashbo
  c.getCoordinatorDashboardData_=()=>{throw Error('must not aggregate progress');};
  c.getAllReviewCompletionStatus_=()=>{throw Error('must not read marks');};
  const dto=JSON.parse(c.API_coordinator_getSystemStatus()).data;
- assert.deepEqual(dto.github,{coordUsername:'coord-gh',reposWithAccess:2,totalRepos:1});
+ assert.equal('github' in dto,false,'the GitHub access card and its numbers are gone');
  assert(Array.isArray(dto.publishing.items));
  // The cards themselves come from the view; each keeps the hooks its dashboard module attaches to.
  vm.runInContext(fs.readFileSync(path.join(__dirname,'..','system-status-view.js'),'utf8'),c);
  const target=parseHTML('<div id="t"></div>').document.getElementById('t');
  c.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null).render(target,JSON.parse(JSON.stringify(dto)));
- for(const id of ['githubReposAccess','reviewConfigurationCard','initializeAssessmentStorageButton','committeeConfigurationCard','studentInvitationResend','githubSyncButton','weeklyPhase2Setup']) assert(target.querySelector('#'+id),id);
- assert.equal(target.querySelector('#githubReposAccess').textContent,'2 / 1');
+ for(const id of ['reviewConfigurationCard','initializeAssessmentStorageButton','committeeConfigurationCard','studentInvitationResend','weeklyPhase2Setup']) assert(target.querySelector('#'+id),id);
 });
 
 test('timeline composes lifecycle events and configured assessments without overrides',()=>{
