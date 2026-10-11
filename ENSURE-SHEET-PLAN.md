@@ -1,6 +1,9 @@
 # `ensureSheet_`: common sheet-creation helper plan
 
-Status: proposal. Nothing in this file has been applied, and AGENTS.md is not edited by it.
+Status: **built** (`ensure-sheet.js`, AGENTS.md "Creating and repairing sheets"). In use for `ActivityDependencies`, `TitleLog`, `LogEntries` and
+`ProgressEligibility` (setup mode) and `CommitCollectionStatus` (runtime mode). Not yet used where the creating code is reached from a
+dashboard request and so cannot run setup mode: the assessment journals, `AssessmentDefinitions`, `GuideSignoff` and `AIProgressAnalysis`
+keep their own creation code. The text below is the original plan.
 
 This is the shared helper that every setup path will use to create a sheet or bring it up to date. It is a building
 block of [SHEET-HEADER-MATCHING-PLAN.md](SHEET-HEADER-MATCHING-PLAN.md), whose decision 6 and policy item 7 define its

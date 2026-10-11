@@ -19,9 +19,11 @@ one column to locate rows; `readMatchedRows_()` returns complete matched records
 in search-result order using one batched value read. Writes remain limited to the
 intended cells. Readers do not persist data or width caches between calls.
 
-Fixed-layout form, log, configuration, and marking consumers still use explicit
-column positions. Full-width reads prevent truncation; they do not make those
-layouts reorderable. Layout changes require updating readers and writers together.
+Every sheet the code uses is read and written by header name, so column order does not
+matter and extra columns are kept: see SHEETS.md for each sheet and its status. The
+exception is the master registry of the hub spreadsheet, whose columns are still read by
+position (the header names are not defined in this project). Full-width reads prevent
+truncation. A missing or repeated required header throws and names the sheet and header.
 
 Deploy `sheet-reads.js` alongside all callers. `npm test` includes empty-sheet,
 reordered-header, trailing-column and matched-row checks, plus a source audit

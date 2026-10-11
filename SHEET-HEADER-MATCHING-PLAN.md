@@ -1,6 +1,22 @@
 # Header-name matching for fixed-layout sheets: plan
 
-Status: proposal. Nothing in this file has been applied.
+Status: **mostly executed 2026-10-11.** Phase 1 (the catalog lists every sheet, completeness test on), phase 2 (`CommitCollectionStatus`),
+phase 3 (`GitHubAccounts`), phase 4 (`Config`, `Commits`; `LogEntries` was already by name) and phase 5 (the assessment journals, one unit)
+are built, each with shuffled-column, missing-header and duplicate-header tests, and the sheet-access audit runs over the sheets whose
+status is `migrated` in SHEETS.md. Differences from the plan as written:
+
+- `WeeklyReminders` is not migrated: the reminder e-mail was removed, so nothing reads or writes it. It stays in the catalog as positional
+  until the owner decides to remove it.
+- `MasterRegistry` lives in the hub spreadsheet and is read by position in `title-service.js` (`titleSimilarity_`). Its header names are not
+  defined anywhere in this project, so it waits for the owner to supply them.
+- Sheets that were already read by name before this work (`TeamRoster`, `TeamStatus`, `ReviewCommittee`, `WeeklyWindows`, `GuideSignoff`,
+  `AIProgressAnalysis`, `AssessmentDefinitions`, `Milestones`, `Rubrics`) have status `by-name`: their `code` lists are not written, so the
+  audit does not cover them yet.
+- `TeamStatus` still gets its `Repo URL` header appended by a request path (`updateTeamStatusRepoUrl_`), which the rule "request paths never
+  repair a header" forbids. Moving it to setup is a separate decision.
+- Policy phase 6 (AGENTS.md "Sheet access") has not been decided.
+
+The text below is the original plan.
 
 **Sequencing (one gate).** The retirement of the form-bound sheets is planned first, in
 [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md), and that plan is agreed before anything here is built.
