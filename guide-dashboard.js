@@ -86,5 +86,6 @@ function getTeamStatus_(r) {
 
 function submitGuideDecision_(teamId, decision, notes, editedTitle) {
   const email = Session.getActiveUser().getEmail();
-  return applyGuideDecision_(teamId, decision, notes, email, editedTitle);
+  // Release 0 (TITLE-REVISION-PLAN.md, section 11): the write takes the script lock and rereads TITLE_CUTOVER under it.
+  return withTitleWriteLock_(1000, 'Another decision is being saved. Try again.', () => applyGuideDecision_(teamId, decision, notes, email, editedTitle));
 }

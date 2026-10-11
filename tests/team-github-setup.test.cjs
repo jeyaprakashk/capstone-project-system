@@ -35,7 +35,7 @@ function fixture() {
   });
   const originalSheet=c.getSheet_;
   c.getSheet_=name=>name==='users'?{getLastColumn:()=>7,getLastRow:()=>usernames.length+1,getRange:(r,c,n)=>({getValues:()=>r===1?[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL']]:usernames})}:originalSheet(name);
-  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-template.js','github-provisioning.js','intake-approval-workflow.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-template.js','github-provisioning.js','title-cutover.js','intake-approval-workflow.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.installGithubTemplate_=()=>({verified:true}); // Template installation has its own tests; setup only resumes it.
   c.weeklyStudents_=()=>[1,2].filter(n=>team[n+2]).map(n=>({teamId:team[0],email:team[n+2],regNo:team[n+7]}));
   c.refreshGithubAccountMetadata_=()=>{}; // Metadata persistence is exercised by account integration tests.

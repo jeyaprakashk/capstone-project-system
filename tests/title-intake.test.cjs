@@ -26,6 +26,9 @@ function setup(guideDecision = '', reviewerDecision = 'Revise') {
     getDataRange:() => ({ getValues:() => [[], row.slice()] })
   };
   const c = createSheetReadContext({
+    // Release 0: the title writers take the script lock and read TITLE_CUTOVER (unset here, so writes are allowed).
+    LockService:{ getScriptLock:() => ({ hasLock:() => true, releaseLock() {} }) },
+    PropertiesService:{ getScriptProperties:() => ({ getProperty:() => null }) },
     recordWeeklyEligibilityIfConfigured_:()=>{},
     getCoordinatorEmail_:() => 'coordinator@example.com', getAcademicYear_:() => '2026', getConfig_:() => '',
     SHEET_NAMES:{ TEAM_INTAKE_RAW:'TeamIntakeRaw', TEAM_STATUS:'TeamStatus' },
@@ -40,7 +43,7 @@ function setup(guideDecision = '', reviewerDecision = 'Revise') {
       Object.entries(fields).forEach(([key,value]) => row[TS[key]] = value);
     }, getDashboardUrl_:() => 'https://example.com/dashboard'
   });
-  for (const file of ['intake-approval-workflow.js', 'guide-dashboard.js']) {
+  for (const file of ['title-cutover.js', 'intake-approval-workflow.js', 'guide-dashboard.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), c);
   }
   const submit = () => c.onTeamIntakeSubmit({

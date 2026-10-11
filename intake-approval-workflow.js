@@ -14,7 +14,11 @@ const HUB_SHEET_ID = getConfig_('HUB_SHEET_ID');
 function onTeamIntakeSubmit(e) {
   requireTriggerOrOperator_();
   if (!textEquals_(e.range.getSheet().getName(), SHEET_NAMES.TEAM_INTAKE_RAW)) return;
+  // Release 0 (TITLE-REVISION-PLAN.md, section 11): the write takes the script lock and rereads TITLE_CUTOVER under it.
+  return withTitleWriteLock_(30000, 'Title updates are busy. This submission was not applied.', () => applyTeamIntakeSubmission_(e));
+}
 
+function applyTeamIntakeSubmission_(e) {
   const normalizeLabel = (s) => String(s).trim().toLowerCase();
   const namedValuesNormalized = {};
   Object.keys(e.namedValues).forEach(k => { namedValuesNormalized[normalizeLabel(k)] = e.namedValues[k]; });
