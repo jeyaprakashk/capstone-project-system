@@ -47,6 +47,14 @@ state noted.
     must be the same. If they differ, stop and tell the developer: the new code would switch to the attached spreadsheet.
     On the rehearsal copy no `SHEET_ID` is needed, because the copy uses itself.
 
+### Release 0 on the live project (2026-10-11)
+
+Pushed from the `release-0` tag (`4eab0a1`) with `clasp push` at 9:16 am: **99 files**. The manifest prompt did not appear, so the
+live manifest already matched the repo's. The old `onTeamIntakeSubmit` form trigger was deleted before the push. The owner reports
+the new web-app version was created and the dashboards checked. The spreadsheet-resolution change (`e20ade9`) is **not** in this release.
+The plan's "at least a day before the cutover" gap starts from this moment; the owner has a review on the next day and has asked for
+the complete title system to be live by 6 pm the same day (see the note in BUILD-ORDER.md).
+
 ### Rehearsal log (copy "Branch of Capstone Tracker - Batch 2023-27", 2026-10-11)
 
 Code on the copy: `main` at `e20ade9` (Release 0 plus the spreadsheet-resolution change), pushed with `clasp push`.
