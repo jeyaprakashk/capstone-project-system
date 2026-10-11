@@ -1,8 +1,8 @@
 /**
- * TITLE DIGESTS - the two reminder e-mails of the title workflow, read from TitleLog (TITLE-REVISION-PLAN.md, section 10):
- *  - sendGuideReminderDigest: to each guide, the teams whose title is waiting for the guide (status NEEDS_REVIEW);
+ * TITLE DIGESTS - the reviewer reminder e-mail of the title workflow, read from TitleLog (TITLE-REVISION-PLAN.md, section 10):
  *  - sendReviewerApprovalDigest: to each reviewer, the guide-approved titles waiting for the reviewers (status AWAITING_REVIEWER).
- * A team whose title history is not valid is left out and logged. Both are trigger or editor-run entry points.
+ * A team whose title history is not valid is left out and logged. It is a trigger or editor-run entry point. (The guide reminder digest
+ * was removed: the faculty now use the dashboard regularly.)
  */
 
 /** Teams of the roster with their title state: [{row, state}]. Teams with an invalid history are logged and skipped. */
@@ -38,17 +38,5 @@ function sendReviewerApprovalDigest() {
   Object.entries(digestByReviewer).forEach(([reviewerEmail, lines]) => {
     MailApp.sendEmail(reviewerEmail, `Capstone Title Approvals — ${lines.length} pending`,
       `Guide-approved titles awaiting your decision:\n\n${lines.join('\n')}\n\nReview here: ${getDashboardUrl_()}`);
-  });
-}
-
-function sendGuideReminderDigest() {
-  requireTriggerOrOperator_();
-  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const stillPending = titleDigestTeams_(TS, getSheetRows_(SHEET_NAMES.TEAM_STATUS)).filter(team => team.state.status === 'NEEDS_REVIEW');
-  const byGuide = groupBy_(stillPending, team => team.row[TS.GUIDE_EMAIL]);
-  Object.entries(byGuide).forEach(([guideEmail, teams]) => {
-    const lines = teams.map(({row, state}) => `Team ${row[TS.TEAM_ID]} — "${state.proposal.title}"`);
-    MailApp.sendEmail(guideEmail, `Reminder: ${teams.length} title(s) awaiting your review`,
-      `${lines.join('\n')}\n\nReview here: ${getDashboardUrl_()}`);
   });
 }

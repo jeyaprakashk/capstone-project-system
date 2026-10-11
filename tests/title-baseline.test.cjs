@@ -175,7 +175,7 @@ test('baseline: coordinator (title counts, the tracker status, health and the te
   }, true);
 });
 
-test('baseline: the Guide reminder and Reviewer approval digests', () => {
+test('baseline: the Reviewer approval digest', () => {
   const f = weeklyFixture();
   const c = f.c;
   f.config.HUB_SHEET_ID = 'hub';
@@ -189,23 +189,19 @@ test('baseline: the Guide reminder and Reviewer approval digests', () => {
   f.status.rows.splice(1, f.status.rows.length, ...teams.map(team => f.ts.map(header => team[header] ?? '')));
   f.syncTitleLog();
   c.getCommitteeInfo_ = () => ({reviewer1Email: 'rev1@example.com', reviewer2Email: 'rev2@example.com', reviewer3Email: '', reviewer4Email: ''});
-  c.sendGuideReminderDigest();
-  const guideMails = f.mails.splice(0);
   c.sendReviewerApprovalDigest();
   const reviewerMails = f.mails.splice(0);
   const teamsIn = body => [...body.matchAll(/Team (D\d\d)/g)].map(match => match[1]);
   const byId = Object.fromEntries(list.map((combo, index) => ['D' + String(index).padStart(2, '0'), combo.id]));
   const describe = mails => mails.map(mail => ({to: mail[0], subject: mail[1], states: teamsIn(mail[2]).map(id => byId[id])}));
-  // The digests now list the teams whose TitleLog status is waiting for the guide (NEEDS_REVIEW) or for the reviewers (AWAITING_REVIEWER).
+  // The digests now list the teams whose TitleLog status is waiting for the guide or for the reviewers (AWAITING_REVIEWER).
   // The old rules also listed odd states (a reviewer-approved team with no Guide Decision; a guide-approved team with no title), which
   // are not titles waiting for anyone; the states that mean the same in both models must still be listed, as the snapshot recorded.
   const waiting = status => list.filter(combo => newStatusOf(combo) === status).map(combo => combo.id);
-  const recordedGuide = JSON.parse(fs.readFileSync('tests/title-baseline/snapshots/digests.json', 'utf8')).guideReminder[0].states;
   const recordedReviewer = JSON.parse(fs.readFileSync('tests/title-baseline/snapshots/digests.json', 'utf8')).reviewerApproval[0].states;
-  assert.deepEqual(describe(guideMails), [{to: 'guide@example.com', subject: 'Reminder: ' + waiting('NEEDS_REVIEW').length + ' title(s) awaiting your review', states: waiting('NEEDS_REVIEW')}]);
+  assert.equal(typeof c.sendGuideReminderDigest, 'undefined', 'the guide reminder digest is gone');
   assert.deepEqual(describe(reviewerMails).map(mail => mail.to), ['rev1@example.com', 'rev2@example.com']);
   for (const mail of describe(reviewerMails)) assert.deepEqual(mail.states, waiting('AWAITING_REVIEWER'));
-  assert.ok(recordedGuide.includes('title=yes guide=- reviewer=-') && waiting('NEEDS_REVIEW').includes('title=yes guide=- reviewer=-'));
   assert.ok(recordedReviewer.includes('title=yes guide=Approved reviewer=-') && waiting('AWAITING_REVIEWER').includes('title=yes guide=Approved reviewer=-'));
 });
 
