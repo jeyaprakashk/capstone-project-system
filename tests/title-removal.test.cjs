@@ -7,14 +7,14 @@ const fs = require('node:fs');
 // The old title columns and the old workflow, as they appear in code.
 const OLD_TITLE_DATA = [
   /\bgetTeamStatus_\b/, /\bREVIEWER_DECISION\b/, /\bGUIDE_DECISION\b/, /\bGUIDE_NOTES\b/, /\bREVIEWER_NOTES\b/, /\bSIMILARITY_FLAG\b/, /\bTITLE_APPROVED_BY\b/,
-  /\bWORK_BREAKDOWN_LINK\b/, /\bNEED_ANALYSIS_LINK\b/, /\bCHAPTER1_LATEX_LINK\b/, /\bTEAM_INTAKE_RAW\b/, /\bsubmitDecision\b/i, /\bbuildTeamIntakeLink_\b/,
+  /\bWORK_BREAKDOWN_LINK\b/, /\bNEED_ANALYSIS_LINK\b/, /\bCHAPTER1_LATEX_LINK\b/, /\bTEAM_INTAKE_RAW\b/, /TeamIntakeRaw/, /\bRAW_LOG\b/, /\bRawLog\b/, /\bsubmitDecision\b/i, /\bbuildTeamIntakeLink_\b/,
   /\bonTeamIntakeSubmit\b/, /\bapplyGuideDecision_\b/, /\bapplyReviewerDecision_\b/, /\bprogressTitleDate_\b.*registry/i, /\bTS\.TITLE\b/, /\bTS\.PROBLEM\b/,
   /\bcolumns\.TITLE\b/, /\bcolumns\.PROBLEM\b/, /\bc\.TITLE\b/, /\br\[TS\.TITLE\]/, /TEAM_INTAKE_FORM_URL_BASE/, /TEAM_INTAKE_TEAMID_ENTRY/
 ];
 
 // Files that keep their mentions, each for a stated reason.
 const EXCLUDED = {
-  'common-constants.js': 'the frozen definitions: SHEET_NAMES and FIELD_DEFINITIONS keep the old columns until the Form sheet is retired'
+  'common-constants.js': 'the frozen TeamStatus column definitions keep the old title columns in the sheet; the Form sheets are gone from SHEET_NAMES'
 };
 
 const runtimeFiles = fs.readdirSync('.').filter(name => name.endsWith('.js') && !name.startsWith('tailwind') && !EXCLUDED[name]);

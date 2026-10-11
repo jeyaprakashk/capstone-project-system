@@ -31,7 +31,7 @@ test('the catalog is a frozen, memoised list of the new sheets', () => {
   const c = load();
   const catalog = c.sheetCatalog_();
   assert.equal(c.sheetCatalog_(), catalog, 'built once per execution');
-  assert.deepEqual(Object.keys(catalog), ['activityDependencies', 'titleLog', 'formArchive']);
+  assert.deepEqual(Object.keys(catalog), ['activityDependencies', 'titleLog']);
   const frozen = value => !value || typeof value !== 'object' || (Object.isFrozen(value) && Object.values(value).every(frozen));
   assert.ok(frozen(catalog));
   assert.equal(typeof c.sheetCatalog_, 'function');
@@ -72,9 +72,6 @@ test('the layouts of the new sheets are pinned', () => {
   assert.equal(catalog.titleLog.access, 'view');
   assert.deepEqual(catalog.titleLog.headers, ['Timestamp', 'Team ID', 'Revision', 'Action', 'Actor', 'Request ID', 'Fingerprint', 'Status',
     'Proposed Title', 'Proposed Problem', 'Notes', 'Similarity Note', 'Reopened', 'Approved Title', 'Approved Problem', 'Approved At', 'Approved By']);
-  assert.equal(catalog.formArchive.name, 'TitleFormArchive');
-  assert.equal(catalog.formArchive.headersFrom, 'runtime');
-  assert.equal(catalog.formArchive.headers, undefined);
 });
 
 test('sheetSpec_ returns name, headers, access and createAtRuntime, never mode, as copies', () => {
@@ -87,14 +84,9 @@ test('sheetSpec_ returns name, headers, access and createAtRuntime, never mode, 
   assert.equal(c.sheetSpec_('titleLog').headers.length, 17, 'mutating a returned spec never changes the catalog');
 });
 
-test('sheetSpec_ validates its arguments, and supplies run-time headers only where the entry allows them', () => {
+test('sheetSpec_ validates its arguments', () => {
   const c = load();
   assert.throws(() => c.sheetSpec_('nope'), /Unknown sheet in the catalog: nope/);
-  assert.throws(() => c.sheetSpec_('activityDependencies', ['A']), /fixed in the catalog/);
-  assert.throws(() => c.sheetSpec_('formArchive'), /must be supplied/);
-  assert.throws(() => c.sheetSpec_('formArchive', []), /must be supplied/);
-  const archive = plain(c.sheetSpec_('formArchive', ['Timestamp', 'Team ID']));
-  assert.deepEqual(archive, {name: 'TitleFormArchive', headers: ['Timestamp', 'Team ID'], access: 'view', createAtRuntime: false});
 });
 
 test('headersFrom resolves a frozen definition by reference and rejects an unknown one', () => {
@@ -186,6 +178,5 @@ test('SHEETS.md is generated from the catalog and is up to date', () => {
   assert.equal(fs.readFileSync('SHEETS.md', 'utf8'), expected, 'SHEETS.md is out of date; run npm run build:sheets-doc');
   assert.match(expected, /`ActivityDependencies`.*Visible, green tab \(`edit`\)/);
   assert.match(expected, /`TitleLog`.*Visible, red tab \(`view`\)/);
-  assert.match(expected, /Taken from the source Form sheet at archive time/);
   assert.ok(!expected.includes('\r'), 'the generated file uses LF line endings');
 });

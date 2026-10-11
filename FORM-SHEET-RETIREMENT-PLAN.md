@@ -1,6 +1,10 @@
 # Form-bound sheet retirement: plan
 
-Status: proposal. Nothing in this file has been applied, and AGENTS.md is not edited by it.
+Status: **executed 2026-10-11 by owner decision.** The owner took a full backup of the spreadsheet and deleted the `TeamIntakeRaw` tab, so the archive
+copy, the rename and the 14-day wait (sections 5 steps 4 to 8) were skipped: the backup is the archive. The code side (step 9) is done: `TEAM_INTAKE_RAW`
+is gone from `SHEET_NAMES`, `schema.json` was regenerated for that one line, the unused `formArchive` catalog entry and its run-time-headers support were
+removed, and `tests/title-removal.test.cjs` now fails on any `TeamIntakeRaw`, `RawLog` or `RAW_LOG` reference. Left for the owner: remove the Form settings
+from the `Config` tab. The text below is the original plan, kept for the record.
 
 This plan retires every sheet that a Google Form fills, starting with `TeamIntakeRaw`. It comes **before**
 [SHEET-HEADER-MATCHING-PLAN.md](SHEET-HEADER-MATCHING-PLAN.md), which leaves these sheets untouched. It does not repeat the

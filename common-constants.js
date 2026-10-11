@@ -11,7 +11,6 @@ const SHEET_NAMES = {
   TEAM_STATUS: 'TeamStatus',
   REVIEW_COMMITTEE: 'ReviewCommittee',
   GITHUB_ACCOUNTS: 'GitHubAccounts',
-  TEAM_INTAKE_RAW: 'TeamIntakeRaw',
   MASTER_REGISTRY: 'MasterRegistry',
   LOG_ENTRIES: 'LogEntries',
   WEEKLY_REMINDERS: 'WeeklyReminders',

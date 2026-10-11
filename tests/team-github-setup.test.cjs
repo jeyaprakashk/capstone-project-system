@@ -15,7 +15,7 @@ function fixture() {
   const norm=value=>String(value||'').trim().toLowerCase();
   const properties=new Map();
   const c=createSheetReadContext({console,Date,PropertiesService:{getScriptProperties:()=>({getProperty:key=>properties.has(key)?properties.get(key):null,setProperty:(key,value)=>properties.set(key,value),deleteProperty:key=>properties.delete(key)})},
-    SHEET_NAMES:{TEAM_STATUS:'teams',TEAM_ROSTER:'roster',GITHUB_ACCOUNTS:'users',TEAM_INTAKE_RAW:'intake',RAW_LOG:'logs'},
+    SHEET_NAMES:{TEAM_STATUS:'teams',TEAM_ROSTER:'roster',GITHUB_ACCOUNTS:'users'},
     FIELD_DEFINITIONS:{TEAM_STATUS:{},TEAM_ROSTER:{}},
     getColumnMap_:()=>columns,getSheetRows_:name=>name==='teams'?[team]:name==='users'?usernames:[],
     getRepoUrlForTeam_:()=>team[7],getOptionalHeaderIndex_:()=>7,

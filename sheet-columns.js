@@ -5,7 +5,6 @@
  * migration completes the catalog.
  *
  * - Frozen sheets are referenced with headersFrom: 'FIELD_DEFINITIONS.<NAME>', never copied.
- * - headersFrom: 'runtime' means the headers are supplied when the specification is requested (the Form archive).
  * - `code` lists only code that exists: { file, role, functions }, role = setup | runtime-create | read | write.
  * - createAtRuntime marks a sheet that runtime code may create (ensureSheet_ mode 'runtime'); see ENSURE-SHEET-PLAN.md.
  * It is a function, not a top-level constant, so it does not depend on file load order.
@@ -41,15 +40,6 @@ function sheetCatalog_() {
           {file: 'title-log.js', role: 'read', functions: ['readTitleLog_']},
           {file: 'title-log.js', role: 'write', functions: ['appendTitleLogRow_']}
         ]
-      },
-      formArchive: {
-        name: 'TitleFormArchive',
-        access: 'view',
-        headersFrom: 'runtime',
-        status: 'new',
-        purpose: 'Values-only copy of the Form-period history, kept for one semester.',
-        createAtRuntime: false,
-        code: []
       }
     });
   }
@@ -64,9 +54,8 @@ function sheetCatalogFreeze_(value) {
   return value;
 }
 
-/** The header list of an entry, or null when it is supplied at run time. */
+/** The header list of an entry. */
 function sheetCatalogHeaders_(entry) {
-  if (entry.headersFrom === 'runtime') return null;
   if (entry.headersFrom) {
     const match = /^FIELD_DEFINITIONS\.([A-Za-z0-9_]+)$/.exec(entry.headersFrom);
     const definition = match && FIELD_DEFINITIONS[match[1]];
@@ -78,18 +67,9 @@ function sheetCatalogHeaders_(entry) {
 
 /**
  * The specification ensureSheet_ needs: {name, headers, access, createAtRuntime}. Never `mode`: the call site sets that.
- * runtimeHeaders is required for, and only allowed on, an entry with headersFrom: 'runtime'.
  */
-function sheetSpec_(key, runtimeHeaders) {
+function sheetSpec_(key) {
   const entry = sheetCatalog_()[key];
   if (!entry) throw new Error('Unknown sheet in the catalog: ' + key);
-  let headers;
-  if (entry.headersFrom === 'runtime') {
-    if (!Array.isArray(runtimeHeaders) || !runtimeHeaders.length) throw new Error('The headers of ' + entry.name + ' must be supplied when its specification is requested.');
-    headers = runtimeHeaders.slice();
-  } else {
-    if (runtimeHeaders !== undefined) throw new Error('The headers of ' + entry.name + ' are fixed in the catalog and cannot be supplied.');
-    headers = sheetCatalogHeaders_(entry);
-  }
-  return {name: entry.name, headers, access: entry.access, createAtRuntime: entry.createAtRuntime === true};
+  return {name: entry.name, headers: sheetCatalogHeaders_(entry), access: entry.access, createAtRuntime: entry.createAtRuntime === true};
 }

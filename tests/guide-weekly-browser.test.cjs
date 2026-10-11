@@ -175,7 +175,7 @@ test('guide approval context matches the current title, reviewer and year and re
   const records=[['2026-27','Odd','G33','guide@test','Approved title','','','2026-09-29T12:00:00Z','reviewer@test'],
     ['2025-26','Odd','G33','guide@test','Old title','','','2026-09-30T12:00:00Z','reviewer@test']];
   const c=vm.createContext({timedPhase_:(timings,phase,read)=>read(),normalizeText_:norm,textEquals_:(a,b)=>norm(a)===norm(b),emailsMatch_:(a,b)=>norm(a)===norm(b),getAcademicYear_:()=> '2026-27',
-    getSpreadsheet_:()=>({getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),getHubRegistrySheet_:()=> 'registry',getSheet_:()=> 'intake',SHEET_NAMES:{TEAM_INTAKE_RAW:'intake'},
+    getSpreadsheet_:()=>({getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),getHubRegistrySheet_:()=> 'registry',getSheet_:()=> 'intake',
     readSheetRows_:(sheet,start)=>sheet==='registry'?records:start===1?[['Timestamp','Team ID','Work Breakdown Document']]:[['2026-09-28T12:00:00Z','G33','file']],escapeHtml_:value=>String(value)});
   vm.runInContext(fs.readFileSync('guide-dashboard.js','utf8'),c);
   assert.match(c.guideRecordDate_(Date.parse('2026-09-29T12:00:00Z')),/29 Sept 2026/);
