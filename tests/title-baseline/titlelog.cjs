@@ -15,9 +15,9 @@ function legacySteps(title, guide, reviewer) {
 }
 
 /** TitleLog row objects for a team in the given old state. Rows are dated well before the fixtures' clocks. */
-function titleRowsFor({teamId = 'T1', title, guide, reviewer, problem = 'A problem statement', guideNotes = '', reviewerNotes = '', start = Date.parse('2025-12-01T00:00:00Z')}) {
+function titleRowsFor({teamId = 'T1', title, guide, reviewer, problem = 'A problem statement', guideNotes = '', reviewerNotes = '', similarityNote = '', start = Date.parse('2025-12-01T00:00:00Z')}) {
   const steps = legacySteps(title, guide, reviewer).map(action => {
-    if (action === 'SUBMIT') return {action, title: String(title).trim().toUpperCase(), problem};
+    if (action === 'SUBMIT') return {action, title: String(title).trim().toUpperCase(), problem, similarityNote};
     if (action === 'RETURN') return {action, notes: String(reviewer).toLowerCase() === 'revise' ? reviewerNotes || 'Please revise.' : guideNotes || 'Please revise.'};
     return action;
   });

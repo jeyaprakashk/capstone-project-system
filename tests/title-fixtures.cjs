@@ -34,7 +34,7 @@ function history(steps, {teamId = 'T1', start = T0, baselineTitle = 'BASE TITLE'
       if (status !== 'NOT_SUBMITTED') { next.title = baselineTitle; next.problem = baselineProblem; }
       if (status === 'APPROVED') { next.approvedTitle = baselineTitle; next.approvedProblem = baselineProblem; next.approvedAt = timestamp + approvedAtOffset; next.approvedBy = 'reviewer@example.com'; }
     } else if (action === 'SUBMIT') {
-      next.status = 'NEEDS_REVIEW'; next.title = spec.title || 'A TITLE'; next.problem = spec.problem === undefined ? 'A problem statement' : spec.problem; next.notes = '';
+      next.status = 'NEEDS_REVIEW'; next.title = spec.title || 'A TITLE'; next.problem = spec.problem === undefined ? 'A problem statement' : spec.problem; next.notes = ''; next.similarityNote = spec.similarityNote || '';
     } else if (action === 'GUIDE_APPROVE') {
       next.status = 'AWAITING_REVIEWER'; if (spec.title) next.title = spec.title; next.notes = spec.notes || '';
     } else if (action === 'RETURN') {

@@ -11,8 +11,8 @@ function reviewConfiguration_(key) {
 }
 
 /** Team readiness is independent of Review sequence. */
-function reviewEligibility_(row, columns) {
-  return String(row[columns.TITLE] || '').trim() && textEquals_(row[columns.REVIEWER_DECISION], 'Approved')
+function reviewEligibility_(row, columns, index) {
+  return titleGate_(row[columns.TEAM_ID], index).approved
     ? {eligible:true,reason:''} : {eligible:false,reason:'Approve the project title before entering review marks.'};
 }
 
@@ -28,8 +28,9 @@ function reviewContext_(teamId, staff, key) {
   if (!students.length || new Set(students.map(s=>s.register)).size !== students.length) throw new Error('Student roster is missing or ambiguous.');
   const roster = {team:normalizeReviewKey_(row[columns.TEAM_ID]),committee,students};
   const committeeInfo=getCommitteeInfo_(committee) || {};
-  return {actor,roster,eligibility:reviewEligibility_(row,columns),details:{team:String(row[columns.TEAM_ID]),
-    title:String(row[columns.TITLE] || ''),problem:String(row[columns.PROBLEM] || ''),committee,
+  const titleIndex = readTitleIndex_(), gate = titleGate_(row[columns.TEAM_ID], titleIndex);
+  return {actor,roster,eligibility:reviewEligibility_(row,columns,titleIndex),details:{team:String(row[columns.TEAM_ID]),
+    title:gate.title,problem:gate.problem,committee,
     reviewers:[1,2,3,4].map(n=>({name:String(committeeInfo['reviewer'+n+'Name'] || ''),email:String(committeeInfo['reviewer'+n+'Email'] || '')})).filter(r=>r.name || r.email),
     guideName:String(row[columns.GUIDE_NAME] || ''),guideEmail:String(row[columns.GUIDE_EMAIL] || '')}};
 }
@@ -260,7 +261,12 @@ function reviewProgress_(row, columns, records, config, definition, loaded) {
   const recorded=submitted;
   const completed=submitted && markedStudents===totalStudents;
   const prerequisiteReason=assessmentPrerequisiteBlock_(definition||assessmentDefinition_(config.key),row[columns.TEAM_ID],loaded);
-  const availability=reviewAvailability_({eligibility:{...reviewEligibility_(row,columns),...(prerequisiteReason?{reason:prerequisiteReason}:{})}},config,latest);
+  // The title index is read once per progress run (kept in `loaded` when the caller has one). A team whose title history is not valid
+  // is simply not eligible here; the coordinator sees why on the title screen.
+  let eligibility;
+  try { eligibility=reviewEligibility_(row,columns,loaded ? (loaded.titleIndex=loaded.titleIndex || readTitleIndex_()) : undefined); }
+  catch(error) { eligibility={eligible:false,reason:'The title history is unavailable. Contact the coordinator.'}; }
+  const availability=reviewAvailability_({eligibility:{...eligibility,...(prerequisiteReason?{reason:prerequisiteReason}:{})}},config,latest);
   return {completed,recorded,prerequisiteReason,markedStudents,totalStudents,available:true,status:latest?latest.status:'Not started',...availability};
 }
 function loadPublishedReviewEvaluation_(key) {return loadPublishedAssessment_(key);}

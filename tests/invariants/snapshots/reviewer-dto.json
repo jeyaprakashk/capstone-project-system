@@ -1,8 +1,8 @@
 {
   "summary": {
-    "pending": 2,
+    "pending": 1,
     "approved": 1,
-    "awaitingGuide": 2,
+    "awaitingGuide": 3,
     "total": 5
   },
   "reviews": [
@@ -24,7 +24,7 @@
         "R1",
         "R2"
       ],
-      "title": "<script>alert(1)</script> Title",
+      "title": "<SCRIPT>ALERT(1)</SCRIPT> TITLE",
       "committee": "C1",
       "titleApproval": {
         "status": {
@@ -32,19 +32,12 @@
           "label": "Pending review"
         },
         "canDecide": true,
-        "submittedTitle": "<script>alert(1)</script> Title",
+        "revision": 2,
+        "submittedTitle": "<SCRIPT>ALERT(1)</SCRIPT> TITLE",
+        "problem": "A problem statement",
         "similarityFlag": "Similar to T9",
-        "documents": [
-          {
-            "label": "WBS",
-            "url": "https://example.com/wbs"
-          },
-          {
-            "label": "Need Analysis",
-            "url": "https://example.com/need"
-          }
-        ],
-        "reviewerNotes": ""
+        "folderUrl": "https://drive.example.com/T1",
+        "notes": ""
       },
       "reviews": [
         {
@@ -67,7 +60,7 @@
       "registerNumbers": [
         "R3"
       ],
-      "title": "Approved title",
+      "title": "APPROVED TITLE",
       "committee": "C1",
       "titleApproval": {
         "status": {
@@ -75,10 +68,12 @@
           "label": "Approved"
         },
         "canDecide": false,
-        "submittedTitle": "Approved title",
+        "revision": 3,
+        "submittedTitle": "APPROVED TITLE",
+        "problem": "A problem statement",
         "similarityFlag": "",
-        "documents": [],
-        "reviewerNotes": "Good scope"
+        "folderUrl": "",
+        "notes": ""
       },
       "reviews": [
         {
@@ -99,18 +94,20 @@
       "teamId": "T3",
       "guideName": "",
       "registerNumbers": [],
-      "title": "Revision title",
+      "title": "REVISION TITLE",
       "committee": "C1",
       "titleApproval": {
         "status": {
           "tone": "warning",
-          "label": "Revision requested"
+          "label": "Returned for revision"
         },
-        "canDecide": true,
-        "submittedTitle": "Revision title",
+        "canDecide": false,
+        "revision": 3,
+        "submittedTitle": "REVISION TITLE",
+        "problem": "A problem statement",
         "similarityFlag": "",
-        "documents": [],
-        "reviewerNotes": ""
+        "folderUrl": "",
+        "notes": "Narrow the scope"
       },
       "reviews": [
         {
@@ -139,10 +136,12 @@
           "label": "Not submitted"
         },
         "canDecide": false,
-        "submittedTitle": "   ",
+        "revision": 0,
+        "submittedTitle": "",
+        "problem": "",
         "similarityFlag": "",
-        "documents": [],
-        "reviewerNotes": ""
+        "folderUrl": "",
+        "notes": ""
       },
       "reviews": [
         {
@@ -163,7 +162,7 @@
       "teamId": "T5",
       "guideName": "Guide 5",
       "registerNumbers": [],
-      "title": "Submitted title",
+      "title": "SUBMITTED TITLE",
       "committee": "C1",
       "titleApproval": {
         "status": {
@@ -171,10 +170,12 @@
           "label": "Awaiting guide"
         },
         "canDecide": false,
-        "submittedTitle": "Submitted title",
+        "revision": 1,
+        "submittedTitle": "SUBMITTED TITLE",
+        "problem": "A problem statement",
         "similarityFlag": "",
-        "documents": [],
-        "reviewerNotes": ""
+        "folderUrl": "",
+        "notes": ""
       },
       "reviews": [
         {

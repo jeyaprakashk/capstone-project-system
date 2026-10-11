@@ -78,12 +78,16 @@ comparison against the output of the function it replaces.
   reviews:[{key,label}],                 // configured REVIEW assessments, in column order
   reviewError:string|null,               // set when marks are unavailable (e.g. missing definitions)
   teams:[{ teamId, guideName, registerNumbers:[string], title, committee,
-           titleApproval:{ status:{tone:'neutral'|'success'|'warning', label}, canDecide:boolean,
-                           submittedTitle, similarityFlag, documents:[{label,url}], reviewerNotes },
+           titleApproval:{ status:{tone:'neutral'|'success'|'warning', label}, canDecide:boolean, revision:number,
+                           submittedTitle, problem, similarityFlag, folderUrl, notes },
            reviews:[{key, enabled:boolean, actionLabel, note}] }] }
 ```
 
-Only teams in the reviewer's committees are returned. `tone` is semantic; the view maps it to colours.
+Only teams in the reviewer's committees are returned. `tone` is semantic; the view maps it to colours. The title facts come from `TitleLog`: `title` is the
+title in effect (the approved one once approved), `submittedTitle` and `problem` are the proposal, `similarityFlag` is the similarity note, `notes` is the
+latest note, `folderUrl` is the team's Drive folder (empty when absent), and `revision` is what the decision must send as `expectedRevision` to
+`API_reviewer_decideTitle`. `canDecide` is true only while the title is waiting for the reviewers. A team whose title history fails validation shows
+the status `Unavailable` and cannot be decided.
 Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invariants/snapshots/reviewer-*.json`).
 
 ### CoordinatorDashboard

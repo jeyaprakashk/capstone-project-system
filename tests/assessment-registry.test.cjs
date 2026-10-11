@@ -262,6 +262,7 @@ test('Reviewer dashboard shows configuration-required message for missing, empty
   if(state==='empty')f.rows.splice(1);
   if(state==='invalid')f.rows[1][8]='unsupported';
   vm.runInContext(fs.readFileSync('reviewer-api.js','utf8'),c);
+  c.teamFolderUrls_=()=>({});
   const dto=c.buildReviewerDto_({pending:[],approved:[],notYetGuideApproved:[],total:0,assigned:[]});
   assert.match(dto.reviewError,/AssessmentDefinitions/i);assert.deepEqual(Array.from(dto.reviews),[]);assert.equal(dto.teams.length,0);
  }

@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { loadSources, expectGolden } = require('./invariants/golden.cjs');
+const { installTitleLog } = require('./title-gate-stub.cjs');
 
 function serverFixture(email = 'reviewer@example.com') {
   const c = loadSources(['common-constants.js', 'common-helpers.js', 'lucide-icons.js', 'icon-renderer.js', 'reviewer-dashboard.js', 'api-envelope.js', 'reviewer-api.js'],
@@ -13,7 +14,7 @@ function serverFixture(email = 'reviewer@example.com') {
   const rows = [
     row({ TEAM_ID: 'T1', COMMITTEE_NUMBER: 'C1', GUIDE_NAME: 'Dr. Guide', GUIDE_DECISION: 'Approved', TITLE: '<script>alert(1)</script> Title', S1_REGNO: 'R1', S2_REGNO: 'R2', SIMILARITY_FLAG: 'Similar to T9', WORK_BREAKDOWN_LINK: 'https://example.com/wbs', NEED_ANALYSIS_LINK: 'https://example.com/need' }),
     row({ TEAM_ID: 'T2', COMMITTEE_NUMBER: 'C1', GUIDE_NAME: 'Dr. Guide', GUIDE_DECISION: 'Approved', REVIEWER_DECISION: 'Approved', TITLE: 'Approved title', S1_REGNO: 'R3', REVIEWER_NOTES: 'Good scope' }),
-    row({ TEAM_ID: 'T3', COMMITTEE_NUMBER: 'C1', REVIEWER_DECISION: 'Revise', GUIDE_DECISION: 'Approved', TITLE: 'Revision title' }),
+    row({ TEAM_ID: 'T3', COMMITTEE_NUMBER: 'C1', REVIEWER_DECISION: 'Revise', GUIDE_DECISION: 'Approved', TITLE: 'Revision title', REVIEWER_NOTES: 'Narrow the scope' }),
     row({ TEAM_ID: 'T4', COMMITTEE_NUMBER: 'C1', TITLE: '   ' }),
     row({ TEAM_ID: 'T5', COMMITTEE_NUMBER: 'C1', TITLE: 'Submitted title', GUIDE_NAME: 'Guide 5' }),
     row({ TEAM_ID: 'OTHER', COMMITTEE_NUMBER: 'C2', TITLE: 'Hidden' })
@@ -29,15 +30,19 @@ function serverFixture(email = 'reviewer@example.com') {
   };
   Object.assign(c, {
     getColumnMap_: () => index, getSheetRows_: () => rows, getCommitteeNumbersForReviewer_: () => ['C1'],
-    normalizeReviewKey_: s => String(s || '').trim().toLowerCase(), getReviewerReviewProgress_: () => progress
+    normalizeReviewKey_: s => String(s || '').trim().toLowerCase(), getReviewerReviewProgress_: () => progress,
+    teamFolderUrls_: () => ({ t1: 'https://drive.example.com/T1' })
   });
+  // The titles are read from TitleLog; the rows above keep the old-style data the fixture was written with, translated to TitleLog rows.
+  installTitleLog(c, () => rows.map(r => ({ teamId: r[index.TEAM_ID], title: r[index.TITLE], guide: r[index.GUIDE_DECISION], reviewer: r[index.REVIEWER_DECISION],
+    reviewerNotes: r[index.REVIEWER_NOTES], similarityNote: r[index.SIMILARITY_FLAG] })));
   return { c, progress, rows };
 }
 
 // Facts the removed server-rendered HTML presented for each team.
 const dtoFacts = dto => dto.teams.map(t => ({
   teamId: t.teamId, guideName: t.guideName, registerNumbers: t.registerNumbers, title: t.title, committee: t.committee,
-  statusLabel: t.titleApproval.status.label, canDecide: t.titleApproval.canDecide, documents: t.titleApproval.documents,
+  statusLabel: t.titleApproval.status.label, canDecide: t.titleApproval.canDecide, folderUrl: t.titleApproval.folderUrl,
   reviews: t.reviews.map(r => ({ key: r.key, enabled: r.enabled, actionLabel: r.actionLabel, note: r.note }))
 }));
 
@@ -56,7 +61,7 @@ test('reviewer DTO summary, review columns, notes and excluded committees match 
   assert.deepEqual(dto.reviews, progress.reviews);
   assert.equal(dto.reviewError, null);
   assert(!dto.teams.some(t => t.teamId === 'OTHER'));
-  assert.equal(dto.teams.find(t => t.teamId === 'T2').titleApproval.reviewerNotes, 'Good scope');
+  assert.equal(dto.teams.find(t => t.teamId === 'T3').titleApproval.notes, 'Narrow the scope');
   assert.equal(dto.teams.find(t => t.teamId === 'T1').titleApproval.similarityFlag, 'Similar to T9');
 });
 
@@ -95,7 +100,7 @@ test('dashboard shell compiles, defines the bridge before the dashboard script a
   const fs = require('node:fs');
   const files = ['common-styles.js', 'busy-state.js', 'common-constants.js', 'common-helpers.js', 'guide-dashboard.js', 'coordinator-dashboard.js', 'student-dashboard.js', 'reviewer-dashboard.js',
     'lucide-icons.js', 'icon-renderer.js', 'review-evaluation-client.js', 'internal-assessment-publishing-client.js', 'guide-evaluation-client.js', 'guide-weekly-client.js',
-    'assessment-history-view.js','dashboard-client-scripts.js', 'review-academic-policy.js', 'data-bridge-client.js', 'reviewer-view.js', 'guide-view.js', 'student-view.js', 'coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','shared-tabs.js','system-status-actions.js','student-github-actions.js', 'system-status-view.js', 'student-weekly-view.js', 'student-results-view.js', 'student-api.js', 'coordinator-api.js', 'dashboard-router.js'];
+    'assessment-history-view.js','dashboard-client-scripts.js', 'review-academic-policy.js', 'data-bridge-client.js', 'title-requests.js', 'reviewer-view.js', 'guide-view.js', 'student-view.js', 'coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','shared-tabs.js','system-status-actions.js','student-github-actions.js', 'system-status-view.js', 'student-weekly-view.js', 'student-results-view.js', 'student-api.js', 'coordinator-api.js', 'dashboard-router.js'];
   const c = loadSources(files, { PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }) },
     HtmlService: { createHtmlOutputFromFile: name => ({ getContent: () => fs.readFileSync(name + '.html', 'utf8') }) } });
   const html = c.buildDashboardShell_('r@example.com', [{ key: 'reviewer', label: 'Reviewer', contentId: 'reviewerContent' }]);

@@ -6,20 +6,11 @@
       "R1",
       "R2"
     ],
-    "title": "<script>alert(1)</script> Title",
+    "title": "<SCRIPT>ALERT(1)</SCRIPT> TITLE",
     "committee": "C1",
     "statusLabel": "Pending review",
     "canDecide": true,
-    "documents": [
-      {
-        "label": "WBS",
-        "url": "https://example.com/wbs"
-      },
-      {
-        "label": "Need Analysis",
-        "url": "https://example.com/need"
-      }
-    ],
+    "folderUrl": "https://drive.example.com/T1",
     "reviews": [
       {
         "key": "review1",
@@ -41,11 +32,11 @@
     "registerNumbers": [
       "R3"
     ],
-    "title": "Approved title",
+    "title": "APPROVED TITLE",
     "committee": "C1",
     "statusLabel": "Approved",
     "canDecide": false,
-    "documents": [],
+    "folderUrl": "",
     "reviews": [
       {
         "key": "review1",
@@ -65,11 +56,11 @@
     "teamId": "T3",
     "guideName": "",
     "registerNumbers": [],
-    "title": "Revision title",
+    "title": "REVISION TITLE",
     "committee": "C1",
-    "statusLabel": "Revision requested",
-    "canDecide": true,
-    "documents": [],
+    "statusLabel": "Returned for revision",
+    "canDecide": false,
+    "folderUrl": "",
     "reviews": [
       {
         "key": "review1",
@@ -93,7 +84,7 @@
     "committee": "C1",
     "statusLabel": "Not submitted",
     "canDecide": false,
-    "documents": [],
+    "folderUrl": "",
     "reviews": [
       {
         "key": "review1",
@@ -113,11 +104,11 @@
     "teamId": "T5",
     "guideName": "Guide 5",
     "registerNumbers": [],
-    "title": "Submitted title",
+    "title": "SUBMITTED TITLE",
     "committee": "C1",
     "statusLabel": "Awaiting guide",
     "canDecide": false,
-    "documents": [],
+    "folderUrl": "",
     "reviews": [
       {
         "key": "review1",

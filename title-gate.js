@@ -87,7 +87,10 @@ function titleGate_(teamId, index) {
  * `proposal` is the pair the team is working on. Throws UNAVAILABLE like titleGate_.
  */
 function titleSummary_(teamId, index) {
-  const state = titleStateFromIndex_(index || readTitleIndex_(), teamId);
+  return titleSummaryFromState_(titleStateFromIndex_(index || readTitleIndex_(), teamId));
+}
+
+function titleSummaryFromState_(state) {
   const approved = state.approved.value;
   return {
     teamId: state.teamId, revision: state.revision, status: state.status, reopened: state.reopened, approved,

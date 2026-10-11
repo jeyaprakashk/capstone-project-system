@@ -8,7 +8,7 @@ const { loadSources } = require('./invariants/golden.cjs');
 
 const team = (n, extra = {}) => ({
   teamId: 'T' + n, guideName: 'Guide ' + n, registerNumbers: ['R' + n + 'a', 'R' + n + 'b'], title: 'Title ' + n, committee: 'C1',
-  titleApproval: { status: { tone: 'warning', label: 'Pending review' }, canDecide: true, submittedTitle: 'Title ' + n, similarityFlag: '', documents: [], reviewerNotes: '' },
+  titleApproval: { status: { tone: 'warning', label: 'Pending review' }, canDecide: true, revision: 3, submittedTitle: 'Title ' + n, problem: '', similarityFlag: '', folderUrl: '', notes: '' },
   reviews: [{ key: 'review1', enabled: true, actionLabel: 'Enter marks', note: 'Open' }, { key: 'review2', enabled: false, actionLabel: 'Enter marks', note: 'Not yet' }],
   ...extra
 });
@@ -17,7 +17,7 @@ const dtoOf = teams => ({ summary: { pending: teams.length, approved: 0, awaitin
 function setup(dto) {
   const { document, window } = parseHTML('<html><body><div id="reviewerContent"></div></body></html>');
   const calls = { marks: [], refresh: 0, loading: 0, finished: 0, writes: [] };
-  const c = loadSources(['data-bridge-client.js', 'shared-tabs.js', 'reviewer-view.js'], { document, Promise, setTimeout, clearTimeout, Intl, Date });
+  const c = loadSources(['data-bridge-client.js', 'shared-tabs.js', 'title-requests.js', 'reviewer-view.js'], { document, Promise, setTimeout, clearTimeout, Intl, Date });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const state = { dto: dto || dtoOf([team(1)]), writeResult: { message: 'Saved' }, writeError: null, readError: null };
   bridge.useTransport(async (method, args) => {
@@ -28,7 +28,8 @@ function setup(dto) {
   const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: name => { assert(['tag','clipboard-check','ellipsis','triangle-alert'].includes(name), 'Unknown icon: ' + name); return ''; }, refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
   vm.runInContext('globalThis.__make = ' + c.reviewerViewBrowser_.toString(), c);
   const tabs = c.sharedTabsBrowser_(() => ui);
-  const view = c.__make(bridge, () => ui, () => ({ open: (...a) => calls.marks.push(a) }), () => tabs);
+  const requests = c.titleRequestsBrowser_();
+  const view = c.__make(bridge, () => ui, () => ({ open: (...a) => calls.marks.push(a) }), () => tabs, () => requests);
   const host = document.getElementById('reviewerContent');
   return { view, host, document, window, calls, state, ui, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
@@ -83,23 +84,28 @@ test('guide and search filters, empty state, and pagination',()=>{
   const guide=f.host.querySelector('[data-action=guide]');Object.defineProperty(guide,'value',{value:'Guide 2',configurable:true});f.fire(guide,'change');assert.deepEqual(Array.from(rows(f)).map(r=>r.dataset.teamId),['T2']);
   const search=f.host.querySelector('#reviewerAssignedSearch');search.value='nothing';f.fire(search,'input');assert.equal(rows(f).length,0);assert.match(f.host.textContent,/No teams match your filters/);
 });
-test('title panel retains documents, similarity flag, and read-only outcome',()=>{
-  const t=team(1);t.titleApproval.documents=[{label:'WBS',url:'https://example.com'},{label:'Bad',url:'javascript:bad()'}];t.titleApproval.similarityFlag='Check similarity';
+test('title panel retains the folder link, problem, similarity flag, and read-only outcome',()=>{
+  const t=team(1);t.titleApproval.folderUrl='https://example.com/folder';t.titleApproval.problem='The problem';t.titleApproval.similarityFlag='Check similarity';
   const f=setup();f.view.render(f.host,dtoOf([t]));f.click(f.host.querySelector('[data-action=open-title]'));
-  assert.match(panel(f).textContent,/Title 1.*Guide: Guide 1/);assert.match(panel(f).textContent,/Check similarity/);
-  assert.deepEqual(Array.from(panel(f).querySelectorAll('a')).map(a=>a.getAttribute('href')),['https://example.com','#']);
+  assert.match(panel(f).textContent,/Title 1.*Guide: Guide 1/);assert.match(panel(f).textContent,/Check similarity/);assert.match(panel(f).textContent,/The problem/);
+  assert.deepEqual(Array.from(panel(f).querySelectorAll('a')).map(a=>a.getAttribute('href')),['https://example.com/folder']);
+  const unsafe=team(2);unsafe.titleApproval.folderUrl='javascript:bad()';f.view.render(f.host,dtoOf([unsafe]));f.click(f.host.querySelector('[data-action=open-title]'));
+  assert.deepEqual(Array.from(panel(f).querySelectorAll('a')).map(a=>a.getAttribute('href')),['#']);f.click(panel(f).querySelector('[data-action=close-panel]'));f.view.render(f.host,dtoOf([t]));f.click(f.host.querySelector('[data-action=open-title]'));
   f.click(panel(f).querySelector('[data-action=close-panel]'));assert.equal(panel(f),null);
   t.titleApproval.canDecide=false;t.titleApproval.status={tone:'success',label:'Approved'};f.view.render(f.host,dtoOf([t]));f.click(f.host.querySelector('[data-action=open-title]'));
   assert.equal(panel(f).querySelector('[data-action=submit-decision]'),null);
 });
-test('revision requires a note and sends one existing API write',async()=>{
+test('revision requires a note and sends one decideTitle write with the revision the page showed',async()=>{
   const f=setup();f.view.render(f.host,dtoOf([team(1)]));f.click(f.host.querySelector('[data-action=open-title]'));
   assert.equal(panel(f).querySelector('[data-action=submit-decision]').disabled,true);
   f.click(panel(f).querySelector('[data-decision=Revise]'));assert.equal(panel(f).querySelector('[data-action=submit-decision]').disabled,true);
   const note=panel(f).querySelector('[data-action=notes]');note.value='Needs revision';f.fire(note,'input');
   assert.equal(panel(f).querySelector('[data-action=submit-decision]').disabled,false);
   f.click(panel(f).querySelector('[data-action=submit-decision]'));await f.settle();
-  assert.deepEqual(JSON.parse(JSON.stringify(f.calls.writes)),[['API_reviewer_submitDecision',['T1','Revise','Needs revision']]]);
+  const writes=JSON.parse(JSON.stringify(f.calls.writes));
+  assert.equal(writes.length,1);assert.equal(writes[0][0],'API_reviewer_decideTitle');
+  const sent=writes[0][1][0];assert.match(sent.requestId,/^\S{8,}$/);
+  assert.deepEqual({...sent,requestId:'x'},{requestId:'x',expectedRevision:3,teamId:'T1',decision:'return',notes:'Needs revision'});
   assert.equal(f.calls.loading,f.calls.finished);
   assert.equal(panel(f),null);
   assert.match(f.host.querySelector('[data-reviewer-toast]').textContent,/Saved/);

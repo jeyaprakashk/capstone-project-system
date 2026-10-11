@@ -8,7 +8,7 @@ function reviewerTeamContext_(teamId) {
   const row = rows[0], committee = String(row[TS.COMMITTEE_NUMBER] || '').trim();
   if (!getCommitteeNumbersForReviewer_(email).some(number => textEquals_(number, committee))) throw new Error('You are not an assigned reviewer for this team.');
   const students = getStudentsFromTeamStatusRow_(row, TS).map(student => ({register:normalizeReviewKey_(student.regNo),name:String(student.name || '')}));
-  return {TS,row,committee,students,team:String(row[TS.TEAM_ID]),title:String(row[TS.TITLE] || '')};
+  return {TS,row,committee,students,team:String(row[TS.TEAM_ID]),title:titleGate_(row[TS.TEAM_ID]).title};
 }
 
 /** Progress for the given team rows. `onlyKey` limits the work to one Review; its prerequisites are still read once each. */

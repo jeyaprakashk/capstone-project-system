@@ -107,8 +107,9 @@ function getMigratedViewsClientScript_(roles) {
   const has = role => !roles || roles.indexOf(role) >= 0;
   return [
     `const DataBridge = (${dataBridgeBrowser_.toString()})();
-const SharedTabs = (${sharedTabsBrowser_.toString()})(() => DashboardUI);`,
-    has('reviewer') ? `const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations, () => SharedTabs);` : '',
+const SharedTabs = (${sharedTabsBrowser_.toString()})(() => DashboardUI);
+const TitleRequests = (${titleRequestsBrowser_.toString()})();`,
+    has('reviewer') ? `const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations, () => SharedTabs, () => TitleRequests);` : '',
     has('coord') ? `const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => InternalAssessmentPublishing, () => SystemStatusActions);
 const CoordinatorView = (${coordinatorViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TeamDrawerView);
 const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI);` : '',

@@ -11,11 +11,17 @@ function getReviewerDashboardData_(email) {
   const myCommitteeNumbers = new Set(getCommitteeNumbersForReviewer_(email).map(normalizeText_));
   const myRows = rows.filter(r => myCommitteeNumbers.has(normalizeText_(r[TS.COMMITTEE_NUMBER])));
 
-  const pending = myRows.filter(r => textEquals_(r[TS.GUIDE_DECISION], 'Approved') && !textEquals_(r[TS.REVIEWER_DECISION], 'Approved'));
-  const approved = myRows.filter(r => textEquals_(r[TS.REVIEWER_DECISION], 'Approved'));
-  const notYetGuideApproved = myRows.filter(r => !textEquals_(r[TS.GUIDE_DECISION], 'Approved'));
+  // The title state of each team comes from TitleLog, read once. A team whose history is not valid has an error instead of a state
+  // and is counted in none of the three groups.
+  const index = readTitleIndex_();
+  const titles = Object.create(null);
+  myRows.forEach(r => { titles[normalizeText_(r[TS.TEAM_ID])] = titleTryState_(index, r[TS.TEAM_ID]); });
+  const statusOf = r => { const title = titles[normalizeText_(r[TS.TEAM_ID])]; return title.state ? title.state.status : ''; };
+  const pending = myRows.filter(r => statusOf(r) === 'AWAITING_REVIEWER');
+  const approved = myRows.filter(r => statusOf(r) === 'APPROVED' || statusOf(r) === 'REOPENED');
+  const notYetGuideApproved = myRows.filter(r => ['NOT_SUBMITTED', 'NEEDS_REVIEW', 'RETURNED'].includes(statusOf(r)));
 
-  return { pending, approved, notYetGuideApproved, assigned: myRows, total: myRows.length };
+  return { pending, approved, notYetGuideApproved, assigned: myRows, total: myRows.length, titles };
 }
 
 function submitReviewerDecision_(teamId, decision, notes) {

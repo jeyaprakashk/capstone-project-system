@@ -155,3 +155,27 @@ function findTeamFolder_(teamId, semester) {
   const documents = teamDocumentsFolderOrNull_();
   return documents ? teamFolderIn_(documents, teamId, semester).folder : null;
 }
+
+/**
+ * The Drive folder link of each team, from one listing of Team Documents: {normalized Team ID: url}. `teams` = [{teamId, semester}].
+ * A team with no folder, or with more than one folder of the name, is left out. Never creates anything, and never fails the caller:
+ * when Drive cannot be read the result is empty and the views simply show no link.
+ */
+function teamFolderUrls_(teams) {
+  const urls = Object.create(null);
+  try {
+    const documents = teamDocumentsFolderOrNull_();
+    if (!documents) return urls;
+    const byName = Object.create(null), folders = documents.getFolders();
+    while (folders.hasNext()) { const folder = folders.next(), name = folder.getName(); (byName[name] = byName[name] || []).push(folder); }
+    const year = getAcademicYear_();
+    teams.forEach(team => {
+      let name;
+      try { name = teamFolderName_(year, team.semester, team.teamId); } catch (error) { return; }
+      if (byName[name] && byName[name].length === 1) urls[normalizeText_(team.teamId)] = String(byName[name][0].getUrl());
+    });
+  } catch (error) {
+    console.error('Team folder links could not be read: ' + (error && error.message || error));
+  }
+  return urls;
+}

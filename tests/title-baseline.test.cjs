@@ -10,6 +10,8 @@ const { coordinatorFixture } = require('./coordinator-fixture.cjs');
 const { combos, inside } = require('./title-baseline/combos.cjs');
 const { expectBaseline, expectBaselineAs } = require('./title-baseline/golden.cjs');
 
+// The four states that mean the same in the old and the new model (tests/title-gate.test.cjs also checks them against status.json).
+const SAME_MEANING = new Set(['title=no guide=- reviewer=-', 'title=yes guide=- reviewer=-', 'title=yes guide=Approved reviewer=-', 'title=yes guide=- reviewer=Approved']);
 const load = (context, files) => files.forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), context, {filename: file}));
 const plain = value => JSON.parse(JSON.stringify(value));
 const iso = value => value ? new Date(value).toISOString() : '';
@@ -66,18 +68,26 @@ test('baseline: review marking (eligibility, the reviewer status, who can decide
     const TS = c.getColumnMap_('TeamStatus', inside(c, 'FIELD_DEFINITIONS.TEAM_STATUS'));
     const row = f.status.rows[1];
     const progress = {reviews: [{key: 'review1'}], teams: {t1: {review1: {available: true, readable: true, completed: false, status: 'Draft', markedStudents: 0, totalStudents: 2, reason: '', prerequisiteReason: ''}}}};
-    const team = c.reviewerTeamDto_(row, TS, progress);
     const data = c.getReviewerDashboardData_('reviewer@example.com');
+    const title = data.titles['t1'];
+    const team = c.reviewerTeamDto_(row, TS, progress, title, '');
     const ids = rows => rows.map(r => String(r[TS.TEAM_ID]));
     result[combo.id] = {
       reviewEligibility: plain(c.reviewEligibility_(row, TS)),
-      reviewerStatus: plain(c.reviewerTitleStatus_(row, TS)),
+      reviewerStatus: plain(c.reviewerTitleStatus_(title)),
       titleApproval: {status: plain(team.titleApproval.status), canDecide: team.titleApproval.canDecide},
       marksCellEnabled: team.reviews[0].enabled,
       dashboard: {pending: ids(data.pending), approved: ids(data.approved), notYetGuideApproved: ids(data.notYetGuideApproved)}
     };
   }
-  expectBaseline('review-marking', result);
+  // Review marking is gated on an approved title exactly as before, in every one of the 32 states. The reviewer's own groups and chips
+  // are compared only for the states whose meaning is the same in both models; the others differ on purpose (a returned title is one
+  // status now, and a reviewer cannot decide on a title the guide has not approved).
+  const projected = Object.fromEntries(Object.entries(result).map(([id, entry]) => [id, SAME_MEANING.has(id) ? entry : {reviewEligibility: entry.reviewEligibility, marksCellEnabled: entry.marksCellEnabled}]));
+  // One recorded quirk is not kept: the old dashboard listed a reviewer-approved team that had no Guide Decision as also awaiting the
+  // guide. An approved title has always passed the guide now, so it is in one group only.
+  expectBaselineAs('review-marking', projected, (entry, id) => !SAME_MEANING.has(id) ? {reviewEligibility: entry.reviewEligibility, marksCellEnabled: entry.marksCellEnabled}
+    : id === 'title=yes guide=- reviewer=Approved' ? {...entry, dashboard: {...entry.dashboard, notYetGuideApproved: []}} : entry);
 });
 
 test('baseline: eligibility (the title date and the resulting eligibility, now from TitleLog)', () => {

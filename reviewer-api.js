@@ -2,18 +2,20 @@
  * REVIEWER DASHBOARD API — JSON only. See DATA-CONTRACTS.md.
  * Same data, authorization and rules as the previous server-rendered dashboard.
  */
-function reviewerTitleStatus_(row, TS) {
-  const decision = row[TS.REVIEWER_DECISION];
-  if (!String(row[TS.TITLE] || '').trim()) return {tone:'neutral', label:'Not submitted'};
-  if (textEquals_(decision, 'Approved')) return {tone:'success', label:'Approved'};
-  if (textEquals_(decision, 'Revise')) return {tone:'warning', label:'Revision requested'};
-  if (textEquals_(row[TS.GUIDE_DECISION], 'Approved')) return {tone:'warning', label:'Pending review'};
-  return {tone:'neutral', label:'Awaiting guide'};
+const REVIEWER_TITLE_STATUS_ = Object.freeze({
+  NOT_SUBMITTED: {tone:'neutral', label:'Not submitted'}, NEEDS_REVIEW: {tone:'neutral', label:'Awaiting guide'},
+  AWAITING_REVIEWER: {tone:'warning', label:'Pending review'}, RETURNED: {tone:'warning', label:'Returned for revision'},
+  APPROVED: {tone:'success', label:'Approved'}, REOPENED: {tone:'warning', label:'Reopened'}
+});
+
+/** The status chip for a team's title. `title` is {state} or {error} from titleTryState_. */
+function reviewerTitleStatus_(title) {
+  return title.state ? {...REVIEWER_TITLE_STATUS_[title.state.status]} : {tone:'warning', label:'Unavailable'};
 }
 
-function reviewerReviewCellDto_(row, TS, review, progress) {
+function reviewerReviewCellDto_(row, TS, review, progress, title) {
   const state = (progress.teams[normalizeReviewKey_(row[TS.TEAM_ID])] || {})[review.key];
-  const titleApproved = !!String(row[TS.TITLE] || '').trim() && textEquals_(row[TS.REVIEWER_DECISION], 'Approved');
+  const titleApproved = !!(title.state && title.state.approved.value);
   const available = !!(state && state.available);
   const enabled = available && !!state.readable && titleApproved && !state.prerequisiteReason;
   const hint = !available ? ((state && state.error) || 'Marks unavailable.') : (state.reason || state.status);
@@ -26,30 +28,27 @@ function reviewerReviewCellDto_(row, TS, review, progress) {
   };
 }
 
-function reviewerTeamDto_(row, TS, progress) {
-  const title = String(row[TS.TITLE] || '').trim();
-  const canDecide = !!title && textEquals_(row[TS.GUIDE_DECISION], 'Approved') && !textEquals_(row[TS.REVIEWER_DECISION], 'Approved');
-  const documents = [
-    {label:'WBS', url:row[TS.WORK_BREAKDOWN_LINK]},
-    {label:'Need Analysis', url:row[TS.NEED_ANALYSIS_LINK]},
-    {label:'Ch.1 LaTeX', url:row[TS.CHAPTER1_LATEX_LINK]}
-  ].filter(d => d.url).map(d => ({label:d.label, url:String(d.url)}));
-  const status = reviewerTitleStatus_(row, TS);
+function reviewerTeamDto_(row, TS, progress, title, folderUrl) {
+  const summary = title.state ? titleSummaryFromState_(title.state) : null;
+  const canDecide = !!title.state && titleCanDo_(title.state, 'reviewerApprove', {roles:{reviewer:true}}).allowed;
+  const status = reviewerTitleStatus_(title);
   return {
     teamId:String(row[TS.TEAM_ID]),
     guideName:String(row[TS.GUIDE_NAME] || ''),
     registerNumbers:[1, 2, 3, 4].map(n => String(row[TS['S' + n + '_REGNO']] || '').trim()).filter(Boolean),
-    title,
+    title:summary ? summary.title : '',
     committee:String(row[TS.COMMITTEE_NUMBER] || ''),
     titleApproval:{
       status,
       canDecide,
-      submittedTitle:String(row[TS.TITLE] || ''),
-      similarityFlag:String(row[TS.SIMILARITY_FLAG] || ''),
-      documents,
-      reviewerNotes:String(row[TS.REVIEWER_NOTES] || '')
+      revision:summary ? summary.revision : 0,
+      submittedTitle:summary ? summary.proposal.title : '',
+      problem:summary ? summary.proposal.problem : '',
+      similarityFlag:summary ? summary.similarityNote : '',
+      folderUrl:String(folderUrl || ''),
+      notes:summary ? summary.notes : ''
     },
-    reviews:progress.reviews.map(review => reviewerReviewCellDto_(row, TS, review, progress))
+    reviews:progress.reviews.map(review => reviewerReviewCellDto_(row, TS, review, progress, title))
   };
 }
 
@@ -57,11 +56,12 @@ function reviewerTeamDto_(row, TS, progress) {
 function buildReviewerDto_(data) {
   const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const progress = getReviewerReviewProgress_(data.assigned);
+  const folders = teamFolderUrls_(data.assigned.map(row => ({teamId:row[TS.TEAM_ID], semester:row[TS.SEMESTER]})));
   return {
     summary:{pending:data.pending.length, approved:data.approved.length, awaitingGuide:data.notYetGuideApproved.length, total:data.total},
     reviews:progress.reviews.map(review => ({key:review.key, label:String(review.label)})),
     reviewError:progress.error ? String(progress.error) : null,
-    teams:data.assigned.map(row => reviewerTeamDto_(row, TS, progress))
+    teams:data.assigned.map(row => reviewerTeamDto_(row, TS, progress, data.titles[normalizeText_(row[TS.TEAM_ID])], folders[normalizeText_(row[TS.TEAM_ID])]))
   };
 }
 
