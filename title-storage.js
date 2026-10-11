@@ -56,6 +56,14 @@ function buildTitleLogReport_() {
   return titleLogReport_(readTitleLog_().rows, rosterIds, Date.now(), readTitleCutover_() === 'LIVE');
 }
 
+/** Editor-run: the same report as API_coordinator_validateTitleLog, written to the execution log (cutover step 7). */
+function validateTitleLog() {
+  requireTriggerOrOperator_();
+  const report = buildTitleLogReport_();
+  console.log(JSON.stringify(report, null, 2));
+  return report;
+}
+
 function API_coordinator_validateTitleLog() {
   return apiHandle_(() => { coordinatorAccessOrThrow_(); return buildTitleLogReport_(); });
 }

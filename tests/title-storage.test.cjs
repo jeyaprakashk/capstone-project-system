@@ -107,10 +107,30 @@ test('the endpoint is coordinator-only and reads the roster and the cutover', ()
   assert.equal(JSON.parse(g.API_coordinator_validateTitleLog()).error.code, 'UNAUTHORIZED');
 });
 
-test('source rules: the only public function is setupTitleStorage, and it starts with the guard', () => {
+test('validateTitleLog is the editor-run twin of the endpoint: it logs the report and starts with the guard', () => {
+  const text = fs.readFileSync('title-storage.js', 'utf8');
+  const body = text.slice(text.indexOf('function validateTitleLog'));
+  assert.equal(body.slice(body.indexOf('{') + 1).trim().split(/\r?\n/)[0].trim(), 'requireTriggerOrOperator_();');
+  const rows = history(['SUBMIT'], {teamId: 'T1'});
+  const sheetEnv = makeTitleEnv([HEADERS, ...rows.map(sheetRow)], {files: ['title-cutover.js', 'title-storage.js']});
+  const g = sheetEnv.context, logged = [];
+  g.requireTriggerOrOperator_ = () => {};
+  g.console = {log: line => logged.push(line), error() {}};
+  g.getColumnMap_ = () => ({TEAM_ID: 0});
+  g.getSheetRows_ = () => [['T1'], ['T2']];
+  g.SHEET_NAMES = {TEAM_STATUS: 'TeamStatus'};
+  g.FIELD_DEFINITIONS = {TEAM_STATUS: {}};
+  g.readTitleCutover_ = () => '';
+  const report = JSON.parse(JSON.stringify(g.validateTitleLog()));
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.errors.map(e => [e.kind, e.teamId]), [['NO_ROW', 'T2']]);
+  assert.deepEqual(JSON.parse(logged[0]), report);
+});
+
+test('source rules: the public functions are setupTitleStorage and validateTitleLog, and setup starts with the guard', () => {
   const text = fs.readFileSync('title-storage.js', 'utf8');
   const publicFunctions = [...text.matchAll(/^function ([A-Za-z0-9$]+)\s*\(/gm)].map(match => match[1]).filter(name => !name.endsWith('_') && !name.startsWith('API_'));
-  assert.deepEqual(publicFunctions, ['setupTitleStorage']);
+  assert.deepEqual(publicFunctions, ['setupTitleStorage', 'validateTitleLog']);
   const body = text.slice(text.indexOf('function setupTitleStorage'));
   assert.equal(body.slice(body.indexOf('{') + 1).trim().split(/\r?\n/)[0].trim(), 'requireTriggerOrOperator_();');
 });

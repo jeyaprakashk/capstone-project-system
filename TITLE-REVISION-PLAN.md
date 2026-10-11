@@ -644,8 +644,10 @@ editor-run functions (`setupTitleStorage` and the retirement plan's preflight, a
    titles, and none is still running (the barrier above).
 3. Close the Form (`setAcceptingResponses(false)`) if it is not already closed; its trigger was deleted in step 0. Copy each team's existing Form-uploaded
    documents into its team folder under the fixed names.
-4. Copy the baseline into `TitleLog` from TeamStatus as it now stands. Every decision made before step 2 is
-   included, and none can arrive after it.
+4. Run `importTitleBaseline` (editor-run, `title-baseline-import.js`): it copies the baseline into `TitleLog` from TeamStatus as it
+   now stands, one `BASELINE` row per team, and refuses unless `TITLE_CUTOVER` is `PAUSED`. Every decision made before step 2 is
+   included, and none can arrive after it. It reports the teams it could not write (an approved team without an approval date in the
+   master registry) so the coordinator can enter those rows by hand. The file is deleted after the cutover.
 5. Deploy the new version. Reads work; writes still refuse because of `PAUSED`.
 6. Run `API_coordinator_validateTitleLog` and check the requirements card. Fix the baseline until both are clean. Then
    **restore the triggers paused in step 0**, and only now (check before restoring that none was re-enabled earlier, by

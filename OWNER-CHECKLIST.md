@@ -98,11 +98,11 @@ Follow the order. Stop and ask if any step does not behave as written.
 | 0 | **You pause and delete first**, on the Triggers page, under every account that installed one. **Pause** `reconcileProgressEligibility` and `sendGuideReminderDigest` (the two installed triggers that read title state; the other time-driven ones keep running). **Delete** the `onTeamIntakeSubmit` form-submit trigger. Write down each paused trigger's handler, schedule and owner, then reopen the Triggers page and confirm the two are not active and the Form trigger is gone. **Only then** does the developer run `npm run push` (no new deployment) |
 | 1 | In the editor, run `setupTitleStorage`. Type the three `ActivityDependencies` rows with `Active = Yes` (the developer gives you the exact rows) |
 | 2 | Run `setTitleCutover('PAUSED')` and wait for it to return |
-| 3 | Run the archive **preflight**. If it reports bad headers, stop and decide with the developer |
-| 4 | Run the archive **copy**, then the **verification**. It must report **zero mismatches**. Keep the report |
-| 5 | Copy the baseline into `TitleLog` from `TeamStatus` as it stands |
+| 3 | **Documents.** Copy each team's existing Form-uploaded documents into its team folder (`Team Documents`) under the fixed names `Step1_Work_Breakdown.docx` and `Step2_Need_Analysis.docx` (the folders must exist first: System Status, Team folders). Close the Form if it is still accepting responses |
+| 4 | **Archive of the Form sheet: not built yet.** The archive preflight, copy and verification functions of [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md) do not exist in the code. Skip this step; `TeamIntakeRaw` stays exactly as it is and is not renamed or deleted until the archive is built and verified (part D) |
+| 5 | Run `importTitleBaseline` in the editor. It copies each team's current title state from `TeamStatus` into `TitleLog` (one `BASELINE` row per team) and refuses unless the cutover is `PAUSED`. Read its report: `problems` lists teams it could not write (an approved team with no approval date in the master registry, for example; type that row by hand), `invalid` must be empty. It is safe to run again; teams that already have rows are skipped |
 | 6 | **Deploy the new version** (new deployment version of the web app) |
-| 7 | Run `API_coordinator_validateTitleLog` and check the requirements card until both are clean. Then **restore the triggers** you paused in step 0 (they stay paused until now) |
+| 7 | In the editor run `validateTitleLog` and read the execution log: `errors` must be empty. Then open a team's drawer (Coordinator, the team row, **Title**) and check its requirements card. Fix and repeat until both are clean. Then **restore the triggers** you paused in step 0 (they stay paused until now) |
 | 8 | Check the requirement list of teams at `NOT_SUBMITTED` or `RETURNED` and tell teams that are not ready |
 | 9 | Open each role's dashboard read-only, then run `setTitleCutover('LIVE')` and announce |
 

@@ -39,7 +39,8 @@ function sheetCatalog_() {
         code: [
           {file: 'title-storage.js', role: 'setup', functions: ['setupTitleStorage']},
           {file: 'title-log.js', role: 'read', functions: ['readTitleLog_']},
-          {file: 'title-log.js', role: 'write', functions: ['appendTitleLogRow_']}
+          {file: 'title-log.js', role: 'write', functions: ['appendTitleLogRow_']},
+          {file: 'title-baseline-import.js', role: 'write', functions: ['importTitleBaseline']}
         ]
       },
       formArchive: {
