@@ -26,7 +26,7 @@ cannot go live, until those are done.
 | 11 | **Retirement tail:** rename `TeamIntakeRaw`, the verification period, unlink and delete, the final schema-snapshot commit. **Done without the rename and the wait** (the owner deleted the tab after a backup) | archive/plans/FORM-SHEET-RETIREMENT-PLAN.md (steps 7 to 9) | 10 | 13 |
 | 12 | **Header-name migration**, phases 0 to 5. Phase 1 completes the catalog. The retiring Form sheet stays out of scope until step 11 removes it | archive/plans/SHEET-HEADER-MATCHING-PLAN.md | 10 | 13, 14 |
 | 13 | The AGENTS.md **policy decision** about column layouts (migration phase 6) and dropping the transitional rules | archive/plans/SHEET-HEADER-MATCHING-PLAN.md | 11, 12 | none |
-| 14 | **Student identity** work, later, rebased on the header-name `GitHubAccounts` | [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md) | 12 | none |
+| 14 | **Student identity** work, on a branch, for the next semester's spreadsheet (plan rewritten as revision 15, 2026-10-12; awaiting the owner's answers in its section 15) | [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md) | 12 | none |
 
 ## Branching rule
 
