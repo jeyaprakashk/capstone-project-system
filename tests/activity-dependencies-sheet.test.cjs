@@ -49,7 +49,6 @@ test('the helper result is returned unchanged', () => {
   const result = {created: false, repaired: ['Active']};
   const {context} = load({}, {ensureSheet_: stubbedHelper(result).ensureSheet_});
   assert.equal(context.ensureActivityDependenciesSheet_(), result);
-  assert.equal(context.setupActivityDependencies(), result);
 });
 
 test('first-creation formatting: plain-text columns, a frozen header row and a Yes/No list for Active from row 2', () => {
@@ -122,30 +121,11 @@ test('the sheet is correct without the formatting: an end-to-end run with onCrea
   assert.equal(writes.length, 1, 'only the header row is written: setup never inserts a data row');
 });
 
-test('setupActivityDependencies calls the guard first, then the ensure function, and rejects a non-coordinator', () => {
-  const order = [];
-  const stub = stubbedHelper({created: true, repaired: []});
-  const {context} = load({}, {
-    requireTriggerOrOperator_: () => order.push('guard'),
-    ensureSheet_: spec => { order.push('ensure'); return stub.ensureSheet_(spec); }
-  });
-  context.setupActivityDependencies();
-  assert.deepEqual(order, ['guard', 'ensure']);
-
-  const denied = load({}, {
-    requireTriggerOrOperator_: () => { throw new Error('Coordinator access is required.'); },
-    ensureSheet_: () => { throw new Error('must not be reached'); }
-  });
-  assert.throws(() => denied.context.setupActivityDependencies(), /Coordinator access is required/);
-});
-
-test('source rules: the first statement is the guard, the module is the only listed setup entry point, no name or header is defined here', () => {
+test('source rules: no name or header is defined here, and the module has no public function', () => {
   const text = fs.readFileSync('activity-dependencies-sheet.js', 'utf8');
-  const body = text.slice(text.indexOf('function setupActivityDependencies'));
-  assert.equal(body.slice(body.indexOf('{') + 1).trim().split(/\r?\n/)[0].trim(), 'requireTriggerOrOperator_();');
   const code = text.replace(/\/\*[\s\S]*?\*\//g, '');
   assert.ok(!code.includes("'ActivityDependencies'"), 'the sheet name lives in the catalog');
   assert.ok(!code.includes("'Kind'"), 'the headers live in the catalog');
   const publicFunctions = [...text.matchAll(/^function ([A-Za-z0-9$]+)\s*\(/gm)].map(match => match[1]).filter(name => !name.endsWith('_'));
-  assert.deepEqual(publicFunctions, ['setupActivityDependencies']);
+  assert.deepEqual(publicFunctions, []);
 });

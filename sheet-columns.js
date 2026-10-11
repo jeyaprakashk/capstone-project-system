@@ -23,7 +23,8 @@ function sheetCatalog_() {
         purpose: 'Rules that gate student actions. The coordinator fills the rows.',
         createAtRuntime: false,
         code: [
-          {file: 'activity-dependencies-sheet.js', role: 'setup', functions: ['setupActivityDependencies', 'ensureActivityDependenciesSheet_']}
+          {file: 'activity-dependencies-sheet.js', role: 'setup', functions: ['ensureActivityDependenciesSheet_']},
+          {file: 'title-storage.js', role: 'setup', functions: ['setupTitleStorage']}
         ]
       },
       titleLog: {
@@ -35,7 +36,11 @@ function sheetCatalog_() {
         status: 'new',
         purpose: 'Append-only title history; the latest row of a team is its current title state.',
         createAtRuntime: false,
-        code: []
+        code: [
+          {file: 'title-storage.js', role: 'setup', functions: ['setupTitleStorage']},
+          {file: 'title-log.js', role: 'read', functions: ['readTitleLog_']},
+          {file: 'title-log.js', role: 'write', functions: ['appendTitleLogRow_']}
+        ]
       },
       formArchive: {
         name: 'TitleFormArchive',
