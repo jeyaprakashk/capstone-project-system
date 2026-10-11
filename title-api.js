@@ -225,7 +225,6 @@ function buildTitleDto_(teamId, viewer, ctx) {
       submit: titleCapability_(state, 'submit', {roles}, activity, checklist),
       approve: titleDecisionCapability_(state, roles, 'approve'),
       return: titleDecisionCapability_(state, roles, 'return'),
-      upload: (() => { const capability = documentUploadCapability_(state, roles, team, ctx); return {work: capability, need: capability}; })(),
       reopen: titleCapability_(state, 'reopen', {roles}, null, null),
       cancel: titleCapability_(state, 'cancelReopen', {roles}, null, null)
     }

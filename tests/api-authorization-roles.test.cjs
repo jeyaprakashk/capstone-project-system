@@ -53,7 +53,6 @@ const ENDPOINTS = {
   API_publishing_get: [['review1'], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
   API_publishing_run: [['publishInternalAssessment_', { ...REQUEST }], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
   API_title_get: [[TEAM], OUTSIDER],
-  API_student_uploadDocument: [[{ requestId: 'request_123456789', documentKey: 'work', fileName: 'a.docx', mimeType: '', dataBase64: 'UEsDBA==' }], [...OUTSIDER, 'guide@example.com']],
   API_student_submitTitle: [[{ requestId: 'request_123456789', expectedRevision: 0, title: 'A title', problem: 'A problem' }], [...OUTSIDER, 'guide@example.com']],
   API_guide_decideTitle: [[{ requestId: 'request_123456789', expectedRevision: 0, teamId: TEAM, decision: 'approve' }], [...OUTSIDER, 'one@example.com']],
   API_reviewer_decideTitle: [[{ requestId: 'request_123456789', expectedRevision: 0, teamId: TEAM, decision: 'approve' }], [...OUTSIDER, 'one@example.com', 'guide@example.com']],

@@ -36,8 +36,8 @@ function studentTitleDto_(d, teamId, titleApproved, email) {
   if (d.githubSetup) ctx.github[String(teamId).trim()] = {setup:d.githubSetup};
   const dto = buildTitleDto_(String(teamId).trim(), {email, roles:{student:true}}, ctx);
   // A student sees its own capabilities only: no staff decisions, no history, and the similarity note stays with the staff.
-  const {history, similarityNote, ...visible} = dto;
-  return {...visible, can:{submit:dto.can.submit, upload:dto.can.upload}, state:label.state, statusText:label.text, due};
+  const {history, similarityNote, documents, ...visible} = dto;
+  return {...visible, can:{submit:dto.can.submit}, state:label.state, statusText:label.text, due};
 }
 
 /** Core DTO: team, roster, title approval and assessment labels. Needs sheet data only (getStudentBaseData_). */

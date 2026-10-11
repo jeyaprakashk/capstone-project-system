@@ -44,7 +44,7 @@ history (one row per change, the latest row of a team is its state). Specified i
   `titleSummary_` / `titleStateFromIndex_` when a screen needs the workflow state. Read the log once with `readTitleIndex_()` and pass
   the index for a list of teams. Never read the old title columns; `tests/title-removal.test.cjs` fails when a runtime module does.
 - **Write** only through `titleWrite_` (`title-write.js`): one path, one lock, the cutover check under the lock, a request ID and the
-  revision the user saw. Endpoints (`title-api.js`, `team-document-upload.js`) resolve who the caller is and pass callbacks; the rules are
+  revision the user saw. Endpoints (`title-api.js`) resolve who the caller is and pass callbacks; the rules are
   in `title-service.js` and the history validation in `title-history.js`. A row is appended and never edited.
 - **Requirements** that gate a student action come from the `ActivityDependencies` sheet through the engine (`activity-engine.js`, the
   `github` and `drive` checks). Misconfiguration denies; nothing is cached between requests; a student never sees a check's `diagnostic`.

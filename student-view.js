@@ -147,7 +147,7 @@ function studentViewBrowser_(bridge, getUi, actions) {
       panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) +
       panelMarkup('title', state.tab, projectSlot('title', ui)) + panelMarkup('github', state.tab, projectSlot('github', ui)) +
       panelMarkup('team', state.tab, teamMarkup(dto)) + '</div>';
-    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); host.addEventListener('change', onChange); }
+    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); }
     const side = document.getElementById('studentSideNav');
     if (side) {
       side.innerHTML = navMarkup(state.tab);
@@ -183,7 +183,6 @@ function studentViewBrowser_(bridge, getUi, actions) {
     if (target.hasAttribute('data-github-form-jump')) actions.github.focusGithubAccountForm(target);
     else if (action === 'github-refresh') actions.github.refreshGithubStatus(target);
     else if (action === 'project-retry') loadProject();
-    else if (action === 'title-upload') actions.title.pick(target);
     else if (action === 'show-tab') showTab(target.getAttribute('data-tab'));
   }
   function onKeydown(event) {
@@ -199,10 +198,6 @@ function studentViewBrowser_(bridge, getUi, actions) {
     if (form) { actions.github.previewGithubAccount(event, form); return; }
     const titleForm = event.target.closest ? event.target.closest('[data-title-form]') : null;
     if (titleForm) actions.title.submit(event, titleForm);
-  }
-  function onChange(event) {
-    const input = event.target.closest ? event.target.closest('[data-doc-input]') : null;
-    if (input) actions.title.upload(input);
   }
 
   function load() { return bridge.read('role:student', 'API_student_getCore', []); }

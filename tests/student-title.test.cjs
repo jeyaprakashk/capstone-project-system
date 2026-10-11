@@ -11,8 +11,7 @@ const cap = (allowed, reason = '', requirements = []) => ({ allowed, reason, act
 const dto = (extra = {}) => ({
   teamId: 'T1', revision: 2, status: 'RETURNED', reopened: false, proposal: { title: 'OLD IDEA', problem: 'Old problem' }, notes: 'Too broad', approved: { value: false, title: '', problem: '', at: null, by: '' },
   reopen: null, folderUrl: 'https://drive.example.com/T1', state: 'active', statusText: 'Changes requested — update and resubmit', due: { date: '10 Jan', overdue: false },
-  documents: [{ key: 'work', label: 'Work Breakdown document', present: true, uploadedBy: 'ann@x.edu', uploadedAt: '2026-01-02T10:00:00.000Z' }, { key: 'need', label: 'Need Analysis document', present: false, uploadedBy: null, uploadedAt: null }],
-  can: { submit: cap(true), upload: { work: cap(true), need: cap(false, 'Documents cannot change while the title is under review.') } }, ...extra
+    can: { submit: cap(true) }, ...extra
 });
 
 function setup(options = {}) {
@@ -39,19 +38,17 @@ function setup(options = {}) {
 const text = node => node.textContent.replace(/\s+/g, ' ').trim();
 const submitEvent = f => ({ preventDefault() { this.prevented = true; }, prevented: false });
 
-test('a returned title shows the feedback, the proposal to edit, the documents and an enabled Resubmit button', () => {
+test('a returned title shows the feedback, the proposal to edit and an enabled Resubmit button, and no documents or upload', () => {
   const f = setup();
   const body = text(f.host);
-  for (const expected of ['Changes requested — update and resubmit', 'Submitted title: OLD IDEA', 'Feedback: Too broad', 'Approval due 10 Jan', 'Open team folder', 'Work Breakdown document', 'Uploaded', 'uploaded by ann@x.edu', 'Need Analysis document', 'Not uploaded']) assert(body.includes(expected), expected);
+  for (const expected of ['Changes requested — update and resubmit', 'Submitted title: OLD IDEA', 'Feedback: Too broad', 'Approval due 10 Jan', 'Open team folder']) assert(body.includes(expected), expected);
+  for (const absent of ['Work Breakdown document', 'Need Analysis document', 'Upload', 'Replace (.docx)']) assert(!body.includes(absent), absent);
+  assert.equal(f.host.querySelector('input[type="file"]'), null);
+  assert.equal(f.host.querySelector('[data-action="title-upload"]'), null);
   assert.equal(f.host.querySelector('[data-title-field="title"]').value, 'OLD IDEA');
   assert.equal(f.host.querySelector('[data-title-field="problem"]').value, 'Old problem');
   assert.equal(text(f.host.querySelector('[data-title-form] button[type="submit"]')), 'Resubmit title');
   assert.equal(f.host.querySelector('[data-title-form] button[type="submit"]').disabled, false);
-  const need = f.host.querySelector('[data-document="need"]');
-  assert.equal(need.querySelector('[data-action="title-upload"]').disabled, true);
-  assert(text(need).includes('Documents cannot change while the title is under review.'));
-  assert.equal(f.host.querySelector('[data-document="work"] [data-action="title-upload"]').disabled, false);
-  assert.equal(text(f.host.querySelector('[data-document="work"] [data-action="title-upload"]')), 'Replace (.docx)');
 });
 
 test('the states: not submitted, under review, approved, reopened and unavailable', () => {
@@ -75,7 +72,7 @@ test('the states: not submitted, under review, approved, reopened and unavailabl
 });
 
 test('unmet requirements are listed with their reasons and the form is disabled with the reason', () => {
-  const f = setup({ dto: dto({ status: 'NOT_SUBMITTED', notes: '', can: { submit: cap(false, 'GitHub setup complete: Waiting for teammates.', [{ label: 'GitHub setup complete', met: false, reason: 'Waiting for teammates.' }, { label: 'Work Breakdown document', met: true, reason: '' }]), upload: { work: cap(true), need: cap(true) } } }) });
+  const f = setup({ dto: dto({ status: 'NOT_SUBMITTED', notes: '', can: { submit: cap(false, 'GitHub setup complete: Waiting for teammates.', [{ label: 'GitHub setup complete', met: false, reason: 'Waiting for teammates.' }, { label: 'Work Breakdown document', met: true, reason: '' }]) } }) });
   const list = text(f.host.querySelector('[data-title-checklist]'));
   assert(list.includes('GitHub setup complete') && list.includes('Waiting for teammates.') && list.includes('Work Breakdown document') && list.includes('Done'));
   assert.equal(f.host.querySelector('[data-title-form] button[type="submit"]').disabled, true);
@@ -139,59 +136,10 @@ test('a conflict or refusal reloads the project and the message survives the rel
   assert.equal(f.host.querySelector('[data-title-notice]'), null, 'the notice is shown once');
 });
 
-test('choosing a file uploads it as base64 under its document key, then reloads', async () => {
-  const f = setup();
-  const input = f.host.querySelector('[data-doc-input="need"]');
-  const file = { name: 'plan.DOCX', size: 1234, lastModified: 99, type: '', content: 'PK-hello' };
-  Object.defineProperty(input, 'files', { value: [file], configurable: true });
-  await f.title.upload(input);
-  assert.equal(f.writes.length, 1);
-  assert.equal(f.writes[0][0], 'API_student_uploadDocument');
-  const sent = f.writes[0][1][0];
-  assert.deepEqual({ ...sent, requestId: 'x' }, { requestId: 'x', documentKey: 'need', fileName: 'plan.DOCX', mimeType: '', dataBase64: Buffer.from('PK-hello').toString('base64') });
-  assert.match(sent.requestId, /^\S{8,}$/);
-  assert.equal(f.control.reloads, 1);
-});
-
-test('a file that is not .docx or is over 10 MB is refused before anything is sent', async () => {
-  const f = setup();
-  const input = f.host.querySelector('[data-doc-input="work"]');
-  const status = f.host.querySelector('[data-document="work"] [data-document-status]');
-  Object.defineProperty(input, 'files', { value: [{ name: 'plan.pdf', size: 10, lastModified: 1 }], configurable: true });
-  await f.title.upload(input);
-  assert.equal(status.textContent, 'Choose a Word document (.docx).');
-  Object.defineProperty(input, 'files', { value: [{ name: 'plan.docx', size: 11 * 1024 * 1024, lastModified: 1 }], configurable: true });
-  await f.title.upload(input);
-  assert.equal(status.textContent, 'The file is larger than 10 MB.');
-  assert.equal(f.writes.length, 0);
-});
-
-test('a failed upload shows the message; an upload retried with the same file keeps its request ID after an uncertain failure', async () => {
-  const f = setup();
-  const input = f.host.querySelector('[data-doc-input="work"]');
-  const status = f.host.querySelector('[data-document="work"] [data-document-status]');
-  Object.defineProperty(input, 'files', { value: [{ name: 'a.docx', size: 5, lastModified: 7, content: 'PK1' }], configurable: true });
-  f.control.error = 'Drive is busy'; f.control.code = 'TRANSPORT';
-  await f.title.upload(input);
-  assert.equal(status.textContent, 'Drive is busy');
-  await f.title.upload(input);
-  assert.equal(f.writes[1][1][0].requestId, f.writes[0][1][0].requestId);
-  assert.equal(f.control.reloads, 0);
-});
-
-test('pick opens the file chooser of its own document', () => {
-  const f = setup();
-  let clicked = null;
-  f.host.querySelectorAll('[data-doc-input]').forEach(input => { input.click = () => { clicked = input.getAttribute('data-doc-input'); }; });
-  f.title.pick(f.host.querySelector('[data-document="need"] [data-action="title-upload"]'));
-  assert.equal(clicked, 'need');
-});
-
 test('escapes every value, makes no inline handlers and renders only compiled classes', () => {
   const evil = '<img src=x onerror=alert(1)>"\'&';
   const f = setup({ dto: dto({ statusText: evil, notes: evil, proposal: { title: evil, problem: evil }, folderUrl: 'javascript:alert(1)', due: { date: evil, overdue: true },
-    documents: [{ key: 'work', label: evil, present: true, uploadedBy: evil, uploadedAt: 'bad' }, { key: 'need', label: evil, present: false, uploadedBy: null, uploadedAt: null }],
-    can: { submit: cap(true, '', [{ label: evil, met: false, reason: evil }]), upload: { work: cap(false, evil), need: cap(true) } } }) });
+    can: { submit: cap(true, '', [{ label: evil, met: false, reason: evil }]) } }) });
   assert.equal(f.host.querySelectorAll('img').length, 0);
   assert.deepEqual(Array.from(f.host.querySelectorAll('*')).flatMap(n => Array.from(n.attributes).map(a => a.name)).filter(name => /^on/i.test(name)), []);
   assert(Array.from(f.host.querySelectorAll('a')).every(a => !/^javascript:/i.test(a.getAttribute('href'))));

@@ -23,7 +23,7 @@ function setup({cutover = 'LIVE', registryFails = false, activity = null} = {}) 
   const session = {email: 'ann@x.edu'};
   const properties = {TITLE_CUTOVER: cutover};
   const env = makeTitleEnv([HEADERS], {
-    files: ['title-cutover.js', 'activity-engine.js', 'title-service.js', 'title-write.js', 'team-folders.js', 'team-document-upload.js', 'title-api.js'],
+    files: ['title-cutover.js', 'activity-engine.js', 'title-service.js', 'title-write.js', 'team-folders.js', 'team-documents.js', 'title-api.js'],
     globals: {
       Utilities, Session: {getActiveUser: () => ({getEmail: () => session.email})},
       MailApp: {sendEmail: (to, subject, body) => mails.push({to, subject, body})},
