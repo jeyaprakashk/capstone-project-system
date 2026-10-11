@@ -66,7 +66,9 @@ Code on the copy: `main` at `e20ade9` (Release 0 plus the spreadsheet-resolution
 | **Web app on the copy** (Part 2): with `TITLE_CUTOVER` = `PAUSED`, Approve on the dummy team `ZZTEST` in the Guide dashboard refused with "Title updates are paused. Reload the dashboard shortly." and the team stayed "Needs Your Review" | **Pass** (screenshot) |
 | With `TITLE_CUTOVER` = `LIVE`, Approve refused with "Reload the dashboard." and the team stayed "Needs Your Review" | **Pass** (screenshot) |
 | With `TITLE_CUTOVER` unset, Approve worked as before: the team moved to "Awaiting Reviewer" with "You approved — awaiting Reviewer." | **Pass** (screenshot) |
-| The deployed web app of the copy showed the dummy team that exists only in the copy, so the web app resolved the copy's own spreadsheet | **Pass.** Whether this came from the attached spreadsheet or from a `SHEET_ID` property that points at the copy depends on the copy's Script Properties: **owner to check** that the copy has no `SHEET_ID` (if it has none, `getActiveSpreadsheet()` is confirmed to work from the web app) |
+| The deployed web app of the copy showed the dummy team that exists only in the copy, and the copy has **no** `SHEET_ID` property (owner confirmed), so `getActiveSpreadsheet()` works from a deployed web app of the bound script | **Pass** |
+| The Guide Decision cell for the dummy team became `Approved` (screenshot) | **Pass** |
+| The "Guide-Approved Title" email to `COORDINATOR_EMAIL` | **Not received. Open:** being diagnosed (Config value, spam, Executions log, a direct mail test). The decision path did not change how mail is sent; it only wrapped the write in the lock |
 
 What this confirms on real Google, beyond the local tests: editor-run functions use the pushed code; `ensureSheet_` creates a
 sheet with the right tab colour, header row and formatting; `getActiveSpreadsheet()` resolves the copy for an editor run; the
