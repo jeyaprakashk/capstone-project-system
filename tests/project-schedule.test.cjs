@@ -14,9 +14,10 @@ function fixture(overrides = {}, runtime = {}) {
   const milestoneRows=runtime.milestoneRows || [['Milestone ID','Milestone Name','Due Date','Graded By','Weight (%)'],...Object.keys(labels).map(key=>[key,labels[key],settings[key],'Not Applicable',''])];
   const milestones={getDataRange:()=>({getValues:()=>{reads++;return milestoneRows;}})};
   let reads = 0;
-  const sheet = {getLastRow:()=>entries.length+1, getLastColumn:()=>2, getRange:(row,col,count,width)=>({
-    getValues:()=>{ reads++; return entries.slice(row-2,row-2+count).map(r=>r.slice(col-1,col-1+width)); },
-    setValue:value=>{entries[row-2][col-1]=value;}
+  const configRows = [['Key','Value'],...entries];
+  const sheet = {getLastRow:()=>configRows.length, getLastColumn:()=>2, getRange:(row,col,count,width)=>({
+    getValues:()=>{ reads++; return configRows.slice(row-1,row-1+count).map(r=>r.slice(col-1,col-1+width)); },
+    setValue:value=>{configRows[row-1][col-1]=value;}
   })};
   const properties = runtime.properties || new Map([['SHEET_ID','test-id'],['GITHUB_TOKEN','test-token']]);
   const c = createSheetReadContext({Date, console,

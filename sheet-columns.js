@@ -21,10 +21,13 @@ function sheetCatalog_() {
         name: 'Config',
         access: 'edit',
         headers: ['Key', 'Value', 'Description'],
-        status: 'positional',
-        purpose: 'Settings: one key and value per row. The code reads the first two columns by position.',
+        status: 'migrated',
+        purpose: 'Settings: one key and value per row, found under the Key and Value headers. Description is for people. Created by hand; no code creates it.',
         createAtRuntime: false,
-        code: []
+        code: [
+          {file: 'common-helpers.js', role: 'read', functions: ['getConfig_', 'configColumns_']},
+          {file: 'common-helpers.js', role: 'write', functions: ['setConfig_']}
+        ]
       },
       teamRoster: {
         name: SHEET_NAMES.TEAM_ROSTER,

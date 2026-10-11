@@ -11,9 +11,10 @@ function fakeBook(id, rows) {
   const config = {
     getName: () => 'Config',
     getLastRow: () => configRows.length,
-    getLastColumn: () => 3,
+    getLastColumn: () => Math.max(...configRows.map(row => row.length)),
     getRange: (row, column, numRows, numColumns) => ({
-      getValues: () => Array.from({length: numRows}, (_, r) => Array.from({length: numColumns}, (_, c) => (configRows[row - 1 + r] || [])[column - 1 + c] ?? ''))
+      getValues: () => Array.from({length: numRows}, (_, r) => Array.from({length: numColumns}, (_, c) => (configRows[row - 1 + r] || [])[column - 1 + c] ?? '')),
+      setValue: value => { configRows[row - 1][column - 1] = value; }
     })
   };
   return {getId: () => id, getSheetByName: name => name === 'Config' ? config : null, getSheets: () => [config]};
@@ -85,4 +86,35 @@ test('source rules: only getSpreadsheet_ reads the SHEET_ID property, and no oth
   for (const file of ['team-folders.js', 'coordinator-dashboard.js', 'review-configuration.js']) {
     assert.match(fs.readFileSync(file, 'utf8'), /getSpreadsheetId_\(\)/, file);
   }
+});
+
+// Config is found by header name: the Key and Value columns (SHEET-HEADER-MATCHING-PLAN.md, phase 4).
+test('Config: Key and Value are found by name, in any order, with other columns ignored', () => {
+  const book = fakeBook('b', [['Notes', 'Value', 'Description', 'Key'], ['n', '24', 'd', 'SUBMISSION_REMINDER_HOURS'], ['n', 'x', 'd', ' Other_Key ']]);
+  const {context} = load({active: book});
+  context.SpreadsheetApp.flush = () => {};
+  assert.equal(context.getConfig_('SUBMISSION_REMINDER_HOURS'), '24');
+  assert.equal(context.getConfig_('other_key'), 'x');
+  context.setConfig_('submission_reminder_hours', '36');
+  assert.equal(context.getConfig_('SUBMISSION_REMINDER_HOURS'), '36');
+  assert.equal(book.getSheetByName('Config').getRange(2, 2, 1, 1).getValues()[0][0], '36', 'the Value column is written, not column B by position');
+  assert.equal(book.getSheetByName('Config').getRange(2, 4, 1, 1).getValues()[0][0], 'SUBMISSION_REMINDER_HOURS', 'the Key column is untouched');
+});
+
+test('Config: a missing or repeated Key or Value header throws, naming it', () => {
+  for (const [header, pattern] of [[['Name', 'Value', 'Description'], /Missing: Key/], [['Key', 'Val', 'Description'], /Missing: Value/],
+    [['Key', 'Value', 'key'], /Duplicate header in Config: Key/]]) {
+    const {context} = load({active: fakeBook('b', [header, ['A', '1', '']])});
+    assert.throws(() => context.getConfig_('A'), pattern);
+  }
+});
+
+test('Config: one read per execution, header row included', () => {
+  const book = fakeBook('b');
+  const config = book.getSheetByName('Config'), reads = [], getRange = config.getRange;
+  config.getRange = (...args) => { reads.push(args.join(',')); return getRange(...args); };
+  const {context} = load({active: book});
+  context.getConfig_('SUBMISSION_REMINDER_HOURS');
+  context.getConfig_('SUBMISSION_REMINDER_HOURS');
+  assert.deepEqual(reads, ['1,1,2,3']);
 });

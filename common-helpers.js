@@ -29,16 +29,29 @@ function getConfig_(key) {
     );
   }
 
-  const rows = readSheetRows_(configSheet, 2, lastRow - 1);
+  // One read, header row included: the Key and Value columns are found by name.
+  const rows = readSheetRows_(configSheet, 1, lastRow);
+  const columns = configColumns_(rows[0]);
 
   configExecutionValues_ = Object.create(null);
-  rows.forEach(row => {
-    const key = normalizeText_(row[0]);
+  rows.slice(1).forEach(row => {
+    const key = normalizeText_(row[columns.key]);
     if (!key) return;
     if (Object.prototype.hasOwnProperty.call(configExecutionValues_, key)) throw new Error('Duplicate Config key: ' + key);
-    configExecutionValues_[key] = row[1];
+    configExecutionValues_[key] = row[columns.value];
   });
   return requireConfigValue_(targetKey);
+}
+
+/** The Key and Value columns of the Config header row, found by name. Description and any other column are ignored. */
+function configColumns_(headerRow) {
+  const find = name => {
+    const matches = (headerRow || []).flatMap((cell, index) => textEquals_(cell, name) ? [index] : []);
+    if (matches.length > 1) throw new Error('Duplicate header in Config: ' + name + '.');
+    if (!matches.length) throw new Error('Config header mismatch. Missing: ' + name + '.');
+    return matches[0];
+  };
+  return {key: find('Key'), value: find('Value')};
 }
 
 function requireConfigValue_(key) {
@@ -67,13 +80,14 @@ function setConfig_(key, value) {
     throw new Error('Config sheet contains no configuration entries.');
   }
 
-  const keys = readSheetRows_(configSheet, 2, lastRow - 1);
+  const rows = readSheetRows_(configSheet, 1, lastRow);
+  const columns = configColumns_(rows[0]);
 
   const targetKey = normalizeText_(key);
 
-  for (let i = 0; i < keys.length; i++) {
-    if (normalizeText_(keys[i][0]) === targetKey) {
-      configSheet.getRange(i + 2, 2).setValue(value);
+  for (let i = 1; i < rows.length; i++) {
+    if (normalizeText_(rows[i][columns.key]) === targetKey) {
+      configSheet.getRange(i + 1, columns.value + 1).setValue(value);
       SpreadsheetApp.flush();
       configExecutionValues_ = null;
       projectScheduleExecution_ = null;
