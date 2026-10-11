@@ -78,7 +78,6 @@ test('reviewer endpoints authorize on the server and map failures to safe errors
   const denied = serverFixture();
   denied.c.getCommitteeNumbersForReviewer_ = () => [];
   assert.deepEqual(JSON.parse(denied.c.API_reviewer_getDashboard()), { ok: false, error: { code: 'UNAUTHORIZED', message: 'You do not have Reviewer access.' } });
-  assert.equal(JSON.parse(denied.c.API_reviewer_submitDecision('T1', 'Approved', '')).error.code, 'UNAUTHORIZED');
   const anonymous = serverFixture('');
   assert.equal(JSON.parse(anonymous.c.API_reviewer_getDashboard()).error.code, 'UNAUTHENTICATED');
   const broken = serverFixture();
@@ -86,14 +85,6 @@ test('reviewer endpoints authorize on the server and map failures to safe errors
   const failure = JSON.parse(broken.c.API_reviewer_getDashboard());
   assert.equal(failure.error.code, 'INTERNAL');
   assert.doesNotMatch(failure.error.message, /secret|column/);
-});
-
-test('reviewer decision keeps the existing business rules and messages', () => {
-  const f = serverFixture();
-  f.c.submitReviewerDecision_ = (team, decision, notes) => { if (decision === 'Revise' && !notes.trim()) throw new Error('Notes are required when requesting revision.'); return { ok: true, message: 'Saved ' + team + ' ' + decision }; };
-  assert.deepEqual(JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Approved', '')).data, { message: 'Saved T1 Approved' });
-  const rejected = JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Revise', ' '));
-  assert.deepEqual(rejected.error, { code: 'REJECTED', message: 'Notes are required when requesting revision.' });
 });
 
 test('dashboard shell compiles, defines the bridge before the dashboard script and includes the Tailwind build', () => {
@@ -110,15 +101,6 @@ test('dashboard shell compiles, defines the bridge before the dashboard script a
   assert(script.indexOf('const ReviewerView') < script.indexOf('const DashboardUI'));
   assert(html.indexOf('tailwind-styles') < 0 && html.includes('.px-4{'), 'compiled Tailwind CSS is inlined');
   assert(!html.includes('--fs-h1') && !html.includes('app-styles'), 'the legacy stylesheet is gone');
-});
-
-test('workflow rejections returned as {ok:false} are errors, never success', () => {
-  const f = serverFixture();
-  f.c.submitReviewerDecision_ = () => ({ ok: false, message: 'You are not an assigned reviewer for Team T1.' });
-  assert.deepEqual(JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Approved', '')),
-    { ok: false, error: { code: 'REJECTED', message: 'You are not an assigned reviewer for Team T1.' } });
-  f.c.submitReviewerDecision_ = () => ({ ok: true, message: 'Decision recorded for Team T1.' });
-  assert.deepEqual(JSON.parse(f.c.API_reviewer_submitDecision('T1', 'Approved', '')).data, { message: 'Decision recorded for Team T1.' });
 });
 
 test('review marking endpoints map save kinds to the existing rules and keep their messages', () => {

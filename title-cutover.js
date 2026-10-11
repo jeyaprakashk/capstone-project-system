@@ -1,43 +1,20 @@
 /**
- * TITLE CUTOVER (Release 0) - the write barrier for the title cutover. See TITLE-REVISION-PLAN.md, section 11.
+ * TITLE CUTOVER - the write barrier for the title cutover. See TITLE-REVISION-PLAN.md, section 11.
  *
- * One script property, TITLE_CUTOVER, is read under the script lock by every title writer immediately before it writes:
- *   unset   - old code works as today
- *   PAUSED  - old code refuses: "Title updates are paused. Reload the dashboard shortly."
- *   LIVE    - old code refuses permanently: "Reload the dashboard."
- * Any other value refuses like PAUSED (fail closed). The property is changed only by setTitleCutover and clearTitleCutover,
- * which are editor-run and hold the script lock, so when setTitleCutover('PAUSED') returns no old writer is in progress.
+ * One script property, TITLE_CUTOVER, is read under the script lock by every title writer immediately before it writes (titleWrite_ and
+ * the document upload read it through readTitleCutover_). Release 0 shipped this barrier to the old writers, which refused once it was
+ * set; the new code works only when it is LIVE:
+ *   unset   - the old code worked; the new code refuses writes (fail closed)
+ *   PAUSED  - both refuse: "Title updates are paused..."
+ *   LIVE    - the new code works; the old code (if a page still reaches it) refuses: "Reload the dashboard."
+ * Any other value refuses like PAUSED. The property is changed only by setTitleCutover and clearTitleCutover, which are editor-run and
+ * hold the script lock, so when setTitleCutover('PAUSED') returns no title write is in progress.
  */
 const TITLE_CUTOVER_PROPERTY_ = 'TITLE_CUTOVER';
 const TITLE_CUTOVER_LOCK_WAIT_MS_ = 30000;
 
 function readTitleCutover_() {
   return String(PropertiesService.getScriptProperties().getProperty(TITLE_CUTOVER_PROPERTY_) || '').trim();
-}
-
-/** The refusal message for a property value, or '' when title writes are allowed (the property is unset). */
-function titleCutoverRefusal_(value) {
-  if (!value) return '';
-  if (value === 'LIVE') return 'Reload the dashboard.';
-  return 'Title updates are paused. Reload the dashboard shortly.';
-}
-
-/**
- * Runs `write` while holding the script lock, and only if title writes are allowed. The property is read after the lock
- * is held, immediately before the write, so a write that passed an earlier check but reached the lock after PAUSED was
- * set refuses and writes nothing. An already-owned lock is reused and left held. Refusals throw a plain Error.
- */
-function withTitleWriteLock_(waitMs, busyMessage, write) {
-  const lock = LockService.getScriptLock();
-  const owned = lock.hasLock();
-  if (!owned && !lock.tryLock(waitMs)) throw new Error(busyMessage);
-  try {
-    const refusal = titleCutoverRefusal_(readTitleCutover_());
-    if (refusal) throw new Error(refusal);
-    return write();
-  } finally {
-    if (!owned) lock.releaseLock();
-  }
 }
 
 /** Holds the script lock (reusing an owned one) for a change to the property itself. */

@@ -11,6 +11,8 @@ const { combos, inside } = require('./title-baseline/combos.cjs');
 const { legacySteps } = require('./title-baseline/titlelog.cjs');
 const { expectBaseline, expectBaselineAs } = require('./title-baseline/golden.cjs');
 
+/** The TitleLog status an old state is translated to (tests/title-baseline/titlelog.cjs). */
+const newStatusOf = combo => { const steps = legacySteps(combo.title, combo.guide, combo.reviewer); return !steps.length ? 'NOT_SUBMITTED' : steps.includes('RETURN') ? 'RETURNED' : steps.includes('REVIEWER_APPROVE') ? 'APPROVED' : steps.includes('GUIDE_APPROVE') ? 'AWAITING_REVIEWER' : 'NEEDS_REVIEW'; };
 // The four states that mean the same in the old and the new model (tests/title-gate.test.cjs also checks them against status.json).
 const SAME_MEANING = new Set(['title=no guide=- reviewer=-', 'title=yes guide=- reviewer=-', 'title=yes guide=Approved reviewer=-', 'title=yes guide=- reviewer=Approved']);
 const load = (context, files) => files.forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), context, {filename: file}));
@@ -32,13 +34,15 @@ test('the states cover every title, Guide Decision and Reviewer Decision combina
   assert.equal(new Set(list.map(c => c.id)).size, list.length);
 });
 
-test('baseline: the status each state maps to (getTeamStatus_)', () => {
+test('baseline: the status each old state maps to, now read from TitleLog', () => {
   const result = {};
   for (const combo of combos()) {
     const f = fixtureFor(combo);
-    result[combo.id] = f.c.getTeamStatus_(f.status.rows[1]);
+    result[combo.id] = f.c.titleSummary_('T1').status;
   }
-  expectBaseline('status', result);
+  // The old getTeamStatus_ had two "returned" statuses (by the guide, by the reviewer); TitleLog has one.
+  const OLD_TO_NEW = {NOT_SUBMITTED: 'NOT_SUBMITTED', NEEDS_REVIEW: 'NEEDS_REVIEW', AWAITING_REVIEWER: 'AWAITING_REVIEWER', APPROVED: 'APPROVED', REJECTED_BY_GUIDE: 'RETURNED', REVISE_AWAITING_STUDENT: 'RETURNED'};
+  expectBaselineAs('status', result, status => OLD_TO_NEW[status]);
 });
 
 test('baseline: weekly submission (the submit gate and the editable weeks on the student page)', () => {
@@ -153,7 +157,6 @@ test('baseline: coordinator (title counts, the tracker status, health and the te
   const REPRESENTATIVE = {NOT_SUBMITTED: 'title=no guide=- reviewer=-', NEEDS_REVIEW: 'title=yes guide=- reviewer=-', AWAITING_REVIEWER: 'title=yes guide=Approved reviewer=-',
     APPROVED: 'title=yes guide=- reviewer=Approved', RETURNED: 'title=yes guide=Rejected reviewer=-'};
   const OLD_TO_NEW = {NOT_SUBMITTED: 'NOT_SUBMITTED', NEEDS_REVIEW: 'NEEDS_REVIEW', AWAITING_REVIEWER: 'AWAITING_REVIEWER', APPROVED: 'APPROVED', REJECTED_BY_GUIDE: 'RETURNED', REVISE_AWAITING_STUDENT: 'RETURNED'};
-  const newStatusOf = combo => { const steps = legacySteps(combo.title, combo.guide, combo.reviewer); return !steps.length ? 'NOT_SUBMITTED' : steps.includes('RETURN') ? 'RETURNED' : steps.includes('REVIEWER_APPROVE') ? 'APPROVED' : steps.includes('GUIDE_APPROVE') ? 'AWAITING_REVIEWER' : 'NEEDS_REVIEW'; };
   expectBaselineAs('coordinator', result, (recorded, id, all) => {
     if (id === 'titleApproved') return list.filter(combo => newStatusOf(combo) === 'APPROVED').length;
     if (id === 'needsAttention') {
@@ -177,13 +180,14 @@ test('baseline: the Guide reminder and Reviewer approval digests', () => {
   const c = f.c;
   f.config.HUB_SHEET_ID = 'hub';
   f.config.ACADEMIC_YEAR = '2026-27';
-  load(c, ['intake-approval-workflow.js']);
+  load(c, ['title-digests.js']);
   const list = combos();
   const teams = list.map((combo, index) => ({
     'Team ID': 'D' + String(index).padStart(2, '0'), Title: combo.title, 'Guide Decision': combo.guide, 'Reviewer Decision': combo.reviewer,
     'Guide Email': 'guide@example.com', 'Review Committee Number': 'C1'
   }));
   f.status.rows.splice(1, f.status.rows.length, ...teams.map(team => f.ts.map(header => team[header] ?? '')));
+  f.syncTitleLog();
   c.getCommitteeInfo_ = () => ({reviewer1Email: 'rev1@example.com', reviewer2Email: 'rev2@example.com', reviewer3Email: '', reviewer4Email: ''});
   c.sendGuideReminderDigest();
   const guideMails = f.mails.splice(0);
@@ -192,7 +196,17 @@ test('baseline: the Guide reminder and Reviewer approval digests', () => {
   const teamsIn = body => [...body.matchAll(/Team (D\d\d)/g)].map(match => match[1]);
   const byId = Object.fromEntries(list.map((combo, index) => ['D' + String(index).padStart(2, '0'), combo.id]));
   const describe = mails => mails.map(mail => ({to: mail[0], subject: mail[1], states: teamsIn(mail[2]).map(id => byId[id])}));
-  expectBaseline('digests', {guideReminder: describe(guideMails), reviewerApproval: describe(reviewerMails)});
+  // The digests now list the teams whose TitleLog status is waiting for the guide (NEEDS_REVIEW) or for the reviewers (AWAITING_REVIEWER).
+  // The old rules also listed odd states (a reviewer-approved team with no Guide Decision; a guide-approved team with no title), which
+  // are not titles waiting for anyone; the states that mean the same in both models must still be listed, as the snapshot recorded.
+  const waiting = status => list.filter(combo => newStatusOf(combo) === status).map(combo => combo.id);
+  const recordedGuide = JSON.parse(fs.readFileSync('tests/title-baseline/snapshots/digests.json', 'utf8')).guideReminder[0].states;
+  const recordedReviewer = JSON.parse(fs.readFileSync('tests/title-baseline/snapshots/digests.json', 'utf8')).reviewerApproval[0].states;
+  assert.deepEqual(describe(guideMails), [{to: 'guide@example.com', subject: 'Reminder: ' + waiting('NEEDS_REVIEW').length + ' title(s) awaiting your review', states: waiting('NEEDS_REVIEW')}]);
+  assert.deepEqual(describe(reviewerMails).map(mail => mail.to), ['rev1@example.com', 'rev2@example.com']);
+  for (const mail of describe(reviewerMails)) assert.deepEqual(mail.states, waiting('AWAITING_REVIEWER'));
+  assert.ok(recordedGuide.includes('title=yes guide=- reviewer=-') && waiting('NEEDS_REVIEW').includes('title=yes guide=- reviewer=-'));
+  assert.ok(recordedReviewer.includes('title=yes guide=Approved reviewer=-') && waiting('AWAITING_REVIEWER').includes('title=yes guide=Approved reviewer=-'));
 });
 
 test('the baselines are recorded for every area, and none is empty', () => {

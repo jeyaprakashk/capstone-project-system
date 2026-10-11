@@ -76,13 +76,6 @@ function API_reviewer_getDashboard() {
   return apiHandle_(() => withDashboardRead_(() => buildReviewerDto_(getReviewerDashboardData_(reviewerEmailOrThrow_()))));
 }
 
-function API_reviewer_submitDecision(teamId, decision, notes) {
-  return apiHandle_(() => {
-    reviewerEmailOrThrow_();
-    return apiWorkflowResult_(submitReviewerDecision_(String(teamId || ''), String(decision || ''), String(notes || '')), 'Decision saved.');
-  });
-}
-
 /** Review marking: the rules code authorizes (assigned reviewer, or staff) and keeps its messages; the drawer reads and saves through the bridge. */
 const REVIEW_SAVE_KINDS_ = {draft:'saveReviewEvaluationDraft_', submit:'submitReviewEvaluation_', absence:'recordReviewAbsence_', makeupDraft:'saveReviewMakeupDraft_', makeupSubmit:'submitReviewMakeup_'};
 

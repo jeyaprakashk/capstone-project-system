@@ -24,14 +24,3 @@ function getReviewerDashboardData_(email) {
   return { pending, approved, notYetGuideApproved, assigned: myRows, total: myRows.length, titles };
 }
 
-function submitReviewerDecision_(teamId, decision, notes) {
-  // Release 0 (TITLE-REVISION-PLAN.md, section 11): the existing script lock now also rereads TITLE_CUTOVER under it.
-  return withTitleWriteLock_(1000, 'Another decision is being saved. Try again.', () => {
-    const context=reviewerTeamContext_(teamId);
-    if (!['Approved','Revise'].includes(decision)) throw new Error('Invalid reviewer decision.');
-    if (decision==='Revise' && !String(notes || '').trim()) throw new Error('Notes are required when requesting revision.');
-    if (textEquals_(context.row[context.TS.REVIEWER_DECISION],'Approved')) return {ok:true,message:'Title already approved.'};
-    if (!context.title.trim() || !textEquals_(context.row[context.TS.GUIDE_DECISION],'Approved')) throw new Error('The title must be submitted and approved by the guide first.');
-    return applyReviewerDecision_(teamId,decision,notes,Session.getActiveUser().getEmail());
-  });
-}

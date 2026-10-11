@@ -219,13 +219,6 @@ function API_guide_getCommits(teamId) {
   } finally { logPhases_('guide_phases', 'commits', timings, started); }
 }
 
-function API_guide_submitDecision(teamId, decision, notes, editedTitle) {
-  return apiHandle_(() => {
-    guideAccessOrThrow_();
-    return apiWorkflowResult_(submitGuideDecision_(String(teamId || ''), String(decision || ''), String(notes || ''), String(editedTitle || '')), 'Decision saved.');
-  });
-}
-
 /** Weekly progress for the guide's teams; the browser module renders and saves through the bridge. */
 function API_guide_getWeekly() {
   const started = Date.now(), timings = [];

@@ -489,15 +489,6 @@ function getCommitteeNumbersForReviewer_(email) {
 // ===================================================================
 // STUDENT ROSTER LOOKUP
 // ===================================================================
-// ===================================================================
-// FORM LINKS — pre-filled with Team ID
-// ===================================================================
-function buildTeamIntakeLink_(teamId) {
-  const base = getConfig_('TEAM_INTAKE_FORM_URL_BASE');
-  const entry = getConfig_('TEAM_INTAKE_TEAMID_ENTRY');
-  return `${base}?usp=pp_url&${entry}=${encodeURIComponent(teamId)}`;
-}
-
 function getDashboardUrl_() {
   return getConfig_('GUIDE_DASHBOARD_URL');
 }

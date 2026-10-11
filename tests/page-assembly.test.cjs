@@ -31,7 +31,7 @@ function server() {
   PropertiesService:{getScriptProperties:()=>({getProperty:()=>''})},
   Session:{getActiveUser:()=>({getEmail:()=>'user@example.test'})},
   HtmlService:{createHtmlOutput:html=>({html,setTitle(){return this;},addMetaTag(){return this;}}),createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(name+'.html','utf8')})}});
- for(const file of fs.readdirSync('.').filter(name=>name.endsWith('.js')&&name!=='intake-approval-workflow.js')) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+ for(const file of fs.readdirSync('.').filter(name=>name.endsWith('.js'))) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
  return c;
 }
 const c=server();

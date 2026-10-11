@@ -34,18 +34,3 @@ function guideRecordDate_(value) {
   return date && Number.isFinite(date.getTime()) ? date.toLocaleString('en-GB',{timeZone:getSpreadsheet_().getSpreadsheetTimeZone(),day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
 }
 
-function getTeamStatus_(r) {
-  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  if (!r[TS.TITLE]) return 'NOT_SUBMITTED';
-  if (textEquals_(r[TS.REVIEWER_DECISION], 'Approved')) return 'APPROVED';
-  if (textEquals_(r[TS.REVIEWER_DECISION], 'Revise')) return 'REVISE_AWAITING_STUDENT';
-  if (textEquals_(r[TS.GUIDE_DECISION], 'Rejected')) return 'REJECTED_BY_GUIDE';
-  if (textEquals_(r[TS.GUIDE_DECISION], 'Approved')) return 'AWAITING_REVIEWER';
-  return 'NEEDS_REVIEW';
-}
-
-function submitGuideDecision_(teamId, decision, notes, editedTitle) {
-  const email = Session.getActiveUser().getEmail();
-  // Release 0 (TITLE-REVISION-PLAN.md, section 11): the write takes the script lock and rereads TITLE_CUTOVER under it.
-  return withTitleWriteLock_(1000, 'Another decision is being saved. Try again.', () => applyGuideDecision_(teamId, decision, notes, email, editedTitle));
-}

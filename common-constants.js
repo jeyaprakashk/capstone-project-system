@@ -95,15 +95,6 @@ const FIELD_DEFINITIONS = {
 // ===================================================================
 // TEAM STATUS STATES
 // ===================================================================
-const STATUS_LABEL = {
-  NOT_SUBMITTED: { text: 'Not Submitted', cls: 'gray' },
-  NEEDS_REVIEW: { text: 'Needs Your Review', cls: 'orange' },
-  REVISE_AWAITING_STUDENT: { text: 'Awaiting Student Revision', cls: 'gray' },
-  AWAITING_REVIEWER: { text: 'Awaiting Reviewer', cls: 'blue' },
-  APPROVED: { text: 'Approved', cls: 'green' },
-  REJECTED_BY_GUIDE: { text: 'Rejected by You', cls: 'red' }
-};
-
 const STUDENT_TITLE_LABEL = {
   NOT_SUBMITTED: { text: 'Not submitted yet', state: 'active' },
   NEEDS_REVIEW: { text: "Submitted — awaiting your guide's review", state: 'waiting' },

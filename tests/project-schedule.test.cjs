@@ -594,8 +594,6 @@ test('Config keys ignore case and spaces while values remain unchanged',()=>{
 test('approval status and committee access tolerate case and surrounding spaces',()=>{
   const {c}=fixture();
   c.getColumnMap_=()=>({TEAM_ID:0,TITLE:0,GUIDE_DECISION:1,REVIEWER_DECISION:2,COMMITTEE_NUMBER:3});
-  assert.equal(c.getTeamStatus_(['Title',' approved ',' APPROVED ']),'APPROVED');
-  assert.equal(c.getTeamStatus_(['Title','',' revise ']),'REVISE_AWAITING_STUDENT');
   c.getSheetRows_=()=>[['Title',' APPROVED ',' pending ',' C1 ']];
   c.getCommitteeNumbersForReviewer_=()=>['c1'];
   c.getCommitteeInfo_=()=>({});
@@ -629,7 +627,7 @@ test('drawer basic and activity avoid marks; progress avoids roster and commit r
   c.getColumnMap_=()=>({TEAM_ID:0,TITLE:1,COMMITTEE_NUMBER:2});
   c.getSheetRows_=name=>{reads.push(name);return [['T1','Project','1']];};
   c.getRepoUrlForTeam_=()=> 'https://github.com/example/project';
-  c.getCommitteeInfo_=()=>null;c.getTeamStatus_=()=> 'APPROVED';
+  c.getCommitteeInfo_=()=>null;
   installTitleLog(c,()=>[{teamId:'T1',title:'Project',guide:'Approved',reviewer:''}]);
   c.getTeamReviewCompletionStatus_=()=>{throw Error('marks must not be read');};
   c.readActivityRows_=()=>{throw Error('logs must not be read');};

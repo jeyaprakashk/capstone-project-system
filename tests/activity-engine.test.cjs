@@ -342,3 +342,13 @@ test('source rules: the engine files add no public function except the endpoint 
     assert.doesNotMatch(text, /setValues|appendRow|LockService|MailApp/, file);
   }
 });
+
+test('with no rows for an activity a title can be submitted whatever GitHub or Drive say (the release default)', () => {
+  for (const spec of [{github: 'throws'}, {github: 'verificationUnavailable'}, {drive: {documentsFolders: 2, teams: {}}}, {drive: {unreadable: true, teams: {}}}]) {
+    const result = decide({rows: [], ...spec}).result;
+    assert.deepEqual(result, {allowed: true, requirements: [], reason: ''}, JSON.stringify(spec));
+  }
+  const env = setup({rows: [], github: 'throws'});
+  env.c.activityPreconditions_('title.submit', TEAM, env.c.activityContext_());
+  assert.equal(env.reads.github, 0, 'GitHub is not even asked when nothing requires it');
+});

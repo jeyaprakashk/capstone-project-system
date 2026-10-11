@@ -13,7 +13,7 @@ function context() {
   const fixtureConfig = c.getConfig_;
   c.getConfig_ = key => { try { return ({ ACADEMIC_YEAR: '2026', CELL_PD_EMAIL: 'pd@example.com' })[key] ?? fixtureConfig(key); } catch (error) { return ''; } };
   for (const file of ['evaluation-lifecycle.js', 'review-academic-policy.js', 'marks-tracker.js', 'review-evaluation.js', 'reviewer-evaluation.js', 'guide-evaluation.js', 'publication-events.js',
-    'internal-assessment-publishing.js', 'review-configuration.js', 'reviewer-dashboard.js', 'reviewer-api.js', 'guide-dashboard.js', 'guide-api.js', 'intake-approval-workflow.js', 'dashboard-router.js']) {
+    'internal-assessment-publishing.js', 'review-configuration.js', 'reviewer-dashboard.js', 'reviewer-api.js', 'guide-dashboard.js', 'guide-api.js', 'dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
   }
   // Only the student (one@) and the guide (guide@) are in the roster; nobody sits on a Review committee.
@@ -41,7 +41,6 @@ const ENDPOINTS = {
   API_student_completeGithubSetup: [[], [...OUTSIDER, 'guide@example.com']],
   API_guide_getDashboard: [[], [...OUTSIDER, 'one@example.com']],
   API_guide_getGithub: [[], [...OUTSIDER, 'one@example.com']],
-  API_guide_submitDecision: [[TEAM, 'Approved', '', ''], [...OUTSIDER, 'one@example.com']],
   API_guide_getCommits: [[TEAM], [...OUTSIDER, 'one@example.com']],
   API_guide_getWeekly: [[], [...OUTSIDER, 'one@example.com']],
   API_guide_signWeekly: [['entry-1', 'DISCUSSED'], [...OUTSIDER, 'one@example.com']],
@@ -49,7 +48,6 @@ const ENDPOINTS = {
   API_guide_saveEvaluationDraft: [[{ ...REQUEST, token: 'x', scores: {} }], [...OUTSIDER, 'one@example.com']],
   API_guide_submitEvaluation: [[{ ...REQUEST, token: 'x', scores: {} }], [...OUTSIDER, 'one@example.com']],
   API_reviewer_getDashboard: [[], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
-  API_reviewer_submitDecision: [[TEAM, 'Approved', ''], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
   API_review_getEvaluation: [[TEAM, 'review1'], ['outsider@example.com', 'one@example.com']],
   API_review_save: [['draft', { ...REQUEST, scores: {} }], ['outsider@example.com', 'one@example.com']],
   API_publishing_get: [['review1'], [...OUTSIDER, 'one@example.com', 'guide@example.com']],

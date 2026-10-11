@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const GUARDED = ['processWeeklySubmissionSchedule', 'fetchAllCommits', 'auditCommitHistory', 'onTeamIntakeSubmit', 'sendGuideReminderDigest', 'sendReviewerApprovalDigest',
+const GUARDED = ['processWeeklySubmissionSchedule', 'fetchAllCommits', 'auditCommitHistory', 'sendGuideReminderDigest', 'sendReviewerApprovalDigest',
   'processWeeklyProgressAI', 'provisionAllTeamRepos', 'addMissingGuideCollaborators', 'backfillExistingRepos', 'backfillMissingStudentCollaborators', 'setupTitleStorage',
   'setTitleCutover', 'clearTitleCutover'];
 // These check the coordinator themselves (coordinator-only setup and the daily reconciliation).

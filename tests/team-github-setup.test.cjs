@@ -35,7 +35,7 @@ function fixture() {
   });
   const originalSheet=c.getSheet_;
   c.getSheet_=name=>name==='users'?{getLastColumn:()=>7,getLastRow:()=>usernames.length+1,getRange:(r,c,n)=>({getValues:()=>r===1?[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL']]:usernames})}:originalSheet(name);
-  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-template.js','github-provisioning.js','title-cutover.js','intake-approval-workflow.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-template.js','github-provisioning.js','title-cutover.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.installGithubTemplate_=()=>({verified:true}); // Template installation has its own tests; setup only resumes it.
   c.weeklyStudents_=()=>[1,2].filter(n=>team[n+2]).map(n=>({teamId:team[0],email:team[n+2],regNo:team[n+7]}));
   c.refreshGithubAccountMetadata_=()=>{}; // Metadata persistence is exercised by account integration tests.
@@ -199,62 +199,3 @@ test('timeliness uses all valid member timestamps, local deadline date, and repo
   f.outage('/user/');assert.equal(timing(),'unknown');
 });
 
-test('bookmarked title form remains guarded; weekly Form ingestion is retired',()=>{
-  const f=fixture();f.usernames.pop();f.team[2]='Existing title';f.team[13]='Approved';
-  const old=JSON.stringify(f.team);
-  f.c.onTeamIntakeSubmit({range:{getSheet:()=>({getName:()=> 'intake'})},namedValues:{'Email Address':['one@example.com'],'Team ID':['T1'],'Project Title':['Replacement']}});
-  assert.equal(f.c.onFormSubmit,undefined);
-  assert.equal(JSON.stringify(f.team),old);assert.equal(f.writes.length,0);assert.equal(f.logs.length,0);
-  assert.equal(f.mails.length,1);assert.match(f.mails[0][2],/fully approved and cannot be changed/);
-});
-
-test('ready teams retain title Form submission without weekly Form ingestion',()=>{
-  const f=fixture();
-  const intake={range:{getSheet:()=>({getName:()=> 'intake'})},namedValues:{'Email Address':['one@example.com'],'Team ID':['T1'],'Project Title':['New project']}};
-  f.c.onTeamIntakeSubmit(intake);
-  assert.equal(f.writes[0].TITLE,'NEW PROJECT');
-  assert.equal(f.c.onFormSubmit,undefined);assert.equal(f.logs.length,0);
-});
-
-test('title intake is independent of GitHub registration, repository access and availability',()=>{
-  const cases=[
-    f=>f.usernames.pop(),
-    f=>{f.usernames[1][4]='999';},
-    f=>{f.team[7]='';},
-    f=>f.repository(false),
-    f=>f.permissions.set('two','read'),
-    f=>{f.permissions.delete('two');f.invitations.push({invitee:{login:'two',id:102},permissions:'write'});},
-    f=>f.outage('/user/102'),
-    f=>f.outage('/collaborators/two'),
-    f=>f.outage('/invitations')
-  ];
-  for(const arrange of cases){
-    const f=fixture();arrange(f);const before=JSON.stringify([f.team,f.usernames]);
-    f.c.onTeamIntakeSubmit({range:{getSheet:()=>({getName:()=> 'intake'})},namedValues:{'Email Address':['one@example.com'],'Team ID':['T1'],'Project Title':['New project']}});
-    assert.equal(f.writes[0].TITLE,'NEW PROJECT');assert.equal(JSON.stringify([f.team,f.usernames]),before);
-    assert.equal(f.mails.length,1);assert.equal(f.mails[0][0],'guide@example.com');
-    assert.equal(f.calls.length,0,'Title intake must not call GitHub');
-  }
-});
-
-test('pending GitHub invitations do not block title intake; roster membership is still required',()=>{
-  const f=fixture();f.permissions.delete('two');f.invitations.push({invitee:{login:'two',id:102},permissions:'write'});
-  assert.equal(f.state().ready,true);
-  const intake={range:{getSheet:()=>({getName:()=> 'intake'})},namedValues:{'Email Address':['one@example.com'],'Team ID':['T1'],'Project Title':['New project']}};
-  intake.namedValues['Email Address']=['outsider@example.com'];f.c.onTeamIntakeSubmit(intake);
-  assert.equal(f.writes.length,0);assert.equal(f.mails.length,2);
-  assert.equal(f.mails[0][0],'outsider@example.com');assert.equal(f.mails[1][0],'guide@example.com');
-  intake.namedValues['Email Address']=['one@example.com'];
-  f.c.onTeamIntakeSubmit(intake);assert.equal(f.writes[0].TITLE,'NEW PROJECT');
-});
-
-test('account metadata is rewritten only when a stored value would change, so reads skip the locked sheet scan',()=>{
-  const f=fixture();let refreshes=0;f.c.refreshGithubAccountMetadata_=()=>{refreshes++;};
-  f.usernames[0][5]='Stale display name';
-  f.state();assert(refreshes>0);
-  const members=f.state().members;
-  f.usernames.forEach((row,i)=>{row[3]=members[i].username;row[5]=members[i].displayName;row[6]=members[i].profileUrl;});
-  refreshes=0;f.state();assert.equal(refreshes,0);
-  f.usernames[1][6]='https://github.com/old-url';
-  f.state();assert(refreshes>0);
-});
