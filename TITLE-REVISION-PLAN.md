@@ -415,7 +415,7 @@ These all move to `titleGate_`, or to the title DTO for display:
 | Reviewer | [reviewer-api.js:5-50](reviewer-api.js#L5-L50), [reviewer-dashboard.js:7-31](reviewer-dashboard.js#L7-L31) |
 | Coordinator | [coordinator-dashboard.js](coordinator-dashboard.js) lines 57, 97, 165, 275, 307, 317; [coordinator-view.js:163](coordinator-view.js#L163); the team drawer |
 | Student | [student-dashboard.js:42](student-dashboard.js#L42), [student-api.js:36](student-api.js#L36) (Form link) |
-| Digests | `sendGuideReminderDigest` (status `NEEDS_REVIEW`), `sendReviewerApprovalDigest` (status `AWAITING_REVIEWER`) |
+| Digests | None: the guide and reviewer digest e-mails were removed (the faculty use the dashboard); no code reads title state for a digest |
 
 Before Phase 1 ends, grep every use of `getTeamStatus_`, `REVIEWER_DECISION`, `GUIDE_DECISION`, `TS.TITLE`,
 `columns.TITLE`, `TS.PROBLEM`, `SIMILARITY_FLAG`, `TITLE_APPROVED_BY`, the document-link fields, `TEAM_INTAKE_RAW`,

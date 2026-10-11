@@ -1,5 +1,5 @@
 // Phase 0 golden masters (TITLE-REVISION-PLAN.md): today's downstream results for every TeamStatus title/decision combination.
-// Weekly submission, review marking, eligibility, coordinator health and the two digests are driven through the real code on the
+// Weekly submission, review marking, eligibility, coordinator health are driven through the real code on the
 // existing fixtures. Later phases (titleGate_) must produce the same results for the states whose meaning is unchanged.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -175,39 +175,9 @@ test('baseline: coordinator (title counts, the tracker status, health and the te
   }, true);
 });
 
-test('baseline: the Reviewer approval digest', () => {
-  const f = weeklyFixture();
-  const c = f.c;
-  f.config.HUB_SHEET_ID = 'hub';
-  f.config.ACADEMIC_YEAR = '2026-27';
-  load(c, ['title-digests.js']);
-  const list = combos();
-  const teams = list.map((combo, index) => ({
-    'Team ID': 'D' + String(index).padStart(2, '0'), Title: combo.title, 'Guide Decision': combo.guide, 'Reviewer Decision': combo.reviewer,
-    'Guide Email': 'guide@example.com', 'Review Committee Number': 'C1'
-  }));
-  f.status.rows.splice(1, f.status.rows.length, ...teams.map(team => f.ts.map(header => team[header] ?? '')));
-  f.syncTitleLog();
-  c.getCommitteeInfo_ = () => ({reviewer1Email: 'rev1@example.com', reviewer2Email: 'rev2@example.com', reviewer3Email: '', reviewer4Email: ''});
-  c.sendReviewerApprovalDigest();
-  const reviewerMails = f.mails.splice(0);
-  const teamsIn = body => [...body.matchAll(/Team (D\d\d)/g)].map(match => match[1]);
-  const byId = Object.fromEntries(list.map((combo, index) => ['D' + String(index).padStart(2, '0'), combo.id]));
-  const describe = mails => mails.map(mail => ({to: mail[0], subject: mail[1], states: teamsIn(mail[2]).map(id => byId[id])}));
-  // The digests now list the teams whose TitleLog status is waiting for the guide or for the reviewers (AWAITING_REVIEWER).
-  // The old rules also listed odd states (a reviewer-approved team with no Guide Decision; a guide-approved team with no title), which
-  // are not titles waiting for anyone; the states that mean the same in both models must still be listed, as the snapshot recorded.
-  const waiting = status => list.filter(combo => newStatusOf(combo) === status).map(combo => combo.id);
-  const recordedReviewer = JSON.parse(fs.readFileSync('tests/title-baseline/snapshots/digests.json', 'utf8')).reviewerApproval[0].states;
-  assert.equal(typeof c.sendGuideReminderDigest, 'undefined', 'the guide reminder digest is gone');
-  assert.deepEqual(describe(reviewerMails).map(mail => mail.to), ['rev1@example.com', 'rev2@example.com']);
-  for (const mail of describe(reviewerMails)) assert.deepEqual(mail.states, waiting('AWAITING_REVIEWER'));
-  assert.ok(recordedReviewer.includes('title=yes guide=Approved reviewer=-') && waiting('AWAITING_REVIEWER').includes('title=yes guide=Approved reviewer=-'));
-});
-
 test('the baselines are recorded for every area, and none is empty', () => {
   const dir = require('node:path').join(__dirname, 'title-baseline', 'snapshots');
-  for (const name of ['status', 'weekly', 'review-marking', 'eligibility', 'coordinator', 'digests']) {
+  for (const name of ['status', 'weekly', 'review-marking', 'eligibility', 'coordinator']) {
     const file = require('node:path').join(dir, name + '.json');
     assert.ok(fs.existsSync(file), name + ' baseline is missing');
     assert.ok(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8'))).length > 0, name + ' baseline is empty');

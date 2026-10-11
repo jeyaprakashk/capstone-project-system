@@ -169,7 +169,7 @@ test('duplicates, identity changes and no future cutover fail without fabricated
 });
 
 test('production has no team eligibility fallback, mutation hooks or migration dependency',()=>{
- for(const file of ['logbook-tracker.js','common-helpers.js','title-digests.js','github-provisioning.js','student-dashboard.js']){
+ for(const file of ['logbook-tracker.js','common-helpers.js','github-provisioning.js','student-dashboard.js']){
   const text=fs.readFileSync(file,'utf8');assert.doesNotMatch(text,/WEEKLY_ELIGIBILITY_HEADER_|ensureWeeklyProgressEligibility_|recordWeeklyEligibilityIfConfigured_|team\.eligibleFrom|PROGRESS_ELIGIBILITY_MIGRATION/);
  }
  const f=weeklyFixture();f.c.getTeamGithubSetup_=()=>{throw Error('Team gate forbidden');};f.c.requireTeamGithubReady_=f.c.getTeamGithubSetup_;
