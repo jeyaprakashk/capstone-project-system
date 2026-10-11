@@ -74,7 +74,7 @@ comparison against the output of the function it replaces.
   reviews:[{key,label}],                 // configured REVIEW assessments, in column order
   reviewError:string|null,               // set when marks are unavailable (e.g. missing definitions)
   teams:[{ teamId, guideName, registerNumbers:[string], title, committee,
-           titleApproval:{ status:{tone:'neutral'|'success'|'warning', label}, canDecide:boolean, revision:number,
+           titleApproval:{ status:{tone:'neutral'|'success'|'warning', label}, canDecide:boolean, canApprove:boolean, approveBlockedReason:string, revision:number,
                            submittedTitle, problem, similarityFlag, folderUrl, notes },
            reviews:[{key, enabled:boolean, actionLabel, note}] }] }
 ```

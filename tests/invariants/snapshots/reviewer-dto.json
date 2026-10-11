@@ -32,6 +32,8 @@
           "label": "Pending review"
         },
         "canDecide": true,
+        "canApprove": true,
+        "approveBlockedReason": "",
         "revision": 2,
         "submittedTitle": "<SCRIPT>ALERT(1)</SCRIPT> TITLE",
         "problem": "A problem statement",
@@ -68,6 +70,8 @@
           "label": "Approved"
         },
         "canDecide": false,
+        "canApprove": false,
+        "approveBlockedReason": "",
         "revision": 3,
         "submittedTitle": "APPROVED TITLE",
         "problem": "A problem statement",
@@ -102,6 +106,8 @@
           "label": "Returned for revision"
         },
         "canDecide": false,
+        "canApprove": false,
+        "approveBlockedReason": "",
         "revision": 3,
         "submittedTitle": "REVISION TITLE",
         "problem": "A problem statement",
@@ -136,6 +142,8 @@
           "label": "Not submitted"
         },
         "canDecide": false,
+        "canApprove": false,
+        "approveBlockedReason": "",
         "revision": 0,
         "submittedTitle": "",
         "problem": "",
@@ -170,6 +178,8 @@
           "label": "Awaiting guide"
         },
         "canDecide": false,
+        "canApprove": false,
+        "approveBlockedReason": "",
         "revision": 1,
         "submittedTitle": "SUBMITTED TITLE",
         "problem": "A problem statement",

@@ -30,7 +30,11 @@ function reviewerReviewCellDto_(row, TS, review, progress, title) {
 
 function reviewerTeamDto_(row, TS, progress, title, folderUrl) {
   const summary = title.state ? titleSummaryFromState_(title.state) : null;
-  const canDecide = !!title.state && titleCanDo_(title.state, 'reviewerApprove', {roles:{reviewer:true}}).allowed;
+  // The reviewer can act on a title that is waiting for the reviewers: return it, and approve it unless a rule refuses (a blank problem
+  // statement can only be returned).
+  const approve = title.state ? titleCanDo_(title.state, 'reviewerApprove', {roles:{reviewer:true}}) : {allowed:false, reason:''};
+  const giveBack = title.state ? titleCanDo_(title.state, 'return', {roles:{reviewer:true}}) : {allowed:false};
+  const canDecide = approve.allowed || giveBack.allowed;
   const status = reviewerTitleStatus_(title);
   return {
     teamId:String(row[TS.TEAM_ID]),
@@ -41,6 +45,8 @@ function reviewerTeamDto_(row, TS, progress, title, folderUrl) {
     titleApproval:{
       status,
       canDecide,
+      canApprove:approve.allowed,
+      approveBlockedReason:title.state && title.state.status === 'AWAITING_REVIEWER' && !approve.allowed ? String(approve.reason || '') : '',
       revision:summary ? summary.revision : 0,
       submittedTitle:summary ? summary.proposal.title : '',
       problem:summary ? summary.proposal.problem : '',

@@ -8,7 +8,7 @@ const { loadSources } = require('./invariants/golden.cjs');
 
 const team = (n, extra = {}) => ({
   teamId: 'T' + n, guideName: 'Guide ' + n, registerNumbers: ['R' + n + 'a', 'R' + n + 'b'], title: 'Title ' + n, committee: 'C1',
-  titleApproval: { status: { tone: 'warning', label: 'Pending review' }, canDecide: true, revision: 3, submittedTitle: 'Title ' + n, problem: '', similarityFlag: '', folderUrl: '', notes: '' },
+  titleApproval: { status: { tone: 'warning', label: 'Pending review' }, canDecide: true, canApprove: true, approveBlockedReason: '', revision: 3, submittedTitle: 'Title ' + n, problem: '', similarityFlag: '', folderUrl: '', notes: '' },
   reviews: [{ key: 'review1', enabled: true, actionLabel: 'Enter marks', note: 'Open' }, { key: 'review2', enabled: false, actionLabel: 'Enter marks', note: 'Not yet' }],
   ...extra
 });
@@ -33,6 +33,7 @@ function setup(dto) {
   const host = document.getElementById('reviewerContent');
   return { view, host, document, window, calls, state, ui, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
+const text = node => node.textContent.replace(/\s+/g, ' ').trim();
 const rows = f => f.host.querySelectorAll('[data-reviewer-body] tr[data-team-id]');
 const stage = (f,key) => f.click(f.host.querySelector('[role=tab][data-stage='+key+']'));
 const panel = f => f.host.querySelector('[data-title-panel]');
@@ -109,6 +110,17 @@ test('revision requires a note and sends one decideTitle write with the revision
   assert.equal(f.calls.loading,f.calls.finished);
   assert.equal(panel(f),null);
   assert.match(f.host.querySelector('[data-reviewer-toast]').textContent,/Saved/);
+});
+test('a title that can be returned but not approved keeps the controls: Approve is disabled with the reason, Request revision works', async () => {
+  const t = team(1); t.titleApproval.canApprove = false; t.titleApproval.approveBlockedReason = 'The problem statement is missing. Return the title so the team can resubmit it with one.';
+  const f = setup(dtoOf([t])); f.view.render(f.host, dtoOf([t])); f.click(f.host.querySelector('[data-action=open-title]'));
+  assert.equal(panel(f).querySelector('[data-decision=Approved]').disabled, true);
+  assert.equal(panel(f).querySelector('[data-decision=Revise]').disabled, false);
+  assert.match(text(panel(f).querySelector('[data-approve-blocked]')), /problem statement is missing/);
+  f.click(panel(f).querySelector('[data-decision=Revise]'));
+  const note = panel(f).querySelector('[data-action=notes]'); note.value = 'Add a problem statement'; f.fire(note, 'input');
+  f.click(panel(f).querySelector('[data-action=submit-decision]')); await f.settle();
+  assert.equal(f.calls.writes[0][1][0].decision, 'return');
 });
 test('mobile bar shows four stages and More opens a sheet with the extra configured reviews',()=>{
   const dto=dtoOf([team(1)]);
