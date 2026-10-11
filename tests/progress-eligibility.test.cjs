@@ -7,9 +7,8 @@ function fixture(){
  const f=weeklyFixture();f.setEligibility('');f.user('coord@example.com');
  f.set('Guide Email','guide@example.com');f.set('Semester','ODD');f.set('Title Approved By','reviewer@example.com');
  f.c.getAcademicYear_=()=> '2026-27';
- const registry=f.sheet('MasterRegistry',[['Year','Semester','Team','Guide','Title','Repo','Members','Approved','Reviewer'],
-  ['2026-27','ODD','T1','guide@example.com','Project','','',new Date('2026-01-01T00:00:00Z'),'reviewer@example.com']]);
- f.c.getHubRegistrySheet_=()=>registry;
+ // The title was approved at 2026-01-01T00:00:00Z: the TitleLog rows are dated so that the final approval falls then.
+ f.setTitleStart(Date.parse('2025-12-31T22:00:00Z'));
  const calls=[];let response;
  const commit=(id,at,sha='a'.repeat(40))=>({sha,author:{id:Number(id),login:id==='101'?'alice':'bob',type:'User'},commit:{message:'Implemented sensor acquisition',committer:{date:at}}});
  const normal=path=>{
@@ -21,7 +20,7 @@ function fixture(){
  response=normal;
  f.c.progressGithubGet_=path=>{assert.equal(f.locked(),false,'network outside script lock');calls.push(path);return response(path);};
  const record=reg=>f.c.readProgressEligibility_().find(r=>r.regNo===(reg||'001'));
- return {...f,registry,calls,commit,normal,record,respond:fn=>{response=fn;},run:()=>f.c.reconcileProgressEligibility()};
+ return {...f,calls,commit,normal,record,respond:fn=>{response=fn;},run:()=>f.c.reconcileProgressEligibility()};
 }
 
 test('normal-deadline calculation is inclusive, never uses late cutoff, and handles absent future windows',()=>{
@@ -43,7 +42,7 @@ test('earliest reliable date wins and repository commit scans are shared without
 });
 
 test('unresolved students retain earlier established commit evidence after history changes',()=>{
-  const f=fixture();f.registry.rows.splice(1);
+  const f=fixture();f.set('Reviewer Decision','');
   f.respond(p=>p.includes('/commits')?{status:200,body:[f.commit('101','2026-01-01')]}:f.normal(p));
   f.run();assert.equal(f.record().eligibleFrom,'');
   const reference=f.record().evidence;
@@ -136,10 +135,20 @@ test('time-budget, cyclic and foreign pagination failures are never evidence abs
  assert.throws(()=>f.c.progressGithubPages_('/repos/org/team/commits',()=>({status:200,body:[],headers:{link:'<https://api.github.com/repos/org/team/commits>; rel="next"'}}),Infinity),/incomplete/);
 });
 
-test('missing and mismatched authoritative title dates do not become observation time',()=>{
- for(const change of [f=>f.registry.rows[1][7]='',f=>f.registry.rows[1][0]='2025-26',f=>f.registry.rows[1][4]='Different title',f=>f.registry.rows[1][8]='wrong@example.com']){
-  const f=fixture();change(f);f.run();assert.equal(f.record().eligibleFrom,'');assert.equal(f.record().titleDate,'');assert.equal(f.record().status,'WAITING_TITLE');
- }
+test('a title that is not approved, or whose history is invalid, never becomes eligibility',()=>{
+ const waiting=fixture();waiting.set('Reviewer Decision','');waiting.run();
+ assert.equal(waiting.record().eligibleFrom,'');assert.equal(waiting.record().titleDate,'');assert.equal(waiting.record().status,'WAITING_TITLE');
+ const returned=fixture();returned.set('Reviewer Decision','Revise');returned.run();
+ assert.equal(returned.record().eligibleFrom,'');assert.equal(returned.record().status,'WAITING_TITLE');
+ const broken=fixture();broken.titleLog.rows[3][16]='nobody@example.com';broken.run();
+ assert.equal(broken.record().eligibleFrom,'');assert.equal(broken.record().titleDate,'');assert.equal(broken.record().status,'CHECK_ERROR');
+ assert.match(broken.record().error,/unavailable/);
+});
+
+test('the title date is the first final approval in TitleLog, and a reopening does not move it',()=>{
+ const f=fixture();f.run();
+ assert.equal(f.record().titleDate.toISOString(),'2026-01-01T00:00:00.000Z');
+ assert.equal(f.record().titleStatus,'APPROVED');
 });
 
 test('earlier individual weeks produce no reminders, and summaries ignore ineligible teammates',()=>{

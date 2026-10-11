@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
+const { HEADERS: TITLE_LOG_HEADERS, sheetRow: titleLogSheetRow } = require('./title-sheet-fixture.cjs');
+const { titleRowsFor } = require('./title-baseline/titlelog.cjs');
 function weeklyFixture() {
   let now = Date.parse('2026-01-02T12:00:00Z'), user='one@example.com', ready=true, locked=false, mailFails=false;
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now; } }
@@ -25,7 +27,9 @@ function weeklyFixture() {
     MailApp:{sendEmail:(...args)=>{if(mailFails)throw Error('Mail unavailable');mails.push(args);}},
     ScriptApp:{getProjectTriggers:()=>triggers.slice(),deleteTrigger:t=>triggers.splice(triggers.indexOf(t),1),newTrigger:name=>({timeBased(){return this;},everyHours(n){this.hours=n;return this;},atHour(n){this.hour=n;return this;},everyDays(n){this.days=n;return this;},inTimezone(tz){this.timezone=tz;return this;},create(){triggers.push({getHandlerFunction:()=>name,hours:this.hours,hour:this.hour,days:this.days,timezone:this.timezone});}})}
   });
-  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','weekly-activity.js','logbook-tracker.js','progress-eligibility.js','team-github-setup.js','weekly-progress-phase2.js','marks-tracker.js','guide-dashboard.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','weekly-activity.js','logbook-tracker.js','progress-eligibility.js','team-github-setup.js','weekly-progress-phase2.js','marks-tracker.js','guide-dashboard.js','sheet-columns.js','title-log.js','title-history.js','title-gate.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+  // The title readers raise coded errors; fixtures that load api-envelope.js later replace this with the real one.
+  c.apiFail_=(code,message)=>Object.assign(new Error(message),{apiCode:code});
   c.parseGithubRepoUrl_=url=>{const m=String(url).match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+?)(?:\.git)?\/?$/i);return m?{owner:m[1],repo:m[2]}:null;};
   const definitions=vm.runInContext('FIELD_DEFINITIONS',c);
   const ts=Object.values(definitions.TEAM_STATUS).concat('Repo URL'),tr=Object.values(definitions.TEAM_ROSTER);
@@ -52,9 +56,18 @@ function weeklyFixture() {
   const fields=vm.runInContext('PROGRESS_ELIGIBILITY_FIELDS_',c), peHeaders=Object.values(fields);
   const pe=sheet('ProgressEligibility',[peHeaders,...['001','002'].map(reg=>peHeaders.map(h=>({'Register Number':reg,'Team':'T1','Progress Eligible From Week ID':'W1','Enforced From Week ID':'W1','Eligibility Fixed At':new Clock(),'Status':'FIXED'}[h]||'')))]);
   const setEligibility=(week,reg)=>pe.rows.slice(1).forEach(row=>{if(!reg||row[0]===reg){row[peHeaders.indexOf('Progress Eligible From Week ID')]=week;row[peHeaders.indexOf('Enforced From Week ID')]=week;row[peHeaders.indexOf('Eligibility Fixed At')]=week?new Clock():'';}});
-  const set=(header,value)=>status.rows[1][ts.indexOf(header)]=value;
+  // The old model's title state (a title and two decisions) is kept in TeamStatus by the tests that were written for it; the readers
+  // now use TitleLog, so every change to those cells rewrites the team's TitleLog rows to the state that means the same.
+  let titleStart=Date.parse('2025-12-01T00:00:00Z');
+  const titleLog=sheet('TitleLog',[TITLE_LOG_HEADERS.slice()]);
+  const LEGACY=['Title','Guide Decision','Reviewer Decision','Reviewer Notes','Guide Notes','Problem Statement'];
+  const syncTitleLog=()=>{const cell=h=>status.rows[1][ts.indexOf(h)]||'';
+    titleLog.rows.splice(1,titleLog.rows.length,...titleRowsFor({teamId:'T1',title:cell('Title'),guide:cell('Guide Decision'),reviewer:cell('Reviewer Decision'),problem:cell('Problem Statement')||'A problem statement',guideNotes:cell('Guide Notes'),reviewerNotes:cell('Reviewer Notes'),start:titleStart}).map(titleLogSheetRow));};
+  const set=(header,value)=>{status.rows[1][ts.indexOf(header)]=value;if(LEGACY.includes(header))syncTitleLog();};
+  syncTitleLog();
   const input=(extra={})=>({requestId:crypto.randomUUID(),weekId:'W1',workCompleted:'Work',guideDiscussion:'Decision',blockers:'None',nextAction:'Next',...extra});
-  return {c,collectionStatus,config,sheets,status,roster,ts,tr,mails,properties,errors,triggers,sheet,input,set,setEligibility,pe,fields,githubSetup,
+  const setTitleStart=ms=>{titleStart=ms;syncTitleLog();};
+  return {c,titleLog,syncTitleLog,setTitleStart,collectionStatus,config,sheets,status,roster,ts,tr,mails,properties,errors,triggers,sheet,input,set,setEligibility,pe,fields,githubSetup,
     time:value=>{now=Date.parse(value);},user:value=>{user=value;},ready:value=>{ready=value;},mailFails:value=>{mailFails=value;},locked:()=>locked,
     entries:()=>c.readLogEntries_(),eligible:()=>pe.rows[1][peHeaders.indexOf('Progress Eligible From Week ID')]};
 }

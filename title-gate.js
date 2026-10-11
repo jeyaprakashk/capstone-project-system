@@ -80,3 +80,28 @@ function titleGate_(teamId, index) {
     approvedAt: approved && state.approved.at !== null ? new Date(state.approved.at) : null
   };
 }
+
+/**
+ * What a dashboard row needs about one team's title, from one read: the gate answer plus the workflow status, the latest note and
+ * the similarity note. `title` and `problem` are the effective pair (the approved pair once approved, otherwise the proposal);
+ * `proposal` is the pair the team is working on. Throws UNAVAILABLE like titleGate_.
+ */
+function titleSummary_(teamId, index) {
+  const state = titleStateFromIndex_(index || readTitleIndex_(), teamId);
+  const approved = state.approved.value;
+  return {
+    teamId: state.teamId, revision: state.revision, status: state.status, reopened: state.reopened, approved,
+    title: approved ? state.approved.title : state.proposal.title,
+    problem: approved ? state.approved.problem : state.proposal.problem,
+    approvedAt: approved && state.approved.at !== null ? new Date(state.approved.at) : null,
+    approvedBy: approved ? state.approved.by : '',
+    proposal: {title: state.proposal.title, problem: state.proposal.problem},
+    notes: state.notes, similarityNote: state.similarityNote
+  };
+}
+
+/** {summary} or {error}, so a list shows one bad team and carries on. */
+function titleTrySummary_(teamId, index) {
+  try { return {summary: titleSummary_(teamId, index)}; }
+  catch (error) { return {error: error && error.message || String(error)}; }
+}

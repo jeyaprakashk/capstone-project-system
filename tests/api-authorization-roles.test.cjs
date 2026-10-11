@@ -14,7 +14,7 @@ function context() {
   c.getConfig_ = key => { try { return ({ ACADEMIC_YEAR: '2026', CELL_PD_EMAIL: 'pd@example.com' })[key] ?? fixtureConfig(key); } catch (error) { return ''; } };
   for (const file of ['evaluation-lifecycle.js', 'review-academic-policy.js', 'marks-tracker.js', 'review-evaluation.js', 'reviewer-evaluation.js', 'guide-evaluation.js', 'publication-events.js',
     'internal-assessment-publishing.js', 'review-configuration.js', 'reviewer-dashboard.js', 'reviewer-api.js', 'guide-dashboard.js', 'guide-api.js', 'intake-approval-workflow.js', 'dashboard-router.js',
-    'title-cutover.js', 'title-log.js', 'title-history.js', 'title-gate.js', 'activity-engine.js', 'title-service.js', 'title-write.js', 'team-folders.js', 'team-document-upload.js', 'activity-check-drive.js', 'title-api.js']) {
+    'title-cutover.js', 'activity-engine.js', 'title-service.js', 'title-write.js', 'team-folders.js', 'team-document-upload.js', 'activity-check-drive.js', 'title-api.js']) {
     vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
   }
   // Only the student (one@) and the guide (guide@) are in the roster; nobody sits on a Review committee.

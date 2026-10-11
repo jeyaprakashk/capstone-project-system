@@ -421,7 +421,7 @@ function submitWeeklyProgress_(input) {
     }
     const team = weeklyTeam_(student.teamId);
     if (weeklyGuideFrozen_(records,input.weekId,weeklySignedEntryIds_())) throw new Error('Guide confirmation has frozen this week. Further revisions are not allowed.');
-    if (getTeamStatus_(team.row) !== 'APPROVED') throw new Error('Your title must be approved before weekly submission.');
+    if (!titleGate_(student.teamId).approved) throw new Error('Your title must be approved before weekly submission.');
     const eligibility = progressStudentEligibility_(student);
     if (!getRepoUrlForTeam_(student.teamId)) throw new Error('The team repository is unavailable.');
     const now = new Date(), windows = getWeeklySubmissionWindows_();
@@ -451,7 +451,7 @@ function loadStudentWeeklyProgress_() {
   const eligibility = progressStudentEligibility_(student, undefined, windows);
   const now = new Date();
   const eligibleFrom = eligibility.eligibleFrom, enforcedFrom = eligibility.enforcedFrom;
-  const ready = !!eligibleFrom && getTeamStatus_(team.row) === 'APPROVED';
+  const ready = !!eligibleFrom && titleGate_(student.teamId).approved;
   const records = readLogEntries_(null,student.regNo);
   const allowed = eligibleWeeklyWindows_(eligibleFrom,windows);
   const signedIds = weeklySignedEntryIds_();

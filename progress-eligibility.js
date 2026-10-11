@@ -99,14 +99,16 @@ function calculateProgressEligibility_(record, windows, now) {
   return {...result,eligibleFrom:windows[index].weekId,enforcedFrom:windows[index].weekId,fixedAt:now,status:'FIXED',error:''};
 }
 
-function progressTitleDate_(team, registry) {
-  const r = team.row, c = team.columns;
-  if (getTeamStatus_(r) !== 'APPROVED') return '';
-  const matches = registry.filter(a=>textEquals_(a[0],getAcademicYear_()) && textEquals_(a[1],r[c.SEMESTER]) &&
-    textEquals_(a[2],team.teamId) && emailsMatch_(a[3],r[c.GUIDE_EMAIL]) && String(a[4]) === String(r[c.TITLE]) &&
-    emailsMatch_(a[8],r[c.TITLE_APPROVED_BY]));
-  const value = matches.length ? matches[matches.length-1][7] : '';
-  return Number.isFinite(progressDateMs_(value)) ? new Date(value) : '';
+/** The first final approval of the team's title, from TitleLog ('' when it has none). `index` is the validated title index. */
+function progressTitleDate_(team, index) {
+  const date = titleGate_(team.teamId, index).approvedAt;
+  return date && Number.isFinite(progressDateMs_(date)) ? date : '';
+}
+
+/** The status the eligibility record keeps: APPROVED once the title has had its first final approval, otherwise the workflow status. */
+function progressTitleStatus_(team, index) {
+  const summary = titleSummary_(team.teamId, index);
+  return summary.approved ? 'APPROVED' : summary.status;
 }
 
 /** Dedicated read-only transport: retain pagination headers, never log private audit bodies. */
@@ -217,8 +219,8 @@ function reconcileProgressEligibility() {
   }
   const context = {request:progressGithubGet_,cache:new Map(),deadline:Date.now()+240000};
   const accounts = getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS), accountColumns = githubAccountColumns_(accounts), accountRows = readSheetRows_(accounts,2);
-  let registry, registryError;
-  try { registry = readSheetRows_(getHubRegistrySheet_(),2); } catch(error) { registryError = true; }
+  let titleIndex, titleError;
+  try { titleIndex = readTitleIndex_(); } catch(error) { titleError = true; }
   const report = {checked:0,fixed:0,deferred:0,writeErrors:0,held};
   for (const item of pending) {
     if (Date.now() >= context.deadline) { report.deferred += pending.length-report.checked; break; }
@@ -228,8 +230,9 @@ function reconcileProgressEligibility() {
       const team = weeklyTeam_(student.teamId), c = team.columns;
       const slot = [1,2,3,4].find(n=>textEquals_(team.row[c['S'+n+'_REGNO']],student.regNo));
       next.name = team.row[c['S'+slot+'_NAME']] || '';
-      next.titleStatus = getTeamStatus_(team.row);
-      next.titleDate = registryError ? '' : progressTitleDate_(team,registry);
+      if (titleError) throw new Error('Title approval history is unavailable.');
+      next.titleStatus = progressTitleStatus_(team,titleIndex);
+      next.titleDate = progressTitleDate_(team,titleIndex);
       const identity = githubStudentIdentity_(student,accountRows,accountColumns,students);
       if (identity.state !== 'available') throw new Error(identity.reason);
       if (record.githubId && record.githubId !== identity.githubId) throw new Error('Eligibility GitHub identity changed; coordinator review required.');
@@ -239,7 +242,6 @@ function reconcileProgressEligibility() {
       const slug = repo.owner+'/'+repo.repo;
       if (record.evidence && String(JSON.parse(record.evidence).repo).toLowerCase() !== slug.toLowerCase()) throw new Error('Eligibility repository changed; coordinator review required.');
       next = progressResolveEvidence_(next,slug,context);
-      if (!next.error && registryError) throw new Error('Title approval history is unavailable.');
       if (!next.error) next = calculateProgressEligibility_(next,windows,new Date());
     } catch(error) { next.status = 'CHECK_ERROR'; next.error = error.message; }
     try { weeklyLock_(()=>{
@@ -257,8 +259,9 @@ function reconcileProgressEligibility() {
           const repo = parseGithubRepoUrl_(getRepoUrlForTeam_(student.teamId));
           if (!repo || (repo.owner+'/'+repo.repo).toLowerCase() !== String(JSON.parse(next.evidence).repo).toLowerCase()) throw new Error('Repository changed during reconciliation.');
         }
-        next.titleStatus = getTeamStatus_(freshTeam.row);
-        next.titleDate = progressTitleDate_(freshTeam,readSheetRows_(getHubRegistrySheet_(),2));
+        const freshIndex = readTitleIndex_();
+        next.titleStatus = progressTitleStatus_(freshTeam,freshIndex);
+        next.titleDate = progressTitleDate_(freshTeam,freshIndex);
       }
       if (current.firstDetected) next.firstDetected = current.firstDetected;
       // A concurrent run may have established the first observation.

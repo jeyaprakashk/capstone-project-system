@@ -8,7 +8,7 @@ const vm = require('node:vm');
 const { weeklyFixture } = require('./weekly-progress-fixture.cjs');
 const { coordinatorFixture } = require('./coordinator-fixture.cjs');
 const { combos, inside } = require('./title-baseline/combos.cjs');
-const { expectBaseline } = require('./title-baseline/golden.cjs');
+const { expectBaseline, expectBaselineAs } = require('./title-baseline/golden.cjs');
 
 const load = (context, files) => files.forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), context, {filename: file}));
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -80,23 +80,22 @@ test('baseline: review marking (eligibility, the reviewer status, who can decide
   expectBaseline('review-marking', result);
 });
 
-test('baseline: eligibility (the title date from the registry and the resulting eligibility)', () => {
+test('baseline: eligibility (the title date and the resulting eligibility, now from TitleLog)', () => {
   const result = {};
   for (const combo of combos()) {
     const f = fixtureFor(combo);
     const c = f.c;
-    f.config.ACADEMIC_YEAR = '2026-27';
-    f.set('Semester', 'Odd');
-    f.set('Guide Email', 'guide@example.com');
-    f.set('Title Approved By', 'reviewer@example.com');
+    // The old registry date was 2026-01-01T00:00:00Z; the final approval in the TitleLog rows falls at the same moment.
+    f.setTitleStart(Date.parse('2025-12-31T22:00:00Z'));
     const team = c.weeklyTeam_('T1');
-    const registry = [['2026-27', 'Odd', 'T1', 'guide@example.com', combo.title, 'https://github.com/org/team', '', new Date('2026-01-01T00:00:00Z'), 'reviewer@example.com']];
-    const titleDate = c.progressTitleDate_(team, registry);
-    const titleStatus = c.getTeamStatus_(team.row);
+    const index = c.readTitleIndex_();
+    const titleDate = c.progressTitleDate_(team, index);
+    const titleStatus = c.progressTitleStatus_(team, index);
     const outcome = c.calculateProgressEligibility_({effectiveDate: new Date('2026-01-01T00:00:00Z'), titleDate, titleStatus}, c.getWeeklySubmissionWindows_(), new Date('2026-01-10T00:00:00Z'));
-    result[combo.id] = {titleStatus, titleDate: iso(titleDate), eligibility: {status: outcome.status, eligibleFrom: outcome.eligibleFrom || '', enforcedFrom: outcome.enforcedFrom || '', error: outcome.error || ''}};
+    result[combo.id] = {approved: titleStatus === 'APPROVED', titleDate: iso(titleDate), eligibility: {status: outcome.status, eligibleFrom: outcome.eligibleFrom || '', enforcedFrom: outcome.enforcedFrom || '', error: outcome.error || ''}};
   }
-  expectBaseline('eligibility', result);
+  // The old status words differ from the new ones; only "approved or not" and the date are compared, plus the resulting eligibility.
+  expectBaselineAs('eligibility', result, entry => ({approved: entry.titleStatus === 'APPROVED', titleDate: entry.titleDate, eligibility: entry.eligibility}));
 });
 
 test('baseline: coordinator (title counts, the tracker status, health and the team drawer)', () => {
