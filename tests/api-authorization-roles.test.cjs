@@ -13,7 +13,8 @@ function context() {
   const fixtureConfig = c.getConfig_;
   c.getConfig_ = key => { try { return ({ ACADEMIC_YEAR: '2026', CELL_PD_EMAIL: 'pd@example.com' })[key] ?? fixtureConfig(key); } catch (error) { return ''; } };
   for (const file of ['evaluation-lifecycle.js', 'review-academic-policy.js', 'marks-tracker.js', 'review-evaluation.js', 'reviewer-evaluation.js', 'guide-evaluation.js', 'publication-events.js',
-    'internal-assessment-publishing.js', 'review-configuration.js', 'reviewer-dashboard.js', 'reviewer-api.js', 'guide-dashboard.js', 'guide-api.js', 'intake-approval-workflow.js', 'dashboard-router.js']) {
+    'internal-assessment-publishing.js', 'review-configuration.js', 'reviewer-dashboard.js', 'reviewer-api.js', 'guide-dashboard.js', 'guide-api.js', 'intake-approval-workflow.js', 'dashboard-router.js',
+    'title-cutover.js', 'title-log.js', 'title-history.js', 'title-gate.js', 'activity-engine.js', 'title-service.js', 'title-write.js', 'title-api.js']) {
     vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
   }
   // Only the student (one@) and the guide (guide@) are in the roster; nobody sits on a Review committee.
@@ -55,6 +56,10 @@ const ENDPOINTS = {
   API_review_save: [['draft', { ...REQUEST, scores: {} }], ['outsider@example.com', 'one@example.com']],
   API_publishing_get: [['review1'], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
   API_publishing_run: [['publishInternalAssessment_', { ...REQUEST }], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
+  API_title_get: [[TEAM], OUTSIDER],
+  API_student_submitTitle: [[{ requestId: 'request_123456789', expectedRevision: 0, title: 'A title', problem: 'A problem' }], [...OUTSIDER, 'guide@example.com']],
+  API_guide_decideTitle: [[{ requestId: 'request_123456789', expectedRevision: 0, teamId: TEAM, decision: 'approve' }], [...OUTSIDER, 'one@example.com']],
+  API_reviewer_decideTitle: [[{ requestId: 'request_123456789', expectedRevision: 0, teamId: TEAM, decision: 'approve' }], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
   API_shared_getTimeline: [[], OUTSIDER],
   API_shared_getRubrics: [[], OUTSIDER]
 };

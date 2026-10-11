@@ -33,6 +33,11 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_coordinator_getHealth()` | Coordinator | none | `{needsAttention, partial, teams:{<teamId>:{health}}}` | the health read |
 | `API_coordinator_validateTitleLog()` | Coordinator | none | `{ok, live, rows, rosterTeams, errors:[{kind, teamId, message}], information:[{kind, teamId, message}], truncated}`; `kind` is `NO_ROW`, `NOT_ON_ROSTER`, `INVALID_HISTORY` or `APPROVED_WITHOUT_DATE`; a roster team with no row is an error until `TITLE_CUTOVER` is `LIVE`, then information; each list holds at most 200 items and `truncated` says more existed. Read-only. Rejected with `UNAVAILABLE` when the TitleLog sheet is missing or its headers are wrong | new (title revision, Phase 1) |
 | `API_coordinator_getRequirements(teamId?)` | Coordinator | optional `teamId` | `{rules:{<activity>:[{kind,item,label}]}, errors:[string], teamId, activities}`; `activities` is `null` without a team, otherwise `{<activity>:{allowed, reason, requirements:[{label, met, reason, diagnostic?}]}}` for `title.submit`, `title.resubmit` and `document.upload`. `diagnostic` appears here only (`GITHUB_ERROR`, `GITHUB_MEMBER_UNVERIFIED`, `GITHUB_REPOSITORY_UNVERIFIED`, `TEAM_DOCUMENTS_UNRESOLVED`, `FOLDER_AMBIGUOUS`); student DTOs go through `studentRequirements_`, which removes it. A team not on the roster is `NOT_FOUND`. Read-only | new (activity engine) |
+| `API_title_get(teamId?)` | Student (own team), Guide, Reviewer, Coordinator | optional `teamId`; a student always gets its own team | `TitleDto` (below). `UNAUTHORIZED` for a person with no role on the team (also for a team that does not exist, except to a coordinator, who gets `NOT_FOUND`); `UNAVAILABLE` when that team's history fails validation | new (title revision) |
+| `API_student_submitTitle(input)` | Student | `{requestId, expectedRevision, title, problem}`; the team comes from the session | `{ok, revision, status, message, warning?}` | the Team Intake Form |
+| `API_guide_decideTitle(input)` | Guide | `{requestId, expectedRevision, teamId, decision:'approve'|'return', notes, editedTitle?}`; `editedTitle` only with `approve`; `notes` required for `return` | `{ok, revision, status, message, warning?}` | `API_guide_submitDecision` (removed with the guide slice) |
+| `API_reviewer_decideTitle(input)` | Reviewer | `{requestId, expectedRevision, teamId, decision:'approve'|'return', notes}` | `{ok, revision, status, message, warning?}` | `API_reviewer_submitDecision` (removed with the reviewer slice) |
+| `API_coordinator_reopenTitle(input)` / `API_coordinator_cancelReopen(input)` | Coordinator | `{requestId, expectedRevision, teamId, reason}` (reason required, at most 500 characters) | `{ok, revision, status, message, warning?}` | new |
 | `API_coordinator_getActivity()` | Coordinator | none | `{state (`active`, `between` weeks, `not-started`, `ended`, `unavailable`), week, checkedAt, teams:{<teamId lower-case>:{logs,commits}}, totalTeams, activeTeams}` | `loadAllTeamsWeeklyActivity_` (wrapped) |
 | `API_coordinator_getSystemStatus()` | Coordinator | none | `SystemStatus` (below) | `loadCoordinatorSystemStatus` (removed) |
 | `API_student_getWeekly()` / `API_student_submitWeekly(input)` | Student | input: `{requestId, weekId, workCompleted, guideDiscussion, blockers, nextAction}` | the existing weekly-progress object (`ready, weeks, actions, history, evidence, allWeeks, timezone, checkedAt …`) / `{ok, entryId, weekId, entryStatus, timeliness, firstSubmittedAt, message}` | `loadStudentWeeklyProgress_` / `submitWeeklyProgress_` called directly |
@@ -144,6 +149,23 @@ up to 25 team folders per call from `cursor` (the last Team ID key handled); it 
 repeat. Two `Team Documents` folders, duplicate team folders or names that collide are reported and never merged, removed or created.
 `findTeamFolder_(teamId, semester)` is the shared server lookup for later features (it never creates anything). The browser asks for
 confirmation, naming the parent folder, before the write. Contract tests: `tests/team-folders.test.cjs`, `tests/team-folders-view.test.cjs`.
+
+### TitleDto
+
+Returned by `API_title_get`. Dates are ISO strings. `history` is filled for the coordinator only. `can.*` is the whole of what the view may offer: the server computes it with the same rules as the write path, so a button and its refusal cannot disagree.
+
+```
+{ teamId, revision, status (NOT_SUBMITTED|NEEDS_REVIEW|AWAITING_REVIEWER|RETURNED|APPROVED|REOPENED), reopened,
+  proposal:{title, problem}, notes, similarityNote,
+  approved:{value, title, problem, at, by},
+  reopen:{reason, by, at} | null,
+  folderUrl,                                         // the team Drive folder, '' when absent
+  history:[{revision, action, actor, at, notes}],    // coordinator only
+  can:{ submit, approve, return, reopen, cancel }    // each a Capability }
+Capability = { allowed, reason, activity ('title.submit'|'title.resubmit'|null), requirements:[{label, met, reason}] }
+```
+
+`requirements` is filled only for a student on its own team, and only when the built-in rules would allow the action; it never carries a `diagnostic`. Documents and upload capabilities are added with the upload endpoint.
 
 ### StudentCore and StudentProject
 
