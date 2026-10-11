@@ -29,7 +29,7 @@ const FIELD_DEFINITIONS = {
   AIProgressAnalysis: {id:'Analysis ID', entryId:'Entry ID', technical_substance:'Technical Substance', specificity:'Specificity', outcome:'Outcome', next_action:'Next Action', github_support:'GitHub Support', score:'AI Score', comment:'Comment', analyzedAt:'Analyzed At'},
   COMMIT_COLLECTION_STATUS: {TEAM_ID:'Team ID', STATUS:'Status', UPDATED_AT:'Updated At'},
   WEEKLY_WINDOWS: {weekId:'Week ID', opens_at:'Opens At', deadline_at:'Deadline At', late_until:'Late Until'},
-  // Authoritative six-column order: A:F, with Commit SHA at index 5.
+  // The six commit columns, found by header name (a GitHub Author ID column follows). New rows put them in this order.
   COMMITS: { DATE:'Date', TEAM_ID:'Team ID', MESSAGE:'Commit Message', USERNAME:'GitHub Username', REPO_URL:'Repository URL', SHA:'Commit SHA' },
   LOG_ENTRIES: {
     id:'Entry ID', requestId:'Request ID', regNo:'Reg No', teamId:'Team ID', weekId:'Week ID',

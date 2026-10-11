@@ -5,16 +5,17 @@ phase 3 (`GitHubAccounts`), phase 4 (`Config`, `Commits`; `LogEntries` was alrea
 are built, each with shuffled-column, missing-header and duplicate-header tests, and the sheet-access audit runs over the sheets whose
 status is `migrated` in SHEETS.md. Differences from the plan as written:
 
-- `WeeklyReminders` is not migrated: the reminder e-mail was removed, so nothing reads or writes it. It stays in the catalog as positional
-  until the owner decides to remove it.
+- `WeeklyReminders` was removed completely (sheet name, definition, catalog entry, snapshot): the reminder e-mail it served is gone.
 - `MasterRegistry` lives in the hub spreadsheet and is read by position in `title-service.js` (`titleSimilarity_`). Its header names are not
   defined anywhere in this project, so it waits for the owner to supply them.
 - Sheets that were already read by name before this work (`TeamRoster`, `TeamStatus`, `ReviewCommittee`, `WeeklyWindows`, `GuideSignoff`,
   `AIProgressAnalysis`, `AssessmentDefinitions`, `Milestones`, `Rubrics`) have status `by-name`: their `code` lists are not written, so the
-  audit does not cover them yet.
-- `TeamStatus` still gets its `Repo URL` header appended by a request path (`updateTeamStatusRepoUrl_`), which the rule "request paths never
-  repair a header" forbids. Moving it to setup is a separate decision.
-- Policy phase 6 (AGENTS.md "Sheet access") has not been decided.
+  audit does not cover them; shuffled-column tests do (below).
+- The `Repo URL` header of `TeamStatus` is now added by the editor-run `setupTeamStatusColumns`; a repository write no longer adds it and fails
+  with a clear message if it is missing.
+- Policy phase 6 was decided by the owner (Option B) and applied: AGENTS.md now freezes sheet names, header text and data but not column
+  order, and has a "Sheet access" section. Shuffled-column tests for the nine by-name sheets and a project-wide search for numeric sheet
+  indexes (`tests/sheet-position-guard.test.cjs`) were added instead of per-function lists for them.
 
 The text below is the original plan.
 

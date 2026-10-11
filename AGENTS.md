@@ -6,10 +6,11 @@ or spreadsheet data while doing so.
 
 ## Frozen — do not change
 
-- Spreadsheet sheet names, headers, column layouts and stored data
-  (`SHEET_NAMES`, `FIELD_DEFINITIONS`, fixed-layout journals and logs). For a sheet whose code uses header
-  names, editor-run `ensureSheet_` may initialize an empty existing sheet or append missing headers during
-  setup, under the "Creating and repairing sheets" rules below.
+- Spreadsheet sheet names, header text and stored data
+  (`SHEET_NAMES`, `FIELD_DEFINITIONS`, journals and logs). No work renames a header, deletes a column or rewrites
+  data. Column order is not a dependency: code finds columns by header name (see "Sheet access"), so a column may be
+  moved or added by hand. Editor-run `ensureSheet_` may initialize an empty existing sheet or append missing headers
+  during setup, under the "Creating and repairing sheets" rules below.
 - Academic rules: Review rubrics, attendance/makeup policy, eligibility,
   deadlines, publishing, weights and prerequisites.
 - Role detection and server-side authorization.
@@ -21,8 +22,9 @@ only for a deliberate, reviewed rule or schema change made outside a migration.
 ## Creating and repairing sheets
 
 `ensureSheet_` (`ensure-sheet.js`) creates new catalog sheets and manages headers for sheets whose readers and writers use
-header names. Existing sheets move to it in the same commit as their header-name migration; until then their existing
-creation and validation paths remain in place. Every call names its `mode`.
+header names. A sheet whose creating code runs in an editor-run setup uses it; creating code reached from a dashboard request
+(the assessment journals, `AssessmentDefinitions`, `GuideSignoff`, `AIProgressAnalysis`) keeps its own creation path, because
+setup mode never runs on a request. Every call names its `mode`.
 
 - `mode: 'setup'` runs only in editor-run setup paths. It creates an absent sheet, writes the header row of an existing sheet
   that has no rows, and may append a missing header at the right end of an existing sheet. It never moves, renames or
@@ -34,6 +36,29 @@ creation and validation paths remain in place. Every call names its `mode`.
 - Request paths never repair a header.
 - New sheets are defined in the catalog (`sheet-columns.js`), not in `SHEET_NAMES` or `FIELD_DEFINITIONS`. `SHEETS.md` is
   generated from it with `npm run build:sheets-doc`.
+
+## Sheet access
+
+Every sheet is read and written by header name, so column order does not matter and an extra column is harmless. The one
+exception is the master registry of the hub spreadsheet (`title-service.js`, `titleSimilarity_`), read by position until its
+header names are known; `tests/sheet-position-guard.test.cjs` lists it.
+
+- Reach a sheet field through a column map built from the header row (`getColumnMap_`, `buildColumnMap_`, or the sheet's own
+  `...Columns_` function). Never use a number as a row index or a `getRange` column. Header comparison is `textEquals_`
+  (trimmed, case-insensitive).
+- A missing required header throws, and so does a repeated one; the error names the sheet and the header. Extra columns are
+  ignored. A request never repairs, adds or moves a header (see "Creating and repairing sheets").
+- One logical write is one write call over the span from the leftmost to the rightmost mapped column (`writeRecordSpan_`);
+  columns outside the span are never touched. A cell inside the span that the code does not map keeps its value, so a formula
+  typed into such a cell would be turned into its value: do not put formulas in unmapped cells of a written row.
+- Side-effect order (write, flush, delete a property, send) is the same as before a sheet was migrated.
+- A new sheet gets its headers in definition order, from the catalog.
+- Proof, not just search: each sheet has tests that run the real code on shuffled columns (`tests/shuffled-columns.test.cjs`
+  and the sheet's own tests), a missing-header test and a duplicate-header test. `tests/sheet-position-guard.test.cjs` searches
+  every module for a number used as a sheet index, and the catalog audit in `tests/sheet-catalog.test.cjs` checks the functions
+  listed for each `migrated` sheet in `sheet-columns.js`. The search cannot see a number held in a variable; the shuffled
+  tests do.
+- Renaming a header is still a code change, reviewed like a schema change, with its snapshot update.
 
 ## Project titles
 
@@ -59,7 +84,8 @@ history (one row per change, the latest row of a team is its state). Specified i
 
 1. **Server (Apps Script).** Reads and writes sheets, GitHub and mail. Returns JSON
    only: no HTML, inline styles, CSS classes or layout knowledge. Every endpoint
-   re-checks authorization. Column mapping never leaves the server.
+   re-checks authorization. Column mapping never leaves the server, and server code reaches sheet fields through a column map
+   built from header names (see "Sheet access").
 2. **Client data bridge.** The only caller of `google.script.run`. Wraps calls in
    promises, validates the response envelope, and owns loading, error, timeout and
    stale-response handling.
@@ -162,5 +188,6 @@ refresh and settle loading on every path. This lives in the bridge, not in views
 
 `npm test` runs everything; `npm run test:migration` runs the bridge, view and DTO tests. All tests pass (the 7
 `tests/team-github-setup.test.cjs` failures recorded at Version 127 no longer occur); no test may regress. A test file
-that is not listed in the `test` script in `package.json` never runs. `npm run check:sheets-doc` must also pass
+that is not listed in the `test` script in `package.json` never runs. A change to how a sheet is read or written comes with a
+shuffled-column test, a missing-header test and a duplicate-header test for that sheet. `npm run check:sheets-doc` must also pass
 (`SHEETS.md` is generated from the catalog).
