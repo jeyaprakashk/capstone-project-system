@@ -88,7 +88,7 @@ test('source rules: only getSpreadsheet_ reads the SHEET_ID property, and no oth
   }
 });
 
-// Config is found by header name: the Key and Value columns (SHEET-HEADER-MATCHING-PLAN.md, phase 4).
+// Config is found by header name: the Key and Value columns (archive/plans/SHEET-HEADER-MATCHING-PLAN.md, phase 4).
 test('Config: Key and Value are found by name, in any order, with other columns ignored', () => {
   const book = fakeBook('b', [['Notes', 'Value', 'Description', 'Key'], ['n', '24', 'd', 'SUBMISSION_REMINDER_HOURS'], ['n', 'x', 'd', ' Other_Key ']]);
   const {context} = load({active: book});

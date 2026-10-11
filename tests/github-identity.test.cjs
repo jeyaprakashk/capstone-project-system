@@ -180,7 +180,7 @@ test('both permanent schemas normalize only case and outer whitespace and never 
   }
 });
 
-// GitHubAccounts is found by header name (SHEET-HEADER-MATCHING-PLAN.md, phase 3).
+// GitHubAccounts is found by header name (archive/plans/SHEET-HEADER-MATCHING-PLAN.md, phase 3).
 function shuffleAccounts(f){
   const order=[6,3,0,5,1,4,2]; // URL, Username, Timestamp, Name, Email, ID, Team ID
   f.accounts.rows.splice(0,Infinity,...f.accounts.rows.map(row=>order.map(i=>row[i])));

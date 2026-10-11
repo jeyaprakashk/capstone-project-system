@@ -1,5 +1,5 @@
 // The sheet catalog (sheet-columns.js): shape, specifications, the call-site audits and the generated SHEETS.md.
-// The catalog lists every sheet the code touches (SHEET-HEADER-MATCHING-PLAN.md, phase 1), and a completeness test keeps it so.
+// The catalog lists every sheet the code touches (archive/plans/SHEET-HEADER-MATCHING-PLAN.md, phase 1), and a completeness test keeps it so.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -209,7 +209,7 @@ test('a sheet with a generated name has no specification until the caller suppli
   assert.throws(() => load().sheetSpec_('assessmentJournal'), /generated name/);
 });
 
-// The sheet-access audit (SHEET-HEADER-MATCHING-PLAN.md, section 8). A text-level tripwire against positional access creeping back
+// The sheet-access audit (archive/plans/SHEET-HEADER-MATCHING-PLAN.md, section 8). A text-level tripwire against positional access creeping back
 // into a migrated sheet; it cannot see an index held in a variable. The shuffled-column tests are the proof. Writing a header row
 // (getRange(1, ...)) when a sheet is created is allowed: new sheets get their headers in definition order. So is a whole-row write from
 // column A whose width is a built row's length (getRange(n, 1, 1, row.length)): the row was built from the column map.

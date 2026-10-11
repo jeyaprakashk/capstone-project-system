@@ -1,5 +1,5 @@
 /**
- * TITLE HISTORY - the validation of one team's TitleLog rows (TITLE-REVISION-PLAN.md, section 4, rules 1 to 8).
+ * TITLE HISTORY - the validation of one team's TitleLog rows (archive/plans/TITLE-REVISION-PLAN.md, section 4, rules 1 to 8).
  * Pure: it takes the parsed rows of one team and the current time and returns a list of problems (empty when valid).
  * A failure makes only that team UNAVAILABLE. With these rules titleGate_ and the eligibility calculation can never
  * disagree about whether or when a team was approved.

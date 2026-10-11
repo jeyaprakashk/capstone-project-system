@@ -54,7 +54,7 @@ column moves, no data is rewritten, and AGENTS.md is not edited. That is what AG
 complies with it. Changing the *policy* is a separate decision, made only after the code and tests have shown order
 independence (phase 6, section 3).
 
-**Position in the build order:** catalog v1 is item 3, built before the title work; the migration itself is item 12 and starts only after the cutover (item 10). The policy decision is item 13. The full order is in [BUILD-ORDER.md](BUILD-ORDER.md).
+**Position in the build order:** catalog v1 is item 3, built before the title work; the migration itself is item 12 and starts only after the cutover (item 10). The policy decision is item 13. The full order is in [BUILD-ORDER.md](../../BUILD-ORDER.md).
 
 ## 1. Purpose
 
@@ -63,7 +63,7 @@ This plan moves that code to find columns by **header name**, so the code no lon
 header text and stored data stay exactly as they are.
 
 The project already does this for part of the code. `getColumnMap_` and `buildColumnMap_`
-([common-helpers.js:199](common-helpers.js#L199)) turn header names into column indexes and throw when a required
+([common-helpers.js:199](../../common-helpers.js#L199)) turn header names into column indexes and throw when a required
 header is missing. README.md (lines 22 to 24) says the remaining "fixed-layout form, log, configuration, and marking
 consumers" still use explicit positions. This plan removes that exception.
 
@@ -112,7 +112,7 @@ the changes, applied in their own commit:
 | 6 | Invariants paragraph | Guards `SHEET_NAMES` and `FIELD_DEFINITIONS` | Unchanged |
 | 7 | "Frozen", first bullet (headers and column layouts) | No code adds a header to an existing sheet | **Owner decision:** `ensureSheet_`, run at setup, may append a missing header to the right end of any existing sheet under the safety rules in decision 6. It never moves, renames or deletes a column or touches data. This item belongs to [ENSURE-SHEET-PLAN.md](ENSURE-SHEET-PLAN.md) (sections 4, 7 and 10) and is approved there; it does not wait for phase 6 and is not performed by the migration commits |
 
-Also updated in that commit: the `COMMITS` comment in [common-constants.js:35](common-constants.js#L35) ("Authoritative
+Also updated in that commit: the `COMMITS` comment in [common-constants.js:35](../../common-constants.js#L35) ("Authoritative
 six-column order") is reworded.
 
 **README.md** describes the code as it is, so each migration commit updates the README lines it makes untrue
@@ -150,7 +150,7 @@ If the policy change in section 3 is approved, these become the AGENTS.md "Sheet
    is a layout change to live sheets, so it is listed as policy item 7 in section 3.
 4. Header comparison is `textEquals_` (trimmed, case-insensitive), as in the rest of the project.
 5. **Creation and validation are part of the migration.** `commitCollectionStatusSheet_` and `weeklyReminderSheet_`
-   ([logbook-tracker.js:143](logbook-tracker.js#L143), [logbook-tracker.js:495](logbook-tracker.js#L495)) today reject any
+   ([logbook-tracker.js:143](../../logbook-tracker.js#L143), [logbook-tracker.js:495](../../logbook-tracker.js#L495)) today reject any
    header row whose length or order differs from the definition, before a reader runs. A migrated sheet replaces that with
    the required-header check above. New sheets are still created with the headers in definition order. This loosens a
    failure path on purpose: a shuffled or extended sheet is now accepted. Each migrated sheet's commit states this.
@@ -175,7 +175,7 @@ If the policy change in section 3 is approved, these become the AGENTS.md "Sheet
   read-modify-write would turn a formula into its value. Phase 0 confirms this with the owner, and the writer test covers
   a sheet with an extra plain-value column. The precondition is necessary, not sufficient (see W1).
 - **W4. Formatting calls move with the column.** Today's `setNumberFormat('@')` and the apostrophe prefix for values
-  that start with `=`, `+`, `@` or `-` ([logbook-tracker.js:171](logbook-tracker.js#L171)) apply to the mapped column and
+  that start with `=`, `+`, `@` or `-` ([logbook-tracker.js:171](../../logbook-tracker.js#L171)) apply to the mapped column and
   run in the same order relative to the write.
 - **W5. For the tested current layout the calls are identical.** When the mapped columns are contiguous and in today's
   order, the migrated code issues the same ranges and values as the old code. The trace test (section 8) asserts this.
@@ -376,7 +376,7 @@ current code reaches. The goal is equivalence to the existing behaviour, not an 
 - the commit-status upsert: before its single write, and after it;
 - the reminder-property migration: before the write; after the write and before `flush`; after `flush` and before the
   first property is deleted; and part way through the deletions (the retry must not duplicate receipts);
-- the reminder path ([logbook-tracker.js:572](logbook-tracker.js#L572)): the email is sent *before* its receipt is
+- the reminder path ([logbook-tracker.js:572](../../logbook-tracker.js#L572)): the email is sent *before* its receipt is
   written, inside a `try` that only logs a failure. A failure between the send and the receipt write therefore leaves no
   receipt, and the next run sends the reminder again. **This is an existing limitation and is retained, not fixed:** the
   migrated code has the same order, and the test asserts the same duplicate on retry, so it documents the behaviour
@@ -386,7 +386,7 @@ current code reaches. The goal is equivalence to the existing behaviour, not an 
 **Building-block tests:** duplicate detection, writer blank-fill and span width, W3 and W4 behaviour.
 
 **Sheet-access audit (concrete design).** The existing source audit in
-[tests/sheet-reads.test.cjs:91](tests/sheet-reads.test.cjs#L91) checks value-read *methods*; it does not know which sheet
+[tests/sheet-reads.test.cjs:91](../../tests/sheet-reads.test.cjs#L91) checks value-read *methods*; it does not know which sheet
 an index belongs to. The new audit reads the catalog's `code` lists (section 7), which map each `migrated` sheet to the
 files and named functions that read or write it:
 
@@ -428,7 +428,7 @@ on phase 6.
 | A live sheet has a duplicate or misspelt header | Owner checks in phase 0; the errors name the sheet and the header |
 | A form-bound sheet (for example `TeamIntakeRaw`) takes headers from question text | Owner decision: all form-bound sheets are being retired, so they are not migrated. Their existing code stays unchanged until removal; see "Retiring sheets" |
 | Journals are shared by many files and break together | They go last and as one unit |
-| Overlap with the title plan and [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md), which touch `GitHubAccounts` | Decision 4: this migration goes first and the student-identity plan is rebased on it later; new sheets such as `TitleLog` use header-name access from the start |
+| Overlap with the title plan and [STUDENT-IDENTITY-PLAN.md](../../STUDENT-IDENTITY-PLAN.md), which touch `GitHubAccounts` | Decision 4: this migration goes first and the student-identity plan is rebased on it later; new sheets such as `TitleLog` use header-name access from the start |
 | Read-modify-write turns a formula in an unmapped cell into a value | Rule W3 precondition, checked in phase 0 |
 
 ### Retiring sheets (form-bound)
@@ -438,8 +438,8 @@ Owner decision: every form-bound sheet will be retired. Until each one is remove
 - It is **not** migrated, **not** put on `ensureSheet_`, and has status `retiring` in the catalog and is not audited. Its readers and writers
   stay unchanged, so the retirement work is the only thing that touches them.
 - Known today: `TeamIntakeRaw` (filled by the intake Form), read at
-  [intake-approval-workflow.js:16](intake-approval-workflow.js#L16) (`onTeamIntakeSubmit`) and
-  [guide-dashboard.js:60](guide-dashboard.js#L60). The title plan (Phase 4) removes `onTeamIntakeSubmit`; the other read
+  [intake-approval-workflow.js:16](../../intake-approval-workflow.js#L16) (`onTeamIntakeSubmit`) and
+  [guide-dashboard.js:60](../../guide-dashboard.js#L60). The title plan (Phase 4) removes `onTeamIntakeSubmit`; the other read
   goes when the sheet does. The live check (2026-10-11) found two more Form-linked tabs, `RawLog` and `Announcements`,
   which no code reads (FORM-SHEET-RETIREMENT-PLAN.md section 2a); they are out of scope here for the same reason.
   `GitHubAccounts` is **not** form-bound: the owner confirms it no longer depends on a Form (students register through the
@@ -459,7 +459,7 @@ Owner decision: every form-bound sheet will be retired. Until each one is remove
 4. **GitHubAccounts timing. Decided: before the student-identity work.** The student-identity feature is large and may be
    implemented later, so phase 3 does not wait for it. The student-identity plan will be rebased on the header-name
    version of `GitHubAccounts` when it is taken up: any column it adds is then added by name (through `ensureSheet_`),
-   not by position. [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md) has not been checked against this plan and needs
+   not by position. [STUDENT-IDENTITY-PLAN.md](../../STUDENT-IDENTITY-PLAN.md) has not been checked against this plan and needs
    that review at that time; nothing in it is changed now.
 5. **Duplicate-header strictness. Decided: option A.** Throw only for a duplicate of a header the code requires. A
    duplicate of an extra or unknown header is ignored, like any other extra column. Header equality is `textEquals_`

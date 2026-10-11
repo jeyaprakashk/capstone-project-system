@@ -1,4 +1,4 @@
-// The removal check (TITLE-REVISION-PLAN.md, section 9): no runtime code reads or writes the old title data. The goal is zero runtime
+// The removal check (archive/plans/TITLE-REVISION-PLAN.md, section 9): no runtime code reads or writes the old title data. The goal is zero runtime
 // readers and writers, not zero mentions: the frozen definitions, the invariant snapshots, the tests and the documentation keep theirs.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

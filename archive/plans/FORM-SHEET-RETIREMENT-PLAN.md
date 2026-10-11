@@ -36,7 +36,7 @@ This plan retires every sheet that a Google Form fills, starting with `TeamIntak
 title work: the code removal is already in [TITLE-REVISION-PLAN.md](TITLE-REVISION-PLAN.md) and is referenced, not copied.
 Where the two differ, the title plan wins until the changes in section 4 are applied to it.
 
-**Position in the build order:** steps 2 to 5 run inside the cutover (item 10), so they come **before** the header-name migration (item 12); steps 7 to 9 are item 11 and **may overlap** the migration, because the migration leaves the retiring Form sheet untouched. The full order is in [BUILD-ORDER.md](BUILD-ORDER.md).
+**Position in the build order:** steps 2 to 5 run inside the cutover (item 10), so they come **before** the header-name migration (item 12); steps 7 to 9 are item 11 and **may overlap** the migration, because the migration leaves the retiring Form sheet untouched. The full order is in [BUILD-ORDER.md](../../BUILD-ORDER.md).
 
 ## 1. Owner decisions
 
@@ -59,10 +59,10 @@ Where the two differ, the title plan wins until the changes in section 4 are app
 
 | Item | Where | Notes |
 |---|---|---|
-| Sheet constant | `TEAM_INTAKE_RAW: 'TeamIntakeRaw'` in [common-constants.js:14](common-constants.js#L14); pinned by `tests/invariants/snapshots/schema.json` | Removing it is a deliberate schema change (section 4, item 3) |
-| Form-submit handler | `onTeamIntakeSubmit(e)` in [intake-approval-workflow.js:14](intake-approval-workflow.js#L14), the only function that reads `e.range` or `e.namedValues` | Removed in title plan Phase 4 |
-| Form link | `buildTeamIntakeLink_` ([common-helpers.js:483](common-helpers.js#L483)); config keys `TEAM_INTAKE_FORM_URL_BASE`, `TEAM_INTAKE_TEAMID_ENTRY`; used in [student-api.js:36](student-api.js#L36) | Removed in title plan Phase 4 |
-| Reader of the sheet | `readGuideRecordContext_` in [guide-dashboard.js:60](guide-dashboard.js#L60): reads `Team ID`, `Timestamp`, `Work Breakdown Document`, `Need Analysis Report` by header name to show each team's latest document-submission date | Replaced under the title plan's Guide phase; see section 3 |
+| Sheet constant | `TEAM_INTAKE_RAW: 'TeamIntakeRaw'` in [common-constants.js:14](../../common-constants.js#L14); pinned by `tests/invariants/snapshots/schema.json` | Removing it is a deliberate schema change (section 4, item 3) |
+| Form-submit handler | `onTeamIntakeSubmit(e)` in [intake-approval-workflow.js:14](../../intake-approval-workflow.js#L14), the only function that reads `e.range` or `e.namedValues` | Removed in title plan Phase 4 |
+| Form link | `buildTeamIntakeLink_` ([common-helpers.js:483](../../common-helpers.js#L483)); config keys `TEAM_INTAKE_FORM_URL_BASE`, `TEAM_INTAKE_TEAMID_ENTRY`; used in [student-api.js:36](../../student-api.js#L36) | Removed in title plan Phase 4 |
+| Reader of the sheet | `readGuideRecordContext_` in [guide-dashboard.js:60](../../guide-dashboard.js#L60): reads `Team ID`, `Timestamp`, `Work Breakdown Document`, `Need Analysis Report` by header name to show each team's latest document-submission date | Replaced under the title plan's Guide phase; see section 3 |
 | Columns the Form wrote | `Timestamp`, `Email Address`, `Team ID`, `Project Title`, `Problem Statement`, `Work Breakdown Document`, `Need Analysis Report` | From the handler's `nv(...)` calls |
 | Uploaded files | Drive files created by the Form's file-upload questions; `TeamIntakeRaw` holds their links | The title plan copies them into each team folder at cutover (its section 11, step 3) |
 | Tests | `tests/title-intake.test.cjs`, intake cases in `tests/team-github-setup.test.cjs`, fixtures in `tests/guide-weekly-browser.test.cjs` and `tests/student-fixture.cjs` | Removed or updated with the code |

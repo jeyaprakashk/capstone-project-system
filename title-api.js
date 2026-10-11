@@ -1,5 +1,5 @@
 /**
- * TITLE API - the endpoints of the title workflow (TITLE-REVISION-PLAN.md, section 10). JSON only. Each write endpoint resolves who the
+ * TITLE API - the endpoints of the title workflow (archive/plans/TITLE-REVISION-PLAN.md, section 10). JSON only. Each write endpoint resolves who the
  * caller is for the team, then hands the action to titleWrite_ (title-write.js) with the callbacks it needs. The rules themselves live in
  * title-service.js; nothing here decides a workflow state.
  */
@@ -156,7 +156,7 @@ function titleDecisionCapability_(state, roles, which) {
 }
 
 /**
- * The Title DTO (TITLE-REVISION-PLAN.md, section 10). `viewer` = {email, roles}. Staff see presence only of documents and a student sees
+ * The Title DTO (archive/plans/TITLE-REVISION-PLAN.md, section 10). `viewer` = {email, roles}. Staff see presence only of documents and a student sees
  * only its own team; the coordinator also gets the history.
  */
 function buildTitleDto_(teamId, viewer, ctx) {

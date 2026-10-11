@@ -202,7 +202,7 @@ function setStatusFields_(sheet, row, fields, columnMap) {
 
 /**
  * One logical write of a record: the cells from the leftmost to the rightmost mapped column, written with one setValues call
- * (SHEET-HEADER-MATCHING-PLAN.md rule W1). `record` holds values by column-map key. `existingRow` is the row as read, or null for a
+ * (archive/plans/SHEET-HEADER-MATCHING-PLAN.md rule W1). `record` holds values by column-map key. `existingRow` is the row as read, or null for a
  * new row; a column inside the span that the map does not name keeps the value it has. For columns that are side by side the call is
  * the same getRange and setValues the old positional code made.
  */

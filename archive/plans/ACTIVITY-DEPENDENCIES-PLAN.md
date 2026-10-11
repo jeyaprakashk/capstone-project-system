@@ -36,7 +36,7 @@ A small engine that decides whether a student action may proceed, from rules a c
 
 ## The plan as it was written
 
-**Position in the build order:** item 7 (the title plan's Phase 2). Its step 1 is the sheet in item 4; steps 2 to 6 need only the catalog and the test doubles; steps 7 and 8 need the endpoint and the upload. The full order is in [BUILD-ORDER.md](BUILD-ORDER.md).
+**Position in the build order:** item 7 (the title plan's Phase 2). Its step 1 is the sheet in item 4; steps 2 to 6 need only the catalog and the test doubles; steps 7 and 8 need the endpoint and the upload. The full order is in [BUILD-ORDER.md](../../BUILD-ORDER.md).
 
 ## 1. Purpose
 
@@ -158,7 +158,7 @@ registerActivityCheck_(kind, {
 | `drive` | an upload name from `TEAM_DOCUMENT_FILE_NAMES_` | Exactly one non-trashed file with that exact name is in the team folder | `teamFoldersBase_`, `teamDocumentsFolder_`, `teamFolderIn_`, then a name lookup |
 
 - **The `github` check must be read-only.** Today `getTeamGithubSetup_` can call `refreshGithubAccountMetadata_`
-  ([team-github-setup.js:99](team-github-setup.js#L99)), which takes a lock and writes the GitHub accounts sheet when a
+  ([team-github-setup.js:99](../../team-github-setup.js#L99)), which takes a lock and writes the GitHub accounts sheet when a
   stored username, display name or profile URL differs from GitHub's. That write is a side effect of a read path and is
   not acceptable for a dashboard load or coordinator inspection. The plan therefore requires a read-only mode:
   `getTeamGithubSetup_` accepts an option (for example `readOnly: true`) that skips only that refresh, and the engine
@@ -179,11 +179,11 @@ registerActivityCheck_(kind, {
 - **`drive` messages.** Absence and ambiguity are different and the check must tell them apart:
   - `findTeamFolder_` and `teamDocumentsFolderOrNull_` return null for absent, ambiguous and unreadable alike, so the
     check does not use them. It composes the underlying helpers, which do report the difference:
-    1. `teamFoldersBase_()` ([team-folders.js:29](team-folders.js#L29)): an `issue` (spreadsheet folder unreadable, not in
+    1. `teamFoldersBase_()` ([team-folders.js:29](../../team-folders.js#L29)): an `issue` (spreadsheet folder unreadable, not in
        a folder, or in several) is unresolved.
-    2. `teamDocumentsFolder_(base.folder, false)` ([team-folders.js:45](team-folders.js#L45)): an `issue` (more than one
+    2. `teamDocumentsFolder_(base.folder, false)` ([team-folders.js:45](../../team-folders.js#L45)): an `issue` (more than one
        Team Documents folder) is unresolved. No issue and no folder is the only true "absent" case.
-    3. `teamFolderIn_(documents, teamId, semester)` ([team-folders.js:144](team-folders.js#L144)) returns
+    3. `teamFolderIn_(documents, teamId, semester)` ([team-folders.js:144](../../team-folders.js#L144)) returns
        `{folder, count}`: `count` 0 is absent, above 1 is ambiguous.
     A thrown Drive error is also unresolved.
   - Team Documents absent, or `count` 0: unmet, "Team folder not created yet."
@@ -262,7 +262,7 @@ activityPreconditions_(activityId, team, ctx) →
 ## 8. Response and endpoint
 
 The core functions return plain objects. Endpoints wrap them in the standard envelope from
-[DATA-CONTRACTS.md](DATA-CONTRACTS.md), so the core stays testable on its own.
+[DATA-CONTRACTS.md](../../DATA-CONTRACTS.md), so the core stays testable on its own.
 
 - "Not allowed" is a normal answer: `ok: true`, `data.allowed: false`. The action endpoint that refuses because of it
   returns `REJECTED` with the unmet items.

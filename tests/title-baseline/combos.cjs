@@ -1,4 +1,4 @@
-// Phase 0 of TITLE-REVISION-PLAN.md: every TeamStatus title/decision combination that today's downstream code can see.
+// Phase 0 of archive/plans/TITLE-REVISION-PLAN.md: every TeamStatus title/decision combination that today's downstream code can see.
 // The old model stores a title (blank or not), a Guide Decision and a Reviewer Decision; getTeamStatus_ turns them into a status.
 // These states are the inputs of the golden masters in ./snapshots (captured from the code before any title change).
 const TITLES = [{key: 'no', value: ''}, {key: 'yes', value: 'Project'}];

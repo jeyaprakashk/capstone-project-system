@@ -1,4 +1,4 @@
-// Builders for TitleLog rows used by the title tests. They follow TITLE-REVISION-PLAN.md sections 4 and 5 directly and do not use
+// Builders for TitleLog rows used by the title tests. They follow archive/plans/TITLE-REVISION-PLAN.md sections 4 and 5 directly and do not use
 // the production code, so the history rules and the service are checked against an independent description of the log.
 const HOUR = 3600000;
 const T0 = Date.parse('2026-01-02T10:00:00Z');

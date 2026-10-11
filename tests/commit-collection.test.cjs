@@ -248,7 +248,7 @@ test('missing and ambiguous status fail closed; malformed headers never get rewr
  assert.equal(other.sheets.has('CommitCollectionStatus'),false);
 });
 
-// CommitCollectionStatus is found by header name (SHEET-HEADER-MATCHING-PLAN.md, phase 2 pilot).
+// CommitCollectionStatus is found by header name (archive/plans/SHEET-HEADER-MATCHING-PLAN.md, phase 2 pilot).
 function statusSheet(f, rows) {
  f.sheets.get('CommitCollectionStatus').rows.splice(0, Infinity, ...rows);
  return f.sheets.get('CommitCollectionStatus');
@@ -311,7 +311,7 @@ test('status: a newly created tab is hidden and red, as a system sheet', () => {
  assert.equal(f.sheets.get('CommitCollectionStatus').hidden, true);
 });
 
-// Commits is found by header name (SHEET-HEADER-MATCHING-PLAN.md, phase 4).
+// Commits is found by header name (archive/plans/SHEET-HEADER-MATCHING-PLAN.md, phase 4).
 test('commits: the current layout is appended with one getRange over seven columns, as before',()=>{
  const f=fixture(),sheet=f.sheets.get('Commits'),calls=[],getRange=sheet.getRange;
  sheet.getRange=(...args)=>{calls.push(args.join(','));return getRange(...args);};

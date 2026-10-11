@@ -1,5 +1,5 @@
-// Phase 0 stubs (TITLE-REVISION-PLAN.md) for the GitHub and Drive layers that the submission requirements will check
-// (ACTIVITY-DEPENDENCIES-PLAN.md). They answer from a script and make no live call, so the engine's tests can cover every
+// Phase 0 stubs (archive/plans/TITLE-REVISION-PLAN.md) for the GitHub and Drive layers that the submission requirements will check
+// (archive/plans/ACTIVITY-DEPENDENCIES-PLAN.md). They answer from a script and make no live call, so the engine's tests can cover every
 // outcome, including "GitHub is down" and an ambiguous folder, which a live service cannot be told to produce.
 //
 //   githubSetupStub(preset, overrides)  - a getTeamGithubSetup_ stand-in with the real result shape and the real message text

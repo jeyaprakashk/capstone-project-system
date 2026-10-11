@@ -1,5 +1,5 @@
 /**
- * ACTIVITY CHECK: github (ACTIVITY-DEPENDENCIES-PLAN.md, section 5). The one item is READY: every member's username is valid, the
+ * ACTIVITY CHECK: github (archive/plans/ACTIVITY-DEPENDENCIES-PLAN.md, section 5). The one item is READY: every member's username is valid, the
  * repository is verified, every member has active or invited access, and template setup has finished. It reads
  * getTeamGithubSetup_ in its read-only mode, so a dashboard load never writes the GitHub accounts sheet.
  */

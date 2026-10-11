@@ -1,5 +1,5 @@
 /**
- * REQUIREMENTS ENDPOINT - the coordinator's view of the activity rules (ACTIVITY-DEPENDENCIES-PLAN.md, section 8). Read-only.
+ * REQUIREMENTS ENDPOINT - the coordinator's view of the activity rules (archive/plans/ACTIVITY-DEPENDENCIES-PLAN.md, section 8). Read-only.
  * Without a team it returns the parsed rules and the loader's errors; with a team it returns that team's checklist for each
  * activity, including the checks' diagnostics, which students never see (studentRequirements_ removes them).
  */

@@ -62,7 +62,7 @@ the master registry of the hub spreadsheet (`readMasterRegistry_`), which is rea
 ## Project titles
 
 The project title and problem statement are not stored in TeamStatus any more. They live in the `TitleLog` sheet, an append-only
-history (one row per change, the latest row of a team is its state). Specified in [TITLE-REVISION-PLAN.md](TITLE-REVISION-PLAN.md).
+history (one row per change, the latest row of a team is its state). Specified in [TITLE-REVISION-PLAN.md](archive/plans/TITLE-REVISION-PLAN.md).
 
 - **Read** a team's title only through `titleGate_(teamId)` (approved or not, and the title and problem in effect), or
   `titleSummary_` / `titleStateFromIndex_` when a screen needs the workflow state. Read the log once with `readTitleIndex_()` and pass

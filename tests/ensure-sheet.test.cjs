@@ -1,5 +1,5 @@
 // ensureSheet_ (ensure-sheet.js): creation, header checks, repair, runtime mode, locking and caches.
-// Uses a fake spreadsheet; there are no live calls. Specified in ENSURE-SHEET-PLAN.md.
+// Uses a fake spreadsheet; there are no live calls. Specified in archive/plans/ENSURE-SHEET-PLAN.md.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

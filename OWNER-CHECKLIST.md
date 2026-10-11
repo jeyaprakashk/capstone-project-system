@@ -1,7 +1,7 @@
 # Owner checklist
 
 What **you** do by hand, in order. Everything else is developer work and is not listed. The steps come from
-[TITLE-REVISION-PLAN.md](TITLE-REVISION-PLAN.md) (section 11) and [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md);
+[TITLE-REVISION-PLAN.md](archive/plans/TITLE-REVISION-PLAN.md) (section 11) and [FORM-SHEET-RETIREMENT-PLAN.md](archive/plans/FORM-SHEET-RETIREMENT-PLAN.md);
 if they differ from this page, those plans win. Your steps belong to items 9 to 11 of [BUILD-ORDER.md](BUILD-ORDER.md); the order of the whole work is there. **Status (2026-10-11): the code is built and the cutover is done. Sections A to C are history; section D was rewritten and lists what is still for you to do.** Steps in A to C that mention an archive, a rename or a wait were not carried out (see D).
 
 ## A. Now: checks in the live spreadsheet (read-only, no changes)
@@ -25,10 +25,10 @@ state noted.
 
 | # | Result | What it means, and what you do |
 |---|---|---|
-| 1 | **First run:** 23 tabs; linked Forms on `Announcements`, `TeamIntakeRaw` and `RawLog`. **Second run:** 21 tabs, `Announcements` and `RawLog` gone, no linked Form on any tab | Resolved by your removals; no code read either tab. Nothing to decide now (FORM-SHEET-RETIREMENT-PLAN.md, section 2a). `TeamIntakeRaw` is now an ordinary tab |
+| 1 | **First run:** 23 tabs; linked Forms on `Announcements`, `TeamIntakeRaw` and `RawLog`. **Second run:** 21 tabs, `Announcements` and `RawLog` gone, no linked Form on any tab | Resolved by your removals; no code read either tab. Nothing to decide now (archive/plans/FORM-SHEET-RETIREMENT-PLAN.md, section 2a). `TeamIntakeRaw` is now an ordinary tab |
 | 2 | **No formulas** in any of the 23 tabs; no named ranges or charts. Pivot tables and filter views were not established | Good for the migration's write rule (no formulas to flatten). **Owner confirmed (2026-10-11): no pivot tables.** Filter views were not mentioned; check each tab's Data menu if you want to be certain |
 | 3 | **Pass.** No duplicate or blank titles in row 1 of any tab | Nothing to do |
-| 4 | **Pass.** 2 direct users and 1 group on the shared drive; no direct student | **Owner confirmed (2026-10-11): the group is faculty only.** Nothing more to do (TITLE-REVISION-PLAN.md, operator rule 6) |
+| 4 | **Pass.** 2 direct users and 1 group on the shared drive; no direct student | **Owner confirmed (2026-10-11): the group is faculty only.** Nothing more to do (archive/plans/TITLE-REVISION-PLAN.md, operator rule 6) |
 | 5 | **Not as expected.** Six triggers; `onTeamIntakeSubmit` (form submit) is still installed | Deleted at cutover step 0. The title-reading trigger to pause is `reconcileProgressEligibility`; `sendGuideReminderDigest` is deleted (function removed); the reviewer digest is not scheduled |
 | 6 | **Not complete.** 62 team folders; 55 have both files. Missing both: `g8`, `g45`, `g35`, `g34`, `g32`, `g11`. Missing `Step2_Need_Analysis.docx`: `g46`. No duplicates | These seven teams cannot submit a title under the new flow until they upload the missing documents (the requirement rows). Cutover step 8 tells them. **Owner will finalise this later (2026-10-11)**: chase the documents before cutover, or tell the teams at cutover |
 
@@ -99,7 +99,7 @@ Follow the order. Stop and ask if any step does not behave as written.
 | 1 | In the editor, run `setupTitleStorage`. (The plan also had you type three `ActivityDependencies` rows. They were not entered and are not needed: the `ActivityDependencies` tab stays header-only, so no submission requirement is enforced.) |
 | 2 | Run `setTitleCutover('PAUSED')` and wait for it to return |
 | 3 | **Documents.** Copy each team's existing Form-uploaded documents into its team folder (`Team Documents`) under the fixed names `Step1_Work_Breakdown.docx` and `Step2_Need_Analysis.docx` (the folders must exist first: System Status, Team folders). Close the Form if it is still accepting responses |
-| 4 | **Superseded: never built, and not needed.** The owner took a full backup and deleted the `TeamIntakeRaw` tab. Original text: the archive preflight, copy and verification functions of [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md) do not exist in the code. Skip this step; `TeamIntakeRaw` stays exactly as it is and is not renamed or deleted until the archive is built and verified (part D) |
+| 4 | **Superseded: never built, and not needed.** The owner took a full backup and deleted the `TeamIntakeRaw` tab. Original text: the archive preflight, copy and verification functions of [FORM-SHEET-RETIREMENT-PLAN.md](archive/plans/FORM-SHEET-RETIREMENT-PLAN.md) do not exist in the code. Skip this step; `TeamIntakeRaw` stays exactly as it is and is not renamed or deleted until the archive is built and verified (part D) |
 | 5 | (Done at the cutover; the function was deleted afterwards.) Run `importTitleBaseline` in the editor. It copies each team's current title state from `TeamStatus` into `TitleLog` (one `BASELINE` row per team) and refuses unless the cutover is `PAUSED`. Read its report: `problems` lists teams it could not write (an approved team with no approval date in the master registry, for example; type that row by hand), `invalid` must be empty. It is safe to run again; teams that already have rows are skipped |
 | 6 | **Deploy the new version** (new deployment version of the web app) |
 | 7 | In the editor run `validateTitleLog` and read the execution log: `errors` must be empty. Then open a team's drawer (Coordinator, the team row, **Title**) and check its requirements card. Fix and repeat until both are clean. Then **restore the triggers** you paused in step 0 (they stay paused until now) |

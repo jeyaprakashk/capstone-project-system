@@ -101,7 +101,7 @@ test('guide weight and criterion maxima come from sheets and changes reject stal
  const result=f.c.submitGuideEvaluation_(f.input(d));assert.equal(result.total,40);assert.equal(result.weighted,24);
 });
 
-// Assessment journals are found by header name (SHEET-HEADER-MATCHING-PLAN.md, phase 5).
+// Assessment journals are found by header name (archive/plans/SHEET-HEADER-MATCHING-PLAN.md, phase 5).
 function shuffleJournal(f){
  const order=[8,3,0,5,1,6,2,7,4]; // Payload, Revision, Assessment, Actor, Team, At, Student, Request ID, Action
  const data=f.tables.GuideEvaluations;

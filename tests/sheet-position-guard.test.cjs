@@ -1,5 +1,5 @@
 // No server code reaches a sheet cell by a number. Sheets are read and written by header name (AGENTS.md, "Sheet access"), so a
-// column can move without the code noticing. This is the project-wide search of SHEET-HEADER-MATCHING-PLAN.md section 8, run over every
+// column can move without the code noticing. This is the project-wide search of archive/plans/SHEET-HEADER-MATCHING-PLAN.md section 8, run over every
 // root module. It is a text-level tripwire, with known limits (it cannot see a number held in a variable); the shuffled-column
 // tests in tests/shuffled-columns.test.cjs and in each sheet's own tests are the proof.
 const {test} = require('node:test');

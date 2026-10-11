@@ -147,7 +147,7 @@ function auditCommitHistory() {
 
 /**
  * The sheet and its columns found by header name, or null when the sheet does not exist. With `create` a missing sheet is created
- * first (the one runtime creator, ENSURE-SHEET-PLAN.md "Runtime mode"). Extra columns are ignored; a missing or repeated required
+ * first (the one runtime creator, archive/plans/ENSURE-SHEET-PLAN.md "Runtime mode"). Extra columns are ignored; a missing or repeated required
  * header throws and nothing is repaired. Call under the script lock when creating or writing collection status.
  */
 function commitCollectionStatusSheet_(create) {

@@ -1,4 +1,4 @@
-// TitleLog history validation (title-history.js): rules 1 to 8 of TITLE-REVISION-PLAN.md section 4, one broken case each.
+// TitleLog history validation (title-history.js): rules 1 to 8 of archive/plans/TITLE-REVISION-PLAN.md section 4, one broken case each.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

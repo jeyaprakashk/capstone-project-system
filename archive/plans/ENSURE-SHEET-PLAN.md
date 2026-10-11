@@ -43,7 +43,7 @@ block of [SHEET-HEADER-MATCHING-PLAN.md](SHEET-HEADER-MATCHING-PLAN.md), whose d
 repair rule, and it replaces the sheet-specific function in [ACTIVITY-DEPENDENCIES-SHEET-PLAN.md](ACTIVITY-DEPENDENCIES-SHEET-PLAN.md)
 (section 11).
 
-**Position in the build order:** items 1 and 2. It needs nothing and must be merged, with its second commit, before any sheet is created through it. The full order is in [BUILD-ORDER.md](BUILD-ORDER.md).
+**Position in the build order:** items 1 and 2. It needs nothing and must be merged, with its second commit, before any sheet is created through it. The full order is in [BUILD-ORDER.md](../../BUILD-ORDER.md).
 
 ## 1. Purpose
 
@@ -147,7 +147,7 @@ call site, not the sheet. In this plan `access` (`system`, `view`, `edit`) is th
 (`setup`, `runtime`); the two are unrelated.
 
 One existing path creates a sheet during a runtime write: `writeCommitCollectionStatus_`
-([logbook-tracker.js:175](logbook-tracker.js#L175)) calls `commitCollectionStatusSheet_(true)` under the script lock, so
+([logbook-tracker.js:175](../../logbook-tracker.js#L175)) calls `commitCollectionStatusSheet_(true)` under the script lock, so
 the first status write creates `CommitCollectionStatus` if it is missing. (The other creator, `weeklyReminderSheet_(true)`,
 is called only from `setupWeeklySubmissionStorage`, an editor-run setup; Phase 0 confirms there is no other.) The
 migration must keep that behaviour, so the helper has a narrow mode for it. Moving creation into setup instead would change
@@ -199,7 +199,7 @@ Setup mode can append a header to a live sheet, so a runtime caller must never r
 - **Success:** `{created, repaired}`. `repaired` lists the headers appended, so a setup function can report them. They are
   also written to the server log (the sheet name and the header names, no cell values).
 - **Failure:** the helper throws a plain `Error`, the project's standard (for example `Commits header mismatch ...` in
-  [logbook-tracker.js:61](logbook-tracker.js#L61)). API endpoints already turn that into the envelope error. Messages
+  [logbook-tracker.js:61](../../logbook-tracker.js#L61)). API endpoints already turn that into the envelope error. Messages
   name the sheet and say that nothing was changed:
   - `<Sheet> header mismatch. Missing: <a, b>. Unrecognised: <x>. Fix the header row by hand; nothing was changed.`
   - `Duplicate header in <Sheet>: <h>. Nothing was changed.`
@@ -220,8 +220,8 @@ Setup mode can append a header to a live sheet, so a runtime caller must never r
    have created or repaired the sheet meanwhile), decide again, then write.
 3. **Locking.** If this execution already holds the script lock (`lock.hasLock()`), use it and do not take it again, so a
    caller inside a locked section cannot deadlock. Otherwise take it with `waitLock(30000)` and release it in `finally`.
-   This is the project's existing pattern (`weeklyLock_` in [logbook-tracker.js:268](logbook-tracker.js#L268) and the
-   identity lock in [github-identity.js:71](github-identity.js#L71)): reuse an owned lock, otherwise wait up to 30
+   This is the project's existing pattern (`weeklyLock_` in [logbook-tracker.js:268](../../logbook-tracker.js#L268) and the
+   identity lock in [github-identity.js:71](../../github-identity.js#L71)): reuse an owned lock, otherwise wait up to 30
    seconds. The helper takes no other lock, so it is always the innermost lock and cannot create a lock-order cycle with
    any current or future caller. If the wait times out it throws "Another setup is running. Try again shortly.".
 4. **Few calls.** One `insertSheet`, one `setValues` for all headers, one `setTabColor`, at most one `hideSheet`, and one
@@ -229,7 +229,7 @@ Setup mode can append a header to a live sheet, so a runtime caller must never r
 5. **Hidden sheet.** Count visible sheets first; if hiding would leave none, throw before changing anything.
 6. **Cache invalidation after any write.** Clear this sheet's entry in `sheetExecutionHandles_`, the matching
    `_columnMapCache` entries (they include the header map, which has just changed), and any `dashboardReadSnapshot_` or
-   `dashboardHeaderSnapshot_` entry for it in [common-helpers.js](common-helpers.js). A small `invalidateSheetCaches_(name)`
+   `dashboardHeaderSnapshot_` entry for it in [common-helpers.js](../../common-helpers.js). A small `invalidateSheetCaches_(name)`
    in that file does this, so no caller reaches into those variables.
 7. **`onCreate` runs once, only on creation, inside the lock.** It is for cosmetic setup such as plain-text columns or a
    dropdown. If it throws, the error propagates with the note that the sheet was created; the next run sees a complete

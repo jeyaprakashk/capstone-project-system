@@ -1,6 +1,6 @@
 /**
  * TITLE STORAGE - the editor-run setup of the title sheets and the coordinator's read-only check of the log
- * (TITLE-REVISION-PLAN.md, sections 10 and 11). Names, headers and access modes live in the sheet catalog (sheet-columns.js).
+ * (archive/plans/TITLE-REVISION-PLAN.md, sections 10 and 11). Names, headers and access modes live in the sheet catalog (sheet-columns.js).
  */
 const TITLE_REPORT_LIMIT_ = 200;
 

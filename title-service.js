@@ -1,5 +1,5 @@
 /**
- * TITLE SERVICE - the rules of the title workflow (TITLE-REVISION-PLAN.md, sections 5 and 6): input rules, who may do what in which
+ * TITLE SERVICE - the rules of the title workflow (archive/plans/TITLE-REVISION-PLAN.md, sections 5 and 6): input rules, who may do what in which
  * state, the row each action appends, the request fingerprint and the similarity check. These functions decide and build; they
  * do not read or write sheets (title-write.js does), so they can be tested without a spreadsheet.
  *

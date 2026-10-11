@@ -4,12 +4,12 @@
  * positional (some column is still read by position), migrated (every access is by header name, listed in `code` and audited by
  * tests/sheet-catalog.test.cjs). Whether the code that creates a sheet goes through ensureSheet_ shows in `code` as a setup or
  * runtime-create entry.
- * Specified in SHEET-HEADER-MATCHING-PLAN.md ("Sheet catalog"); the generated reference is SHEETS.md
+ * Specified in archive/plans/SHEET-HEADER-MATCHING-PLAN.md ("Sheet catalog"); the generated reference is SHEETS.md
  * (npm run build:sheets-doc). Every sheet the code touches is listed (the master registry is in the hub spreadsheet).
  *
  * - Frozen sheets are referenced with headersFrom: 'FIELD_DEFINITIONS.<NAME>', never copied.
  * - `code` lists only code that exists: { file, role, functions }, role = setup | runtime-create | read | write.
- * - createAtRuntime marks a sheet that runtime code may create (ensureSheet_ mode 'runtime'); see ENSURE-SHEET-PLAN.md.
+ * - createAtRuntime marks a sheet that runtime code may create (ensureSheet_ mode 'runtime'); see archive/plans/ENSURE-SHEET-PLAN.md.
  * It is a function, not a top-level constant, so it does not depend on file load order.
  */
 let sheetCatalogMemo_ = null;

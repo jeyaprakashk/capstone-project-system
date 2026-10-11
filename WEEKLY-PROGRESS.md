@@ -160,7 +160,7 @@ weekly processing. The following describes storage and the existing hourly sched
    installations. Remove retired weekly installations owned by other accounts.
 5. Weekly entry no longer uses a Google Form, and no code reads `RawLog`. The `RawLog` tab
    and its Form were removed by the owner (2026-10-11; see
-   [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md)).
+   [FORM-SHEET-RETIREMENT-PLAN.md](archive/plans/FORM-SHEET-RETIREMENT-PLAN.md)).
    Remove Config `WEEKLY_LOG_FORM_URL_BASE` and `WEEKLY_LOG_TEAMID_ENTRY` if they are present.
 6. Verify a student submission and revision in the deployed dashboard and inspect
    the installed hourly trigger. No local tests install triggers or deploy code.

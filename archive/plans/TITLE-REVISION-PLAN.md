@@ -48,7 +48,7 @@ upload replacement and concurrency, requirement deadlocks, history validation, t
 existing status names, input rules for title and problem, the effective title and problem pair, and legacy baselines
 with a blank problem. Revision 9 is revision 8 marked final, with no design change.
 
-**Position in the build order:** items 5, 6, 8, 9 and 10. Phase 1 needs `ensureSheet_` and catalog v1 (items 1 to 4); Phase 2 is the engine (item 7). The full order is in [BUILD-ORDER.md](BUILD-ORDER.md).
+**Position in the build order:** items 5, 6, 8, 9 and 10. Phase 1 needs `ensureSheet_` and catalog v1 (items 1 to 4); Phase 2 is the engine (item 7). The full order is in [BUILD-ORDER.md](../../BUILD-ORDER.md).
 
 ## 1. Goal and scope
 
@@ -97,7 +97,7 @@ old title data.
 9. **Similarity uses the existing `similarity_` and thresholds,** with one normalization for student and guide titles.
 10. **Submission requirements are data, not code.** The kinds of check (`github`, `drive`) are code. Which checks
     apply to which activity is rows in `ActivityDependencies`. At release: `github`/`READY` and the two documents.
-11. **This plan lands before [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md),** which is rebased afterwards
+11. **This plan lands before [STUDENT-IDENTITY-PLAN.md](../../STUDENT-IDENTITY-PLAN.md),** which is rebased afterwards
     (section 14, F8).
 
 ## 3. Frozen and deliberate changes
@@ -214,7 +214,7 @@ a duplicate header or unlabelled content is refused and nothing is changed.
   - otherwise: the proposed title and the proposed problem.
 
   `titleGate_` returns this pair (section 2) and every screen outside the title panel uses it: reviews, review
-  marking (the `title` and `problem` details at [review-evaluation.js:32](review-evaluation.js#L32)), results, the
+  marking (the `title` and `problem` details at [review-evaluation.js:32](../../review-evaluation.js#L32)), results, the
   team drawer and lists. Title panels show both pairs during a reopening, labelled "Approved" and "Proposed".
 
 **Similarity** (submissions and guide edits):
@@ -256,7 +256,7 @@ Every title write carries `requestId` and `expectedRevision`.
 11. Release the lock, then send mail. A mail failure is logged and returned as `warning`; the save stands. A
     duplicate request sends no mail.
 
-**Error codes** (the existing envelope codes in [api-envelope.js](api-envelope.js); no new codes):
+**Error codes** (the existing envelope codes in [api-envelope.js](../../api-envelope.js); no new codes):
 
 | Situation | Code | View behaviour |
 |---|---|---|
@@ -313,11 +313,11 @@ required item; an activity has several items by having several rows.
 
 - An unmet `github` item uses the existing `githubSetupMessage_` text as its reason.
 - `READY` is the only `github` item. A repository-only check is not offered: `getTeamGithubSetup_` verifies the
-  repository only once every username is complete ([team-github-setup.js:116](team-github-setup.js#L116)), so it
+  repository only once every username is complete ([team-github-setup.js:116](../../team-github-setup.js#L116)), so it
   cannot answer "does the repository exist?" on its own. Any other `github` item is a misconfiguration (F3 lists an
   independent repository check as a possible later kind).
 - A `drive` item must be one of the upload names in `TEAM_DOCUMENT_FILE_NAMES_`
-  ([team-folders.js:11](team-folders.js#L11)); any other name is a misconfiguration, because students could never
+  ([team-folders.js:11](../../team-folders.js#L11)); any other name is a misconfiguration, because students could never
   satisfy it.
 
 ### Loader and decision
@@ -361,7 +361,7 @@ gated actions, `activityPreconditions_`, so they cannot disagree.
 ## 8. Document upload (minimal)
 
 The `drive` requirements need a way for files to reach the team folder. Folder creation does not share
-folders with anyone ([team-folders.js:111](team-folders.js#L111)), so students cannot place files themselves.
+folders with anyone ([team-folders.js:111](../../team-folders.js#L111)), so students cannot place files themselves.
 
 - **Endpoint:** `API_student_uploadDocument({requestId, documentKey, fileName, mimeType, dataBase64})`. The team comes
   from the session. `documentKey` is a key of `TEAM_DOCUMENT_FILE_NAMES_` (`work`, `need`); the stored name is that
@@ -445,13 +445,13 @@ These all move to `titleGate_`, or to the title DTO for display:
 
 | Area | Sites |
 |---|---|
-| Weekly submission | [logbook-tracker.js:424](logbook-tracker.js#L424), [logbook-tracker.js:454](logbook-tracker.js#L454) |
-| Review marking | [review-evaluation.js:15](review-evaluation.js#L15), [review-evaluation.js:32](review-evaluation.js#L32) (title and problem details: the effective pair), [reviewer-evaluation.js:3-13](reviewer-evaluation.js#L3-L13) (`reviewerTeamContext_` title), [reviewer-api.js:16](reviewer-api.js#L16) |
-| Eligibility | [progress-eligibility.js:93-104](progress-eligibility.js#L93-L104), [progress-eligibility.js:221-261](progress-eligibility.js#L221-L261): `titleStatus` and `titleDate` come from the gate; the `ProgressEligibility` columns and calculation are unchanged |
-| Guide | [guide-dashboard.js:22](guide-dashboard.js#L22), [guide-dashboard.js:38-75](guide-dashboard.js#L38-L75) (approval and document dates), [guide-api.js:73](guide-api.js#L73), [guide-api.js:155](guide-api.js#L155) |
-| Reviewer | [reviewer-api.js:5-50](reviewer-api.js#L5-L50), [reviewer-dashboard.js:7-31](reviewer-dashboard.js#L7-L31) |
-| Coordinator | [coordinator-dashboard.js](coordinator-dashboard.js) lines 57, 97, 165, 275, 307, 317; [coordinator-view.js:163](coordinator-view.js#L163); the team drawer |
-| Student | [student-dashboard.js:42](student-dashboard.js#L42), [student-api.js:36](student-api.js#L36) (Form link) |
+| Weekly submission | [logbook-tracker.js:424](../../logbook-tracker.js#L424), [logbook-tracker.js:454](../../logbook-tracker.js#L454) |
+| Review marking | [review-evaluation.js:15](../../review-evaluation.js#L15), [review-evaluation.js:32](../../review-evaluation.js#L32) (title and problem details: the effective pair), [reviewer-evaluation.js:3-13](../../reviewer-evaluation.js#L3-L13) (`reviewerTeamContext_` title), [reviewer-api.js:16](../../reviewer-api.js#L16) |
+| Eligibility | [progress-eligibility.js:93-104](../../progress-eligibility.js#L93-L104), [progress-eligibility.js:221-261](../../progress-eligibility.js#L221-L261): `titleStatus` and `titleDate` come from the gate; the `ProgressEligibility` columns and calculation are unchanged |
+| Guide | [guide-dashboard.js:22](../../guide-dashboard.js#L22), [guide-dashboard.js:38-75](../../guide-dashboard.js#L38-L75) (approval and document dates), [guide-api.js:73](../../guide-api.js#L73), [guide-api.js:155](../../guide-api.js#L155) |
+| Reviewer | [reviewer-api.js:5-50](../../reviewer-api.js#L5-L50), [reviewer-dashboard.js:7-31](../../reviewer-dashboard.js#L7-L31) |
+| Coordinator | [coordinator-dashboard.js](../../coordinator-dashboard.js) lines 57, 97, 165, 275, 307, 317; [coordinator-view.js:163](../../coordinator-view.js#L163); the team drawer |
+| Student | [student-dashboard.js:42](../../student-dashboard.js#L42), [student-api.js:36](../../student-api.js#L36) (Form link) |
 | Digests | None: the guide and reviewer digest e-mails were removed (the faculty use the dashboard); no code reads title state for a digest |
 
 Before Phase 1 ends, grep every use of `getTeamStatus_`, `REVIEWER_DECISION`, `GUIDE_DECISION`, `TS.TITLE`,
@@ -475,10 +475,10 @@ added there deliberately.
 
 | Removed | Callers removed with it |
 |---|---|
-| `API_guide_submitDecision`, `submitGuideDecision_`, `applyGuideDecision_` | [guide-view.js:333](guide-view.js#L333); its DATA-CONTRACTS.md row; its tests |
-| `API_reviewer_submitDecision`, `submitReviewerDecision_`, `applyReviewerDecision_` | [reviewer-view.js:135](reviewer-view.js#L135); its DATA-CONTRACTS.md row; its tests |
+| `API_guide_submitDecision`, `submitGuideDecision_`, `applyGuideDecision_` | [guide-view.js:333](../../guide-view.js#L333); its DATA-CONTRACTS.md row; its tests |
+| `API_reviewer_submitDecision`, `submitReviewerDecision_`, `applyReviewerDecision_` | [reviewer-view.js:135](../../reviewer-view.js#L135); its DATA-CONTRACTS.md row; its tests |
 | `onTeamIntakeSubmit` | its `GUARDED` entry; `tests/title-intake.test.cjs`; the intake cases in `tests/team-github-setup.test.cjs` |
-| `buildTeamIntakeLink_`, `TEAM_INTAKE_FORM_URL_BASE`, `TEAM_INTAKE_TEAMID_ENTRY` | [student-api.js:36](student-api.js#L36); `tests/student-fixture.cjs` |
+| `buildTeamIntakeLink_`, `TEAM_INTAKE_FORM_URL_BASE`, `TEAM_INTAKE_TEAMID_ENTRY` | [student-api.js:36](../../student-api.js#L36); `tests/student-fixture.cjs` |
 | `getTeamStatus_`, `progressTitleDate_`, `readGuideApprovals_`, the `TeamIntakeRaw` document-date reader | every site in the table above |
 | The `CHAPTER1_LATEX_LINK` read in `reviewer-api.js` (a field not in `FIELD_DEFINITIONS`) | the reviewer documents list |
 
@@ -544,7 +544,7 @@ DATA-CONTRACTS.md, the endpoint, its contract test and its view change together.
 **Views.** Bridge only, Tailwind utilities, `data-*` hooks and delegated listeners; views render only `can.*` (with
 each capability's `requirements`) and `documents`. New modules are registered under their role in `getMigratedViewsClientScript_` and in
 `ROLE_MODULES` in `tests/page-assembly.test.cjs`; their tests go into the `test` and `test:migration` scripts.
-Rebuild Tailwind after any class change. [tests/entry-point-guard.test.cjs](tests/entry-point-guard.test.cjs) gains
+Rebuild Tailwind after any class change. [tests/entry-point-guard.test.cjs](../../tests/entry-point-guard.test.cjs) gains
 `setupTitleStorage`, `setTitleCutover` and `clearTitleCutover` (both from Release 0) and the new `API_*` functions, and loses `onTeamIntakeSubmit` and the two old decision endpoints.
 
 ### Phases
@@ -882,7 +882,7 @@ alternatives.
 
 ### F8. Rebase of the student identity plan
 
-After this release, [STUDENT-IDENTITY-PLAN.md](STUDENT-IDENTITY-PLAN.md) changes as follows: drop the
+After this release, [STUDENT-IDENTITY-PLAN.md](../../STUDENT-IDENTITY-PLAN.md) changes as follows: drop the
 `'maintenance-reply'` exception; migrate `TitleLog` (team IDs and actor emails); move the title service's membership
 and eligibility lookups and the `github` check's member list to `Students` and `TeamRoster`; add the new endpoints,
 the upload and the engine checks to its guarded and reader lists; consider replacing `TITLE_CUTOVER` with its general

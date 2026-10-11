@@ -1,5 +1,5 @@
 /**
- * TITLE REQUEST IDS - browser module serialized into every dashboard page as `TitleRequests` (TITLE-REVISION-PLAN.md, section 6).
+ * TITLE REQUEST IDS - browser module serialized into every dashboard page as `TitleRequests` (archive/plans/TITLE-REVISION-PLAN.md, section 6).
  * The bridge never retries a write, so a view that sends a title write owns the request ID:
  *  - the first time for a given content it gets a new ID;
  *  - it keeps the ID while the user retries the same content after a failure that may have committed (TRANSPORT, TIMEOUT, BAD_RESPONSE,

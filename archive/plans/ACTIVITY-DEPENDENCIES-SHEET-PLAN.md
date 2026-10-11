@@ -32,7 +32,7 @@ The sheet is created through the shared helper `ensureSheet_`, specified in [ENS
 This plan therefore only supplies the sheet's specification and its setup entry point. Creation, header checking, repair,
 locking, tab colour and visibility are the helper's job and are not repeated here.
 
-**Position in the build order:** item 4. It needs items 2 and 3 (`ensureSheet_` with repair enabled, and catalog v1) and enables the title plan's Phase 1. The full order is in [BUILD-ORDER.md](BUILD-ORDER.md).
+**Position in the build order:** item 4. It needs items 2 and 3 (`ensureSheet_` with repair enabled, and catalog v1) and enables the title plan's Phase 1. The full order is in [BUILD-ORDER.md](../../BUILD-ORDER.md).
 
 ## 1. Purpose
 
@@ -125,7 +125,7 @@ Apps Script's editor can run only functions whose names do not end in `_`, so th
 setupActivityDependencies()      // editor-run
 ```
 
-- It starts with `requireTriggerOrOperator_()` ([common-helpers.js:254](common-helpers.js#L254)) and then calls
+- It starts with `requireTriggerOrOperator_()` ([common-helpers.js:254](../../common-helpers.js#L254)) and then calls
   `ensureActivityDependenciesSheet_()`, returning its result so the person running it sees what was created or repaired.
 - It is a new public function, so it is added to `tests/entry-point-guard.test.cjs`, which fails when an unlisted public
   function appears.

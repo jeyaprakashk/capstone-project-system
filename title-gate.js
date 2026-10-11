@@ -1,5 +1,5 @@
 /**
- * TITLE GATE - the one yes/no answer "does this team have an approved title?" (TITLE-REVISION-PLAN.md, section 2, decision 1).
+ * TITLE GATE - the one yes/no answer "does this team have an approved title?" (archive/plans/TITLE-REVISION-PLAN.md, section 2, decision 1).
  * It is derived from TitleLog only. A team's history is validated whenever it is read; a team whose history fails is
  * UNAVAILABLE, and only that team. Nothing here writes.
  */

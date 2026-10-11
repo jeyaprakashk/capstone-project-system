@@ -1,5 +1,5 @@
 /**
- * ACTIVITY CHECK: drive (ACTIVITY-DEPENDENCIES-PLAN.md, section 5). The item is an upload name from TEAM_DOCUMENT_FILE_NAMES_. It is
+ * ACTIVITY CHECK: drive (archive/plans/ACTIVITY-DEPENDENCIES-PLAN.md, section 5). The item is an upload name from TEAM_DOCUMENT_FILE_NAMES_. It is
  * met when exactly one non-trashed file with that exact name is in the team folder. It tells a confirmed absence apart from a lookup
  * that could not be resolved, which the shared findTeamFolder_ cannot (it returns null for both), so it composes the helpers under it.
  */

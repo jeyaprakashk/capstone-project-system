@@ -1,5 +1,5 @@
 /**
- * TITLE WRITE - the one path every title change takes (TITLE-REVISION-PLAN.md, section 6). The endpoints of the later phases call
+ * TITLE WRITE - the one path every title change takes (archive/plans/TITLE-REVISION-PLAN.md, section 6). The endpoints of the later phases call
  * titleWrite_ with the action and a few callbacks; this file owns the order of checks, the lock, the append and the duplicate rules.
  *
  *   request = {action, teamId, requestId, expectedRevision, input}

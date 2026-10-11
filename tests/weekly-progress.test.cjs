@@ -227,7 +227,7 @@ test('revisions recheck commits while identical retries remain idempotent',()=>{
  assert.equal(f.c.submitWeeklyProgress_(input).entryId,first.entryId);assert.equal(JSON.stringify(f.entries()),original);
 });
 
-// LogEntries and ProgressEligibility are created and checked by ensureSheet_ in the editor-run setup (ENSURE-SHEET-PLAN.md).
+// LogEntries and ProgressEligibility are created and checked by ensureSheet_ in the editor-run setup (archive/plans/ENSURE-SHEET-PLAN.md).
 test('setup creates LogEntries and ProgressEligibility as view sheets and appends a missing header without touching data',()=>{
  const f=weeklyFixture();
  f.sheets.delete('LogEntries');f.sheets.delete('ProgressEligibility');

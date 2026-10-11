@@ -1,7 +1,7 @@
 /**
  * ACTIVITY DEPENDENCIES SHEET - setup entry point and first-creation formatting.
- * Specified in ACTIVITY-DEPENDENCIES-SHEET-PLAN.md. The name, headers and access mode live in the sheet catalog
- * (sheet-columns.js), not here. Reading and validating the rows is the engine's job (ACTIVITY-DEPENDENCIES-PLAN.md).
+ * Specified in archive/plans/ACTIVITY-DEPENDENCIES-SHEET-PLAN.md. The name, headers and access mode live in the sheet catalog
+ * (sheet-columns.js), not here. Reading and validating the rows is the engine's job (archive/plans/ACTIVITY-DEPENDENCIES-PLAN.md).
  * Setup creates the sheet empty; the coordinator enters the rows at cutover. The editor-run entry point is
  * setupTitleStorage (title-storage.js), which creates this sheet together with TitleLog.
  */

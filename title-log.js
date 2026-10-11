@@ -1,5 +1,5 @@
 /**
- * TITLE LOG - reading and writing the TitleLog sheet (TITLE-REVISION-PLAN.md, section 4).
+ * TITLE LOG - reading and writing the TitleLog sheet (archive/plans/TITLE-REVISION-PLAN.md, section 4).
  * The sheet is append-only and script-owned. Its name and headers live in the sheet catalog (sheet-columns.js);
  * TITLE_LOG_KEYS_ names each column in the same order. Columns are found by header name. Runtime code never creates,
  * appends or repairs a header: a missing or duplicated header makes every title read and write fail with UNAVAILABLE.

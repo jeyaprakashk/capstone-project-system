@@ -1,4 +1,4 @@
-// Phase 0 golden masters (TITLE-REVISION-PLAN.md): today's downstream results for every TeamStatus title/decision combination.
+// Phase 0 golden masters (archive/plans/TITLE-REVISION-PLAN.md): today's downstream results for every TeamStatus title/decision combination.
 // Weekly submission, review marking, eligibility, coordinator health are driven through the real code on the
 // existing fixtures. Later phases (titleGate_) must produce the same results for the states whose meaning is unchanged.
 const { test } = require('node:test');

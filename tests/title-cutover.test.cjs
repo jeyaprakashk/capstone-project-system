@@ -1,5 +1,5 @@
 // The TITLE_CUTOVER write barrier (title-cutover.js): the property is changed only by the two editor-run functions, under the script lock.
-// Specified in TITLE-REVISION-PLAN.md, section 11 ("TITLE_CUTOVER" and the write barrier). The old writers that Release 0 guarded with it
+// Specified in archive/plans/TITLE-REVISION-PLAN.md, section 11 ("TITLE_CUTOVER" and the write barrier). The old writers that Release 0 guarded with it
 // (tag release-0) are gone; the new write path reads the property under the lock (tests/title-write.test.cjs).
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

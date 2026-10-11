@@ -1,5 +1,5 @@
 /**
- * TITLE CUTOVER - the write barrier for the title cutover. See TITLE-REVISION-PLAN.md, section 11.
+ * TITLE CUTOVER - the write barrier for the title cutover. See archive/plans/TITLE-REVISION-PLAN.md, section 11.
  *
  * One script property, TITLE_CUTOVER, is read under the script lock by every title writer immediately before it writes (titleWrite_ and
  * the document upload read it through readTitleCutover_). Release 0 shipped this barrier to the old writers, which refused once it was
@@ -43,7 +43,7 @@ function setTitleCutover(value) {
 /**
  * Editor-run. The one authorized rollback operation: deletes the property, only if it is PAUSED or unset. It refuses once the
  * value is LIVE (fix forward), and refuses a value it does not recognise. Run it last in a rollback, after the previous
- * deployment and saved code are restored (TITLE-REVISION-PLAN.md, section 11).
+ * deployment and saved code are restored (archive/plans/TITLE-REVISION-PLAN.md, section 11).
  */
 function clearTitleCutover() {
   requireTriggerOrOperator_();

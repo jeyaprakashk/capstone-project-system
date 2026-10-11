@@ -1,6 +1,6 @@
 /**
  * ENSURE SHEET - the common helper that creates a sheet or checks its header row.
- * Specified in ENSURE-SHEET-PLAN.md; the sheet catalog that supplies specifications is in SHEET-HEADER-MATCHING-PLAN.md.
+ * Specified in archive/plans/ENSURE-SHEET-PLAN.md; the sheet catalog that supplies specifications is in archive/plans/SHEET-HEADER-MATCHING-PLAN.md.
  *
  *   ensureSheet_({name, headers, access, mode, createAtRuntime, onCreate}) -> {created, repaired}
  *
