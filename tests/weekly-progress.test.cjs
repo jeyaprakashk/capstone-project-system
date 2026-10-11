@@ -85,7 +85,7 @@ test('the hourly schedule sends no e-mail at any time and writes no reminder rec
  const f=weeklyFixture();f.setEligibility('W1');
  for(const at of ['2026-01-04T17:59:59Z','2026-01-04T18:00:00Z','2026-01-05T18:00:00Z']){f.time(at);f.c.processWeeklySubmissionSchedule();}
  assert.equal(f.mails.length,0);
- assert.equal(f.sheets.get('WeeklyReminders').rows.length,1,'only the header row: nothing is recorded as sent');
+ assert.equal(f.sheets.has('WeeklyReminders'),false,'there is no reminder storage at all');
  f.time('2026-01-20T00:00:00Z');f.c.processWeeklySubmissionSchedule();
  assert.ok(f.entries().some(entry=>entry.entryStatus==='MISSED'),'a week nobody submitted is recorded as missed');
  const source=fs.readFileSync('logbook-tracker.js','utf8');
@@ -94,7 +94,7 @@ test('the hourly schedule sends no e-mail at any time and writes no reminder rec
 });
 
 test('storage setup no longer needs a reminder setting or creates reminder storage',()=>{
- const f=weeklyFixture();f.sheets.delete('WeeklyReminders');delete f.config.SUBMISSION_REMINDER_HOURS;
+ const f=weeklyFixture();delete f.config.SUBMISSION_REMINDER_HOURS;
  f.user('coord@example.com');f.c.setupWeeklySubmissionStorage();
  assert.equal(f.sheets.has('WeeklyReminders'),false);
 });
@@ -245,4 +245,19 @@ test('setup creates LogEntries and ProgressEligibility as view sheets and append
  const before=JSON.stringify(log.rows);
  newExecution();assert.throws(()=>f.c.setupWeeklySubmissionStorage(),/header mismatch/);
  assert.equal(JSON.stringify(log.rows),before,'a missing header together with an unrecognised one is a possible typo: nothing is changed');
+});
+
+// TeamStatus gets its Repo URL column from the editor-run setup, never from a request.
+test('a repository write does not add the Repo URL header; setupTeamStatusColumns does, for the coordinator only',()=>{
+ const f=weeklyFixture(),sheet=f.sheets.get('TeamStatus'),index=sheet.rows[0].indexOf('Repo URL');
+ const newExecution=()=>vm.runInContext('ensureSheetReady_ = Object.create(null)',f.c);
+ sheet.rows[0].splice(index,1);sheet.rows.slice(1).forEach(row=>row.splice(index,1));
+ const before=JSON.stringify(sheet.rows);
+ assert.throws(()=>f.c.updateTeamStatusRepoUrl_('T1','https://github.com/org/team'),/setupTeamStatusColumns/);
+ assert.equal(JSON.stringify(sheet.rows),before,'the request changed nothing');
+ f.user('one@example.com');assert.throws(()=>f.c.setupTeamStatusColumns(),/Coordinator/);
+ f.user('coord@example.com');newExecution();f.c.setupTeamStatusColumns();
+ assert.equal(sheet.rows[0][sheet.rows[0].length-1],'Repo URL','appended at the right end');
+ f.c.updateTeamStatusRepoUrl_('T1','https://github.com/org/team');
+ assert.equal(sheet.rows[1][sheet.rows[0].indexOf('Repo URL')],'https://github.com/org/team');
 });

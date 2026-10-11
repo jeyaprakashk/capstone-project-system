@@ -42,10 +42,13 @@ function sheetCatalog_() {
         name: SHEET_NAMES.TEAM_STATUS,
         access: 'view',
         headersFrom: 'FIELD_DEFINITIONS.TEAM_STATUS',
+        extraHeaders: ['Repo URL'],
         status: 'by-name',
-        purpose: 'One row per team. Also holds a Repo URL column that is not in the frozen definition and is added by the first repository write.',
+        purpose: 'One row per team. The Repo URL column is not in the frozen definition; setupTeamStatusColumns adds it when it is missing.',
         createAtRuntime: false,
-        code: []
+        code: [
+          {file: 'common-helpers.js', role: 'setup', functions: ['setupTeamStatusColumns']}
+        ]
       },
       reviewCommittee: {
         name: SHEET_NAMES.REVIEW_COMMITTEE,
@@ -97,15 +100,6 @@ function sheetCatalog_() {
           {file: 'logbook-tracker.js', role: 'read', functions: ['readLogEntries_', 'weeklyLogColumns_']},
           {file: 'logbook-tracker.js', role: 'write', functions: ['appendWeeklyEntry_']}
         ]
-      },
-      weeklyReminders: {
-        name: SHEET_NAMES.WEEKLY_REMINDERS,
-        access: 'system',
-        headersFrom: 'FIELD_DEFINITIONS.WEEKLY_REMINDERS',
-        status: 'positional',
-        purpose: 'Receipts of weekly reminders. Creation and validation require the exact column order.',
-        createAtRuntime: false,
-        code: []
       },
       commits: {
         name: SHEET_NAMES.COMMITS,
@@ -252,13 +246,14 @@ function sheetCatalogFreeze_(value) {
 
 /** The header list of an entry. */
 function sheetCatalogHeaders_(entry) {
+  const withExtra = list => entry.extraHeaders ? list.concat(entry.extraHeaders) : list;
   if (entry.headersFrom) {
     const match = /^FIELD_DEFINITIONS\.([A-Za-z0-9_]+)$/.exec(entry.headersFrom);
     const definition = match && FIELD_DEFINITIONS[match[1]];
     if (!definition) throw new Error('Unknown header definition in the sheet catalog: ' + entry.headersFrom);
-    return Object.values(definition);
+    return withExtra(Object.values(definition));
   }
-  return entry.headers.slice();
+  return withExtra(entry.headers.slice());
 }
 
 /**

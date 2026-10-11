@@ -10,7 +10,7 @@ const GUARDED = ['processWeeklySubmissionSchedule', 'fetchAllCommits', 'auditCom
   'processWeeklyProgressAI', 'provisionAllTeamRepos', 'backfillExistingRepos', 'backfillMissingStudentCollaborators', 'setupTitleStorage', 'validateTitleLog',
   'setTitleCutover', 'clearTitleCutover'];
 // These check the coordinator themselves (coordinator-only setup and the daily reconciliation).
-const SELF_CHECKED = ['setupWeeklySubmissionStorage', 'setupProgressEligibilityStorage', 'setupWeeklyProgressPhase2Storage', 'setupWeeklyProgressPhase2Triggers', 'reconcileProgressEligibility'];
+const SELF_CHECKED = ['setupTeamStatusColumns', 'setupWeeklySubmissionStorage', 'setupProgressEligibilityStorage', 'setupWeeklyProgressPhase2Storage', 'setupWeeklyProgressPhase2Triggers', 'reconcileProgressEligibility'];
 const files = fs.readdirSync('.').filter(name => name.endsWith('.js') && !name.startsWith('tailwind'));
 
 test('the only public functions are API endpoints, doGet and the listed entry points', () => {

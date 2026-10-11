@@ -457,13 +457,20 @@ function getRepoUrlForTeam_(teamId) {
   return '';
 }
 
+/**
+ * Editor-run, coordinator only: makes sure TeamStatus has the Repo URL column (the one header that is not in the frozen definition).
+ * It appends the header at the right end when it is missing, and changes nothing else. A request never adds it.
+ */
+function setupTeamStatusColumns() {
+  const email = Session.getActiveUser().getEmail();
+  if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
+  return ensureSheet_({...sheetSpec_('teamStatus'), mode: 'setup'});
+}
+
 function updateTeamStatusRepoUrl_(teamId, repoUrl) {
   const sheet = getSheet_(SHEET_NAMES.TEAM_STATUS);
-  let repoCol = getOptionalHeaderIndex_(sheet, 'Repo URL');
-  if (repoCol < 0) {
-    repoCol = sheet.getLastColumn();
-    sheet.getRange(1, repoCol + 1).setValue('Repo URL');
-  }
+  const repoCol = getOptionalHeaderIndex_(sheet, 'Repo URL');
+  if (repoCol < 0) throw new Error('TeamStatus has no Repo URL column. Run setupTeamStatusColumns in the Apps Script editor, then retry.');
   const teamCol = getOptionalHeaderIndex_(sheet, 'Team ID');
   if (teamCol < 0 || sheet.getLastRow() < 2) throw new Error('TeamStatus/Team ID not available.');
   const match = sheet.getRange(2, teamCol + 1, sheet.getLastRow() - 1, 1)

@@ -1,6 +1,6 @@
 # Student identity: implementation plan
 
-Status: **plan, not implemented.** Nothing described here exists in the code yet.
+Status: **plan, not implemented. Note (2026-10-11): the `WeeklyReminders` sheet it mentions was removed with the reminder e-mail, so skip every step about it.** Nothing described here exists in the code yet.
 
 ## Status and next steps
 

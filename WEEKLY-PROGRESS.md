@@ -248,21 +248,8 @@ repository, Week ID resolution, timestamps and timing classifications are server
 
 ## Email policy
 
-The only weekly-progress email is one pre-deadline reminder per eligible student
-and Week ID, within SUBMISSION_REMINDER_HOURS of the deadline and only when there
-is no actual submission. There are no confirmation, MISSED, late, guide,
-coordinator, flag, escalation or sign-off emails. Dashboard status messages
-communicate save results. Existing title/intake emails remain unrelated.
-
-Successful sends are recorded in `WeeklyReminders` (`Reg No`, `Week ID`, `Sent At`).
-`setupWeeklySubmissionStorage()` creates the tab and transfers existing
-`weekly-reminder:<encoded-reg-no>:<week-id>` Script Properties before removing
-them. Run setup before the scheduler uses this version.
-Failed sends can retry;
-recorded successful sends are suppressed. No report-only or flag logic gates
-reminders. Apps Script scheduling is approximate. Delivery and the sheet receipt
-are not transactional, so a crash after sending but before recording can duplicate
-an email.
+The project sends no e-mail. The weekly pre-deadline reminder, its `WeeklyReminders` sheet and the
+`SUBMISSION_REMINDER_HOURS` setting were removed; dashboard status messages communicate save results.
 
 No snapshots, verification flags, guide sign-off, PROGRESS_SUMMARY,
 REVIEW_SNAPSHOT, escalation or marks integration are implemented.
