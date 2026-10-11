@@ -48,6 +48,9 @@ history (one row per change, the latest row of a team is its state). Specified i
   in `title-service.js` and the history validation in `title-history.js`. A row is appended and never edited.
 - **Requirements** that gate a student action come from the `ActivityDependencies` sheet through the engine (`activity-engine.js`, the
   `github` and `drive` checks). Misconfiguration denies; nothing is cached between requests; a student never sees a check's `diagnostic`.
+- **Students never get a Drive link.** The team folders live in a shared drive that students are not members of, so no student DTO or
+  student view carries `folderUrl`, a document link or any folder link. Guides, reviewers and the coordinator get `folderUrl`.
+  `tests/student-title.test.cjs` and `tests/student-migration.test.cjs` fail if a student receives one.
 - The browser sends title writes with a request ID from `TitleRequests` (`title-requests.js`) and the `revision` its DTO carried.
 - `TITLE_CUTOVER` is changed only by `setTitleCutover` and `clearTitleCutover`. `title-baseline-import.js` is the one temporary reader of
   the old columns (cutover step 4) and is deleted after the cutover.

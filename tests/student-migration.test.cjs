@@ -115,3 +115,15 @@ test('the core endpoint never touches GitHub and the two parts carry disjoint fi
 });
 
 module.exports = { legacyFacts, dtoFacts, build, normalize };
+
+test('a student never receives a Drive link, documents, a history or a similarity note, in any state', () => {
+  for (const name of Object.keys(SCENARIOS)) {
+    const s = studentFixture(name);
+    s.c.teamFolderUrls_ = () => ({ t1: 'https://drive.example.com/folders/T1' });
+    s.c.findTeamFolder_ = () => ({ getUrl: () => 'https://drive.example.com/folders/T1' });
+    const title = JSON.parse(s.c.API_student_getProject()).data.title;
+    for (const field of ['folderUrl', 'documents', 'history', 'similarityNote']) assert.equal(field in title, false, name + ': ' + field);
+    assert.doesNotMatch(JSON.stringify(title), /drive\.example\.com|drive\.google/, name);
+    assert.deepEqual(Object.keys(title.can || {}), title.can ? ['submit'] : [], name);
+  }
+});

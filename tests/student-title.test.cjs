@@ -10,7 +10,7 @@ const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
 const cap = (allowed, reason = '', requirements = []) => ({ allowed, reason, activity: null, requirements });
 const dto = (extra = {}) => ({
   teamId: 'T1', revision: 2, status: 'RETURNED', reopened: false, proposal: { title: 'OLD IDEA', problem: 'Old problem' }, notes: 'Too broad', approved: { value: false, title: '', problem: '', at: null, by: '' },
-  reopen: null, folderUrl: 'https://drive.example.com/T1', state: 'active', statusText: 'Changes requested — update and resubmit', due: { date: '10 Jan', overdue: false },
+  reopen: null, state: 'active', statusText: 'Changes requested — update and resubmit', due: { date: '10 Jan', overdue: false },
     can: { submit: cap(true) }, ...extra
 });
 
@@ -41,7 +41,9 @@ const submitEvent = f => ({ preventDefault() { this.prevented = true; }, prevent
 test('a returned title shows the feedback, the proposal to edit and an enabled Resubmit button, and no documents or upload', () => {
   const f = setup();
   const body = text(f.host);
-  for (const expected of ['Changes requested — update and resubmit', 'Submitted title: OLD IDEA', 'Feedback: Too broad', 'Approval due 10 Jan', 'Open team folder']) assert(body.includes(expected), expected);
+  for (const expected of ['Changes requested — update and resubmit', 'Submitted title: OLD IDEA', 'Feedback: Too broad', 'Approval due 10 Jan']) assert(body.includes(expected), expected);
+  assert.equal(f.host.querySelector('a'), null, 'a student card has no links: no Drive folder, no documents');
+  assert.doesNotMatch(body, /folder/i);
   for (const absent of ['Work Breakdown document', 'Need Analysis document', 'Upload', 'Replace (.docx)']) assert(!body.includes(absent), absent);
   assert.equal(f.host.querySelector('input[type="file"]'), null);
   assert.equal(f.host.querySelector('[data-action="title-upload"]'), null);
@@ -138,7 +140,7 @@ test('a conflict or refusal reloads the project and the message survives the rel
 
 test('escapes every value, makes no inline handlers and renders only compiled classes', () => {
   const evil = '<img src=x onerror=alert(1)>"\'&';
-  const f = setup({ dto: dto({ statusText: evil, notes: evil, proposal: { title: evil, problem: evil }, folderUrl: 'javascript:alert(1)', due: { date: evil, overdue: true },
+  const f = setup({ dto: dto({ statusText: evil, notes: evil, proposal: { title: evil, problem: evil }, due: { date: evil, overdue: true },
     can: { submit: cap(true, '', [{ label: evil, met: false, reason: evil }]) } }) });
   assert.equal(f.host.querySelectorAll('img').length, 0);
   assert.deepEqual(Array.from(f.host.querySelectorAll('*')).flatMap(n => Array.from(n.attributes).map(a => a.name)).filter(name => /^on/i.test(name)), []);
@@ -146,6 +148,12 @@ test('escapes every value, makes no inline handlers and renders only compiled cl
   assert.equal(f.host.querySelector('[data-title-field="title"]').value, evil);
   const good = setup();
   assert.deepEqual(missingClasses(renderedClasses(good.host)), []);
+});
+
+test('a student card never renders a Drive link even if the data carried one', () => {
+  const f = setup({ dto: dto({ folderUrl: 'https://drive.example.com/folders/T1', documents: [{ key: 'work', label: 'Work', present: true }] }) });
+  assert.equal(f.host.querySelector('a'), null);
+  assert.doesNotMatch(f.host.innerHTML, /drive\.example\.com/);
 });
 
 test('source rules: no google.script.run, no inline handlers, no inline styles', () => {

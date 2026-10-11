@@ -35,8 +35,9 @@ function studentTitleDto_(d, teamId, titleApproved, email) {
   const ctx = activityContext_();
   if (d.githubSetup) ctx.github[String(teamId).trim()] = {setup:d.githubSetup};
   const dto = buildTitleDto_(String(teamId).trim(), {email, roles:{student:true}}, ctx);
-  // A student sees its own capabilities only: no staff decisions, no history, and the similarity note stays with the staff.
-  const {history, similarityNote, documents, ...visible} = dto;
+  // A student sees its own capabilities only: no staff decisions, no history, no similarity note, no documents and no Drive folder link
+  // (students are not members of the shared drive, so the folder is not theirs to open).
+  const {history, similarityNote, documents, folderUrl, ...visible} = dto;
   return {...visible, can:{submit:dto.can.submit}, state:label.state, statusText:label.text, due};
 }
 

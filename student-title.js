@@ -15,7 +15,6 @@ function studentTitleBrowser_(bridge, getUi, getRequests, getView) {
   const LABEL = 'mt-3 block text-sm font-semibold text-ink-2';
   const PRIMARY = 'border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
   const BUTTON = 'border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
-  const LINK = 'font-semibold text-primary underline';
   const BADGE = 'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ';
   const OK = BADGE + 'bg-success-tint text-success ring-success/20';
   const MISSING = BADGE + 'bg-warning-tint text-warning ring-warning/20';
@@ -60,7 +59,6 @@ function studentTitleBrowser_(bridge, getUi, getRequests, getView) {
     if (t.status === 'RETURNED' && t.notes) lines.push(p('<strong>Feedback:</strong> ' + escape(t.notes), 'text-warning'));
     if (t.status === 'REOPENED' && t.reopen && t.reopen.reason) lines.push(p('<strong>Reopened:</strong> ' + escape(t.reopen.reason)));
     lines.push(p('Approval due ' + escape(t.due.date) + (t.due.overdue ? ' · Overdue' : ''), t.due.overdue ? 'text-danger' : 'text-ink-2'));
-    if (t.folderUrl) lines.push(p('<a class="' + LINK + '" href="' + escape(/^https?:\/\//i.test(t.folderUrl) ? t.folderUrl : '#') + '" target="_blank" rel="noopener">Open team folder</a>'));
     return lines.join('') + notice + checklistMarkup(t.can && t.can.submit && t.can.submit.requirements) + formMarkup(t);
   }
 
