@@ -35,6 +35,7 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_coordinator_getRequirements(teamId?)` | Coordinator | optional `teamId` | `{rules:{<activity>:[{kind,item,label}]}, errors:[string], teamId, activities}`; `activities` is `null` without a team, otherwise `{<activity>:{allowed, reason, requirements:[{label, met, reason, diagnostic?}]}}` for `title.submit`, `title.resubmit` and `document.upload`. `diagnostic` appears here only (`GITHUB_ERROR`, `GITHUB_MEMBER_UNVERIFIED`, `GITHUB_REPOSITORY_UNVERIFIED`, `TEAM_DOCUMENTS_UNRESOLVED`, `FOLDER_AMBIGUOUS`); student DTOs go through `studentRequirements_`, which removes it. A team not on the roster is `NOT_FOUND`. Read-only | new (activity engine) |
 | `API_title_get(teamId?)` | Student (own team), Guide, Reviewer, Coordinator | optional `teamId`; a student always gets its own team | `TitleDto` (below). `UNAUTHORIZED` for a person with no role on the team (also for a team that does not exist, except to a coordinator, who gets `NOT_FOUND`); `UNAVAILABLE` when that team's history fails validation | new (title revision) |
 | `API_student_submitTitle(input)` | Student | `{requestId, expectedRevision, title, problem}`; the team comes from the session | `{ok, revision, status, message, warning?}` | the Team Intake Form |
+| `API_student_uploadDocument(input)` | Student | `{requestId, documentKey ('work'|'need'), fileName, mimeType, dataBase64}`; the team comes from the session; `.docx` only, at most 10 MB, stored under the fixed name for the key | `{ok, documentKey, present:true, uploadedBy, uploadedAt, replaced, message, warning?}`; `replaced` is true only for a retry whose file a newer upload has since replaced | the Form document upload |
 | `API_guide_decideTitle(input)` | Guide | `{requestId, expectedRevision, teamId, decision:'approve'|'return', notes, editedTitle?}`; `editedTitle` only with `approve`; `notes` required for `return` | `{ok, revision, status, message, warning?}` | `API_guide_submitDecision` (removed with the guide slice) |
 | `API_reviewer_decideTitle(input)` | Reviewer | `{requestId, expectedRevision, teamId, decision:'approve'|'return', notes}` | `{ok, revision, status, message, warning?}` | `API_reviewer_submitDecision` (removed with the reviewer slice) |
 | `API_coordinator_reopenTitle(input)` / `API_coordinator_cancelReopen(input)` | Coordinator | `{requestId, expectedRevision, teamId, reason}` (reason required, at most 500 characters) | `{ok, revision, status, message, warning?}` | new |
@@ -160,12 +161,13 @@ Returned by `API_title_get`. Dates are ISO strings. `history` is filled for the 
   approved:{value, title, problem, at, by},
   reopen:{reason, by, at} | null,
   folderUrl,                                         // the team Drive folder, '' when absent
+  documents:[{key, label, present, uploadedBy, uploadedAt}],
   history:[{revision, action, actor, at, notes}],    // coordinator only
-  can:{ submit, approve, return, reopen, cancel }    // each a Capability }
+  can:{ submit, upload:{work, need}, approve, return, reopen, cancel }    // each a Capability }
 Capability = { allowed, reason, activity ('title.submit'|'title.resubmit'|null), requirements:[{label, met, reason}] }
 ```
 
-`requirements` is filled only for a student on its own team, and only when the built-in rules would allow the action; it never carries a `diagnostic`. Documents and upload capabilities are added with the upload endpoint.
+`requirements` is filled only for a student on its own team, and only when the built-in rules would allow the action; it never carries a `diagnostic`. `documents` lists `{key, label, present, uploadedBy, uploadedAt}` for `work` and `need`; `uploadedBy` and `uploadedAt` are filled for a student's own team only (`''` and `null` for a file placed by hand) and are `null` for staff. `can.upload` is `{work, need}`, each a Capability with activity `document.upload`.
 
 ### StudentCore and StudentProject
 

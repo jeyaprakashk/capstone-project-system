@@ -210,6 +210,7 @@ function buildTitleDto_(teamId, viewer, ctx) {
     activity = state.reopened ? 'title.resubmit' : 'title.submit';
     if (titleCanDo_(state, 'submit', {roles}).allowed) checklist = activityPreconditions_(activity, {teamId: String(row[TS.TEAM_ID]).trim(), semester}, ctx);
   }
+  const team = {teamId: String(row[TS.TEAM_ID]).trim(), semester};
   let folderUrl = '';
   try { const folder = findTeamFolder_(teamId, semester); folderUrl = folder ? String(folder.getUrl()) : ''; } catch (error) { folderUrl = ''; }
   const dto = {
@@ -218,11 +219,13 @@ function buildTitleDto_(teamId, viewer, ctx) {
     approved: {value: state.approved.value, title: state.approved.title, problem: state.approved.problem, at: titleIso_(state.approved.at), by: state.approved.by},
     reopen: state.reopen ? {reason: state.reopen.reason, by: state.reopen.by, at: titleIso_(state.reopen.at)} : null,
     folderUrl,
+    documents: documentStatusList_(team, roles.student, ctx),
     history: roles.coordinator ? state.rows.map(item => ({revision: item.revision, action: item.action, actor: item.actor, at: titleIso_(item.timestamp), notes: item.notes})) : [],
     can: {
       submit: titleCapability_(state, 'submit', {roles}, activity, checklist),
       approve: titleDecisionCapability_(state, roles, 'approve'),
       return: titleDecisionCapability_(state, roles, 'return'),
+      upload: (() => { const capability = documentUploadCapability_(state, roles, team, ctx); return {work: capability, need: capability}; })(),
       reopen: titleCapability_(state, 'reopen', {roles}, null, null),
       cancel: titleCapability_(state, 'cancelReopen', {roles}, null, null)
     }

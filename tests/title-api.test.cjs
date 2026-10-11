@@ -23,7 +23,7 @@ function setup({cutover = 'LIVE', registryFails = false, activity = null} = {}) 
   const session = {email: 'ann@x.edu'};
   const properties = {TITLE_CUTOVER: cutover};
   const env = makeTitleEnv([HEADERS], {
-    files: ['title-cutover.js', 'activity-engine.js', 'title-service.js', 'title-write.js', 'title-api.js'],
+    files: ['title-cutover.js', 'activity-engine.js', 'title-service.js', 'title-write.js', 'team-folders.js', 'team-document-upload.js', 'title-api.js'],
     globals: {
       Utilities, Session: {getActiveUser: () => ({getEmail: () => session.email})},
       MailApp: {sendEmail: (to, subject, body) => mails.push({to, subject, body})},
@@ -44,7 +44,8 @@ function setup({cutover = 'LIVE', registryFails = false, activity = null} = {}) 
   c.getDashboardUrl_ = () => 'https://dash.example';
   c.getAcademicYear_ = () => '2026-27';
   c.getHubRegistrySheet_ = () => { if (registryFails) throw new Error('registry down'); return {getDataRange: () => ({getValues: () => [['y', 's', 't', 'g', 'title'], ['2025-26', 'Even', 'T9', 'g', 'OLD TITLE']]})}; };
-  c.findTeamFolder_ = () => ({getUrl: () => 'https://drive.example/folder'});
+  c.activityDriveFolder_ = () => ({absent: true});
+  c.findTeamFolder_ =() => ({getUrl: () => 'https://drive.example/folder'});
   c.studentAccessOrThrow_ = () => {
     const row = TEAM_ROWS.find(r => [r[3], r[4], r[5], r[6]].includes(session.email));
     if (!row) throw c.apiFail_('NOT_FOUND', 'Student team was not found.');
