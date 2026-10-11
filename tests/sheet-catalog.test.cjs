@@ -140,7 +140,9 @@ test('ensureSheet_ is only called directly, from a function listed in the catalo
 test('a setup function is an editor-run entry point or is reached only from setup code', () => {
   const c = load();
   const guardSource = fs.readFileSync('tests/entry-point-guard.test.cjs', 'utf8');
-  const guarded = new Set([...guardSource.match(/const GUARDED = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)].map(match => match[1]));
+  // GUARDED start with requireTriggerOrOperator_(); SELF_CHECKED are the coordinator-only setup and reconciliation entry points.
+  const listOf = name => [...guardSource.match(new RegExp('const ' + name + ' = \\[([\\s\\S]*?)\\];'))[1].matchAll(/'([^']+)'/g)].map(match => match[1]);
+  const guarded = new Set([...listOf('GUARDED'), ...listOf('SELF_CHECKED')]);
   const setupFunctions = [];
   Object.values(c.sheetCatalog_()).forEach(entry => entry.code.filter(item => item.role === 'setup')
     .forEach(item => item.functions.forEach(fn => setupFunctions.push({file: item.file, fn}))));
@@ -211,7 +213,8 @@ test('a sheet with a generated name has no specification until the caller suppli
 
 // The sheet-access audit (SHEET-HEADER-MATCHING-PLAN.md, section 8). A text-level tripwire against positional access creeping back
 // into a migrated sheet; it cannot see an index held in a variable. The shuffled-column tests are the proof. Writing a header row
-// (getRange(1, ...)) when a sheet is created is allowed: new sheets get their headers in definition order.
+// (getRange(1, ...)) when a sheet is created is allowed: new sheets get their headers in definition order. So is a whole-row write from
+// column A whose width is a built row's length (getRange(n, 1, 1, row.length)): the row was built from the column map.
 function functionSource(text, name) {
   const start = text.search(new RegExp('^function ' + name + '\\s*\\(', 'm'));
   assert.ok(start >= 0, name + ' not found');
@@ -227,7 +230,7 @@ test('audit: no function listed for a migrated sheet reads a row or a column by 
       const text = fs.readFileSync(item.file, 'utf8');
       for (const fn of item.functions) {
         const source = stripComments(functionSource(text, fn));
-        for (const match of source.matchAll(/\b(?:row|r|item\.row|submission|saved|record|existingRow)\[\s*\d+\s*\]|getRange\((?!1\s*,)[^,()]+,\s*\d+\s*[,)]/g)) {
+        for (const match of source.matchAll(/\b(?:row|r|item\.row|submission|saved|record|existingRow)\[\s*\d+\s*\]|getRange\((?!1\s*,)(?![^,()]+,\s*1\s*,\s*1\s*,\s*\w+\.length\s*\))[^,()]+,\s*\d+\s*[,)]/g)) {
           offenders.push(key + ': ' + item.file + ' ' + fn + ' uses ' + match[0]);
         }
       }

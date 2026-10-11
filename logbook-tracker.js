@@ -517,10 +517,8 @@ function setupWeeklySubmissionStorage() {
   if (!email || !activityIsCoordinator_(email)) throw new Error('Coordinator access is required.');
   getWeeklySubmissionWindows_();
   return weeklyLock_(() => {
-    let sheet = getSheet_(SHEET_NAMES.LOG_ENTRIES);
-    if (!sheet) sheet = getSpreadsheet_().insertSheet(SHEET_NAMES.LOG_ENTRIES);
-    if (!sheet.getLastRow()) sheet.getRange(1,1,1,Object.keys(FIELD_DEFINITIONS.LOG_ENTRIES).length).setValues([Object.values(FIELD_DEFINITIONS.LOG_ENTRIES)]);
-    weeklyLogColumns_(sheet);
+    ensureSheet_({...sheetSpec_('logEntries'), mode: 'setup'});
+    weeklyLogColumns_(getSheet_(SHEET_NAMES.LOG_ENTRIES));
     setupProgressEligibilityStorage();
     SpreadsheetApp.flush();
     return {ok:true};

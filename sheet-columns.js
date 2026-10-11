@@ -89,11 +89,12 @@ function sheetCatalog_() {
         name: SHEET_NAMES.LOG_ENTRIES,
         access: 'view',
         headersFrom: 'FIELD_DEFINITIONS.LOG_ENTRIES',
-        status: 'by-name',
+        status: 'migrated',
         purpose: 'Append-only journal of weekly submissions.',
         createAtRuntime: false,
         code: [
-          {file: 'logbook-tracker.js', role: 'read', functions: ['readLogEntries_']},
+          {file: 'logbook-tracker.js', role: 'setup', functions: ['setupWeeklySubmissionStorage']},
+          {file: 'logbook-tracker.js', role: 'read', functions: ['readLogEntries_', 'weeklyLogColumns_']},
           {file: 'logbook-tracker.js', role: 'write', functions: ['appendWeeklyEntry_']}
         ]
       },
@@ -184,10 +185,14 @@ function sheetCatalog_() {
           'First Qualifying Student Commit At', 'Collaborator Date Source', 'Effective Collaborator Date', 'Evidence Reference', 'Title Status',
           'Title Confirmation Date', 'Progress Fixing Date', 'Progress Eligible From Week ID', 'Enforced From Week ID', 'Eligibility Fixed At',
           'Status', 'Last Checked At', 'Last Check Error'],
-        status: 'by-name',
+        status: 'migrated',
         purpose: 'Individual weekly eligibility. A test keeps this list equal to PROGRESS_ELIGIBILITY_FIELDS_.',
         createAtRuntime: false,
-        code: []
+        code: [
+          {file: 'progress-eligibility.js', role: 'setup', functions: ['setupProgressEligibilityStorage']},
+          {file: 'progress-eligibility.js', role: 'read', functions: ['progressEligibilityStorage_']},
+          {file: 'progress-eligibility.js', role: 'write', functions: ['writeProgressEligibility_']}
+        ]
       },
       assessmentJournal: {
         namePattern: 'Assessment_<assessment id>, or the Journal named in AssessmentDefinitions',

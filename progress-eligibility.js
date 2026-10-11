@@ -71,9 +71,7 @@ function writeProgressEligibility_(record) {
 function setupProgressEligibilityStorage() {
   progressEligibilityCoordinator_();
   return weeklyLock_(()=>{
-    let sheet = getSheet_('ProgressEligibility');
-    if (!sheet) sheet = getSpreadsheet_().insertSheet('ProgressEligibility');
-    if (!sheet.getLastRow()) sheet.getRange(1,1,1,Object.keys(PROGRESS_ELIGIBILITY_FIELDS_).length).setValues([Object.values(PROGRESS_ELIGIBILITY_FIELDS_)]);
+    ensureSheet_({...sheetSpec_('progressEligibility'), mode: 'setup'});
     readProgressEligibility_();
     return {ok:true};
   });

@@ -1,6 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
+const vm=require('node:vm');
 const {weeklyFixture}=require('./weekly-progress-fixture.cjs');
 
 test('server identity, append revisions and immutable first timing; retries do not append',()=>{
@@ -165,7 +166,7 @@ test('conflicting journal headers never permit a save or destructive setup',()=>
  const f=weeklyFixture(),sheet=f.sheets.get('LogEntries');
  sheet.rows[0].push('Reg No');const before=JSON.stringify(sheet.rows);
  assert.throws(()=>f.c.submitWeeklyProgress_(f.input()),/exactly one/);
- f.user('coord@example.com');assert.throws(()=>f.c.setupWeeklySubmissionStorage(),/exactly one/);
+ f.user('coord@example.com');assert.throws(()=>f.c.setupWeeklySubmissionStorage(),/Duplicate header in LogEntries: Reg No/);
  assert.equal(JSON.stringify(sheet.rows),before);
 });
 
@@ -224,4 +225,24 @@ test('revisions recheck commits while identical retries remain idempotent',()=>{
  f.sheets.get('Commits').rows.splice(1);
  assert.throws(()=>f.c.submitWeeklyProgress_(f.input({workCompleted:'No evidence revision'})),/No GitHub activity found/);
  assert.equal(f.c.submitWeeklyProgress_(input).entryId,first.entryId);assert.equal(JSON.stringify(f.entries()),original);
+});
+
+// LogEntries and ProgressEligibility are created and checked by ensureSheet_ in the editor-run setup (ENSURE-SHEET-PLAN.md).
+test('setup creates LogEntries and ProgressEligibility as view sheets and appends a missing header without touching data',()=>{
+ const f=weeklyFixture();
+ f.sheets.delete('LogEntries');f.sheets.delete('ProgressEligibility');
+ f.user('coord@example.com');f.c.setupWeeklySubmissionStorage();
+ const log=f.sheets.get('LogEntries'),eligibility=f.sheets.get('ProgressEligibility');
+ assert.deepEqual(Array.from(log.rows[0]),Object.values(JSON.parse(JSON.stringify(vm.runInContext('FIELD_DEFINITIONS.LOG_ENTRIES',f.c)))));
+ assert.equal(eligibility.rows[0][0],'Register Number');
+ assert.ok(!log.hidden,'a view sheet stays visible');
+ const header=Array.from(log.rows[0]),newExecution=()=>vm.runInContext('ensureSheetReady_ = Object.create(null)',f.c);
+ log.rows[0].pop();log.rows.push(['x']);
+ newExecution();f.c.setupWeeklySubmissionStorage();
+ assert.deepEqual(Array.from(log.rows[0]),header,'the missing header is appended at the right end');
+ assert.deepEqual(Array.from(log.rows[1]),['x'],'no data row is touched');
+ log.rows[0][1]='Request IDD';log.rows[0].pop();
+ const before=JSON.stringify(log.rows);
+ newExecution();assert.throws(()=>f.c.setupWeeklySubmissionStorage(),/header mismatch/);
+ assert.equal(JSON.stringify(log.rows),before,'a missing header together with an unrecognised one is a possible typo: nothing is changed');
 });
