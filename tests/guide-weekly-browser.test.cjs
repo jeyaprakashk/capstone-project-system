@@ -344,13 +344,13 @@ test('evaluation tab respects disabled gate and preserves an already open editor
 test('team attention combines only guide actions, updates after decisions and distinguishes unavailable evaluations',()=>{
   const f=fixture();f.c.DashboardUI.renderSkeleton=()=>'<span>Skeleton</span>';
   const root=f.document.createElement('div');root.setAttribute('data-guide-workspace','');
-  root.innerHTML=['A','B'].map((id,i)=>'<button data-guide-select="'+id+'" data-title-attention="'+(i===0)+'" data-documents-attention="2"><span data-team-attention></span></button><section data-guide-team="'+id+'" data-guide-students="[&quot;00'+(i+1)+'&quot;]"></section>').join('')+['title','weekly','documents'].map(key=>'<button data-guide-tab="'+key+'"></button>').join('')+'<button data-guide-tab="evaluation" disabled></button>';
+  root.innerHTML=['A','B'].map((id,i)=>'<button data-guide-select="'+id+'" data-title-attention="'+(i===0)+'"><span data-team-attention></span></button><section data-guide-team="'+id+'" data-guide-students="[&quot;00'+(i+1)+'&quot;]"></section>').join('')+['title','weekly','documents'].map(key=>'<button data-guide-tab="'+key+'"></button>').join('')+'<button data-guide-tab="evaluation" disabled></button>';
   f.document.body.appendChild(root);root.appendChild(f.host);
   const pill=id=>root.querySelector('[data-guide-select="'+id+'"] [data-team-attention]');
   f.api.load();assert.match(pill('A').textContent,/Skeleton/);assert.equal(pill('B').hidden,false);assert.equal(pill('A').getAttribute('aria-busy'),'true');
   f.reply();assert.equal(pill('A').textContent,'Title review · 1');assert.equal(pill('A').getAttribute('aria-busy'),'false');assert.equal(pill('A').hasAttribute('title'),false);assert.equal(root.querySelector('[data-guide-select="A"]').hasAttribute('title'),false);assert.equal(pill('B').hidden,true);assert.equal(f.requests.length,1);
   const tabBadge=key=>root.querySelector('[data-guide-tab="'+key+'"] [data-tab-badge]');
-  assert.equal(tabBadge('weekly').textContent,'1');assert.equal(tabBadge('documents').textContent,'2');
+  assert.equal(tabBadge('weekly').textContent,'1');assert.ok(tabBadge('documents')===null || tabBadge('documents').hidden,'the Documents tab has no count: the folder is a link, not work to do');
   assert.equal(root.querySelector('[data-guide-tab="title"]').getAttribute('aria-selected'),'true');
   f.host.querySelector('[data-sign="DISCUSSED"]').click();f.flush();f.requests.at(-1).success({status:'DISCUSSED',message:'Saved'});
   assert.equal(pill('A').textContent,'Title review · 1');assert.equal(tabBadge('weekly').hidden,true);

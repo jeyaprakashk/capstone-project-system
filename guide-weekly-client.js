@@ -27,7 +27,6 @@ function guideWeeklyBrowser_(bridge, getTabs) {
     const pending=node.data?.entries.filter(entry=>entry.status==='PENDING' && node.data.weeks.includes(entry.weekId) && students.includes(String(entry.regNo).trim().toLowerCase())).length || 0;
     if(pending)actions.push({key:'weekly',label:'Weekly progress',count:pending});
     if(evaluationOpen(root) && root.evaluationAttention?.[team])actions.push({key:'evaluation',label:'Guide Evaluation',count:root.evaluationCounts?.[team] || 1});
-    if(button?.dataset.titleAttention==='true' && Number(button.dataset.documentsAttention)>0)actions.push({key:'documents',label:'Documents',count:Number(button.dataset.documentsAttention)});
     return actions;
   }
   function updateAttention() {

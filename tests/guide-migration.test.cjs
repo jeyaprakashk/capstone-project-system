@@ -27,7 +27,7 @@ function dtoFacts(dto) {
     }
     return {
       teamId: t.teamId,
-      selector: { title: t.title || 'No title submitted yet', members: plural(t.members.length, 'member'), titleAttention: key === 'NEEDS_REVIEW', documentsAttention: t.folderUrl ? 1 : 0 },
+      selector: { title: t.title || 'No title submitted yet', members: plural(t.members.length, 'member'), titleAttention: key === 'NEEDS_REVIEW' },
       heading: { title: t.title || 'No title submitted yet', members: t.members.map(m => m.regno ? m.name + ' (' + m.regno + ')' : m.name).join(', '), mailto: t.memberEmails.join(',') },
       students: t.registerNumbers,
       github: t.github ? {

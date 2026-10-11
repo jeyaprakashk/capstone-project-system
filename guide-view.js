@@ -136,7 +136,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests) {
 
   function selectorMarkup(team, index) {
     const id = escape(team.teamId), attention = team.status.key === 'NEEDS_REVIEW';
-    return '<button type="button" class="' + PILL + '" data-guide-select="' + id + '" data-title-attention="' + attention + '" data-documents-attention="' + (team.folderUrl ? 1 : 0) + '" aria-pressed="' + (index === 0) + '" title="' + escape(team.title || 'No title submitted yet') + '">' +
+    return '<button type="button" class="' + PILL + '" data-guide-select="' + id + '" data-title-attention="' + attention + '" aria-pressed="' + (index === 0) + '" title="' + escape(team.title || 'No title submitted yet') + '">' +
       '<strong data-team-label hidden>' + id + '</strong><span data-team-spinner role="status">' + getUi().renderSkeleton('inline', 'Checking team actions') + '</span></button>';
   }
   const initials = name => String(name || '?').trim().split(/\s+/).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('');

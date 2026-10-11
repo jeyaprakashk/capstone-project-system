@@ -53,7 +53,7 @@ test('renders the workspace contract GuideWeekly and GuideEvaluation depend on',
   assert.deepEqual(Array.from(root.querySelectorAll('[data-guide-team]')).map(n => n.hasAttribute('hidden')), [false, true, true, true, true, true]);
   assert.deepEqual(JSON.parse(byAttr(f, 'data-guide-team', 'T1').getAttribute('data-guide-students')), ['001', '002']);
   assert.equal(byAttr(f, 'data-guide-select', 'T2').getAttribute('data-title-attention'), 'true');
-  assert.equal(byAttr(f, 'data-guide-select', 'T2').getAttribute('data-documents-attention'), '1');
+  assert.equal(byAttr(f, 'data-guide-select', 'T2').hasAttribute('data-documents-attention'), false);
   assert.equal(byAttr(f, 'data-guide-select', 'T2').getAttribute('aria-pressed'), 'true');
   assert.equal(byAttr(f, 'data-guide-select', 'T1').getAttribute('aria-pressed'), 'false');
   assert.equal(byAttr(f, 'data-guide-select', 'T2').querySelector('[data-team-attention]'), null);

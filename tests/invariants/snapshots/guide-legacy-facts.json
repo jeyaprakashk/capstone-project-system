@@ -4,8 +4,7 @@
     "selector": {
       "title": "NEEDS REVIEW",
       "members": "1 member",
-      "titleAttention": true,
-      "documentsAttention": 1
+      "titleAttention": true
     },
     "heading": {
       "title": "NEEDS REVIEW",
@@ -54,8 +53,7 @@
     "selector": {
       "title": "No title submitted yet",
       "members": "1 member",
-      "titleAttention": false,
-      "documentsAttention": 0
+      "titleAttention": false
     },
     "heading": {
       "title": "No title submitted yet",
@@ -99,8 +97,7 @@
     "selector": {
       "title": "REJECTED",
       "members": "1 member",
-      "titleAttention": false,
-      "documentsAttention": 0
+      "titleAttention": false
     },
     "heading": {
       "title": "REJECTED",
@@ -146,8 +143,7 @@
     "selector": {
       "title": "REVISE ME",
       "members": "1 member",
-      "titleAttention": false,
-      "documentsAttention": 0
+      "titleAttention": false
     },
     "heading": {
       "title": "REVISE ME",
@@ -181,8 +177,7 @@
     "selector": {
       "title": "AWAITING REVIEWER",
       "members": "2 members",
-      "titleAttention": false,
-      "documentsAttention": 0
+      "titleAttention": false
     },
     "heading": {
       "title": "AWAITING REVIEWER",
@@ -216,8 +211,7 @@
     "selector": {
       "title": "APPROVED <I>PROJECT</I>",
       "members": "2 members",
-      "titleAttention": false,
-      "documentsAttention": 1
+      "titleAttention": false
     },
     "heading": {
       "title": "APPROVED <I>PROJECT</I>",
