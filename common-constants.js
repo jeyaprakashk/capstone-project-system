@@ -45,7 +45,6 @@ const FIELD_DEFINITIONS = {
     SEMESTER: 'Semester',
     GUIDE_NAME: 'Guide Name',
     GUIDE_EMAIL: 'Guide Email',
-    GUIDE_GITHUB_USERNAME: 'Guide GitHub Username',
     S1_NAME: 'Student 1 Name', S1_REGNO: 'Student 1 Register No', S1_EMAIL: 'Student 1 Email',
     S2_NAME: 'Student 2 Name', S2_REGNO: 'Student 2 Register No', S2_EMAIL: 'Student 2 Email',
     S3_NAME: 'Student 3 Name', S3_REGNO: 'Student 3 Register No', S3_EMAIL: 'Student 3 Email',
