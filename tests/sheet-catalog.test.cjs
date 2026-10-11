@@ -1,6 +1,5 @@
 // The sheet catalog (sheet-columns.js): shape, specifications, the call-site audits and the generated SHEETS.md.
-// Catalog v1 lists the new sheets only, so the completeness test (every sheet the code touches is listed) is not switched on yet;
-// it is switched on when the header-name migration completes the catalog (SHEET-HEADER-MATCHING-PLAN.md, phase 1).
+// The catalog lists every sheet the code touches (SHEET-HEADER-MATCHING-PLAN.md, phase 1), and a completeness test keeps it so.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -8,7 +7,11 @@ const vm = require('node:vm');
 
 const plain = value => JSON.parse(JSON.stringify(value));
 const ACCESS = ['system', 'view', 'edit'];
-const STATUS = ['new', 'migrated', 'positional', 'retiring'];
+const STATUS = ['new', 'by-name', 'positional', 'migrated', 'retiring'];
+// Sheets the code names that the catalog cannot list, each with its reason.
+const NOT_LISTED = {
+  MasterRegistry: 'it lives in the hub spreadsheet (HUB_SHEET_ID), not in this one, and the code reads it by position; its header names are not defined anywhere in this project'
+};
 const ROLES = ['setup', 'runtime-create', 'read', 'write'];
 // Only these entries may carry createAtRuntime: true. A new runtime creator needs a reviewed change to this list.
 const RUNTIME_CREATE_ALLOW_LIST = ['commitCollectionStatus'];
@@ -27,11 +30,11 @@ function enclosingFunction(text, index) {
   return name;
 }
 
-test('the catalog is a frozen, memoised list of the new sheets', () => {
+test('the catalog is a frozen, memoised list', () => {
   const c = load();
   const catalog = c.sheetCatalog_();
   assert.equal(c.sheetCatalog_(), catalog, 'built once per execution');
-  assert.deepEqual(Object.keys(catalog), ['activityDependencies', 'titleLog']);
+  assert.ok(Object.keys(catalog).includes('activityDependencies') && Object.keys(catalog).includes('titleLog'));
   const frozen = value => !value || typeof value !== 'object' || (Object.isFrozen(value) && Object.values(value).every(frozen));
   assert.ok(frozen(catalog));
   assert.equal(typeof c.sheetCatalog_, 'function');
@@ -43,9 +46,11 @@ test('every entry is well formed: unique keys and names, valid headers, access, 
   const names = [];
   for (const [key, entry] of entries) {
     assert.match(key, /^[a-z][A-Za-z0-9]*$/, key);
-    assert.ok(entry.name && entry.name.trim() === entry.name, key + ' needs a trimmed name');
-    assert.ok(!names.some(other => c.textEquals_(other, entry.name)), 'duplicate tab name ' + entry.name);
-    names.push(entry.name);
+    assert.ok(Boolean(entry.name) !== Boolean(entry.namePattern), key + ' needs a name or a namePattern, not both');
+    const label = entry.name || entry.namePattern;
+    assert.ok(label.trim() === label, key + ' needs a trimmed name');
+    assert.ok(!names.some(other => c.textEquals_(other, label)), 'duplicate tab name ' + label);
+    names.push(label);
     assert.ok(ACCESS.includes(entry.access), key + ' access');
     assert.ok(STATUS.includes(entry.status), key + ' status');
     assert.ok(entry.purpose && entry.purpose.trim(), key + ' needs a purpose');
@@ -59,7 +64,6 @@ test('every entry is well formed: unique keys and names, valid headers, access, 
       assert.ok(text.includes(entry.name) || text.includes("'" + key + "'"), key + ': ' + item.file + ' does not refer to the sheet');
     });
     const headers = c.sheetCatalogHeaders_(entry);
-    if (entry.headersFrom === 'runtime') { assert.equal(headers, null); continue; }
     assert.ok(headers.length && headers.every(h => typeof h === 'string' && h.trim()), key + ' headers must be non-blank');
     headers.forEach((h, i) => assert.ok(!headers.some((o, j) => j < i && c.textEquals_(o, h)), key + ' duplicate header ' + h));
   }
@@ -162,13 +166,46 @@ test('a setup function is an editor-run entry point or is reached only from setu
   assert.deepEqual(problems, []);
 });
 
-test('the catalog adds no public function and no entry to SHEET_NAMES or FIELD_DEFINITIONS', () => {
+test('the catalog adds no public function, and a new sheet is not added to SHEET_NAMES or FIELD_DEFINITIONS', () => {
   const text = fs.readFileSync('sheet-columns.js', 'utf8');
   const publicFunctions = [...text.matchAll(/^function ([A-Za-z0-9$]+)\s*\(/gm)].map(match => match[1]).filter(name => !name.endsWith('_'));
   assert.deepEqual(publicFunctions, []);
   const c = load();
   const names = Object.values(plain(vm.runInContext('SHEET_NAMES', c)));
-  Object.values(c.sheetCatalog_()).forEach(entry => assert.ok(!names.includes(entry.name), entry.name + ' must not be added to SHEET_NAMES'));
+  Object.values(c.sheetCatalog_()).filter(entry => entry.status === 'new').forEach(entry => assert.ok(!names.includes(entry.name), entry.name + ' must not be added to SHEET_NAMES'));
+  Object.values(c.sheetCatalog_()).filter(entry => entry.headersFrom).forEach(entry => assert.ok(names.includes(entry.name), entry.name + ' is a frozen sheet and its name comes from SHEET_NAMES'));
+});
+
+test('completeness: every sheet the code names has a catalog entry', () => {
+  const c = load();
+  const constants = plain(vm.runInContext('SHEET_NAMES', c));
+  const listed = new Set(Object.values(c.sheetCatalog_()).map(entry => entry.name).filter(Boolean));
+  const named = new Map();
+  const note = (name, where) => { if (!named.has(name)) named.set(name, []); named.get(name).push(where); };
+  for (const file of rootScripts().filter(name => name !== 'sheet-columns.js' && name !== 'common-constants.js')) {
+    const text = stripComments(fs.readFileSync(file, 'utf8'));
+    for (const match of text.matchAll(/SHEET_NAMES\.([A-Za-z_]+)/g)) note(constants[match[1]], file);
+    for (const match of text.matchAll(/(?:getSheet_|getNamedSheet_|insertSheet)\(\s*'([^']+)'/g)) note(match[1], file);
+  }
+  const missing = [...named.keys()].filter(name => !listed.has(name) && !NOT_LISTED[name]).map(name => name + ' (' + [...new Set(named.get(name))].join(', ') + ')');
+  assert.deepEqual(missing, []);
+  Object.keys(NOT_LISTED).forEach(name => assert.ok(named.has(name), name + ' is no longer used: remove it from NOT_LISTED'));
+});
+
+test('the headers listed in the catalog equal the constants the code validates against', () => {
+  const c = load();
+  ['assessment-registry.js', 'milestone-config.js', 'progress-eligibility.js', 'review-evaluation.js', 'guide-evaluation.js']
+    .forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), c, {filename: file}));
+  const catalog = plain(c.sheetCatalog_());
+  assert.deepEqual(catalog.assessmentDefinitions.headers, plain(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_', c)));
+  assert.deepEqual(catalog.milestones.headers, plain(vm.runInContext('MILESTONE_HEADERS_', c)));
+  assert.deepEqual(catalog.progressEligibility.headers, plain(vm.runInContext('Object.values(PROGRESS_ELIGIBILITY_FIELDS_)', c)));
+  assert.deepEqual(catalog.assessmentJournal.headers, plain(vm.runInContext('REVIEW_JOURNAL_HEADERS_', c)));
+  assert.deepEqual(catalog.assessmentJournal.headers, plain(vm.runInContext('GUIDE_EVAL_HEADERS_', c)));
+});
+
+test('a sheet with a generated name has no specification until the caller supplies the name', () => {
+  assert.throws(() => load().sheetSpec_('assessmentJournal'), /generated name/);
 });
 
 test('SHEETS.md is generated from the catalog and is up to date', () => {

@@ -1,8 +1,9 @@
 /**
  * SHEET CATALOG - one readable list of the sheets the code uses: tab name, access mode, headers, status and purpose.
+ * Status: new (header-name access from the start), by-name (found by header name, but created and checked by its own code, not yet
+ * by ensureSheet_), positional (some column is still read by position), migrated (by name and created through ensureSheet_).
  * Specified in SHEET-HEADER-MATCHING-PLAN.md ("Sheet catalog"); the generated reference is SHEETS.md
- * (npm run build:sheets-doc). Catalog v1 lists the NEW sheets only; existing sheets are added when the header-name
- * migration completes the catalog.
+ * (npm run build:sheets-doc). Every sheet the code touches is listed, except the master registry of the hub spreadsheet.
  *
  * - Frozen sheets are referenced with headersFrom: 'FIELD_DEFINITIONS.<NAME>', never copied.
  * - `code` lists only code that exists: { file, role, functions }, role = setup | runtime-create | read | write.
@@ -14,6 +15,169 @@ let sheetCatalogMemo_ = null;
 function sheetCatalog_() {
   if (!sheetCatalogMemo_) {
     sheetCatalogMemo_ = sheetCatalogFreeze_({
+      config: {
+        name: 'Config',
+        access: 'edit',
+        headers: ['Key', 'Value', 'Description'],
+        status: 'positional',
+        purpose: 'Settings: one key and value per row. The code reads the first two columns by position.',
+        createAtRuntime: false,
+        code: []
+      },
+      teamRoster: {
+        name: SHEET_NAMES.TEAM_ROSTER,
+        access: 'edit',
+        headersFrom: 'FIELD_DEFINITIONS.TEAM_ROSTER',
+        status: 'by-name',
+        purpose: 'Who is in each team: guide, up to four students, committee number.',
+        createAtRuntime: false,
+        code: []
+      },
+      teamStatus: {
+        name: SHEET_NAMES.TEAM_STATUS,
+        access: 'view',
+        headersFrom: 'FIELD_DEFINITIONS.TEAM_STATUS',
+        status: 'by-name',
+        purpose: 'One row per team. Also holds a Repo URL column that is not in the frozen definition and is added by the first repository write.',
+        createAtRuntime: false,
+        code: []
+      },
+      reviewCommittee: {
+        name: SHEET_NAMES.REVIEW_COMMITTEE,
+        access: 'edit',
+        headersFrom: 'FIELD_DEFINITIONS.REVIEW_COMMITTEE',
+        status: 'by-name',
+        purpose: 'Reviewers of each Review Committee.',
+        createAtRuntime: false,
+        code: []
+      },
+      githubAccounts: {
+        name: SHEET_NAMES.GITHUB_ACCOUNTS,
+        access: 'view',
+        headers: ['Timestamp', 'Email address', 'Team ID', 'GitHub Username', 'GitHub ID', 'GitHub Display Name', 'GitHub Profile URL'],
+        status: 'positional',
+        purpose: "Students' confirmed GitHub accounts. The first four columns are read by position, the last three by name.",
+        createAtRuntime: false,
+        code: []
+      },
+      weeklyWindows: {
+        name: SHEET_NAMES.WEEKLY_WINDOWS,
+        access: 'edit',
+        headersFrom: 'FIELD_DEFINITIONS.WEEKLY_WINDOWS',
+        status: 'by-name',
+        purpose: 'Opening, deadline and late cut-off of each weekly submission.',
+        createAtRuntime: false,
+        code: []
+      },
+      logEntries: {
+        name: SHEET_NAMES.LOG_ENTRIES,
+        access: 'view',
+        headersFrom: 'FIELD_DEFINITIONS.LOG_ENTRIES',
+        status: 'by-name',
+        purpose: 'Append-only journal of weekly submissions.',
+        createAtRuntime: false,
+        code: [
+          {file: 'logbook-tracker.js', role: 'read', functions: ['readLogEntries_']},
+          {file: 'logbook-tracker.js', role: 'write', functions: ['appendWeeklyEntry_']}
+        ]
+      },
+      weeklyReminders: {
+        name: SHEET_NAMES.WEEKLY_REMINDERS,
+        access: 'system',
+        headersFrom: 'FIELD_DEFINITIONS.WEEKLY_REMINDERS',
+        status: 'positional',
+        purpose: 'Receipts of weekly reminders. Creation and validation require the exact column order.',
+        createAtRuntime: false,
+        code: []
+      },
+      commits: {
+        name: SHEET_NAMES.COMMITS,
+        access: 'view',
+        headersFrom: 'FIELD_DEFINITIONS.COMMITS',
+        status: 'by-name',
+        purpose: 'Collected GitHub commits. A GitHub Author ID column follows the frozen six.',
+        createAtRuntime: false,
+        code: []
+      },
+      commitCollectionStatus: {
+        name: SHEET_NAMES.COMMIT_COLLECTION_STATUS,
+        access: 'system',
+        headersFrom: 'FIELD_DEFINITIONS.COMMIT_COLLECTION_STATUS',
+        status: 'migrated',
+        purpose: 'Whether the last commit collection of a team succeeded. Created by the first status write.',
+        createAtRuntime: true,
+        code: [
+          {file: 'logbook-tracker.js', role: 'runtime-create', functions: ['commitCollectionStatusSheet_']},
+          {file: 'logbook-tracker.js', role: 'read', functions: ['readCommitCollectionStatus_']},
+          {file: 'logbook-tracker.js', role: 'write', functions: ['upsertCommitCollectionStatus_']}
+        ]
+      },
+      guideSignoff: {
+        name: SHEET_NAMES.GuideSignoff,
+        access: 'view',
+        headersFrom: 'FIELD_DEFINITIONS.GuideSignoff',
+        status: 'by-name',
+        purpose: 'Guide confirmations of weekly entries.',
+        createAtRuntime: false,
+        code: []
+      },
+      aiProgressAnalysis: {
+        name: SHEET_NAMES.AIProgressAnalysis,
+        access: 'view',
+        headersFrom: 'FIELD_DEFINITIONS.AIProgressAnalysis',
+        status: 'by-name',
+        purpose: 'Results of the weekly AI analysis.',
+        createAtRuntime: false,
+        code: []
+      },
+      assessmentDefinitions: {
+        name: 'AssessmentDefinitions',
+        access: 'edit',
+        headers: ['Assessment ID', 'Type', 'Label', 'Sequence', 'Weight (%)', 'Opening', 'Due Date', 'Prerequisites', 'Academic Policy Version', 'Journal'],
+        status: 'by-name',
+        purpose: 'The assessments of the semester. A test keeps this list equal to ASSESSMENT_DEFINITION_HEADERS_.',
+        createAtRuntime: false,
+        code: []
+      },
+      milestones: {
+        name: 'Milestones',
+        access: 'edit',
+        headers: ['Milestone ID', 'Milestone Name', 'Due Date', 'Graded By', 'Weight (%)'],
+        status: 'by-name',
+        purpose: 'Non-assessment events on the timeline. A test keeps this list equal to MILESTONE_HEADERS_.',
+        createAtRuntime: false,
+        code: []
+      },
+      rubrics: {
+        name: 'Rubrics',
+        access: 'edit',
+        headers: ['Assessment ID', 'Order', 'PI', 'Criterion', 'CO', 'Max Marks', 'Type'],
+        status: 'by-name',
+        purpose: 'Rubric criteria. The optional Level 0 to Level 5 columns are read when present.',
+        createAtRuntime: false,
+        code: []
+      },
+      progressEligibility: {
+        name: 'ProgressEligibility',
+        access: 'view',
+        headers: ['Register Number', 'Student Name', 'Team', 'GitHub Username', 'GitHub Numeric ID', 'Collaborator Status', 'Collaborator First Detected At',
+          'First Qualifying Student Commit At', 'Collaborator Date Source', 'Effective Collaborator Date', 'Evidence Reference', 'Title Status',
+          'Title Confirmation Date', 'Progress Fixing Date', 'Progress Eligible From Week ID', 'Enforced From Week ID', 'Eligibility Fixed At',
+          'Status', 'Last Checked At', 'Last Check Error'],
+        status: 'by-name',
+        purpose: 'Individual weekly eligibility. A test keeps this list equal to PROGRESS_ELIGIBILITY_FIELDS_.',
+        createAtRuntime: false,
+        code: []
+      },
+      assessmentJournal: {
+        namePattern: 'Assessment_<assessment id>, or the Journal named in AssessmentDefinitions',
+        access: 'view',
+        headers: ['Assessment', 'Team', 'Student', 'Revision', 'Action', 'Actor', 'At', 'Request ID', 'Payload'],
+        status: 'positional',
+        purpose: 'Append-only history of an assessment, one sheet per assessment. All share this nine-column layout and are read by position.',
+        createAtRuntime: false,
+        code: []
+      },
       activityDependencies: {
         name: 'ActivityDependencies',
         access: 'edit',
@@ -71,5 +235,6 @@ function sheetCatalogHeaders_(entry) {
 function sheetSpec_(key) {
   const entry = sheetCatalog_()[key];
   if (!entry) throw new Error('Unknown sheet in the catalog: ' + key);
+  if (!entry.name) throw new Error('The sheet ' + key + ' has a generated name (' + entry.namePattern + '): the caller must supply it.');
   return {name: entry.name, headers: sheetCatalogHeaders_(entry), access: entry.access, createAtRuntime: entry.createAtRuntime === true};
 }

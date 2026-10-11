@@ -247,3 +247,66 @@ test('missing and ambiguous status fail closed; malformed headers never get rewr
  assert.equal(other.c.readCommitCollectionStatus_('T1'),'');
  assert.equal(other.sheets.has('CommitCollectionStatus'),false);
 });
+
+// CommitCollectionStatus is found by header name (SHEET-HEADER-MATCHING-PLAN.md, phase 2 pilot).
+function statusSheet(f, rows) {
+ f.sheets.get('CommitCollectionStatus').rows.splice(0, Infinity, ...rows);
+ return f.sheets.get('CommitCollectionStatus');
+}
+
+test('status: the calls for the current layout are the old positional calls, in the same order', () => {
+ const f = fixture(), sheet = statusSheet(f, [['Team ID', 'Status', 'Updated At'], ['T1', 'ok', 'then']]);
+ const calls = [], getRange = sheet.getRange;
+ sheet.getRange = (...args) => {
+  const range = getRange(...args), record = name => (...rest) => { calls.push([name, ...args, ...rest.map(String)]); return range[name](...rest); };
+  return {...range, setNumberFormat: record('setNumberFormat'), setValues: (values) => { calls.push(['setValues', ...args, JSON.stringify(values.map(row => row.map(String)))]); return range.setValues(values); }};
+ };
+ f.c.writeCommitCollectionStatus_('T1', 'error');
+ f.c.writeCommitCollectionStatus_('T2', 'ok');
+ const shape = calls.map(call => call.slice(0, 5).join(','));
+ assert.deepEqual(shape.filter(call => !call.startsWith('getValues')), [
+  'setNumberFormat,2,1,@', 'setValues,2,1,1,3',
+  'setNumberFormat,3,1,@', 'setValues,3,1,1,3'
+ ]);
+ assert.equal(calls.find(call => call[0] === 'setValues' && call[1] === 2)[5].startsWith('[["T1","error"'), true);
+});
+
+test('status: columns in any order, with extra columns, are read and written by header name', () => {
+ const f = fixture(), sheet = statusSheet(f, [['Updated At', 'Notes', 'Team ID', 'Status', 'Extra'], ['then', 'keep me', 'T1', 'error', 'also']]);
+ assert.equal(f.c.readCommitCollectionStatus_('T1'), 'error');
+ f.c.writeCommitCollectionStatus_('T1', 'ok');
+ assert.equal(sheet.rows[1][1], 'keep me', 'an unmapped column inside the written span keeps its value');
+ assert.equal(sheet.rows[1][4], 'also');
+ assert.equal(sheet.rows[1][3], 'ok');
+ assert.equal(f.c.readCommitCollectionStatus_('T1'), 'ok');
+ f.c.writeCommitCollectionStatus_('T2', 'error');
+ assert.equal(sheet.rows.length, 3);
+ assert.equal(sheet.rows[2][2], 'T2');
+ assert.equal(sheet.rows[2][3], 'error');
+ assert.equal(sheet.rows[2][1], '', 'a new row leaves the unmapped column blank');
+ assert.deepEqual(Array.from(sheet.rows[0]), ['Updated At', 'Notes', 'Team ID', 'Status', 'Extra'], 'the header row is never touched');
+});
+
+test('status: a missing or repeated required header throws, names the header and changes nothing', () => {
+ const f = fixture(), sheet = statusSheet(f, [['Team ID', 'Status'], ['T1', 'ok']]);
+ const before = JSON.stringify(sheet.rows);
+ assert.throws(() => f.c.readCommitCollectionStatus_('T1'), /header mismatch\. Missing: Updated At/);
+ assert.throws(() => f.c.writeCommitCollectionStatus_('T1', 'ok'), /Missing: Updated At/);
+ assert.equal(JSON.stringify(sheet.rows), before);
+ statusSheet(f, [['Team ID', 'Status', 'Updated At', 'status'], ['T1', 'ok', '', 'x']]);
+ assert.throws(() => f.c.readCommitCollectionStatus_('T1'), /Duplicate header in CommitCollectionStatus: Status/);
+ assert.throws(() => f.c.writeCommitCollectionStatus_('T1', 'ok'), /Duplicate header in CommitCollectionStatus: Status/);
+});
+
+test('status: a formula-like team ID is stored as text and read back', () => {
+ const f = fixture(), sheet = statusSheet(f, [['Team ID', 'Status', 'Updated At']]);
+ f.c.writeCommitCollectionStatus_('=T1', 'ok');
+ assert.equal(sheet.rows[1][0], '=T1');
+ assert.equal(f.c.readCommitCollectionStatus_('=T1'), 'ok');
+});
+
+test('status: a newly created tab is hidden and red, as a system sheet', () => {
+ const f = fixture(); f.sheets.delete('CommitCollectionStatus');
+ f.c.writeCommitCollectionStatus_('T1', 'ok');
+ assert.equal(f.sheets.get('CommitCollectionStatus').hidden, true);
+});

@@ -10,7 +10,7 @@ function weeklyFixture() {
   const sheets = new Map(), properties = new Map(), mails=[], errors=[], triggers=[];
   const config = {SUBMISSION_REMINDER_HOURS:24};
   function sheet(name, rows) {
-    const value={rows,getName:()=>name,getLastRow:()=>rows.length,getLastColumn:()=>Math.max(0,...rows.map(r=>r.length)),getMaxRows:()=>1000,insertRowsAfter(){},
+    const value={rows,getName:()=>name,getLastRow:()=>rows.length,getLastColumn:()=>Math.max(0,...rows.map(r=>r.length)),getMaxRows:()=>1000,insertRowsAfter(){},getMaxColumns:()=>40,insertColumnsAfter(){},setTabColor(){},hideSheet(){this.hidden=true;},isSheetHidden(){return !!this.hidden;},
       getDataRange:()=>({getValues:()=>rows.map(r=>r.slice())}),
       getRange:(r,c,n=1,w=1)=>({getValues:()=>Array.from({length:n},(_,i)=>Array.from({length:w},(_,j)=>rows[r+i-1]?.[c+j-1]??'')),
         setNumberFormat(){return this;},setValue(v){return this.setValues([[v]]);},setValues(values){values.forEach((row,i)=>row.forEach((cell,j)=>{rows[r+i-1] ||= [];rows[r+i-1][c+j-1]=typeof cell==='string' && cell.startsWith("'")?cell.slice(1):cell;}));},
@@ -28,7 +28,7 @@ function weeklyFixture() {
     MailApp:{sendEmail:(...args)=>{if(mailFails)throw Error('Mail unavailable');mails.push(args);}},
     ScriptApp:{getProjectTriggers:()=>triggers.slice(),deleteTrigger:t=>triggers.splice(triggers.indexOf(t),1),newTrigger:name=>({timeBased(){return this;},everyHours(n){this.hours=n;return this;},atHour(n){this.hour=n;return this;},everyDays(n){this.days=n;return this;},inTimezone(tz){this.timezone=tz;return this;},create(){triggers.push({getHandlerFunction:()=>name,hours:this.hours,hour:this.hour,days:this.days,timezone:this.timezone});}})}
   });
-  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','weekly-activity.js','logbook-tracker.js','progress-eligibility.js','team-github-setup.js','weekly-progress-phase2.js','marks-tracker.js','guide-dashboard.js','sheet-columns.js','title-log.js','title-history.js','title-gate.js','title-service.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+  for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','weekly-activity.js','logbook-tracker.js','progress-eligibility.js','team-github-setup.js','weekly-progress-phase2.js','marks-tracker.js','guide-dashboard.js','sheet-columns.js','ensure-sheet.js','title-log.js','title-history.js','title-gate.js','title-service.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
   withLegacyTitleColumns(c);
   // The title readers raise coded errors; fixtures that load api-envelope.js later replace this with the real one.
   c.apiFail_=(code,message)=>Object.assign(new Error(message),{apiCode:code});

@@ -186,6 +186,25 @@ function setStatusFields_(sheet, row, fields, columnMap) {
   });
 }
 
+/**
+ * One logical write of a record: the cells from the leftmost to the rightmost mapped column, written with one setValues call
+ * (SHEET-HEADER-MATCHING-PLAN.md rule W1). `record` holds values by column-map key. `existingRow` is the row as read, or null for a
+ * new row; a column inside the span that the map does not name keeps the value it has. For columns that are side by side the call is
+ * the same getRange and setValues the old positional code made.
+ */
+function writeRecordSpan_(sheet, rowNumber, columns, record, existingRow) {
+  const keys = Object.keys(record);
+  const indexes = keys.map(key => {
+    if (!Number.isInteger(columns[key])) throw new Error('No column is mapped for ' + key + '.');
+    return columns[key];
+  });
+  const left = Math.min(...indexes), right = Math.max(...indexes);
+  const values = [];
+  for (let index = left; index <= right; index++) values.push(existingRow && existingRow[index] !== undefined ? existingRow[index] : '');
+  keys.forEach(key => { values[columns[key] - left] = record[key]; });
+  sheet.getRange(rowNumber, left + 1, 1, right - left + 1).setValues([values]);
+}
+
 function findTeamStatusRow_(statusSheet, teamId, columnMap) {
   const ids = readSheetRows_(statusSheet, 2);
   for (let i = 0; i < ids.length; i++) {

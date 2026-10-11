@@ -140,36 +140,42 @@ function auditCommitHistory() {
   return report;
 }
 
-/** Call under the script lock when creating or writing collection status. */
+/**
+ * The sheet and its columns found by header name, or null when the sheet does not exist. With `create` a missing sheet is created
+ * first (the one runtime creator, ENSURE-SHEET-PLAN.md "Runtime mode"). Extra columns are ignored; a missing or repeated required
+ * header throws and nothing is repaired. Call under the script lock when creating or writing collection status.
+ */
 function commitCollectionStatusSheet_(create) {
-  const name = SHEET_NAMES.COMMIT_COLLECTION_STATUS;
-  let sheet = getSheet_(name);
-  const headers = Object.values(FIELD_DEFINITIONS.COMMIT_COLLECTION_STATUS);
-  if (!sheet && create) sheet = getSpreadsheet_().insertSheet(name);
+  if (create) ensureSheet_({...sheetSpec_('commitCollectionStatus'), mode: 'runtime'});
+  const sheet = getSheet_(SHEET_NAMES.COMMIT_COLLECTION_STATUS);
   if (!sheet) return null;
-  if (!sheet.getLastRow() && create) sheet.getRange(1,1,1,headers.length).setValues([headers]);
-  const actual = readSheetRows_(sheet,1,1)[0] || [];
-  if (actual.length !== headers.length || headers.some((header,index)=>!textEquals_(header,actual[index]))) {
-    throw new Error('CommitCollectionStatus header mismatch. Expected: ' + headers.join(' | '));
-  }
-  return sheet;
+  const fields = FIELD_DEFINITIONS.COMMIT_COLLECTION_STATUS;
+  const actual = (readSheetRows_(sheet,1,1)[0] || []).map(cell=>String(cell == null ? '' : cell).trim());
+  Object.values(fields).forEach(header=>{
+    if (actual.filter(cell=>textEquals_(cell,header)).length > 1) throw new Error('Duplicate header in CommitCollectionStatus: ' + header + '.');
+  });
+  const missing = Object.values(fields).filter(header=>!actual.some(cell=>textEquals_(cell,header)));
+  if (missing.length) throw new Error('CommitCollectionStatus header mismatch. Missing: ' + missing.join(', ') + '.');
+  return {sheet, columns:buildColumnMap_(sheet,fields,actual)};
 }
 
 function readCommitCollectionStatus_(teamId) {
-  const sheet = commitCollectionStatusSheet_(false);
-  if (!sheet) return '';
-  const matches = getSheetRows_(SHEET_NAMES.COMMIT_COLLECTION_STATUS).filter(row=>textEquals_(row[0],teamId));
-  return matches.length === 1 ? String(matches[0][1]) : '';
+  const storage = commitCollectionStatusSheet_(false);
+  if (!storage) return '';
+  const {columns} = storage;
+  const matches = getSheetRows_(SHEET_NAMES.COMMIT_COLLECTION_STATUS).filter(row=>textEquals_(row[columns.TEAM_ID],teamId));
+  return matches.length === 1 ? String(matches[0][columns.STATUS]) : '';
 }
 
-function upsertCommitCollectionStatus_(sheet, teamId, status, updatedAt) {
-  const matches = readSheetRows_(sheet,2).map((row,index)=>({row,index})).filter(item=>textEquals_(item.row[0],teamId));
+function upsertCommitCollectionStatus_(storage, teamId, status, updatedAt) {
+  const {sheet, columns} = storage;
+  const matches = readSheetRows_(sheet,2).map((row,index)=>({row,index})).filter(item=>textEquals_(item.row[columns.TEAM_ID],teamId));
   if (matches.length > 1) throw new Error('Duplicate collection status for team ' + teamId);
   const rowNumber = matches.length ? matches[0].index+2 : sheet.getLastRow()+1;
   if (rowNumber > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(),rowNumber-sheet.getMaxRows());
   const id = String(teamId).trim();
-  sheet.getRange(rowNumber,1).setNumberFormat('@');
-  sheet.getRange(rowNumber,1,1,3).setValues([[/^[=+@-]/.test(id) ? "'"+id : id,status,updatedAt]]);
+  sheet.getRange(rowNumber,columns.TEAM_ID+1).setNumberFormat('@');
+  writeRecordSpan_(sheet,rowNumber,columns,{TEAM_ID:/^[=+@-]/.test(id) ? "'"+id : id,STATUS:status,UPDATED_AT:updatedAt},matches.length ? matches[0].row : null);
 }
 
 function writeCommitCollectionStatus_(teamId, status) {
