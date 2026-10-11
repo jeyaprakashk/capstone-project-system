@@ -48,6 +48,7 @@ function buildStudentCoreDto_(email, teamId, d) {
     teamId:String(teamId),
     roster:d.rosterSlots.map(s => ({name:String(s.name || ''), initials:initialsOf_(s.name), regno:String(s.regno || ''), isMe:emailsMatch_(s.email, email)})),
     titleApproved:!!d.titleState && d.titleState.approved.value,
+    titleStatus:d.titleStatus,
     assessments:{reviews:definitions.filter(item => item.type === 'REVIEW').map(item => ({key:String(item.key), label:String(item.label)})), guideEvaluationLabel:String((guideEvaluation || {}).label || 'Guide Evaluation')}
   };
 }

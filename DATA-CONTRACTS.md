@@ -172,7 +172,7 @@ Capability = { allowed, reason, activity ('title.submit'|'title.resubmit'|null),
 
 The browser loads the student dashboard in two parts: `API_student_getCore` first (it renders the Weeks and Assessments screens and the Team screen's heading and roster), and `API_student_getProject` once, the first time the Title or GitHub screen is shown (both screens draw from that one response), or when a GitHub action refreshes it. `StudentDashboard` below is their union, the shape the page shows once both parts have loaded. The former combined `API_student_getDashboard` was removed after the split was verified live; `tests/student-migration.test.cjs` still freezes the facts of the union for every scenario.
 
-- `StudentCore` = `{teamId, titleApproved, roster, assessments}`.
+- `StudentCore` = `{teamId, titleApproved, titleStatus, roster, assessments}`; `titleStatus` is one of the TitleDto statuses or `UNAVAILABLE`. A `REOPENED` title opens the Title screen first and shows a notice on every screen.
 - `StudentProject` = `{setup, github, title}`.
 
 ### StudentDashboard

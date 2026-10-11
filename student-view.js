@@ -139,11 +139,19 @@ function studentViewBrowser_(bridge, getUi, actions) {
     });
   }
 
+  const NOTICE = 'mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/20 bg-warning-tint px-3 py-2 text-sm text-warning';
+  function reopenedNotice(dto) {
+    if (dto.titleStatus !== 'REOPENED') return '';
+    return '<div data-title-reopened role="status" class="' + NOTICE + '"><span><strong>Your coordinator reopened your project title.</strong> The approved title stays in effect until you submit a change and it is approved.</span>' +
+      '<button type="button" class="' + BUTTON + '" data-action="show-tab" data-tab="title">Open Title</button></div>';
+  }
+
   function render(host, dto) {
     state.host = host; state.dto = dto; state.loaded = {}; state.project = null; state.projectBusy = false;
-    if (!state.tab) state.tab = dto.titleApproved ? 'weeks' : 'github';
+    // A reopened title needs the team's action, so it opens the Title screen first, with a notice on every screen.
+    if (!state.tab) state.tab = dto.titleStatus === 'REOPENED' ? 'title' : dto.titleApproved ? 'weeks' : 'github';
     const ui = getUi();
-    host.innerHTML = '<div class="min-w-0">' +
+    host.innerHTML = '<div class="min-w-0">' + reopenedNotice(dto) +
       panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) +
       panelMarkup('title', state.tab, projectSlot('title', ui)) + panelMarkup('github', state.tab, projectSlot('github', ui)) +
       panelMarkup('team', state.tab, teamMarkup(dto)) + '</div>';

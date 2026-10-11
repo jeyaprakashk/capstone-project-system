@@ -108,7 +108,7 @@ test('the core endpoint never touches GitHub and the two parts carry disjoint fi
     s.c.getTeamGithubSetup_ = s.c.getStudentGithubState_;
     s.c.getTeamsGithubSetup_ = s.c.getStudentGithubState_;
     const core = JSON.parse(s.c.API_student_getCore()).data;
-    assert.deepEqual(Object.keys(core).sort(), ['assessments', 'roster', 'teamId', 'titleApproved'], name);
+    assert.deepEqual(Object.keys(core).sort(), ['assessments', 'roster', 'teamId', 'titleApproved', 'titleStatus'], name);
     const project = JSON.parse(studentFixture(name).c.API_student_getProject()).data;
     assert.deepEqual(Object.keys(project).sort(), ['github', 'setup', 'title'], name);
   }

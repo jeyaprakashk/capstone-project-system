@@ -14,7 +14,7 @@ async function setup(dto, options = {}) {
   const calls = { jump: [], refresh: 0, weekly: 0, results: 0, logs: [], preview: [] };
   const c = loadSources(['data-bridge-client.js', 'title-requests.js', 'student-title.js', 'student-view.js'], { document, Promise, JSON, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
-  const core = { teamId: dto.teamId, roster: dto.roster, titleApproved: dto.titleApproved, assessments: dto.assessments }, project = { setup: dto.setup, github: dto.github, title: dto.title };
+  const core = { teamId: dto.teamId, roster: dto.roster, titleApproved: dto.titleApproved, titleStatus: dto.titleStatus, assessments: dto.assessments }, project = { setup: dto.setup, github: dto.github, title: dto.title };
   bridge.useFixtures({ API_student_getCore: () => core, API_student_getProject: () => ctl.fail ? JSON.stringify({ ok: false, error: { code: 'INTERNAL', message: 'Project setup is unavailable.' } }) : project });
   const ui = {
     busy: require('./busy-fixture.cjs')(),
@@ -51,6 +51,20 @@ test('weekly progress appears only after title approval; the title action stays 
   assert.equal(needsTitle.host.querySelector('a[href*="forms.example"]'), null, 'no Form link any more');
   assert.equal(norm(titleButton((await setup(dtoFor('revise'))).host)), 'Resubmit title');
   assert.equal(titleButton((await setup(dtoFor('needsReview'))).host), null, 'no form while the title is under review');
+});
+
+test('a reopened title opens the Title screen first and shows a notice with a way to it on every screen', async () => {
+  const dto = dtoFor('approved'); dto.titleStatus = 'REOPENED';
+  const f = await setup(dto);
+  assert.equal(f.host.querySelector('[data-student-panel="title"]').hidden, false);
+  assert.equal(f.host.querySelector('[data-student-panel="weeks"]').hidden, true);
+  const notice = f.host.querySelector('[data-title-reopened]');
+  assert.match(norm(notice), /Your coordinator reopened your project title/);
+  f.click(notice.querySelector('[data-action="show-tab"]'));
+  assert.equal(f.host.querySelector('[data-student-panel="title"]').hidden, false);
+  const plain = await setup(dtoFor('approved'));
+  assert.equal(plain.host.querySelector('[data-title-reopened]'), null, 'no notice for an ordinary approved title');
+  assert.equal(plain.host.querySelector('[data-student-panel="weeks"]').hidden, false);
 });
 
 test('Title and GitHub each show one step card; pending setup is listed on GitHub only', async () => {
