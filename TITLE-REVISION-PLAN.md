@@ -633,7 +633,7 @@ editor-run functions (`setupTitleStorage` and the retirement plan's preflight, a
    titles, and none is still running (the barrier above).
 3. Close the Form (`setAcceptingResponses(false)`) if it is not already closed; its trigger was deleted in step 0. Copy each team's existing Form-uploaded
    documents into its team folder under the fixed names.
-4. Run `importTitleBaseline` (editor-run, `title-baseline-import.js`): it copies the baseline into `TitleLog` from TeamStatus as it
+4. Run `importTitleBaseline` (editor-run, `title-baseline-import.js`, deleted after the cutover was done): it copies the baseline into `TitleLog` from TeamStatus as it
    now stands, one `BASELINE` row per team, and refuses unless `TITLE_CUTOVER` is `PAUSED`. Every decision made before step 2 is
    included, and none can arrive after it. It reports the teams it could not write (an approved team without an approval date in the
    master registry) so the coordinator can enter those rows by hand. The file is deleted after the cutover.

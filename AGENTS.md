@@ -52,8 +52,8 @@ history (one row per change, the latest row of a team is its state). Specified i
   student view carries `folderUrl`, a document link or any folder link. Guides, reviewers and the coordinator get `folderUrl`.
   `tests/student-title.test.cjs` and `tests/student-migration.test.cjs` fail if a student receives one.
 - The browser sends title writes with a request ID from `TitleRequests` (`title-requests.js`) and the `revision` its DTO carried.
-- `TITLE_CUTOVER` is changed only by `setTitleCutover` and `clearTitleCutover`. `title-baseline-import.js` is the one temporary reader of
-  the old columns (cutover step 4) and is deleted after the cutover.
+- `TITLE_CUTOVER` is changed only by `setTitleCutover` and `clearTitleCutover`. The one-time import of the old title columns into
+  `TitleLog` (cutover step 4) has been run and its code deleted, so nothing reads the old columns any more.
 
 ## Layers
 

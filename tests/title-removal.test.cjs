@@ -14,8 +14,7 @@ const OLD_TITLE_DATA = [
 
 // Files that keep their mentions, each for a stated reason.
 const EXCLUDED = {
-  'common-constants.js': 'the frozen definitions: SHEET_NAMES and FIELD_DEFINITIONS keep the old columns until the Form sheet is retired',
-  'title-baseline-import.js': 'cutover step 4 copies the old title columns into TitleLog once; the file is deleted after the cutover'
+  'common-constants.js': 'the frozen definitions: SHEET_NAMES and FIELD_DEFINITIONS keep the old columns until the Form sheet is retired'
 };
 
 const runtimeFiles = fs.readdirSync('.').filter(name => name.endsWith('.js') && !name.startsWith('tailwind') && !EXCLUDED[name]);
