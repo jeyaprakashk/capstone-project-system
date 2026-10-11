@@ -310,3 +310,37 @@ test('status: a newly created tab is hidden and red, as a system sheet', () => {
  f.c.writeCommitCollectionStatus_('T1', 'ok');
  assert.equal(f.sheets.get('CommitCollectionStatus').hidden, true);
 });
+
+// Commits is found by header name (SHEET-HEADER-MATCHING-PLAN.md, phase 4).
+test('commits: the current layout is appended with one getRange over seven columns, as before',()=>{
+ const f=fixture(),sheet=f.sheets.get('Commits'),calls=[],getRange=sheet.getRange;
+ sheet.getRange=(...args)=>{calls.push(args.join(','));return getRange(...args);};
+ f.c.appendCollectedCommits_(sheet,'T1',[commit(1),commit(2)],'https://github.com/org/team');
+ // header read, the author-ID text format, then the one write of rows 2 and 3 over columns A to G
+ assert.deepEqual(calls,['1,1,1,7','2,7,2','2,1,2,7']);
+});
+
+test('commits: a shuffled sheet with an extra column is read and appended by header name',()=>{
+ const f=fixture(),sheet=f.sheets.get('Commits');
+ const order=[5,2,0,6,1,4,3]; // SHA, Message, Date, Author ID, Team ID, Repo URL, Username
+ sheet.rows.splice(0,Infinity,...sheet.rows.map(row=>order.map(i=>row[i])));
+ sheet.rows.forEach((row,i)=>row.splice(3,0,i?'keep':'Notes'));
+ const columns=JSON.parse(JSON.stringify(f.c.commitColumns_(sheet)));
+ assert.deepEqual(columns,{DATE:2,TEAM_ID:5,MESSAGE:1,USERNAME:7,REPO_URL:6,SHA:0,AUTHOR_ID:4});
+ const result=f.c.appendCollectedCommits_(sheet,'T1',[commit(1),commit(2)],'https://github.com/org/team');
+ assert.equal(result.count,2);
+ const header=sheet.rows[0],row=sheet.rows[1],at=name=>row[header.indexOf(name)];
+ assert.equal(at('Commit SHA'),sha(1));assert.equal(at('Team ID'),'T1');assert.equal(at('GitHub Username'),'github-user');
+ assert.equal(at('Repository URL'),'https://github.com/org/team');assert.equal(String(at('GitHub Author ID')),'123');assert.equal(at('Notes'),'');
+ const read=f.c.readCollectedCommits_('T1');
+ assert.deepEqual(Array.from(read,commit=>commit.sha),[sha(1),sha(2)]);
+ assert.equal(read[0].authorId,'123');
+ assert.equal(f.c.appendCollectedCommits_(sheet,'T1',[commit(1)],'https://github.com/org/team').count,0,'an existing SHA is still skipped');
+});
+
+test('commits: a missing or repeated required header throws, naming it, and changes nothing',()=>{
+ const f=fixture(),sheet=f.sheets.get('Commits'),before=JSON.stringify(sheet.rows);
+ sheet.rows[0][4]='Repo';assert.throws(()=>f.c.commitColumns_(sheet),/header mismatch\. Missing: Repository URL/);
+ sheet.rows[0][4]='Repository URL';sheet.rows[0].push('commit sha');assert.throws(()=>f.c.commitColumns_(sheet),/Duplicate header in Commits: Commit SHA/);
+ sheet.rows[0].pop();assert.equal(JSON.stringify(sheet.rows),before);
+});

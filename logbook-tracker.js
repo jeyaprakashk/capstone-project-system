@@ -52,15 +52,18 @@ function fetchCommitsForTeam_(repoOwner, repoName, hours) {
   }
 }
 
-/** Six fixed base columns plus the required author ID; validation never rewrites historical rows. */
+/** The six commit columns plus the required author ID, found by header name; validation never rewrites historical rows. */
 function commitColumns_(sheet) {
   if (!sheet) throw new Error('Commits sheet is missing.');
-  const headers = readSheetRows_(sheet,1,1)[0] || [];
-  const columns = Object.fromEntries(Object.keys(FIELD_DEFINITIONS.COMMITS).map((key,index)=>[key,index]));
-  Object.entries(columns).forEach(([key,index])=>{
-    if (!githubBaseHeaderEquals_(headers[index],FIELD_DEFINITIONS.COMMITS[key])) throw new Error('Commits header mismatch at column ' + (index+1) + '. Correct headers without moving historical data.');
+  const headers = (readSheetRows_(sheet,1,1)[0] || []).map(cell=>String(cell == null ? '' : cell).trim());
+  const columns = {}, missing = [];
+  Object.entries(FIELD_DEFINITIONS.COMMITS).forEach(([key,name])=>{
+    const indexes = headers.flatMap((header,index)=>textEquals_(header,name) ? [index] : []);
+    if (indexes.length > 1) throw new Error('Duplicate header in Commits: ' + name + '.');
+    if (indexes.length) columns[key] = indexes[0]; else missing.push(name);
   });
-  const ids = headers.flatMap((h,i)=>String(h).trim().toLowerCase() === 'github author id' ? [i] : []);
+  if (missing.length) throw new Error('Commits header mismatch. Missing: ' + missing.join(', ') + '. Correct headers without moving historical data.');
+  const ids = headers.flatMap((h,i)=>textEquals_(h,'GitHub Author ID') ? [i] : []);
   if (ids.length > 1) throw new Error('Duplicate GitHub Author ID header.');
   columns.AUTHOR_ID = ids.length ? ids[0] : -1;
   if (columns.AUTHOR_ID < 0) throw new Error('GitHub Author ID column missing.');
@@ -89,11 +92,11 @@ function appendCollectedCommits_(sheet, teamId, commits, repoUrl) {
     const key = commitIdentity_(commit.sha);
     const timestamp = new Date(commit.commit && commit.commit.committer && commit.commit.committer.date);
     if (!key || !Number.isFinite(timestamp.getTime()) || typeof commit.commit.message !== 'string') throw new Error('Invalid commit SHA, timestamp or message for ' + teamId);
-    const values = [timestamp,teamId,commit.commit.message.split('\n')[0],commit.author ? commit.author.login : '(unknown)',repoUrl,key];
+    const record = {DATE:timestamp,TEAM_ID:teamId,MESSAGE:commit.commit.message.split('\n')[0],USERNAME:commit.author ? commit.author.login : '(unknown)',REPO_URL:repoUrl,SHA:key};
     const authorId = githubId_(commit.author && commit.author.id);
     if (commit.author && commit.author.id != null && !authorId) throw new Error('Invalid GitHub author ID for ' + teamId);
-    return {key,authorId,
-      values:values.map(value=>typeof value === 'string' && /^[=+@-]/.test(value) ? "'"+value : value)};
+    Object.keys(record).forEach(field=>{ if (typeof record[field] === 'string' && /^[=+@-]/.test(record[field])) record[field] = "'" + record[field]; });
+    return {key,authorId,record};
   });
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -105,11 +108,13 @@ function appendCollectedCommits_(sheet, teamId, commits, repoUrl) {
       const first = sheet.getLastRow()+1, last = first+pending.length-1;
       if (last > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(),last-sheet.getMaxRows());
       sheet.getRange(first,columns.AUTHOR_ID+1,pending.length).setNumberFormat('@');
-      const width = Math.max(6,columns.AUTHOR_ID+1);
-      sheet.getRange(first,1,pending.length,width).setValues(pending.map(commit=>{
+      // One setValues over the span from the leftmost to the rightmost commit column; a column of the sheet that is not a commit
+      // field stays blank in the new rows.
+      const fields = ['DATE','TEAM_ID','MESSAGE','USERNAME','REPO_URL','SHA','AUTHOR_ID'];
+      const left = Math.min(...fields.map(field=>columns[field])), width = Math.max(...fields.map(field=>columns[field])) - left + 1;
+      sheet.getRange(first,left+1,pending.length,width).setValues(pending.map(commit=>{
         const row = Array(width).fill('');
-        commit.values.forEach((value,index)=>{row[index]=value;});
-        row[columns.AUTHOR_ID]=commit.authorId;
+        fields.forEach(field=>{row[columns[field]-left] = field === 'AUTHOR_ID' ? commit.authorId : commit.record[field];});
         return row;
       }));
     }

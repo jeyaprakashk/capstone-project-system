@@ -173,8 +173,8 @@ test('both permanent schemas normalize only case and outer whitespace and never 
     const before=JSON.stringify(sheet.rows);read();assert.equal(JSON.stringify(sheet.rows),before);
     sheet.rows[0][3]='GitHub  Username';assert.throws(read,/header mismatch/);
     sheet.rows[0][3]='GitHub Username';[sheet.rows[0][0],sheet.rows[0][1]]=[sheet.rows[0][1],sheet.rows[0][0]];
-    // GitHubAccounts is found by header name, so a swapped pair is accepted; Commits still requires its order.
-    if(type==='accounts')assert.equal(read().EMAIL,0);else assert.throws(read,/header mismatch/);
+    // Both sheets are found by header name, so a swapped pair is accepted and the map follows the new order.
+    if(type==='accounts')assert.equal(read().EMAIL,0);else assert.equal(read().TEAM_ID,0);
     [sheet.rows[0][0],sheet.rows[0][1]]=[sheet.rows[0][1],sheet.rows[0][0]];
     sheet.rows[0].push(type==='accounts'?'GitHub ID':'GitHub Author ID');assert.throws(read,/Duplicate/);
   }

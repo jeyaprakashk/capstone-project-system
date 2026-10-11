@@ -110,10 +110,14 @@ function sheetCatalog_() {
         name: SHEET_NAMES.COMMITS,
         access: 'view',
         headersFrom: 'FIELD_DEFINITIONS.COMMITS',
-        status: 'by-name',
-        purpose: 'Collected GitHub commits. A GitHub Author ID column follows the frozen six.',
+        status: 'migrated',
+        purpose: 'Collected GitHub commits. A GitHub Author ID column follows the frozen six. Created by hand; no code creates it.',
         createAtRuntime: false,
-        code: []
+        code: [
+          {file: 'logbook-tracker.js', role: 'read', functions: ['commitColumns_', 'readCollectedCommits_', 'auditCommitHistory', 'collectAllCommits_']},
+          {file: 'logbook-tracker.js', role: 'write', functions: ['appendCollectedCommits_']},
+          {file: 'weekly-progress-phase2.js', role: 'read', functions: ['weeklyAIIdentifiers_']}
+        ]
       },
       commitCollectionStatus: {
         name: SHEET_NAMES.COMMIT_COLLECTION_STATUS,
