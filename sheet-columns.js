@@ -76,6 +76,7 @@ function sheetCatalog_() {
           {file: 'guide-api.js', role: 'read', functions: ['buildGuideGithubDto_']},
           {file: 'progress-eligibility.js', role: 'read', functions: ['reconcileProgressEligibility']},
           {file: 'weekly-activity.js', role: 'read', functions: ['weeklyStoredGithubMapping_']},
+          {file: 'team-files.js', role: 'read', functions: ['teamLinkedGithubIds_']},
           {file: 'weekly-progress-phase2.js', role: 'read', functions: ['weeklyAIIdentifiers_']}
         ]
       },
