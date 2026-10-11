@@ -35,6 +35,23 @@ creation and validation paths remain in place. Every call names its `mode`.
 - New sheets are defined in the catalog (`sheet-columns.js`), not in `SHEET_NAMES` or `FIELD_DEFINITIONS`. `SHEETS.md` is
   generated from it with `npm run build:sheets-doc`.
 
+## Project titles
+
+The project title and problem statement are not stored in TeamStatus any more. They live in the `TitleLog` sheet, an append-only
+history (one row per change, the latest row of a team is its state). Specified in [TITLE-REVISION-PLAN.md](TITLE-REVISION-PLAN.md).
+
+- **Read** a team's title only through `titleGate_(teamId)` (approved or not, and the title and problem in effect), or
+  `titleSummary_` / `titleStateFromIndex_` when a screen needs the workflow state. Read the log once with `readTitleIndex_()` and pass
+  the index for a list of teams. Never read the old title columns; `tests/title-removal.test.cjs` fails when a runtime module does.
+- **Write** only through `titleWrite_` (`title-write.js`): one path, one lock, the cutover check under the lock, a request ID and the
+  revision the user saw. Endpoints (`title-api.js`, `team-document-upload.js`) resolve who the caller is and pass callbacks; the rules are
+  in `title-service.js` and the history validation in `title-history.js`. A row is appended and never edited.
+- **Requirements** that gate a student action come from the `ActivityDependencies` sheet through the engine (`activity-engine.js`, the
+  `github` and `drive` checks). Misconfiguration denies; nothing is cached between requests; a student never sees a check's `diagnostic`.
+- The browser sends title writes with a request ID from `TitleRequests` (`title-requests.js`) and the `revision` its DTO carried.
+- `TITLE_CUTOVER` is changed only by `setTitleCutover` and `clearTitleCutover`. `title-baseline-import.js` is the one temporary reader of
+  the old columns (cutover step 4) and is deleted after the cutover.
+
 ## Layers
 
 1. **Server (Apps Script).** Reads and writes sheets, GitHub and mail. Returns JSON
@@ -103,7 +120,7 @@ registered there under the role that uses it (see Role bundles) and its test fil
 (`dashboard-client-scripts.js`) only owns role loading, the shell, the shared drawers and the loading
 overlay; screens, card actions and flows live in their own module (for example `team-drawer-view.js`,
 `shared-timeline-view.js`, `shared-rubrics-view.js`, `system-status-actions.js`,
-`student-github-actions.js`, `assessment-history-view.js`).
+`student-github-actions.js`, `student-title.js`, `assessment-history-view.js`).
 
 ## Role bundles
 
