@@ -120,7 +120,7 @@ const SharedRubricsView = (${sharedRubricsViewBrowser_.toString()})(() => Dashbo
 const StudentResults = (${studentResultsViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentWeekly = (${studentWeeklyViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI, {weekly: StudentWeekly, results: StudentResults, github: StudentGithub});` : '',
-    has('guide') ? `const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly, () => SharedTabs);` : ''
+    has('guide') ? `const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly, () => SharedTabs, () => TitleRequests);` : ''
   ].filter(Boolean).join('\n');
 }
 

@@ -14,18 +14,17 @@ function dtoFromServer(options) {
 /** The dashboard DTO exactly as API_guide_getDashboard returns it, with the GitHub reply the server would give next. */
 function firstPaintFromServer(options) {
   const g = guideFixture(options);
-  return { dto: JSON.parse(g.c.API_guide_getDashboard()).data, github: JSON.parse(g.c.API_guide_getGithub()).data, approvals: JSON.parse(g.c.API_guide_getApprovals()).data };
+  return { dto: JSON.parse(g.c.API_guide_getDashboard()).data, github: JSON.parse(g.c.API_guide_getGithub()).data };
 }
 
 function setup(dto = dtoFromServer()) {
   const { document, window } = parseHTML('<html><body><div id="guideContent"></div></body></html>');
   const calls = { reads: [], weekly: [], loads: 0, refresh: 0, writes: [], toggles: [], github: 0 };
-  const c = loadSources(['data-bridge-client.js', 'shared-tabs.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
+  const c = loadSources(['data-bridge-client.js', 'shared-tabs.js', 'title-requests.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const s = { dto, writeError: null, readError: null };
   bridge.useTransport(async (method, args) => {
     if (method === 'API_guide_getDashboard') return s.readError ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: s.readError } }) : JSON.stringify({ ok: true, data: s.dto });
-    if (method === 'API_guide_getApprovals') { calls.approvals = (calls.approvals || 0) + 1; if (s.approvalsGate) await s.approvalsGate; return s.approvalsError ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: s.approvalsError } }) : JSON.stringify({ ok: true, data: s.approvals || { teams: {} } }); }
     if (method === 'API_guide_getGithub') { calls.github++; if (s.githubGate) await s.githubGate; return s.githubError ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: s.githubError } }) : JSON.stringify({ ok: true, data: s.github }); }
     if (method === 'API_guide_getCommits') { calls.reads.push(args[0]); return JSON.stringify({ ok: true, data: s.commits || { teamId: args[0], state: 'unavailable', message: 'Commit history is not available yet.', members: [] } }); }
     calls.writes.push([method, args]);
@@ -35,7 +34,8 @@ function setup(dto = dtoFromServer()) {
   const weekly = { selectTeam: (t) => calls.weekly.push(['team', t]), selectView: (v) => calls.weekly.push(['view', v]), load: () => calls.loads++, positionTitleInfo: (e, el) => calls.toggles.push(el.id) };
   vm.runInContext('globalThis.__make = ' + c.guideViewBrowser_.toString(), c);
   const tabs = c.sharedTabsBrowser_(() => ui);
-  const view = c.__make(bridge, () => ui, () => weekly, () => tabs);
+  const requests = c.titleRequestsBrowser_();
+  const view = c.__make(bridge, () => ui, () => weekly, () => tabs, () => requests);
   const host = document.getElementById('guideContent');
   return { view, host, document, window, calls, s, ui, weekly, tabs, c, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
@@ -53,7 +53,7 @@ test('renders the workspace contract GuideWeekly and GuideEvaluation depend on',
   assert.deepEqual(Array.from(root.querySelectorAll('[data-guide-team]')).map(n => n.hasAttribute('hidden')), [false, true, true, true, true, true]);
   assert.deepEqual(JSON.parse(byAttr(f, 'data-guide-team', 'T1').getAttribute('data-guide-students')), ['001', '002']);
   assert.equal(byAttr(f, 'data-guide-select', 'T2').getAttribute('data-title-attention'), 'true');
-  assert.equal(byAttr(f, 'data-guide-select', 'T2').getAttribute('data-documents-attention'), '2');
+  assert.equal(byAttr(f, 'data-guide-select', 'T2').getAttribute('data-documents-attention'), '1');
   assert.equal(byAttr(f, 'data-guide-select', 'T2').getAttribute('aria-pressed'), 'true');
   assert.equal(byAttr(f, 'data-guide-select', 'T1').getAttribute('aria-pressed'), 'false');
   assert.equal(byAttr(f, 'data-guide-select', 'T2').querySelector('[data-team-attention]'), null);
@@ -78,14 +78,17 @@ test('each title-approval state shows its own content', () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
   const card = id => byAttr(f, 'data-guide-team', id).querySelector('[data-guide-view="title"]').textContent.replace(/\s+/g, ' ');
   assert.match(card('T2'), /Title \(editable\)/); assert.match(card('T2'), /Similar to T9 \(80%\)/);
-  assert.equal(byAttr(f, 'data-guide-team', 'T2').querySelector('#title-T2').getAttribute('value'), 'Needs review');
+  assert.equal(byAttr(f, 'data-guide-team', 'T2').querySelector('#title-T2').getAttribute('value'), 'NEEDS REVIEW');
   assert.match(card('T2'), /Title approval due .* · Overdue/);
   assert.match(card('T4'), /You approved — awaiting Reviewer\./);
   assert.match(card('T5'), /Your note: Too broad/); assert.match(card('T5'), /Waiting on the team to resubmit\./);
   assert.match(card('T6'), /Reviewer's note: Narrow it/); assert.match(card('T6'), /nothing for you to do/);
+  assert.equal(byAttr(f, 'data-guide-team', 'T2').querySelector('[data-decision="approve"]').disabled, false);
+  assert.equal(byAttr(f, 'data-guide-team', 'T2').querySelector('[data-decision="return"]').disabled, false);
   const side = byAttr(f, 'data-guide-team', 'T1').querySelector('[data-guide-view="title"]').textContent.replace(/\s+/g, ' ');
-  assert.match(side, /Approved by\s*rev@example\.com/); assert.match(side, /Reviewer comment\s*Solid scope/); assert.match(side, /Scope\s*Not recorded separately\./);
-  assert.match(card('T1'), /Approved on date unavailable\s*Timing unavailable/);
+  assert.match(side, /Approved by\s*reviewer@example\.com/); assert.match(side, /Documents\s*Open the team folder\./);
+  assert.equal(byAttr(f, 'data-guide-team', 'T1').querySelector('[data-guide-view="title"] a[href="https://drive.example.com/folders/T1"]').textContent, 'Open team folder');
+  assert.match(card('T1'), /Approved on \d+ \w+ \d{4}/);
   assert.equal(byAttr(f, 'data-guide-team', 'T4').querySelector('#title-T4'), null);
   assert.match(byAttr(f, 'data-guide-team', 'T3').textContent, /Team T3 · Not Submitted/);
   assert.match(byAttr(f, 'data-guide-heading', 'T3').textContent, /No title submitted yet/);
@@ -163,7 +166,7 @@ test('a normal load starts the weekly and GitHub reads with the dashboard read; 
   const bridge = vm.runInContext('(' + f.c.dataBridgeBrowser_.toString() + ')()', f.c);
   bridge.useTransport(async method => { sent.push(method); return JSON.stringify({ ok: true, data: method === 'API_guide_getGithub' ? github : method === 'API_guide_getDashboard' ? dto : { entries: [], weeks: [] } }); });
   vm.runInContext('globalThis.__make2 = ' + f.c.guideViewBrowser_.toString(), f.c);
-  const view = f.c.__make2(bridge, () => f.ui, () => f.weekly, () => f.tabs);
+  const view = f.c.__make2(bridge, () => f.ui, () => f.weekly, () => f.tabs, () => f.c.titleRequestsBrowser_());
   const loaded = await view.load();
   assert.deepEqual(sent.slice().sort(), ['API_guide_getDashboard', 'API_guide_getGithub', 'API_guide_getWeekly']);
   view.render(f.host, loaded); await f.settle(); await f.settle();
@@ -176,54 +179,29 @@ test('a normal load starts the weekly and GitHub reads with the dashboard read; 
   assert.deepEqual(sent, ['API_guide_getDashboard'], 'a re-read after a saved decision starts no early reads');
 });
 
-test('approval details show a placeholder at first paint, then the date and timing fill in for approved teams only', async () => {
+test('the approval date and timing come with the dashboard: nothing waits, nothing is requested afterwards', async () => {
   const { dto } = firstPaintFromServer();
-  const f = setup(dto); f.s.approvals = { teams: { T1: { approvedOn: '29 Sep 2026, 17:30', timing: { state: 'on-time', explanation: 'Title approved 29 Sep 2026, on or before the deadline.', days: -2 } } } };
-  let release; f.s.approvalsGate = new Promise(resolve => { release = resolve; });
-  f.view.render(f.host, f.s.dto);
-  const title = id => byAttr(f, 'data-guide-team', id).querySelector('[data-guide-view="title"]');
-  assert(title('T1').querySelector('[data-approval-loading]'));
-  assert.match(title('T1').textContent, /Approved/); assert.doesNotMatch(title('T1').textContent, /Approved on/);
-  assert.match(title('T1').textContent, /Approved by\s*rev@example\.com/, 'the rest of the approved card is already there');
-  assert.equal(f.host.querySelectorAll('[data-guide-select]').length, 6);
-  assert.equal(f.calls.approvals, 1);
-  const other = title('T2').innerHTML;
-  release(); await f.settle(); await f.settle();
-  assert.equal(title('T1').querySelector('[data-approval-loading]'), null);
-  assert.match(title('T1').textContent, /Approved on 29 Sep 2026, 17:30/); assert.match(title('T1').textContent, /2 days earlier/);
-  assert.equal(title('T2').innerHTML, other, 'other cards are not re-rendered');
-  assert.equal(f.calls.approvals, 1, 'one read for all approved teams');
-});
-
-test('a failed approvals read leaves the card working with the date shown as unavailable', async () => {
-  const { dto } = firstPaintFromServer();
-  const f = setup(dto); f.s.approvalsError = 'Hub unavailable';
+  const f = setup(dto);
   f.view.render(f.host, f.s.dto); await f.settle(); await f.settle();
-  const card = byAttr(f, 'data-guide-team', 'T1');
-  assert.equal(card.querySelector('[data-approval-loading]'), null);
-  const text = card.querySelector('[data-guide-view="title"]').textContent;
-  assert.match(text, /Approved on date unavailable/); assert.match(text, /Timing unavailable/);
+  const title = id => byAttr(f, 'data-guide-team', id).querySelector('[data-guide-view="title"]');
+  assert.equal(title('T1').querySelector('[data-approval-loading]'), null);
+  assert.match(title('T1').textContent, /Approved on \d+ \w+ \d{4}/);
+  assert.match(title('T1').textContent, /earlier|On time/);
+  assert.equal(f.calls.approvals, undefined);
 });
 
-test('a guide with no approved team makes no approvals request', async () => {
-  const { dto } = firstPaintFromServer();
-  dto.teams.forEach(team => { if (team.approval) { team.status = { key: 'AWAITING_REVIEWER', text: 'Awaiting Reviewer', tone: 'blue' }; team.approval = null; } });
-  const f = setup(dto); f.view.render(f.host, f.s.dto); await f.settle();
-  assert(!f.calls.approvals);
-});
-
-test('documents view lists links or reports that none were submitted', () => {
+test('documents view links to the team folder or says it does not exist yet', () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
   const docs = id => byAttr(f, 'data-guide-team', id).querySelector('[data-guide-view="documents"]');
-  assert.deepEqual(Array.from(docs('T2').querySelectorAll('li a')).map(a => a.getAttribute('href')), ['https://example.com/w2', 'https://example.com/n2']);
-  assert.match(docs('T3').textContent, /No documents submitted yet/); assert.match(docs('T3').textContent, /Last document submission: Date unavailable/);
+  assert.deepEqual(Array.from(docs('T2').querySelectorAll('a')).map(a => a.getAttribute('href')), ['https://drive.example.com/folders/T2']);
+  assert.match(docs('T3').textContent, /The team folder has not been created yet/);
   assert(docs('T3').hasAttribute('hidden'));
 });
 
 test('escapes every interpolated value, rejects unsafe links and emits no inline handlers', () => {
   const dto = dtoFromServer(); const evil = '<img src=x onerror=alert(1)>"\'&';
-  Object.assign(dto.teams[0], { title: evil, problem: evil, similarityFlag: evil, guideNotes: evil, reviewerNotes: evil, teamId: 'T"2' });
-  dto.teams[0].members = [{ name: evil, regno: evil }]; dto.teams[0].documents = [{ label: evil, url: 'javascript:alert(1)' }]; dto.teams[0].repoUrl = 'javascript:alert(2)';
+  Object.assign(dto.teams[0], { title: evil, problem: evil, similarityFlag: evil, notes: evil, teamId: 'T"2', folderUrl: 'javascript:alert(1)', proposal: { title: evil, problem: evil } });
+  dto.teams[0].members = [{ name: evil, regno: evil }]; dto.teams[0].repoUrl = 'javascript:alert(2)';
   const f = setup(dto); f.view.render(f.host, dto);
   assert.equal(f.host.querySelectorAll('img').length, 0);
   assert.deepEqual(Array.from(f.host.querySelectorAll('*')).flatMap(n => Array.from(n.attributes).map(a => a.name)).filter(name => /^on/i.test(name)), []);
@@ -244,10 +222,10 @@ test('team and tab buttons delegate to GuideWeekly', () => {
   assert.deepEqual(f.calls.weekly, [['team', 'T1'], ['view', 'documents'], ['view', 'evaluation']]);
 });
 
-test('Reject needs a note and sends nothing without one', async () => {
+test('Return needs a note and sends nothing without one', async () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
-  f.click(f.host.querySelector('[data-decision="Rejected"]')); await f.settle();
-  assert.equal(f.host.querySelector('#status-T2').textContent, 'Please add a note explaining the rejection.');
+  f.click(f.host.querySelector('[data-decision="return"]')); await f.settle();
+  assert.equal(f.host.querySelector('#status-T2').textContent, 'Please add a note explaining why the title is returned.');
   assert.equal(f.calls.writes.length, 0);
 });
 
@@ -255,34 +233,37 @@ test('approve sends the edited title once, re-reads, re-renders and restarts wee
   const f = setup(); f.view.render(f.host, f.s.dto);
   f.host.querySelector('#title-T2').value = 'Edited title'; f.host.querySelector('#notes-T2').value = 'ok';
   const next = JSON.parse(JSON.stringify(f.s.dto)); next.teams[0].status = { key: 'AWAITING_REVIEWER', text: 'Awaiting Reviewer', tone: 'blue' }; next.teams[0].titleDue = null; f.s.dto = next;
-  const button = f.host.querySelector('[data-decision="Approved"]');
+  const button = f.host.querySelector('[data-decision="approve"]');
   f.click(button); f.click(button);
   assert.equal(button.disabled, true); assert(f.host.querySelector('#status-T2 [data-skeleton]')); assert.match(f.host.querySelector('#status-T2').textContent, /Submitting…/);
   await f.settle();
-  assert.deepEqual(JSON.parse(JSON.stringify(f.calls.writes)), [['API_guide_submitDecision', ['T2', 'Approved', 'ok', 'Edited title']]]);
+  const writes = JSON.parse(JSON.stringify(f.calls.writes));
+  assert.equal(writes.length, 1); assert.equal(writes[0][0], 'API_guide_decideTitle');
+  const sent = writes[0][1][0]; assert.match(sent.requestId, /^\S{8,}$/);
+  assert.deepEqual({ ...sent, requestId: 'x' }, { requestId: 'x', expectedRevision: f.s.dto.teams[0].revision, teamId: 'T2', decision: 'approve', notes: 'ok', editedTitle: 'Edited title' });
   assert.equal(f.calls.loads, 1);
   assert.equal(f.host.querySelector('#title-T2'), null);
   assert.match(byAttr(f, 'data-guide-team', 'T2').textContent, /You approved — awaiting Reviewer\./);
 });
 
-test('a rejected decision keeps the form and typed text, shows the server message and re-enables buttons', async () => {
+test('a refused decision reloads the title, shows the server message and re-enables buttons', async () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
   f.s.writeError = 'You are not the recorded guide for Team T2.';
   f.host.querySelector('#notes-T2').value = 'typed note';
-  f.click(f.host.querySelector('[data-decision="Approved"]')); await f.settle();
+  f.click(f.host.querySelector('[data-decision="approve"]')); await f.settle(); await f.settle();
   assert.equal(f.host.querySelector('#status-T2').textContent, 'You are not the recorded guide for Team T2.');
-  assert.equal(f.host.querySelector('[data-decision="Approved"]').disabled, false);
-  assert.equal(f.host.querySelector('#notes-T2').value, 'typed note'); assert.equal(f.calls.loads, 0);
-  f.s.writeError = null; f.click(f.host.querySelector('[data-decision="Rejected"]')); await f.settle();
+  assert.equal(f.host.querySelector('[data-decision="approve"]').disabled, false);
+  f.host.querySelector('#notes-T2').value = 'typed again';
+  f.s.writeError = null; f.click(f.host.querySelector('[data-decision="return"]')); await f.settle();
   assert.equal(f.calls.writes.length, 2);
 });
 
 test('a failed re-read after a saved decision reports it and leaves the content', async () => {
   const f = setup(); f.view.render(f.host, f.s.dto);
   f.s.readError = 'Sheets unavailable';
-  f.click(f.host.querySelector('[data-decision="Approved"]')); await f.settle();
+  f.click(f.host.querySelector('[data-decision="approve"]')); await f.settle();
   assert.match(f.host.querySelector('#status-T2').textContent, /Refresh failed: Sheets unavailable/);
-  assert.equal(f.host.querySelector('[data-decision="Approved"]').disabled, false);
+  assert.equal(f.host.querySelector('[data-decision="approve"]').disabled, false);
   assert.equal(f.host.querySelectorAll('[data-guide-select]').length, 6);
 });
 

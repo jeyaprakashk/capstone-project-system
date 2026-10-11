@@ -7,7 +7,7 @@
  * The workspace tab strip, its styles and its keyboard handling come from SharedTabs.
  * Elements that GuideWeekly toggles with `hidden` carry no display utilities.
  */
-function guideViewBrowser_(bridge, getUi, getWeekly, getTabs) {
+function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests) {
   'use strict';
   const delegated = new WeakSet();
   const state = {dto:null, host:null, busyTeam:null, commits:{}};
@@ -78,12 +78,10 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs) {
   }
   const p = (html, extra) => '<p class="mt-2 text-sm ' + (extra || 'text-ink-2') + '">' + html + '</p>';
 
-  const wbsLink = team => { const w = team.documents.find(d => d.label === 'Work Breakdown'); return w ? ' <a class="font-semibold text-primary underline" href="' + escape(safeUrl(w.url)) + '" target="_blank" rel="noopener">See Work Breakdown</a>' : ''; };
+  const folderLink = team => team.folderUrl ? ' <a class="font-semibold text-primary underline" href="' + escape(safeUrl(team.folderUrl)) + '" target="_blank" rel="noopener">Open team folder</a>' : '';
   function approvedMain(team) {
     const a = team.approval, timing = a.timing, problem = team.problem || '';
-    // approvedOn and timing are null until API_guide_getApprovals answers.
-    const dated = timing ? '<strong class="font-semibold">Approved on ' + escape(a.approvedOn || 'date unavailable') + '</strong>' + timingBadge(timing.state, timingLabel(timing))
-      : '<strong class="font-semibold">Approved</strong><span data-approval-loading role="status">' + getUi().renderSkeleton('inline', 'Reading approval date') + '</span>';
+    const dated = '<strong class="font-semibold">Approved on ' + escape(a.approvedOn || 'date unavailable') + '</strong>' + timingBadge(timing.state, timingLabel(timing));
     return '<div class="flex flex-wrap items-center gap-3 text-success">' + icon('check') + dated + '</div>' +
       (problem ? '<h4 class="mt-5 text-xs font-semibold uppercase tracking-wide text-muted">Problem statement</h4>' +
         '<p data-problem-text class="mt-2 line-clamp-4 text-base leading-7 text-ink-2">' + escape(problem) + '</p>' +
@@ -93,18 +91,18 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs) {
     const row = (label, value) => '<div class="px-4 py-3"><dt class="text-muted">' + label + '</dt><dd class="m-0 mt-1 text-ink">' + value + '</dd></div>';
     return '<dl class="m-0 divide-y divide-edge rounded-card border border-edge bg-paper text-sm">' +
       row('Approved by', '<strong class="font-semibold">' + escape(team.approval.approvedBy || 'Not recorded') + '</strong>') +
-      row('Scope', 'Not recorded separately.' + wbsLink(team)) +
-      row('Reviewer comment', team.reviewerNotes ? escape(team.reviewerNotes) : '<em class="text-muted">No comment recorded</em>') + '</dl>';
+      row('Documents', 'Open the team folder.' + folderLink(team)) +
+      row('Reviewer comment', team.notes ? escape(team.notes) : '<em class="text-muted">No comment recorded</em>') + '</dl>';
   }
   function decisionForm(team) {
     const id = escape(team.teamId);
     return '<label class="mt-3 block text-sm font-semibold text-ink-2" for="title-' + id + '">Title (editable)</label>' +
-      '<input type="text" id="title-' + id + '" value="' + escape(team.title) + '" class="mt-1 block w-full rounded-md border border-control px-3 py-2 text-sm">' +
-      problemBlock(team.problem) + (team.similarityFlag ? p(escape(team.similarityFlag), 'text-warning') : '') +
-      '<textarea id="notes-' + id + '" rows="3" class="mt-3 block w-full rounded-md border border-control px-3 py-2 text-sm" placeholder="Notes (optional, required if rejecting)"></textarea>' +
+      '<input type="text" id="title-' + id + '" value="' + escape(team.proposal.title) + '" class="mt-1 block w-full rounded-md border border-control px-3 py-2 text-sm">' +
+      problemBlock(team.proposal.problem) + (team.similarityFlag ? p(escape(team.similarityFlag), 'text-warning') : '') + (team.approveBlockedReason ? p(escape(team.approveBlockedReason), 'text-danger') : '') +
+      '<textarea id="notes-' + id + '" rows="3" class="mt-3 block w-full rounded-md border border-control px-3 py-2 text-sm" placeholder="Notes (optional; required to return the title)"></textarea>' +
       '<p class="mt-2 text-sm text-muted" id="status-' + id + '" role="status"></p>' +
-      '<div class="mt-3 flex justify-end gap-2"><button type="button" class="' + BUTTON + '" data-action="decide" data-decision="Rejected" data-team="' + id + '">Reject</button>' +
-      '<button type="button" class="' + PRIMARY + '" data-action="decide" data-decision="Approved" data-team="' + id + '">Approve</button></div>';
+      '<div class="mt-3 flex justify-end gap-2"><button type="button" class="' + BUTTON + '" data-action="decide" data-decision="return" data-team="' + id + '"' + (team.canReturn ? '' : ' disabled') + '>Return for revision</button>' +
+      '<button type="button" class="' + PRIMARY + '" data-action="decide" data-decision="approve" data-team="' + id + '"' + (team.canApprove ? '' : ' disabled') + '>Approve</button></div>';
   }
   function titleCard(team) {
     if (team.status.key === 'APPROVED') {
@@ -115,11 +113,12 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs) {
     let body = '';
     if (key === 'NEEDS_REVIEW') body = decisionForm(team);
     else {
-      body = problemBlock(team.problem);
+      body = problemBlock(team.proposal.problem || team.problem);
       if (key === 'AWAITING_REVIEWER') body += p('You approved — awaiting Reviewer.');
-      else if (key === 'APPROVED') body += approvalDetails(team);
-      else if (key === 'REJECTED_BY_GUIDE') body += p('<strong>Your note:</strong> ' + escape(team.guideNotes || '(none)')) + p('Waiting on the team to resubmit.');
-      else if (key === 'REVISE_AWAITING_STUDENT') body += p('<strong>Reviewer\'s note:</strong> ' + escape(team.reviewerNotes || '(none)')) + p('Waiting for the team to resubmit — nothing for you to do until they do.');
+      else if (key === 'REOPENED') body += p('<strong>Reopened by the coordinator:</strong> ' + escape(team.reopen ? team.reopen.reason : '')) + p('The approved title stays in effect until the team resubmits and a new title is approved.');
+      else if (key === 'UNAVAILABLE') body += p('This team\'s title history cannot be read right now. Contact the coordinator.', 'text-danger');
+      else if (key === 'RETURNED' && team.returnedByGuide) body += p('<strong>Your note:</strong> ' + escape(team.notes || '(none)')) + p('Waiting on the team to resubmit.');
+      else if (key === 'RETURNED') body += p('<strong>Reviewer\'s note:</strong> ' + escape(team.notes || '(none)')) + p('Waiting for the team to resubmit — nothing for you to do until they do.');
     }
     return '<div id="card-' + id + '">' +
       '<div class="flex flex-wrap items-center gap-2"><span class="' + (TONE[status.tone] || TONE.gray) + '">Team ' + id + ' · ' + escape(status.text) + '</span>' +
@@ -129,15 +128,15 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs) {
       body + '</div>';
   }
   function documentsView(team) {
-    return (team.documents.length
-      ? '<ul class="m-0 list-none p-0 divide-y divide-edge">' + team.documents.map(d => '<li class="flex items-center justify-between gap-3 py-2 text-sm"><strong>' + escape(d.label) + '</strong><a class="' + BUTTON + '" href="' + escape(safeUrl(d.url)) + '" target="_blank" rel="noopener">Open document</a></li>').join('') + '</ul>'
-      : p('No documents submitted yet.') + p('Last document submission: ' + escape(team.lastDocumentSubmission || 'None recorded'))) +
-      p('Open the submitted files to review the team’s work.');
+    return (team.folderUrl
+      ? '<div class="flex items-center justify-between gap-3 py-2 text-sm"><strong>Team folder</strong><a class="' + BUTTON + '" href="' + escape(safeUrl(team.folderUrl)) + '" target="_blank" rel="noopener">Open team folder</a></div>'
+      : p('The team folder has not been created yet.')) +
+      p('Open the folder to review the team’s documents.');
   }
 
   function selectorMarkup(team, index) {
     const id = escape(team.teamId), attention = team.status.key === 'NEEDS_REVIEW';
-    return '<button type="button" class="' + PILL + '" data-guide-select="' + id + '" data-title-attention="' + attention + '" data-documents-attention="' + team.documents.length + '" aria-pressed="' + (index === 0) + '" title="' + escape(team.title || 'No title submitted yet') + '">' +
+    return '<button type="button" class="' + PILL + '" data-guide-select="' + id + '" data-title-attention="' + attention + '" data-documents-attention="' + (team.folderUrl ? 1 : 0) + '" aria-pressed="' + (index === 0) + '" title="' + escape(team.title || 'No title submitted yet') + '">' +
       '<strong data-team-label hidden>' + id + '</strong><span data-team-spinner role="status">' + getUi().renderSkeleton('inline', 'Checking team actions') + '</span></button>';
   }
   const initials = name => String(name || '?').trim().split(/\s+/).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('');
@@ -217,7 +216,6 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs) {
     host.innerHTML = (dto.teams.length ? workspaceMarkup(dto) : headerMarkup([]) + '<p class="mt-4 text-sm text-muted">You have no teams assigned.</p>');
     watchProblems(host);
     if (dto.teams.some(team => team.github === undefined)) loadGithub(dto);
-    if (dto.teams.some(approvalPending)) loadApprovals(dto);
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); }
     getTabs().bind(host);
     if (!host.guideToggleBound) {
@@ -256,23 +254,6 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs) {
       syncCommits();
     };
     bridge.read('guide-github', 'API_guide_getGithub', [], {...GITHUB_READ, prefetched:true}).then(data => apply(data && data.teams), () => apply(null));
-  }
-
-  const approvalPending = team => !!team.approval && team.approval.timing === null;
-  /** Approval dates come from a second spreadsheet whose read is slow, so they fill in after first paint; a stale reply is ignored. */
-  function loadApprovals(dto) {
-    const unavailable = {approvedOn:'', timing:{state:'unknown', explanation:'Recorded date unavailable.', days:null}};
-    const apply = byTeam => {
-      if (state.dto !== dto || !state.host) return;
-      dto.teams.filter(approvalPending).forEach(team => {
-        const value = byTeam && byTeam[team.teamId] || unavailable;
-        team.approval.approvedOn = String(value.approvedOn || ''); team.approval.timing = value.timing || unavailable.timing;
-        const section = teamSection(team.teamId), view = section && section.querySelector('[data-guide-view="title"]');
-        if (view) view.innerHTML = titleViewMarkup(team);
-      });
-      watchProblems(state.host);
-    };
-    bridge.read('guide-approvals', 'API_guide_getApprovals', [], {timeoutMs:120000}).then(data => apply(data && data.teams), () => apply(null));
   }
 
   /** Commit history is read the first time a team's GitHub status tab is shown, never in the background. */
@@ -327,15 +308,18 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs) {
     if (state.busyTeam) return;
     const notesEl = document.getElementById('notes-' + team), titleEl = document.getElementById('title-' + team);
     const notes = notesEl ? notesEl.value : '', editedTitle = titleEl ? titleEl.value : '';
-    if (decision === 'Rejected' && !notes.trim()) { setStatus(team, 'Please add a note explaining the rejection.'); return; }
+    if (decision === 'return' && !notes.trim()) { setStatus(team, 'Please add a note explaining why the title is returned.'); return; }
     state.busyTeam = team;
     const done = getUi().busy.write(document.getElementById('status-' + team), 'Submitting…', cardButtons(team));
-    bridge.write('API_guide_submitDecision', [team, decision, notes, editedTitle]).then(
-      () => load(true).then(dto => {
+    const current = state.dto.teams.find(item => item.teamId === team), scope = 'guide:' + team;
+    const edited = decision === 'approve' && editedTitle.trim() && editedTitle.trim() !== String(current.proposal.title).trim() ? editedTitle : '';
+    const requestId = getRequests().idFor(scope, [current.revision, decision, notes, edited].join('|'));
+    bridge.write('API_guide_decideTitle', [{requestId, expectedRevision: current.revision, teamId: team, decision, notes, ...(edited ? {editedTitle: edited} : {})}]).then(
+      () => { getRequests().settle(scope); return load(true).then(dto => {
         state.busyTeam = null; render(state.host, dto);
         const weekly = getWeekly(); if (weekly) weekly.load();
-      }, error => { state.busyTeam = null; done('Refresh failed: ' + error.message); }),
-      error => { state.busyTeam = null; done(error.message || 'Unable to submit decision.'); });
+      }, error => { state.busyTeam = null; done('Refresh failed: ' + error.message); }); },
+      error => { getRequests().settle(scope, error); state.busyTeam = null; done(error.message || 'Unable to submit decision.'); if (error.code === 'CONFLICT' || error.code === 'REJECTED') load(true).then(dto => { render(state.host, dto); setStatus(team, error.message); }, () => {}); });
   }
 
   return {load, render, decide, ensureCommits, state};

@@ -178,8 +178,7 @@ test('guide approval context matches the current title, reviewer and year and re
     getSpreadsheet_:()=>({getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),getHubRegistrySheet_:()=> 'registry',getSheet_:()=> 'intake',SHEET_NAMES:{TEAM_INTAKE_RAW:'intake'},
     readSheetRows_:(sheet,start)=>sheet==='registry'?records:start===1?[['Timestamp','Team ID','Work Breakdown Document']]:[['2026-09-28T12:00:00Z','G33','file']],escapeHtml_:value=>String(value)});
   vm.runInContext(fs.readFileSync('guide-dashboard.js','utf8'),c);
-  const context=c.readGuideRecordContext_([row],TS);
-  assert.match(context.approvals.g33,/29 Sept 2026/);assert.match(context.documentSubmissions.g33,/28 Sept 2026/);
+  assert.match(c.guideRecordDate_(Date.parse('2026-09-29T12:00:00Z')),/29 Sept 2026/);
   vm.runInContext(fs.readFileSync('guide-api.js','utf8'),c);
   c.projectDay_=date=>Math.floor(date.getTime()/86400000);
   c.formatProjectDay_=day=>new Date(day*86400000).toISOString().slice(0,10);
@@ -198,9 +197,7 @@ test('guide approval context matches the current title, reviewer and year and re
   assert.equal(joined.state,'on-time');assert.equal(joined.daysLate,0);assert.match(joined.date,/29 Sep/);
   assert.equal(git({githubId:'123',status:'valid',access:'invited',submittedAt:Date.parse('2026-09-29')}),null);
   assert.equal(git({githubId:'',status:'missing',access:'none'}),null);
-  c.readSheetRows_=()=>{throw Error('offline');};
-  const unavailable=c.readGuideRecordContext_([row],TS);
-  assert.equal(unavailable.approvals.g33,undefined);assert.equal(unavailable.documentSubmissions.g33,'Date unavailable');
+  assert.equal(c.guideRecordDate_(NaN),'');assert.equal(c.guideRecordDate_(''),'');
 });
 
 test('full student answers are retained without arbitrary truncation',()=>{

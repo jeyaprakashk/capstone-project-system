@@ -14,64 +14,24 @@ function getGuideDashboardData_(email, timings) {
   const logsByTeam = timedPhase_(timings, 'log_entries_read', () => groupBy_(readLogEntries_(), row => row.teamId));
 
   const STATUS_PRIORITY = {
-    NEEDS_REVIEW: 0, NOT_SUBMITTED: 1, REJECTED_BY_GUIDE: 2,
-    REVISE_AWAITING_STUDENT: 3, AWAITING_REVIEWER: 4, APPROVED: 5
+    NEEDS_REVIEW: 0, NOT_SUBMITTED: 1, RETURNED: 2, REOPENED: 3, AWAITING_REVIEWER: 4, APPROVED: 5, UNAVAILABLE: 6
   };
+  // Each team's title state comes from TitleLog, read once. A team whose history is not valid is UNAVAILABLE and nothing else.
+  const titleIndex = timedPhase_(timings, 'title_log_read', () => readTitleIndex_());
 
   const sharedLogReads = {timings};
-  const teams = timedPhase_(timings, 'team_log_summaries', () => myRows.map(r => ({ row: r, status: getTeamStatus_(r), repoUrl: repoUrlMap[normalizeText_(r[TS.TEAM_ID])] || '', logWeeks:getTeamLogWeekSummary_(r, TS, logsByTeam[normalizeText_(r[TS.TEAM_ID])] || [], schedule, clock, sharedLogReads) }))
+  const teams = timedPhase_(timings, 'team_log_summaries', () => myRows.map(r => { const title = titleTryState_(titleIndex, r[TS.TEAM_ID]); return { row: r, title, status: title.state ? title.state.status : 'UNAVAILABLE', repoUrl: repoUrlMap[normalizeText_(r[TS.TEAM_ID])] || '', logWeeks:getTeamLogWeekSummary_(r, TS, logsByTeam[normalizeText_(r[TS.TEAM_ID])] || [], schedule, clock, sharedLogReads) }; })
     .sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]));
 
-  const counts = { NOT_SUBMITTED: 0, NEEDS_REVIEW: 0, REVISE_AWAITING_STUDENT: 0, AWAITING_REVIEWER: 0, APPROVED: 0, REJECTED_BY_GUIDE: 0 };
+  const counts = { NOT_SUBMITTED: 0, NEEDS_REVIEW: 0, RETURNED: 0, AWAITING_REVIEWER: 0, APPROVED: 0, REOPENED: 0, UNAVAILABLE: 0 };
   teams.forEach(t => counts[t.status]++);
 
-  // Approval dates live in a second spreadsheet whose open time varies widely; API_guide_getApprovals reads them after first paint.
-  return { teams, counts, schedule, clock, windows:sharedLogReads.windows, ...readGuideRecordContext_(myRows, TS, timings, {approvals:false}) };
+  return { teams, counts, schedule, clock, windows:sharedLogReads.windows };
 }
 
 function guideRecordDate_(value) {
   const date=value ? new Date(value) : null;
   return date && Number.isFinite(date.getTime()) ? date.toLocaleString('en-GB',{timeZone:getSpreadsheet_().getSpreadsheetTimeZone(),day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-}
-
-/** Approval date and time for the given teams, from the hub registry; empty when it cannot be read. */
-function readGuideApprovals_(rows, TS, timings) {
-  const approvals={},approvalTimes={};
-  const owned=new Map(rows.map(row=>[normalizeText_(row[TS.TEAM_ID]),row]));
-  // The registry writer appends year, semester, team, guide, title, repo,
-  // members, approval date and approving reviewer, in that order.
-  try {
-    timedPhase_(timings,'hub_registry',()=>readSheetRows_(getHubRegistrySheet_(),2)).forEach(record=>{
-      const key=normalizeText_(record[2]),row=owned.get(key);
-      if(!row || !textEquals_(record[0],getAcademicYear_()) || !textEquals_(record[1],row[TS.SEMESTER]) ||
-        !emailsMatch_(record[3],row[TS.GUIDE_EMAIL]) || String(record[4])!==String(row[TS.TITLE]) ||
-        !emailsMatch_(record[8],row[TS.TITLE_APPROVED_BY]))return;
-      const date=guideRecordDate_(record[7]);if(date){approvals[key]=date;approvalTimes[key]=new Date(record[7]).getTime();}
-    });
-  } catch(error) { /* Approval stays authoritative even when its date cannot be read. */ }
-  return {approvals,approvalTimes};
-}
-
-function readGuideRecordContext_(rows, TS, timings, options) {
-  const documentSubmissions={};
-  const owned=new Map(rows.map(row=>[normalizeText_(row[TS.TEAM_ID]),row]));
-  const {approvals,approvalTimes}=options && options.approvals===false ? {approvals:{},approvalTimes:{}} : readGuideApprovals_(rows,TS,timings);
-  try {
-    const sheet=getSheet_(SHEET_NAMES.TEAM_INTAKE_RAW);
-    if(!sheet)throw new Error('Intake history unavailable');
-    const headers=(readSheetRows_(sheet,1,1)[0] || []).map(normalizeText_);
-    const column=name=>headers.indexOf(normalizeText_(name));
-    const team=column('Team ID'),stamp=column('Timestamp'),work=column('Work Breakdown Document'),need=column('Need Analysis Report');
-    if(team<0 || stamp<0 || (work<0 && need<0))throw new Error('Intake history columns unavailable');
-    const latest={};
-    timedPhase_(timings,'intake_history',()=>readSheetRows_(sheet,2)).forEach(record=>{
-      const key=normalizeText_(record[team]),at=new Date(record[stamp]).getTime();
-      if(!owned.has(key) || (!record[work] && !record[need]) || !Number.isFinite(at))return;
-      if(!latest[key] || at>latest[key])latest[key]=at;
-    });
-    Object.keys(latest).forEach(key=>{documentSubmissions[key]=guideRecordDate_(latest[key]);});
-  } catch(error) { owned.forEach((row,key)=>{documentSubmissions[key]='Date unavailable';}); }
-  return {approvals,approvalTimes,documentSubmissions};
 }
 
 function getTeamStatus_(r) {

@@ -50,9 +50,7 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_student_getProject()` | Student | none | `StudentProject` (below): setup, GitHub and title cards (the GitHub checks) | `getStudentDashboardData_` + `buildStudentProjectDto_` |
 | `API_guide_getDashboard()` | Guide | none | `GuideDashboard` (below) | `buildDashboardContent` (removed) |
 | `API_guide_getGithub()` | Guide | none | `{teams:{<teamId>: GuideGithub \| null}}` for the guide's own teams; `null` = status unavailable (a failed GitHub read is never an error) | `buildGuideGithubDto_` over `getTeamsGithubSetup_`; read once after the dashboard renders so first paint never waits on live GitHub calls |
-| `API_guide_getApprovals()` | Guide | none | `{teams:{<teamId>:{approvedOn:string, timing:{state,explanation,days:number\|null}}}}` for the guide's APPROVED teams only (empty object when none); an unreadable registry gives `approvedOn:''` and `timing.state:'unknown'`, never an error | `buildGuideApprovalsDto_` over `readGuideApprovals_`; the hub registry is a second spreadsheet with a slow, variable open time, so it is read after first paint and only when a team is approved |
 | `API_guide_getCommits(teamId)` | Guide (own team only) | team ID | `{teamId, state:'available'|'unavailable', message, repositoryUrl?, members:[{regno, username, count:number|null, commits:[{sha, shortSha, message, timestamp, url}]}]}`; `count` is every collected commit by that member in the team repository (all time, bootstrap commit excluded) and `commits` the latest 3; read when the GitHub status tab is first shown | `buildGuideCommitsDto_` over `readCollectedCommits_` |
-| `API_guide_submitDecision(teamId, decision, notes, editedTitle)` | Guide | `decision` is `Approved` or `Rejected`; notes required for `Rejected` | `{message}` | `decide` in the old client |
 | `API_reviewer_getDashboard()` | Reviewer | none | `ReviewerDashboard` (below) | `buildReviewerContent` (removed) |
 | `API_reviewer_submitDecision(teamId, decision, notes)` | Reviewer | `decision` is `Approved` or `Revise`; notes required for `Revise` | `{message}` | `reviewerDecide` in the old client |
 | `API_review_getEvaluation(teamId, assessmentId)` | Reviewer | assessment key such as `review1` | the existing `loadReviewEvaluation_` object (details, roster, config, evaluation, statuses, revision, token); `availability.absenceCorrectionAllowed` is true only for a submitted team evaluation with no publication history | `loadReviewEvaluation_` called directly |
@@ -204,10 +202,11 @@ captured from the removed HTML for eight states, with explicit expectations for 
 
 ```
 { teams:[{ teamId, title, status:{key,text,tone}, members:[{name,regno}], memberEmails:[string],
-           registerNumbers:[string], repoUrl, problem, documents:[{label,url}], lastDocumentSubmission,
+           registerNumbers:[string], repoUrl, problem, folderUrl,
+           revision, proposal:{title,problem}, canApprove, canReturn, approveBlockedReason, returnedByGuide,
            overdueLogs:number, titleDue:{date,overdue}|null, titleTiming:{state,explanation}|null,
-           similarityFlag, guideNotes, reviewerNotes,
-           approval:{approvedBy, approvedOn:string|null, timing:{state,explanation,days:number|null}|null}|null }],   // APPROVED only; approvedOn and timing are null until API_guide_getApprovals answers
+           similarityFlag, notes, reopen:{reason,at}|null,
+           approval:{approvedBy, approvedOn:string, timing:{state,explanation,days:number|null}}|null }],   // set once the title has had its first final approval, including while it is reopened
   githubDue:string|null,
   evaluation:{enabled:boolean, notice:string},
   weeks:[{weekId, opensAt, deadlineAt, lateUntil}] }   // epoch ms; consumed by GuideWeekly
@@ -219,7 +218,11 @@ GuideGithub   // one team's entry in API_guide_getGithub().teams
 
 The dashboard has no `github` field. The view treats a team's `github` as `undefined` (placeholder) until
 `API_guide_getGithub` returns, then `GuideGithub` or `null` (unavailable). The golden-master test merges both
-responses (and `API_guide_getApprovals` for approved teams), so `guide-legacy-facts.json` is unchanged.
+responses. The title facts come from `TitleLog`: `status.key` is one of `NOT_SUBMITTED`, `NEEDS_REVIEW`, `AWAITING_REVIEWER`,
+`RETURNED`, `APPROVED`, `REOPENED` or `UNAVAILABLE` (the team's history failed validation); `title` is the title in effect and
+`proposal` the one under review. `revision` is what `API_guide_decideTitle` must send as `expectedRevision`. The approval date and
+timing come with the dashboard (they no longer need a second read). `documents` are no longer listed: `folderUrl` opens the team folder.
+`guide-legacy-facts.json` was regenerated for these title fields in the title-revision change.
 
 Teams are ordered by title-review priority. `state` is one of `on-time`, `late`, `overdue`, `pending`,
 `unknown`; the view maps it to a label and colour. Workflow rejections returned as `{ok:false,message}` by

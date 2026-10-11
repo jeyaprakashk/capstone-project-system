@@ -24,6 +24,7 @@ function guideFixture({ github = 'default' } = {}) {
     { 'Team ID': 'T6', Title: 'Revise me', 'Guide Decision': 'Approved', 'Reviewer Decision': 'Revise', 'Reviewer Notes': 'Narrow it', 'Student 1 Name': 'Eight', 'Student 1 Register No': '008', 'Student 1 Email': 'eight@example.com' }
   ];
   f.status.rows.splice(1, f.status.rows.length, ...teams.map(t => ts.map(h => ({ ...base, ...t })[h] ?? '')));
+  f.syncTitleLog();
   c.getRepoUrlMap_ = () => ({ t1: 'https://github.com/org/team1', t2: 'https://github.com/org/team2' });
   const members = {
     t1: { members: [{ email: 'one@example.com', githubId: '1', status: 'valid', access: 'active', submittedAt: Date.parse('2026-01-07T10:00:00Z') }, { email: 'two@example.com', githubId: '2', status: 'valid', access: 'active', submittedAt: Date.parse('2026-01-09T10:00:00Z') }] },
@@ -32,20 +33,18 @@ function guideFixture({ github = 'default' } = {}) {
     t5: { members: [{ email: 'seven@example.com', githubId: '7', status: 'valid', access: 'unavailable' }] }
   };
   c.getTeamsGithubSetup_ = () => { if (github === 'throw') throw new Error('GitHub down'); return members; };
-  c.getHubRegistrySheet_ = () => ({}); // approval date unavailable unless a test supplies a registry
+  c.teamFolderUrls_ = () => ({ t1: 'https://drive.example.com/folders/T1', t2: 'https://drive.example.com/folders/T2' });
   return { f, c, ts, state, members, header, user: 'guide@example.com', day };
 }
 /**
- * The dashboard DTO with each team's `github` (API_guide_getGithub) and each approved team's approval date and timing
- * (API_guide_getApprovals) filled in: the shape the view shows once all three reads have finished.
+ * The dashboard DTO with each team's `github` (API_guide_getGithub) filled in: the shape the view shows once both reads have finished.
+ * A team's approval date and timing come with the dashboard, straight from TitleLog.
  */
 function guideFullDto(g) {
   const dto = JSON.parse(g.c.API_guide_getDashboard()).data;
   const github = JSON.parse(g.c.API_guide_getGithub()).data;
-  const approvals = JSON.parse(g.c.API_guide_getApprovals()).data;
   dto.teams.forEach(team => {
     team.github = github.teams[team.teamId] ?? null;
-    if (team.approval) Object.assign(team.approval, approvals.teams[team.teamId]);
   });
   return dto;
 }

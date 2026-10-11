@@ -18,7 +18,10 @@ function legacySteps(title, guide, reviewer) {
 function titleRowsFor({teamId = 'T1', title, guide, reviewer, problem = 'A problem statement', guideNotes = '', reviewerNotes = '', similarityNote = '', start = Date.parse('2025-12-01T00:00:00Z')}) {
   const steps = legacySteps(title, guide, reviewer).map(action => {
     if (action === 'SUBMIT') return {action, title: String(title).trim().toUpperCase(), problem, similarityNote};
-    if (action === 'RETURN') return {action, notes: String(reviewer).toLowerCase() === 'revise' ? reviewerNotes || 'Please revise.' : guideNotes || 'Please revise.'};
+    if (action === 'RETURN') {
+      const byReviewer = String(reviewer).toLowerCase() === 'revise';
+      return {action, actor: byReviewer ? 'reviewer@example.com' : 'guide@example.com', notes: byReviewer ? reviewerNotes || 'Please revise.' : guideNotes || 'Please revise.'};
+    }
     return action;
   });
   const rows = history(steps, {teamId, start});

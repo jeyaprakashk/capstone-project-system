@@ -2,13 +2,13 @@
   {
     "teamId": "T2",
     "selector": {
-      "title": "Needs review",
+      "title": "NEEDS REVIEW",
       "members": "1 member",
       "titleAttention": true,
-      "documentsAttention": 2
+      "documentsAttention": 1
     },
     "heading": {
-      "title": "Needs review",
+      "title": "NEEDS REVIEW",
       "members": "Three (003)",
       "mailto": "three@example.com"
     },
@@ -39,22 +39,14 @@
         "Similar to T9 (80%)"
       ],
       "form": {
-        "value": "Needs review"
+        "value": "NEEDS REVIEW",
+        "canApprove": true,
+        "canReturn": true
       },
       "problem": "A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement. A long problem statement."
     },
     "documents": {
-      "links": [
-        {
-          "label": "Work Breakdown",
-          "url": "https://example.com/w2"
-        },
-        {
-          "label": "Need Analysis",
-          "url": "https://example.com/n2"
-        }
-      ],
-      "last": null
+      "folder": "https://drive.example.com/folders/T2"
     }
   },
   {
@@ -99,20 +91,19 @@
       "problem": null
     },
     "documents": {
-      "links": [],
-      "last": "Date unavailable"
+      "folder": null
     }
   },
   {
     "teamId": "T5",
     "selector": {
-      "title": "Rejected",
+      "title": "REJECTED",
       "members": "1 member",
       "titleAttention": false,
       "documentsAttention": 0
     },
     "heading": {
-      "title": "Rejected",
+      "title": "REJECTED",
       "members": "Seven (007)",
       "mailto": "seven@example.com"
     },
@@ -133,7 +124,7 @@
       "repo": null
     },
     "title": {
-      "status": "Team T5 · Rejected by You",
+      "status": "Team T5 · Returned for Revision",
       "timing": {
         "label": "Overdue",
         "explanation": "Title approved is overdue. Deadline: 2026-01-10T00:00:00.000Z."
@@ -144,23 +135,22 @@
         "Waiting on the team to resubmit."
       ],
       "form": null,
-      "problem": null
+      "problem": "A problem statement"
     },
     "documents": {
-      "links": [],
-      "last": "Date unavailable"
+      "folder": null
     }
   },
   {
     "teamId": "T6",
     "selector": {
-      "title": "Revise me",
+      "title": "REVISE ME",
       "members": "1 member",
       "titleAttention": false,
       "documentsAttention": 0
     },
     "heading": {
-      "title": "Revise me",
+      "title": "REVISE ME",
       "members": "Eight (008)",
       "mailto": "eight@example.com"
     },
@@ -169,7 +159,7 @@
     ],
     "github": null,
     "title": {
-      "status": "Team T6 · Awaiting Student Revision",
+      "status": "Team T6 · Returned for Revision",
       "timing": {
         "label": "Overdue",
         "explanation": "Title approved is overdue. Deadline: 2026-01-10T00:00:00.000Z."
@@ -180,23 +170,22 @@
         "Waiting for the team to resubmit — nothing for you to do until they do."
       ],
       "form": null,
-      "problem": null
+      "problem": "A problem statement"
     },
     "documents": {
-      "links": [],
-      "last": "Date unavailable"
+      "folder": null
     }
   },
   {
     "teamId": "T4",
     "selector": {
-      "title": "Awaiting reviewer",
+      "title": "AWAITING REVIEWER",
       "members": "2 members",
       "titleAttention": false,
       "documentsAttention": 0
     },
     "heading": {
-      "title": "Awaiting reviewer",
+      "title": "AWAITING REVIEWER",
       "members": "Five (005), Six (006)",
       "mailto": "five@example.com"
     },
@@ -216,23 +205,22 @@
         "You approved — awaiting Reviewer."
       ],
       "form": null,
-      "problem": null
+      "problem": "A problem statement"
     },
     "documents": {
-      "links": [],
-      "last": "Date unavailable"
+      "folder": null
     }
   },
   {
     "teamId": "T1",
     "selector": {
-      "title": "Approved <i>project</i>",
+      "title": "APPROVED <I>PROJECT</I>",
       "members": "2 members",
       "titleAttention": false,
       "documentsAttention": 1
     },
     "heading": {
-      "title": "Approved <i>project</i>",
+      "title": "APPROVED <I>PROJECT</I>",
       "members": "One (001), Two (002)",
       "mailto": "one@example.com,two@example.com"
     },
@@ -271,23 +259,17 @@
       "status": "Team T1 · Approved",
       "timing": null,
       "paragraphs": [
-        "Approved title: Approved <i>project</i>",
-        "Scope: Not recorded separately. See Work Breakdown.",
-        "Approved by: rev@example.com",
-        "Approved on: Date unavailable Timing unavailable Recorded date unavailable. Deadline: 2026-01-10T00:00:00.000Z.",
-        "Reviewer comment: Solid scope"
+        "Approved title: APPROVED <I>PROJECT</I>",
+        "Documents: Open the team folder. Open team folder.",
+        "Approved by: reviewer@example.com",
+        "Approved on: 1 Dec 2025, 07:30 On time Title approved 2025-12-01T00:00:00.000Z, on or before the deadline (2026-01-10T00:00:00.000Z).",
+        "Reviewer comment: No comment recorded"
       ],
       "form": null,
       "problem": "Short problem"
     },
     "documents": {
-      "links": [
-        {
-          "label": "Work Breakdown",
-          "url": "https://example.com/wbs"
-        }
-      ],
-      "last": null
+      "folder": "https://drive.example.com/folders/T1"
     }
   }
 ]

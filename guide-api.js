@@ -66,33 +66,48 @@ function guideStatusRoster_(r, TS) {
   return [1, 2, 3, 4].map(n => ({email:r[TS['S' + n + '_EMAIL']], regno:r[TS['S' + n + '_REGNO']], name:r[TS['S' + n + '_NAME']]}));
 }
 
-function guideTeamDto_(t, TS, data) {
-  const r = t.row, key = normalizeText_(r[TS.TEAM_ID]), status = t.status, label = STATUS_LABEL[status];
+const GUIDE_TITLE_STATUS_ = Object.freeze({
+  NOT_SUBMITTED: {text:'Not Submitted', cls:'gray'}, NEEDS_REVIEW: {text:'Needs Your Review', cls:'orange'},
+  AWAITING_REVIEWER: {text:'Awaiting Reviewer', cls:'blue'}, RETURNED: {text:'Returned for Revision', cls:'gray'},
+  APPROVED: {text:'Approved', cls:'green'}, REOPENED: {text:'Reopened', cls:'orange'}, UNAVAILABLE: {text:'Unavailable', cls:'gray'}
+});
+
+/** The approval of a team whose title has had its first final approval; its date and timing come straight from TitleLog. */
+function guideApprovalDto_(summary, data) {
+  const at = summary.approvedAt ? summary.approvedAt.getTime() : NaN;
+  return {approvedBy:String(summary.approvedBy || ''), approvedOn:guideRecordDate_(at) || '', timing:guideTitleTimingDto_('APPROVED', at, data.schedule, data.clock)};
+}
+
+function guideTeamDto_(t, TS, data, folderUrl) {
+  const r = t.row, status = t.status, label = GUIDE_TITLE_STATUS_[status];
+  const state = t.title.state, summary = state ? titleSummaryFromState_(state) : null;
   const roster = guideStatusRoster_(r, TS);
-  const documents = [
-    {label:'Work Breakdown', url:r[TS.WORK_BREAKDOWN_LINK]},
-    {label:'Need Analysis', url:r[TS.NEED_ANALYSIS_LINK]},
-    {label:'Chapter 1 (LaTeX)', url:r[TS.CHAPTER1_LATEX_LINK]}
-  ].filter(d => d.url).map(d => ({label:d.label, url:String(d.url)}));
+  const approveDecision = state ? titleCanDo_(state, 'guideApprove', {roles:{guide:true}}) : {allowed:false, reason:'', code:''};
+  const returnDecision = state ? titleCanDo_(state, 'return', {roles:{guide:true}}) : {allowed:false, reason:'', code:''};
+  const approved = !!summary && summary.approved;
   return {
     teamId:String(r[TS.TEAM_ID]),
-    title:String(r[TS.TITLE] || ''),
+    title:summary ? summary.title : '',
     status:{key:status, text:label.text, tone:label.cls},
+    revision:summary ? summary.revision : 0,
+    proposal:summary ? {title:summary.proposal.title, problem:summary.proposal.problem} : {title:'', problem:''},
+    canApprove:approveDecision.allowed,
+    canReturn:returnDecision.allowed,
+    approveBlockedReason:status === 'NEEDS_REVIEW' && !approveDecision.allowed ? approveDecision.reason : '',
+    returnedByGuide:!!state && state.status === 'RETURNED' && emailsMatch_(state.latest.actor, r[TS.GUIDE_EMAIL]),
+    folderUrl:String(folderUrl || ''),
     members:roster.filter(s => s.name).map(s => ({name:String(s.name), regno:String(s.regno || '')})),
     memberEmails:roster.map(s => s.email).filter(Boolean).map(String),
     registerNumbers:roster.map(s => s.regno).filter(Boolean).map(String),
     repoUrl:t.repoUrl || '',
-    problem:String(r[TS.PROBLEM] || ''),
-    documents,
-    lastDocumentSubmission:String(data.documentSubmissions && data.documentSubmissions[key] || ''),
+    problem:summary ? summary.problem : '',
     overdueLogs:t.logWeeks && t.logWeeks.missing ? t.logWeeks.missing : 0,
-    titleDue:status === 'APPROVED' ? null : {date:formatProjectDay_(data.schedule.title), overdue:data.clock.today > data.schedule.title},
-    titleTiming:status === 'APPROVED' ? null : guideTitleTimingDto_(status, undefined, data.schedule, data.clock),
-    similarityFlag:String(r[TS.SIMILARITY_FLAG] || ''),
-    guideNotes:String(r[TS.GUIDE_NOTES] || ''),
-    reviewerNotes:String(r[TS.REVIEWER_NOTES] || ''),
-    // approvedOn and timing are null until API_guide_getApprovals answers (the registry read is slow and variable).
-    approval:status === 'APPROVED' ? {approvedBy:String(r[TS.TITLE_APPROVED_BY] || ''), approvedOn:null, timing:null} : null
+    titleDue:approved ? null : {date:formatProjectDay_(data.schedule.title), overdue:data.clock.today > data.schedule.title},
+    titleTiming:approved ? null : guideTitleTimingDto_(status, undefined, data.schedule, data.clock),
+    similarityFlag:summary ? summary.similarityNote : '',
+    notes:summary ? summary.notes : '',
+    reopen:state && state.reopen ? {reason:state.reopen.reason, at:new Date(state.reopen.at).toISOString()} : null,
+    approval:approved ? guideApprovalDto_(summary, data) : null
   };
 }
 
@@ -108,8 +123,9 @@ function buildGuideDto_(data, timings) {
   const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const teams = data.teams;
   // GitHub status is live and slow; it is read by API_guide_getGithub after the dashboard has rendered.
+  const folders = teamFolderUrls_(teams.map(t => ({teamId:t.row[TS.TEAM_ID], semester:t.row[TS.SEMESTER]})));
   return {
-    teams:teams.map(t => guideTeamDto_(t, TS, data)),
+    teams:teams.map(t => guideTeamDto_(t, TS, data, folders[normalizeText_(t.row[TS.TEAM_ID])])),
     githubDue:Number.isFinite(data.schedule && data.schedule.git) ? formatProjectDay_(data.schedule.git) : null,
     evaluation:guideEvaluationDto_(data.schedule, data.clock),
     weeks:teams.length ? timedPhase_(timings, 'weekly_windows', () => data.windows || getWeeklySubmissionWindows_()).map(w => ({weekId:w.weekId, opensAt:w.opens_at, deadlineAt:w.deadline_at, lateUntil:w.late_until})) : []
@@ -147,31 +163,6 @@ function buildGuideGithubDto_(email, timings) {
     teams[String(r[TS.TEAM_ID])] = guideGithubDto_(githubByTeam && githubByTeam[key], guideStatusRoster_(r, TS), repoUrlMap[key] || '', data);
   });
   return {teams};
-}
-
-/** Approval date and timing for each approved team, keyed by team ID. Unreadable dates are empty strings with unknown timing, never an error. */
-function buildGuideApprovalsDto_(email, timings) {
-  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const approvedRows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(r => emailsMatch_(r[TS.GUIDE_EMAIL], email) && getTeamStatus_(r) === 'APPROVED');
-  const teams = {};
-  if (!approvedRows.length) return {teams};
-  const schedule = getProjectSchedule_(), clock = getProjectClock_(schedule);
-  const {approvals, approvalTimes} = readGuideApprovals_(approvedRows, TS, timings);
-  approvedRows.forEach(r => {
-    const key = normalizeText_(r[TS.TEAM_ID]);
-    teams[String(r[TS.TEAM_ID])] = {approvedOn:String(approvals[key] || ''), timing:guideTitleTimingDto_('APPROVED', approvalTimes[key], schedule, clock)};
-  });
-  return {teams};
-}
-
-function API_guide_getApprovals() {
-  const started = Date.now(), timings = [];
-  try {
-    return apiHandle_(() => withDashboardRead_(() => {
-      const email = timedPhase_(timings, 'access', () => guideAccessOrThrow_());
-      return buildGuideApprovalsDto_(email, timings);
-    }));
-  } finally { logPhases_('guide_phases', 'approvals', timings, started); }
 }
 
 function API_guide_getGithub() {

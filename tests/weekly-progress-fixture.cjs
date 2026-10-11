@@ -61,8 +61,10 @@ function weeklyFixture() {
   let titleStart=Date.parse('2025-12-01T00:00:00Z');
   const titleLog=sheet('TitleLog',[TITLE_LOG_HEADERS.slice()]);
   const LEGACY=['Title','Guide Decision','Reviewer Decision','Reviewer Notes','Guide Notes','Problem Statement'];
-  const syncTitleLog=()=>{const cell=h=>status.rows[1][ts.indexOf(h)]||'';
-    titleLog.rows.splice(1,titleLog.rows.length,...titleRowsFor({teamId:'T1',title:cell('Title'),guide:cell('Guide Decision'),reviewer:cell('Reviewer Decision'),problem:cell('Problem Statement')||'A problem statement',guideNotes:cell('Guide Notes'),reviewerNotes:cell('Reviewer Notes'),start:titleStart}).map(titleLogSheetRow));};
+  const syncTitleLog=()=>{const rows=[];
+    status.rows.slice(1).forEach(row=>{const cell=h=>row[ts.indexOf(h)]||'';if(!cell('Team ID'))return;
+      rows.push(...titleRowsFor({teamId:cell('Team ID'),title:cell('Title'),guide:cell('Guide Decision'),reviewer:cell('Reviewer Decision'),problem:cell('Problem Statement')||'A problem statement',guideNotes:cell('Guide Notes'),reviewerNotes:cell('Reviewer Notes'),similarityNote:cell('Similarity Flag'),start:titleStart}).map(titleLogSheetRow));});
+    titleLog.rows.splice(1,titleLog.rows.length,...rows);};
   const set=(header,value)=>{status.rows[1][ts.indexOf(header)]=value;if(LEGACY.includes(header))syncTitleLog();};
   syncTitleLog();
   const input=(extra={})=>({requestId:crypto.randomUUID(),weekId:'W1',workCompleted:'Work',guideDiscussion:'Decision',blockers:'None',nextAction:'Next',...extra});

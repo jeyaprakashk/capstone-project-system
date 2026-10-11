@@ -17,17 +17,17 @@ function dtoFacts(dto) {
     const key = t.status.key;
     if (key === 'NEEDS_REVIEW' && t.similarityFlag) p.push(t.similarityFlag);
     if (key === 'AWAITING_REVIEWER') p.push('You approved — awaiting Reviewer.');
-    if (key === 'REJECTED_BY_GUIDE') p.push('Your note: ' + (t.guideNotes || '(none)'), 'Waiting on the team to resubmit.');
-    if (key === 'REVISE_AWAITING_STUDENT') p.push("Reviewer's note: " + (t.reviewerNotes || '(none)'), 'Waiting for the team to resubmit — nothing for you to do until they do.');
+    if (key === 'RETURNED' && t.returnedByGuide) p.push('Your note: ' + (t.notes || '(none)'), 'Waiting on the team to resubmit.');
+    if (key === 'RETURNED' && !t.returnedByGuide) p.push("Reviewer's note: " + (t.notes || '(none)'), 'Waiting for the team to resubmit — nothing for you to do until they do.');
     if (t.approval) {
-      p.push('Approved title: ' + t.title, 'Scope: Not recorded separately.' + (t.documents.find(d => d.label === 'Work Breakdown') ? ' See Work Breakdown.' : ''),
+      p.push('Approved title: ' + t.title, 'Documents: Open the team folder.' + (t.folderUrl ? ' Open team folder.' : ''),
         'Approved by: ' + (t.approval.approvedBy || 'Not recorded'),
         'Approved on: ' + (t.approval.approvedOn || 'Date unavailable') + ' ' + BADGE[t.approval.timing.state] + ' ' + t.approval.timing.explanation,
-        'Reviewer comment: ' + (t.reviewerNotes || 'No comment recorded'));
+        'Reviewer comment: ' + (t.notes || 'No comment recorded'));
     }
     return {
       teamId: t.teamId,
-      selector: { title: t.title || 'No title submitted yet', members: plural(t.members.length, 'member'), titleAttention: key === 'NEEDS_REVIEW', documentsAttention: t.documents.length },
+      selector: { title: t.title || 'No title submitted yet', members: plural(t.members.length, 'member'), titleAttention: key === 'NEEDS_REVIEW', documentsAttention: t.folderUrl ? 1 : 0 },
       heading: { title: t.title || 'No title submitted yet', members: t.members.map(m => m.regno ? m.name + ' (' + m.regno + ')' : m.name).join(', '), mailto: t.memberEmails.join(',') },
       students: t.registerNumbers,
       github: t.github ? {
@@ -39,10 +39,10 @@ function dtoFacts(dto) {
       title: {
         status: 'Team ' + t.teamId + ' · ' + t.status.text,
         timing: t.titleTiming ? { label: BADGE[t.titleTiming.state], explanation: t.titleTiming.explanation } : null,
-        paragraphs: p, form: key === 'NEEDS_REVIEW' ? { value: t.title } : null,
+        paragraphs: p, form: key === 'NEEDS_REVIEW' ? { value: t.proposal.title, canApprove: t.canApprove, canReturn: t.canReturn } : null,
         problem: t.problem ? t.problem.replace(/\s+/g, ' ').trim() : null
       },
-      documents: { links: t.documents, last: t.documents.length ? null : (t.lastDocumentSubmission || 'None recorded') }
+      documents: { folder: t.folderUrl || null }
     };
   });
 }
@@ -82,28 +82,18 @@ test('the GitHub endpoint reports every team unavailable, not an error, when Git
   assert(Object.values(frame.data.teams).length > 0 && Object.values(frame.data.teams).every(value => value === null));
 });
 
-test('the dashboard never reads the hub registry; approval details come from their own endpoint, which reads it only for approved teams', () => {
-  const run = g => {
-    let reads = 0; g.c.getHubRegistrySheet_ = () => { reads++; return {}; };
-    const dashboard = JSON.parse(g.c.API_guide_getDashboard()).data;
-    const afterDashboard = reads;
-    const approvals = JSON.parse(g.c.API_guide_getApprovals()).data;
-    return { dashboard, approvals, afterDashboard, total: reads };
-  };
-  const withApproved = run(guideFixture());
-  assert.equal(withApproved.afterDashboard, 0, 'first paint does not wait for the second spreadsheet');
-  assert.equal(withApproved.total, 1);
-  assert.deepEqual(withApproved.dashboard.teams.filter(t => t.approval).map(t => t.approval.timing), [null], 'pending until the approvals reply');
-  assert.deepEqual(withApproved.dashboard.teams.filter(t => t.approval).map(t => t.approval.approvedOn), [null]);
-  assert.deepEqual(Object.keys(withApproved.approvals.teams), ['T1']);
-  assert.equal(withApproved.approvals.teams.T1.approvedOn, '', 'an unreadable registry is an empty date, not an error');
-  assert.equal(withApproved.approvals.teams.T1.timing.state, 'unknown');
-  const g = guideFixture(), decision = g.ts.indexOf('Reviewer Decision');
-  g.f.status.rows.forEach((row, index) => { if (index) row[decision] = ''; });
-  const none = run(g);
-  assert.equal(none.total, 0, 'no approved team, so no registry read at all');
-  assert.deepEqual(none.approvals, { teams: {} });
-  assert(none.dashboard.teams.every(t => t.approval === null));
+test('the approval date and timing come with the dashboard from TitleLog, and the master registry is never read', () => {
+  const g = guideFixture();
+  let reads = 0; g.c.getHubRegistrySheet_ = () => { reads++; return {}; };
+  const dashboard = JSON.parse(g.c.API_guide_getDashboard()).data;
+  assert.equal(reads, 0);
+  const approved = dashboard.teams.filter(t => t.approval);
+  assert.deepEqual(approved.map(t => t.teamId), ['T1']);
+  assert.equal(approved[0].approval.approvedBy, 'reviewer@example.com');
+  assert.match(approved[0].approval.approvedOn, /^\d+ \w+ \d{4}, \d/);
+  assert.equal(approved[0].approval.timing.state, 'on-time');
+  assert.equal(typeof g.c.API_guide_getApprovals, 'undefined', 'the second endpoint is gone');
+  assert(dashboard.teams.filter(t => !t.approval).every(t => t.titleTiming));
 });
 
 test('guide commits DTO counts every collected commit per mapped member and skips the template bootstrap', () => {
