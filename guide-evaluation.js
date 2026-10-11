@@ -1,6 +1,5 @@
 /* Guide evaluation: live reads, immutable per-student revisions, no cross-request cache. */
 const GUIDE_EVAL_POLICY_ = 'guide-bands-v3-target-level-2';
-const GUIDE_EVAL_HEADERS_ = ['Assessment','Team','Student','Revision','Action','Actor','At','Request ID','Payload'];
 const GUIDE_EVAL_BANDS_ = [0,40,60,75,85,95,100];
 function guideActor_(coordinator) {
   const email = Session.getActiveUser().getEmail();
@@ -38,17 +37,18 @@ function guideRecords_() {
   const sheet = getSheet_(guideJournalName_());
   if (!sheet) throw new Error(assessmentStorageMissing_(guideJournalName_()));
   const values = sheet.getDataRange().getValues();
-  if (GUIDE_EVAL_HEADERS_.some((h,i) => values[0][i] !== h)) throw new Error('GuideEvaluations headers do not match.');
+  const columns = assessmentJournalColumns_(values[0]);
+  if (!columns) throw new Error('GuideEvaluations headers do not match.');
   const seen=new Set();
-  const records=values.slice(1).filter(r => r[0] && r[4]!=='publish').map(r => {
-    if (r[0] !== 'guide_eval') throw new Error('Unexpected assessment in GuideEvaluations.');
-    const identity=JSON.stringify([normalizeText_(r[1]),normalizeText_(r[2]),Number(r[3])]);
-    if(seen.has(identity)||!Number.isSafeInteger(Number(r[3]))||Number(r[3])<1)throw new Error('Conflicting or invalid Guide revision.');
+  const records=values.slice(1).filter(r => r[columns.ASSESSMENT] && r[columns.ACTION]!=='publish').map(r => {
+    if (r[columns.ASSESSMENT] !== 'guide_eval') throw new Error('Unexpected assessment in GuideEvaluations.');
+    const identity=JSON.stringify([normalizeText_(r[columns.TEAM]),normalizeText_(r[columns.STUDENT]),Number(r[columns.REVISION])]);
+    if(seen.has(identity)||!Number.isSafeInteger(Number(r[columns.REVISION]))||Number(r[columns.REVISION])<1)throw new Error('Conflicting or invalid Guide revision.');
     seen.add(identity);
-    const value = JSON.parse(r[8]);
-    return {...value, team:normalizeText_(r[1]), student:normalizeText_(r[2]), revision:Number(r[3]), action:String(r[4]), actor:String(r[5]), at:String(r[6]), requestId:String(r[7])};
+    const value = JSON.parse(r[columns.PAYLOAD]);
+    return {...value, team:normalizeText_(r[columns.TEAM]), student:normalizeText_(r[columns.STUDENT]), revision:Number(r[columns.REVISION]), action:String(r[columns.ACTION]), actor:String(r[columns.ACTOR]), at:String(r[columns.AT]), requestId:String(r[columns.REQUEST_ID])};
   });
-  return {sheet,records:publicationProject_(records,values,'guide_eval')};
+  return {sheet,columns,records:publicationProject_(records,values,'guide_eval')};
 }
 function guideLatest_(records, team, student) {
   return records.filter(r => r.team === team && r.student === student).reduce((best,r) => !best || r.revision > best.revision ? r : best, null);
@@ -97,7 +97,7 @@ function guideWrite_(action, input) {
     const roster = guideRoster_(input.team, actor, staff);
     const student = roster.students.find(s => s.register === normalizeText_(input.student));
     if (!student) throw new Error('Student is no longer assigned to this team.');
-    const {sheet,records} = guideRecords_();
+    const {sheet,columns:journalColumns,records} = guideRecords_();
     const duplicate = evaluationDuplicate_(records,actor,input,fingerprint);
     if (duplicate) {
       if (duplicate.fingerprint !== fingerprint) throw new Error('Request ID was already used for different data.');
@@ -130,7 +130,7 @@ function guideWrite_(action, input) {
     ['publication','academicRevision','team','student','revision','action','actor','at','requestId'].forEach(key => delete payload[key]);
     const json = JSON.stringify(payload);
     if (json.length > 45000) throw new Error('Evaluation payload is too large. Shorten remarks.');
-    evaluationAppend_(sheet,[['guide_eval',roster.team,student.register,revision,action,actor,at,input.requestId,json]]);
+    evaluationAppend_(sheet,journalColumns,[['guide_eval',roster.team,student.register,revision,action,actor,at,input.requestId,json]]);
     return {revision,status:payload.status,total:payload.total,weighted:payload.weighted};
   });
 }

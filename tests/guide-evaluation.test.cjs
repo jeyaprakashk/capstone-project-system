@@ -20,7 +20,7 @@ function fixture(){
  c.getMilestones_=()=>{throw Error('Guide must not read Milestones');};
  const rubric=[['Assessment ID','Order','PI','Criterion','CO','Max Marks','Type',...Array.from({length:6},(_,i)=>'Level '+i)],...[15,30,20,15,20].map((max,i)=>['Example criterion '+(i+1),['CO5','CO3','CO5','CO4','CO6'][i],max,Array.from({length:6},(_,level)=>'Example descriptor '+level)]).map(([name,co,max,levels],i)=>['guide_eval',i+1,'PI'+(i+1),name,co,max,'Individual',...levels])];
  sheets.Rubrics=sheet('Rubrics',rubric);sheets.GuideEvaluations=sheet('GuideEvaluations',[...[]]);
- tables.GuideEvaluations.push(...[JSON.parse(vm.runInContext('JSON.stringify(GUIDE_EVAL_HEADERS_)',c))]);
+ tables.GuideEvaluations.push(...[JSON.parse(vm.runInContext('JSON.stringify(Object.values(ASSESSMENT_JOURNAL_FIELDS_))',c))]);
  const load=()=>c.loadGuideEvaluation_('T1','S1');
  const input=(d=load(),scores)=>({team:'T1',student:'S1',revision:d.revision,token:d.token,requestId:crypto.randomUUID().replace(/-/g,''),scores:scores||Object.fromEntries(d.config.criteria.map(x=>[x.pi,{level:3,marks:x.maxMarks*.8,remark:''}]))});
  return {c,tables,students,load,input,actor:v=>actor=v,assign:v=>assigned=v,lock:v=>lockAllowed=v,locked:()=>locked};
@@ -99,4 +99,46 @@ test('guide weight and criterion maxima come from sheets and changes reject stal
  f.tables.Rubrics.splice(2);f.tables.Rubrics[1][5]=50;
  const d=f.load();assert.equal(d.config.maximum,50);assert.equal(d.config.weight,.3);
  const result=f.c.submitGuideEvaluation_(f.input(d));assert.equal(result.total,40);assert.equal(result.weighted,24);
+});
+
+// Assessment journals are found by header name (SHEET-HEADER-MATCHING-PLAN.md, phase 5).
+function shuffleJournal(f){
+ const order=[8,3,0,5,1,6,2,7,4]; // Payload, Revision, Assessment, Actor, Team, At, Student, Request ID, Action
+ const data=f.tables.GuideEvaluations;
+ data.splice(0,Infinity,...data.map(row=>order.map(i=>row[i])));
+ data.forEach((row,i)=>row.splice(2,0,i?'note '+i:'Notes')); // an unmapped column inside the span
+}
+
+test('journal: the current layout is appended with the same call as before, one getRange over nine columns',()=>{
+ const f=fixture(),calls=[],sheet=f.c.getSheet_('GuideEvaluations'),getRange=sheet.getRange;
+ sheet.getRange=(...args)=>{calls.push(args.join(','));return getRange(...args);};
+ f.c.saveGuideEvaluationDraft_(f.input(f.load()));
+ assert.deepEqual(calls.filter(call=>call.split(',').length===4),['2,1,1,9']);
+});
+
+test('journal: a shuffled sheet with an extra column is read and appended by header name',()=>{
+ const f=fixture();
+ f.c.saveGuideEvaluationDraft_(f.input(f.load()));
+ shuffleJournal(f);
+ let d=f.load();
+ assert.equal(d.evaluation.status,'Draft',"the draft written under the old layout is still read");
+ f.c.submitGuideEvaluation_(f.input(d));
+ const data=f.tables.GuideEvaluations,header=data[0],last=data[data.length-1];
+ const at=name=>last[header.indexOf(name)];
+ assert.equal(at('Assessment'),'guide_eval');assert.equal(at('Team'),'t1');assert.equal(at('Student'),'s1');
+ assert.equal(String(at('Revision')),'2');assert.equal(at('Action'),'submit');assert.equal(at('Actor'),'guide@x');
+ assert.ok(JSON.parse(at('Payload')).status==='Submitted');
+ assert.equal(last[header.indexOf('Notes')],'',"a new row leaves the unmapped column blank");
+ assert.equal(data[1][header.indexOf('Notes')],'note 1',"an earlier row keeps its extra value");
+ assert.equal(f.load().evaluation.status,'Submitted');
+});
+
+test('journal: a missing or repeated required header refuses to read or write and changes nothing',()=>{
+ const f=fixture();f.c.saveGuideEvaluationDraft_(f.input(f.load()));
+ const data=f.tables.GuideEvaluations,before=JSON.stringify(data);
+ data[0][5]='Who';assert.throws(()=>f.load(),/Incompatible journal/);
+ data[0][5]='Actor';data[0].push('team');data.slice(1).forEach(row=>row.push(''));
+ assert.throws(()=>f.load(),/Incompatible journal/);
+ data.forEach(row=>row.pop());
+ assert.equal(JSON.stringify(data),before);
 });

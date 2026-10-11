@@ -31,8 +31,8 @@ function fixture() {
     summarizeReviewCompletion_:registers=>({completed:false,totalStudents:registers.size,markedStudents:0})});
   for(const file of ['review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','review-evaluation.js','reviewer-evaluation.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
   stubTitleGate(c,()=>({approved:row[TS.REVIEWER_DECISION]==='Approved' && String(row[TS.TITLE]||'').trim()!=='',title:row[TS.TITLE],problem:row[TS.PROBLEM]}));
-  sheet('Review1Evaluations',[Array.from(vm.runInContext('REVIEW_JOURNAL_HEADERS_',c))]);
-  sheet('Review2Evaluations',[Array.from(vm.runInContext('REVIEW_JOURNAL_HEADERS_',c))]);
+  sheet('Review1Evaluations',[Array.from(vm.runInContext('Object.values(ASSESSMENT_JOURNAL_FIELDS_)',c))]);
+  sheet('Review2Evaluations',[Array.from(vm.runInContext('Object.values(ASSESSMENT_JOURNAL_FIELDS_)',c))]);
   c.getAssessmentDefinitions_=()=>reviews.map((r,i)=>({...r,type:'REVIEW',sequence:i+1,opens:r.opens??r.day-7,academicPolicyVersion:r.academicPolicyVersion||'review-attendance-v1',journal:r.journal||'Review'+(i+1)+'Evaluations',prerequisites:r.prerequisites??(i?[{assessmentId:reviews[i-1].key,condition:'RECORDED'}]:[])}));
   c.assessmentRubric_=d=>reviews.find(r=>r.key===d.key).rubric;
   const load=()=>c.loadReviewEvaluation_('T1','review1');

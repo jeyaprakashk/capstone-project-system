@@ -62,7 +62,7 @@ test('every entry is well formed: unique keys and names, valid headers, access, 
       const text = fs.readFileSync(item.file, 'utf8');
       item.functions.forEach(fn => assert.match(text, new RegExp('^function ' + fn + '\\s*\\(', 'm'), key + ': ' + fn + ' is not in ' + item.file));
       const constant = Object.entries(plain(vm.runInContext('SHEET_NAMES', c))).find(([, value]) => value === entry.name);
-      assert.ok(text.includes(entry.name) || text.includes("'" + key + "'") || (constant && text.includes('SHEET_NAMES.' + constant[0])), key + ': ' + item.file + ' does not refer to the sheet');
+      if (entry.name) assert.ok(text.includes(entry.name) || text.includes("'" + key + "'") || (constant && text.includes('SHEET_NAMES.' + constant[0])), key + ': ' + item.file + ' does not refer to the sheet');
     });
     const headers = c.sheetCatalogHeaders_(entry);
     assert.ok(headers.length && headers.every(h => typeof h === 'string' && h.trim()), key + ' headers must be non-blank');
@@ -201,8 +201,8 @@ test('the headers listed in the catalog equal the constants the code validates a
   assert.deepEqual(catalog.assessmentDefinitions.headers, plain(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_', c)));
   assert.deepEqual(catalog.milestones.headers, plain(vm.runInContext('MILESTONE_HEADERS_', c)));
   assert.deepEqual(catalog.progressEligibility.headers, plain(vm.runInContext('Object.values(PROGRESS_ELIGIBILITY_FIELDS_)', c)));
-  assert.deepEqual(catalog.assessmentJournal.headers, plain(vm.runInContext('REVIEW_JOURNAL_HEADERS_', c)));
-  assert.deepEqual(catalog.assessmentJournal.headers, plain(vm.runInContext('GUIDE_EVAL_HEADERS_', c)));
+  assert.deepEqual(catalog.assessmentJournal.headers, plain(vm.runInContext('Object.values(ASSESSMENT_JOURNAL_FIELDS_)', c)));
+  assert.deepEqual(catalog.assessmentJournal.headers, plain(vm.runInContext('Object.values(ASSESSMENT_JOURNAL_FIELDS_)', c)));
 });
 
 test('a sheet with a generated name has no specification until the caller supplies the name', () => {
@@ -210,7 +210,8 @@ test('a sheet with a generated name has no specification until the caller suppli
 });
 
 // The sheet-access audit (SHEET-HEADER-MATCHING-PLAN.md, section 8). A text-level tripwire against positional access creeping back
-// into a migrated sheet; it cannot see an index held in a variable. The shuffled-column tests are the proof.
+// into a migrated sheet; it cannot see an index held in a variable. The shuffled-column tests are the proof. Writing a header row
+// (getRange(1, ...)) when a sheet is created is allowed: new sheets get their headers in definition order.
 function functionSource(text, name) {
   const start = text.search(new RegExp('^function ' + name + '\\s*\\(', 'm'));
   assert.ok(start >= 0, name + ' not found');
@@ -226,7 +227,7 @@ test('audit: no function listed for a migrated sheet reads a row or a column by 
       const text = fs.readFileSync(item.file, 'utf8');
       for (const fn of item.functions) {
         const source = stripComments(functionSource(text, fn));
-        for (const match of source.matchAll(/\b(?:row|r|item\.row|submission|saved|record|existingRow)\[\s*\d+\s*\]|getRange\([^,()]+,\s*\d+\s*[,)]/g)) {
+        for (const match of source.matchAll(/\b(?:row|r|item\.row|submission|saved|record|existingRow)\[\s*\d+\s*\]|getRange\((?!1\s*,)[^,()]+,\s*\d+\s*[,)]/g)) {
           offenders.push(key + ': ' + item.file + ' ' + fn + ' uses ' + match[0]);
         }
       }

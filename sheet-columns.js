@@ -1,9 +1,9 @@
 /**
  * SHEET CATALOG - one readable list of the sheets the code uses: tab name, access mode, headers, status and purpose.
- * Status: new (header-name access from the start), by-name (found by header name, but the code that creates the sheet still has its own
- * creation and checks, not yet ensureSheet_), positional (some column is still read by position), migrated (every access is by header
- * name, and a sheet the code creates is created through ensureSheet_). The sheet-access audit in tests/sheet-catalog.test.cjs checks
- * the migrated entries.
+ * Status: new (header-name access from the start), by-name (found by header name, but not yet audited: its code list is incomplete),
+ * positional (some column is still read by position), migrated (every access is by header name, listed in `code` and audited by
+ * tests/sheet-catalog.test.cjs). Whether the code that creates a sheet goes through ensureSheet_ shows in `code` as a setup or
+ * runtime-create entry.
  * Specified in SHEET-HEADER-MATCHING-PLAN.md ("Sheet catalog"); the generated reference is SHEETS.md
  * (npm run build:sheets-doc). Every sheet the code touches is listed, except the master registry of the hub spreadsheet.
  *
@@ -189,10 +189,17 @@ function sheetCatalog_() {
         namePattern: 'Assessment_<assessment id>, or the Journal named in AssessmentDefinitions',
         access: 'view',
         headers: ['Assessment', 'Team', 'Student', 'Revision', 'Action', 'Actor', 'At', 'Request ID', 'Payload'],
-        status: 'positional',
-        purpose: 'Append-only history of an assessment, one sheet per assessment. All share this nine-column layout and are read by position.',
+        status: 'migrated',
+        purpose: 'Append-only history of an assessment, one sheet per assessment, all with this layout. Created by the coordinator\'s storage setup, which is a request path and keeps its own creation code.',
         createAtRuntime: false,
-        code: []
+        code: [
+          {file: 'assessment-registry.js', role: 'read', functions: ['assessmentJournal_', 'assessmentJournalColumns_']},
+          {file: 'assessment-registry.js', role: 'write', functions: ['provisionAssessmentJournals_']},
+          {file: 'guide-evaluation.js', role: 'read', functions: ['guideRecords_']},
+          {file: 'review-evaluation.js', role: 'read', functions: ['reviewRecords_']},
+          {file: 'publication-events.js', role: 'read', functions: ['publicationProject_']},
+          {file: 'evaluation-lifecycle.js', role: 'write', functions: ['evaluationAppend_']}
+        ]
       },
       activityDependencies: {
         name: 'ActivityDependencies',

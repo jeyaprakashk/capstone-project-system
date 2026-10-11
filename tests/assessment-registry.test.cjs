@@ -105,7 +105,7 @@ test('default journal discovers existing assessment history by identity without 
 
 test('conflicting bindings, foreign data and ambiguous history fail before creating any journal',()=>{
  for(const kind of ['binding','foreign','ambiguous','headers']){
-  const f=coordinatorStorageSetup(),c=f.c,headers=Array.from(vm.runInContext('REVIEW_JOURNAL_HEADERS_',c));
+  const f=coordinatorStorageSetup(),c=f.c,headers=Array.from(vm.runInContext('Object.values(ASSESSMENT_JOURNAL_FIELDS_)',c));
   if(kind==='headers')f.extra.Journal_review3=f.sheet([['Do not overwrite']],'Journal_review3');
   else if(kind==='foreign')f.extra.Journal_review3=f.sheet([headers,['another_assessment','g18','s1',1]],'Journal_review3');
   else {f.extra.OldHistory=f.sheet([headers,['review3','g18','s1',1]],'OldHistory');if(kind==='ambiguous'){f.rows[3][9]='';f.extra.OtherHistory=f.sheet([headers,['review3','g18','s1',1]],'OtherHistory');}}
@@ -116,7 +116,7 @@ test('conflicting bindings, foreign data and ambiguous history fail before creat
 });
 
 test('configured journal resolves existing case and whitespace variants without creating a duplicate',()=>{
- const f=coordinatorStorageSetup(),c=f.c,headers=Array.from(vm.runInContext('REVIEW_JOURNAL_HEADERS_',c));
+ const f=coordinatorStorageSetup(),c=f.c,headers=Array.from(vm.runInContext('Object.values(ASSESSMENT_JOURNAL_FIELDS_)',c));
  const existing=f.sheet([headers],' journal_REVIEW1 ');f.extra[' journal_REVIEW1 ']=existing;
  const source=fs.readFileSync('common-helpers.js','utf8'),start=source.indexOf('function getNamedSheet_('),end=source.indexOf('\n}',start)+2;
  vm.runInContext(source.slice(start,end),c);

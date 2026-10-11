@@ -26,10 +26,20 @@ function evaluationDuplicate_(records,actor,input,fingerprint) {
 function evaluationRevision_(latest,input) {
   if((latest?latest.revision:0)!==input.revision)throw new Error('This evaluation changed. Reload before saving.');
 }
-function evaluationAppend_(sheet,values) {
-  if(values.some(row=>String(row[8]).length>45000))throw new Error('Evaluation payload is too large. Shorten feedback.');
+/**
+ * Appends rows given in the journal's canonical field order (ASSESSMENT_JOURNAL_FIELDS_); each lands under its header.
+ * `columns` is the journal's column map, found by the reader that returned the sheet.
+ */
+function evaluationAppend_(sheet,columns,values) {
+  const keys=Object.keys(ASSESSMENT_JOURNAL_FIELDS_),payload=keys.indexOf('PAYLOAD');
+  if(values.some(row=>String(row[payload]).length>45000))throw new Error('Evaluation payload is too large. Shorten feedback.');
+  const left=Math.min(...Object.values(columns)),width=Math.max(...Object.values(columns))-left+1;
   const first=sheet.getLastRow()+1;guideEnsureRows_(sheet,first+values.length-1);
-  sheet.getRange(first,1,values.length,9).setValues(values.map(row=>row.map(v=>typeof v==='string'&&v.startsWith('=')?"'"+v:v)));
+  sheet.getRange(first,left+1,values.length,width).setValues(values.map(row=>{
+    const cells=new Array(width).fill('');
+    keys.forEach((key,i)=>{const v=row[i];cells[columns[key]-left]=typeof v==='string'&&v.startsWith('=')?"'"+v:v;});
+    return cells;
+  }));
   SpreadsheetApp.flush();
 }
 function evaluationReopenChanges_(latest,config,roster) {

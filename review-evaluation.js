@@ -1,5 +1,4 @@
 /* Shared REVIEW engine. Every operation requires a configured assessment ID. */
-const REVIEW_JOURNAL_HEADERS_ = ['Assessment','Team','Student','Revision','Action','Actor','At','Request ID','Payload'];
 function reviewHistoryName_(key) { return assessmentJournal_(assessmentDefinition_(key)).name; }
 function reviewConfiguration_(key) {
   const d=assessmentDefinition_(key);
@@ -40,21 +39,22 @@ function reviewRecords_(key) {
   if (!sheet) return {sheet:null,records:[]};
   if(storage.state==='EMPTY')throw new Error(assessmentStorageMissing_(name));
   const rows = storage.rows || sheet.getDataRange().getValues();
-  if (REVIEW_JOURNAL_HEADERS_.some((h,i)=>(rows[0]||[])[i]!==h)) throw new Error(name+' headers must be: '+REVIEW_JOURNAL_HEADERS_.join(', ')+'.');
+  const columns=assessmentJournalColumns_(rows[0]);
+  if (!columns) throw new Error(name+' headers must be: '+Object.values(ASSESSMENT_JOURNAL_FIELDS_).join(', ')+'.');
   const groups=new Map();
-  rows.slice(1).filter(r=>r[0]&&r[4]!=='publish').forEach(r=>{
-    if (r[0] !== key) throw new Error('Unexpected assessment in '+name+' history.');
-    const {scores,total,weighted,assessment,needsPublication,...common}=JSON.parse(r[8]);
+  rows.slice(1).filter(r=>r[columns.ASSESSMENT]&&r[columns.ACTION]!=='publish').forEach(r=>{
+    if (r[columns.ASSESSMENT] !== key) throw new Error('Unexpected assessment in '+name+' history.');
+    const {scores,total,weighted,assessment,needsPublication,...common}=JSON.parse(r[columns.PAYLOAD]);
     if (!scores || !common.config || !common.roster) throw new Error('Invalid student payload in '+name+'.');
     const teamScores={},individualScores={};
     common.config.criteria.forEach(c=>{
       if (Object.prototype.hasOwnProperty.call(scores,c.pi)) (c.type==='Team'?teamScores:individualScores)[c.pi]=scores[c.pi];
     });
-    if(common.schemaVersion!==1 || !common.config.academicPolicyVersion || !Number.isSafeInteger(Number(r[3])) || Number(r[3])<1)throw new Error('Unsupported or invalid Review history revision.');
-    const record={...common,team:normalizeReviewKey_(r[1]),revision:Number(r[3]),action:String(r[4]),actor:String(r[5]),at:String(r[6]),requestId:String(r[7]),teamScores};
+    if(common.schemaVersion!==1 || !common.config.academicPolicyVersion || !Number.isSafeInteger(Number(r[columns.REVISION])) || Number(r[columns.REVISION])<1)throw new Error('Unsupported or invalid Review history revision.');
+    const record={...common,team:normalizeReviewKey_(r[columns.TEAM]),revision:Number(r[columns.REVISION]),action:String(r[columns.ACTION]),actor:String(r[columns.ACTOR]),at:String(r[columns.AT]),requestId:String(r[columns.REQUEST_ID]),teamScores};
     const groupKey=JSON.stringify([record.team,record.revision]), signature=JSON.stringify(record);
     if (!groups.has(groupKey)) groups.set(groupKey,{record,signature,students:[]});
-    const group=groups.get(groupKey),register=normalizeReviewKey_(r[2]);
+    const group=groups.get(groupKey),register=normalizeReviewKey_(r[columns.STUDENT]);
     if (group.signature!==signature || group.students.some(s=>s.register===register)) throw new Error('Inconsistent or duplicate student rows in '+name+'.');
     group.students.push({register,scores:individualScores,total,weighted,...(assessment?{assessment}:{}),...(needsPublication!==undefined?{needsPublication}:{})});
   });
@@ -63,7 +63,7 @@ function reviewRecords_(key) {
     if (group.students.length!==roster.length || !roster.every(s=>group.students.some(r=>r.register===s.register))) throw new Error('Incomplete student revision in '+name+'. Check the team rows before retrying.');
     return {...group.record,students:roster.map(s=>group.students.find(r=>r.register===s.register))};
   });
-  return {sheet,records:publicationProject_(records,rows,key)};
+  return {sheet,columns,records:publicationProject_(records,rows,key)};
 }
 function reviewLatest_(records, team) {
   return records.filter(r=>r.team===normalizeReviewKey_(team)).reduce((best,r)=>!best || r.revision>best.revision?r:best,null);
@@ -138,7 +138,7 @@ function reviewWrite_(action,input,key) {
   const actor=guideActor_(staff);
   if(!['draft','submit','publish','reopen','makeupDraft','makeupSubmit','absenceCorrection'].includes(action))throw new Error('Unsupported Review command.');
   return evaluationCommand_(action,input,fingerprint=>{
-    const context=reviewContext_(input.team,staff,key), {sheet,records}=reviewRecords_(key);
+    const context=reviewContext_(input.team,staff,key), {sheet,columns:journalColumns,records}=reviewRecords_(key);
     if (!sheet) throw new Error(assessmentStorageMissing_(reviewHistoryName_(key)));
     const duplicate=evaluationDuplicate_(records,actor,input,fingerprint);
     if (duplicate) {
@@ -195,7 +195,7 @@ function reviewWrite_(action,input,key) {
       if (json.length>45000) throw new Error('Evaluation payload is too large. Shorten feedback.');
       return [key,context.roster.team,student.register,revision,action,actor,at,input.requestId,json].map(v=>typeof v==='string' && v.startsWith('=')?"'"+v:v);
     });
-    evaluationAppend_(sheet,values);
+    evaluationAppend_(sheet,journalColumns,values);
     return reviewWriteResult_(revision,payload);
   });
 }

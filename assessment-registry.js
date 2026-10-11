@@ -1,4 +1,19 @@
 /** Instances are spreadsheet data; this file registers types and supported policies only. */
+/**
+ * The columns every assessment journal has, with the header each is found under. All journals share this layout. A journal is read
+ * and written by header name, so column order does not matter and extra columns are kept.
+ */
+const ASSESSMENT_JOURNAL_FIELDS_ = {ASSESSMENT:'Assessment',TEAM:'Team',STUDENT:'Student',REVISION:'Revision',ACTION:'Action',ACTOR:'Actor',AT:'At',REQUEST_ID:'Request ID',PAYLOAD:'Payload'};
+/** The journal columns of a header row by name, or null when a header is missing or repeated (the sheet is not a journal). */
+function assessmentJournalColumns_(headerRow) {
+  const columns={};
+  for(const [key,name] of Object.entries(ASSESSMENT_JOURNAL_FIELDS_)){
+    const matches=(headerRow||[]).flatMap((cell,index)=>textEquals_(cell,name)?[index]:[]);
+    if(matches.length!==1)return null;
+    columns[key]=matches[0];
+  }
+  return columns;
+}
 const ASSESSMENT_DEFINITION_HEADERS_ = ['Assessment ID','Type','Label','Sequence','Weight (%)','Opening','Due Date','Prerequisites','Academic Policy Version','Journal'];
 function parseAssessmentDefinitions_(rows,timezone) {
   const headers=(rows[0]||[]).map(normalizeText_);
@@ -96,9 +111,10 @@ function assessmentJournal_(definition) {
       if(sheet.getLastRow()>0)throw new Error('Incompatible journal '+name+' contains blank-valued cells or formulas. Existing data was left unchanged.');
       return {sheet,name,state:'EMPTY'};
     }
-    if(REVIEW_JOURNAL_HEADERS_.some((h,i)=>(rows[0]||[])[i]!==h))throw new Error('Incompatible journal '+name+'. Existing data was left unchanged.');
+    const columns=assessmentJournalColumns_(rows[0]);
+    if(!columns)throw new Error('Incompatible journal '+name+'. Existing data was left unchanged.');
     const entries=rows.slice(1).filter(r=>r.some(v=>String(v??'')!==''));
-    if(entries.some(r=>normalizeText_(r[0])!==definition.key))throw new Error('Journal '+name+' contains another assessment or unidentified data. Existing data was left unchanged.');
+    if(entries.some(r=>normalizeText_(r[columns.ASSESSMENT])!==definition.key))throw new Error('Journal '+name+' contains another assessment or unidentified data. Existing data was left unchanged.');
     // The rows ride along (not enumerable, so never spread or serialized) to spare reviewRecords_ a second full read.
     return Object.defineProperty({sheet,name,state:'READY',hasRecords:!!entries.length},'rows',{value:rows});
   };
@@ -106,8 +122,9 @@ function assessmentJournal_(definition) {
   if(direct.hasRecords||direct.state==='READY'&&definition.journalConfigured!==false)return direct;
   const candidates=getSpreadsheet_().getSheets().filter(sheet=>sheet!==configured).flatMap(sheet=>{
     const rows=sheet.getDataRange().getValues();
-    if(REVIEW_JOURNAL_HEADERS_.some((h,i)=>(rows[0]||[])[i]!==h))return [];
-    if(!rows.slice(1).some(r=>normalizeText_(r[0])===definition.key))return [];
+    const columns=assessmentJournalColumns_(rows[0]);
+    if(!columns)return [];
+    if(!rows.slice(1).some(r=>normalizeText_(r[columns.ASSESSMENT])===definition.key))return [];
     return [inspect(sheet,sheet.getName())];
   });
   if(candidates.length>1)throw new Error('Multiple journals contain '+definition.key+'. Set Journal to the authoritative existing sheet; no data was changed.');
@@ -128,7 +145,7 @@ function provisionAssessmentJournals_(definitions) {
     const created=plan.state==='MISSING',initialized=plan.state==='EMPTY';
     const sheet=created?getSpreadsheet_().insertSheet(plan.name):plan.sheet;
     if(initialized&&sheet.getLastRow()>0)throw new Error('Journal '+plan.name+' changed during setup. Retry; existing data was left unchanged.');
-    if(created||initialized)sheet.getRange(1,1,1,REVIEW_JOURNAL_HEADERS_.length).setValues([REVIEW_JOURNAL_HEADERS_]);
+    if(created||initialized){const headers=Object.values(ASSESSMENT_JOURNAL_FIELDS_);sheet.getRange(1,1,1,headers.length).setValues([headers]);}
     return {assessment:plan.definition.key,label:plan.definition.label,journal:plan.name,created,initialized,state:'READY'};
   });
   SpreadsheetApp.flush();

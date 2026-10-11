@@ -58,11 +58,13 @@ function publicationSnapshot_(definition,record,member) {
 /** Merge publication metadata in memory for existing evaluation lifecycle callers.
  * Only original academic records are used to verify source references. */
 function publicationProject_(academic,rows,key) {
+  const columns=assessmentJournalColumns_(rows[0]);
+  if(!columns)throw new Error('Assessment journal headers do not match.');
   const records=academic.slice(),seen=new Set(academic.map(r=>JSON.stringify([r.team,r.student||'',r.revision])));
-  rows.slice(1).filter(r=>r[0]&&String(r[4])==='publish').sort((a,b)=>Number(a[3])-Number(b[3])).forEach(row=>{
-    const event=JSON.parse(row[8]);
-    if(row[0]!==key||event.kind!=='PUBLICATION'||event.schemaVersion!==PUBLICATION_SCHEMA_||event.presentationVersion!==1)throw new Error('Unsupported publication record.');
-    const team=normalizeText_(row[1]),student=row[2]==='*'?'':normalizeText_(row[2]),revision=Number(row[3]);
+  rows.slice(1).filter(r=>r[columns.ASSESSMENT]&&String(r[columns.ACTION])==='publish').sort((a,b)=>Number(a[columns.REVISION])-Number(b[columns.REVISION])).forEach(row=>{
+    const event=JSON.parse(row[columns.PAYLOAD]);
+    if(row[columns.ASSESSMENT]!==key||event.kind!=='PUBLICATION'||event.schemaVersion!==PUBLICATION_SCHEMA_||event.presentationVersion!==1)throw new Error('Unsupported publication record.');
+    const team=normalizeText_(row[columns.TEAM]),student=row[columns.STUDENT]==='*'?'':normalizeText_(row[columns.STUDENT]),revision=Number(row[columns.REVISION]);
     const identity=JSON.stringify([team,student,revision]);
     if(seen.has(identity)||!Number.isSafeInteger(revision)||revision<1)throw new Error('Conflicting publication revision.');seen.add(identity);
     const source=academic.find(r=>r.team===team&&(r.student||'')===student&&r.revision===event.sourceRevision);
@@ -72,7 +74,7 @@ function publicationProject_(academic,rows,key) {
     const previous=records.filter(r=>r.team===team&&(r.student||'')===student&&r.revision<revision).sort((a,b)=>b.revision-a.revision)[0];
     if(!previous||previous.status==='Draft'||(previous.academicRevision||previous.revision)!==source.revision)throw new Error('Publication source is not the current finalized revision.');
     if(event.releases.some(r=>student?r.student!==student:!source.students.some(s=>s.register===r.student)))throw new Error('Invalid publication student.');
-    const projected={...previous,revision,academicRevision:source.revision,action:'publish',actor:String(row[5]),at:String(row[6]),requestId:String(row[7]),fingerprint:event.fingerprint,publication:event};
+    const projected={...previous,revision,academicRevision:source.revision,action:'publish',actor:String(row[columns.ACTOR]),at:String(row[columns.AT]),requestId:String(row[columns.REQUEST_ID]),fingerprint:event.fingerprint,publication:event};
     if(student)projected.status='Published';
     else {projected.students=previous.students.map(s=>event.releases.some(r=>r.student===s.register)?{...s,needsPublication:false}:s);projected.status=projected.students.some(s=>s.needsPublication)?'Submitted':'Published';}
     records.push(projected);
@@ -86,7 +88,7 @@ function publicationLatestRelease_(records,team,student) {
 function publishInternalAssessment_(input) {
   const actor=guideActor_(true),definition=publicationDefinition_(input&&input.assessmentId),adapter=publicationAdapters_()[definition.type];
   return evaluationCommand_('publish',input,fingerprint=>{
-    const roster=publicationRoster_(input.team),{sheet,records}=adapter.read(definition.key);
+    const roster=publicationRoster_(input.team),{sheet,columns:journalColumns,records}=adapter.read(definition.key);
     if(!sheet)throw new Error('Assessment journal is missing.');
     const duplicate=evaluationDuplicate_(records,actor,input,fingerprint);if(duplicate)return {revision:duplicate.revision,status:duplicate.status};
     const student=input.student?normalizeText_(input.student):null;
@@ -102,7 +104,7 @@ function publishInternalAssessment_(input) {
     const event={kind:'PUBLICATION',eventId:evaluationHash_({assessmentId:definition.key,team:roster.team,student,revision:latest.revision+1,requestId:input.requestId}),schemaVersion:PUBLICATION_SCHEMA_,presentationVersion:1,sourceRevision:source.revision,sourceHash:evaluationHash_(source),
       policyVersion:source.config.academicPolicyVersion||source.config.policy,configurationHash:evaluationHash_(source.config),rubricHash:evaluationHash_(source.config.criteria),fingerprint,releases};
     const revision=latest.revision+1;
-    evaluationAppend_(sheet,[[definition.key,roster.team,adapter.reopenScope==='team'?'*':student,revision,'publish',actor,new Date().toISOString(),input.requestId,JSON.stringify(event)]]);
+    evaluationAppend_(sheet,journalColumns,[[definition.key,roster.team,adapter.reopenScope==='team'?'*':student,revision,'publish',actor,new Date().toISOString(),input.requestId,JSON.stringify(event)]]);
     return {revision,status:adapter.reopenScope==='student'||!student||latest.students.every(s=>s.register===student||!s.needsPublication)?'Published':'Submitted'};
   });
 }

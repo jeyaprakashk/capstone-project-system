@@ -41,7 +41,7 @@ function render() {
     'Every sheet the code uses is listed, except the master registry of the hub spreadsheet (another spreadsheet, headers not defined in this project).',
     '',
     '- **Tab** shows the access mode: it decides the tab colour and whether the sheet is hidden, when the sheet is first created.',
-    '- **Status:** `new` (header-name access from the start), `by-name` (columns found by header name, but the code that creates the sheet still has its own creation and checks), `positional` (some column is still read by position), `migrated` (every access is by header name, and a sheet the code creates is created through `ensureSheet_`), `retiring`.',
+    '- **Status:** `new` (header-name access from the start), `by-name` (found by header name, not yet audited), `positional` (some column is still read by position), `migrated` (every access is by header name, listed in Code and audited), `retiring`.',
     '- **Created at runtime:** only a sheet with this flag may be created by a runtime write (ENSURE-SHEET-PLAN.md, "Runtime mode").',
     '',
     '| Key | Sheet | Tab | Headers | Status | Created at runtime | Purpose | Code |',
