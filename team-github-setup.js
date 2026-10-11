@@ -96,7 +96,8 @@ function getTeamGithubSetup_(teamId, options) {
             // (and so no locked full-sheet scan) unless a stored value would change.
             const stale = identityRows.some(item => emailsMatch_(item[1],submission[1]) && textEquals_(item[2],submission[2]) && githubId_(item[accountColumns.ID]) === check.githubId &&
               (item[3] !== check.username || item[accountColumns.NAME] !== check.displayName || item[accountColumns.URL] !== check.profileUrl));
-            if (stale) refreshGithubAccountMetadata_(submission,check);
+            // readOnly: a requirements check or dashboard load must not write the accounts sheet.
+            if (stale && !options.readOnly) refreshGithubAccountMetadata_(submission,check);
             validationCache.set(metadataKey,true);
           }
         }
