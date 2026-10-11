@@ -47,6 +47,33 @@ state noted.
     must be the same. If they differ, stop and tell the developer: the new code would switch to the attached spreadsheet.
     On the rehearsal copy no `SHEET_ID` is needed, because the copy uses itself.
 
+### Rehearsal log (copy "Branch of Capstone Tracker - Batch 2023-27", 2026-10-11)
+
+Code on the copy: `main` at `e20ade9` (Release 0 plus the spreadsheet-resolution change), pushed with `clasp push`.
+
+| Check | Result |
+|---|---|
+| `setupActivityDependencies` created the `ActivityDependencies` tab in the **copy**: five headers in order, first row frozen, Yes/No list in column E from row 2, green visible tab, no data rows | **Pass** (screenshot) |
+| The live spreadsheet did **not** get the tab (the copy resolved itself, not the original) | **Pass** (owner checked) |
+| A second `setupActivityDependencies` run changed nothing and made no second copy of the tab | **Pass** (owner checked) |
+| `setTitleCutover('PAUSED')` returned `{"ok":true,"value":"PAUSED"}` and the property read `PAUSED` | **Pass** |
+| `clearTitleCutover()` returned `{"ok":true,"was":"PAUSED"}` and the property was unset | **Pass** |
+| `setTitleCutover('LIVE')` returned `{"ok":true,"value":"LIVE"}` | **Pass** |
+| `clearTitleCutover()` while `LIVE` refused with "Cutover is LIVE; fix forward." and left `LIVE` unchanged | **Pass** |
+| `setTitleCutover('PAUSED')` from `LIVE` was allowed; then `clearTitleCutover()` unset it | **Pass** |
+| `setTitleCutover('banana')` refused with "setTitleCutover accepts only 'PAUSED' or 'LIVE'." and changed nothing | **Pass** |
+| Final state: `TITLE_CUTOVER` unset | **Pass** |
+
+What this confirms on real Google, beyond the local tests: editor-run functions use the pushed code; `ensureSheet_` creates a
+sheet with the right tab colour, header row and formatting; `getActiveSpreadsheet()` resolves the copy for an editor run; the
+script lock and script properties behave as the barrier assumes for `setTitleCutover` and `clearTitleCutover`.
+
+**Not yet rehearsed:**
+- the old guide and reviewer decision paths under `PAUSED`, `LIVE` and unset, through a deployed web app (Part 2 of the rehearsal);
+- `getActiveSpreadsheet()` from the web app and from a time-driven trigger (the property fallback covers it if it fails);
+- the manifest comparison for the live project (answer **N** to the overwrite prompt there until compared);
+- the cutover steps themselves (step 0 to 9), pushed code versus deployed version, and trigger pickup of new code.
+
 ## C. Cutover day
 
 Follow the order. Stop and ask if any step does not behave as written.
