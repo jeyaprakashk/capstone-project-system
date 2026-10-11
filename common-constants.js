@@ -60,17 +60,7 @@ const FIELD_DEFINITIONS = {
     S2_NAME: 'Student 2 Name', S2_REGNO: 'Student 2 Register No', S2_EMAIL: 'Student 2 Email',
     S3_NAME: 'Student 3 Name', S3_REGNO: 'Student 3 Register No', S3_EMAIL: 'Student 3 Email',
     S4_NAME: 'Student 4 Name', S4_REGNO: 'Student 4 Register No', S4_EMAIL: 'Student 4 Email',
-    TITLE: 'Title',
-    PROBLEM: 'Problem Statement',
-    SIMILARITY_FLAG: 'Similarity Flag',
-    GUIDE_DECISION: 'Guide Decision',
-    GUIDE_NOTES: 'Guide Notes',
-    REVIEWER_DECISION: 'Reviewer Decision',
-    REVIEWER_NOTES: 'Reviewer Notes',
-    COMMITTEE_NUMBER: 'Review Committee Number',
-    TITLE_APPROVED_BY: 'Title Approved By',
-    WORK_BREAKDOWN_LINK: 'Work Breakdown Link',
-    NEED_ANALYSIS_LINK: 'Need Analysis Link'
+    COMMITTEE_NUMBER: 'Review Committee Number'
   },
 
   REVIEW_COMMITTEE: {

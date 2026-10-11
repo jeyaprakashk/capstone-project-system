@@ -4,10 +4,12 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { loadSources, expectGolden } = require('./invariants/golden.cjs');
 const { installTitleLog } = require('./title-gate-stub.cjs');
+const { withLegacyTitleColumns } = require('./legacy-team-status.cjs');
 
 function serverFixture(email = 'reviewer@example.com') {
   const c = loadSources(['common-constants.js', 'common-helpers.js', 'lucide-icons.js', 'icon-renderer.js', 'reviewer-dashboard.js', 'api-envelope.js', 'reviewer-api.js'],
     { Session: { getActiveUser: () => ({ getEmail: () => email }) }, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }) } });
+  withLegacyTitleColumns(c);
   const defs = vm.runInContext('FIELD_DEFINITIONS.TEAM_STATUS', c);
   const headers = Object.keys(defs), index = Object.fromEntries(headers.map((k, i) => [k, i]));
   const row = values => headers.map(k => values[k] ?? '');

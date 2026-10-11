@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
+const { withLegacyTitleColumns } = require('./legacy-team-status.cjs');
 const crypto = require('node:crypto');
 const { HEADERS: TITLE_LOG_HEADERS, sheetRow: titleLogSheetRow } = require('./title-sheet-fixture.cjs');
 const { titleRowsFor } = require('./title-baseline/titlelog.cjs');
@@ -28,6 +29,7 @@ function weeklyFixture() {
     ScriptApp:{getProjectTriggers:()=>triggers.slice(),deleteTrigger:t=>triggers.splice(triggers.indexOf(t),1),newTrigger:name=>({timeBased(){return this;},everyHours(n){this.hours=n;return this;},atHour(n){this.hour=n;return this;},everyDays(n){this.days=n;return this;},inTimezone(tz){this.timezone=tz;return this;},create(){triggers.push({getHandlerFunction:()=>name,hours:this.hours,hour:this.hour,days:this.days,timezone:this.timezone});}})}
   });
   for(const file of ['common-constants.js','sheet-reads.js','common-helpers.js','github-identity.js','weekly-activity.js','logbook-tracker.js','progress-eligibility.js','team-github-setup.js','weekly-progress-phase2.js','marks-tracker.js','guide-dashboard.js','sheet-columns.js','title-log.js','title-history.js','title-gate.js','title-service.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c,{filename:file});
+  withLegacyTitleColumns(c);
   // The title readers raise coded errors; fixtures that load api-envelope.js later replace this with the real one.
   c.apiFail_=(code,message)=>Object.assign(new Error(message),{apiCode:code});
   c.parseGithubRepoUrl_=url=>{const m=String(url).match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+?)(?:\.git)?\/?$/i);return m?{owner:m[1],repo:m[2]}:null;};

@@ -1,4 +1,5 @@
 const { installTitleLog } = require('./title-gate-stub.cjs');
+const { withLegacyTitleColumns } = require('./legacy-team-status.cjs');
 const { createSheetReadContext } = require('./sheet-read-fixture.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -32,6 +33,7 @@ function fixture(overrides = {}, runtime = {}) {
   for(const file of ['lucide-icons.js','icon-renderer.js','common-constants.js','common-styles.js', 'busy-state.js','common-helpers.js','milestone-config.js','rubric-config.js','weekly-activity.js','coordinator-dashboard.js','student-dashboard.js','guide-dashboard.js','reviewer-dashboard.js','api-envelope.js','guide-api.js','student-api.js','coordinator-api.js','data-bridge-client.js','title-requests.js','reviewer-view.js','guide-view.js','student-view.js','student-title.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','shared-tabs.js','system-status-actions.js','student-github-actions.js','system-status-view.js','student-weekly-view.js','student-results-view.js','data-bridge-client.js','title-requests.js','reviewer-view.js','reviewer-evaluation.js','review-evaluation-client.js','logbook-tracker.js','assessment-history-view.js','dashboard-client-scripts.js','guide-evaluation-client.js','guide-weekly-client.js','review-academic-policy.js','evaluation-lifecycle.js','publication-events.js','assessment-registry.js','guide-evaluation.js','internal-assessment-publishing.js','internal-assessment-publishing-client.js','dashboard-router.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),c,{filename:file});
   }
+  withLegacyTitleColumns(c);
   const definitionRows=[Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c)),...Array.from({length:settings.reviewCount},(_,i)=>['review'+(i+1),'REVIEW','Review '+(i+1),i+1,10,settings.start,settings['review'+(i+1)],'','review-attendance-v1',''])];
   const getSheet_=c.getSheet_;
   c.getSheet_=name=>name==='AssessmentDefinitions'?{getDataRange:()=>({getValues:()=>definitionRows})}:getSheet_(name);
