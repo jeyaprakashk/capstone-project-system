@@ -160,7 +160,7 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
   }
   function rowMarkup(t, reviewColumns) {
     const unavailableHealth = t.health === 'unavailable', loadingRow = t.health === 'loading';
-    const titleBadge = t.titleStatus === 'APPROVED' ? TONE.success + '">Approved' : t.titleStatus === 'NEEDS_REVIEW' ? TONE.warning + '">Review' : t.titleStatus === 'REJECTED_BY_GUIDE' ? TONE.danger + '">Rejected' : TONE.info + '">Pending';
+    const titleBadge = t.titleStatus === 'APPROVED' ? TONE.success + '">Approved' : t.titleStatus === 'NEEDS_REVIEW' ? TONE.warning + '">Review' : t.titleStatus === 'RETURNED' ? TONE.danger + '">Returned' : t.titleStatus === 'REOPENED' ? TONE.warning + '">Reopened' : t.titleStatus === 'UNAVAILABLE' ? TONE.danger + '">Unavailable' : TONE.info + '">Pending';
     const repoLabel = escape([t.repoStatus === 'ready' ? 'Repository URL recorded' : 'Pending', t.githubMessage, t.githubTiming, t.repoUrl ? 'Repository available' : ''].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' · '));
     const health = t.health === 'ontrack' ? [TONE.success, 'On track'] : t.health === 'monitor' ? [TONE.warning, 'Monitor'] : [TONE.danger, 'Needs attention'];
     const activity = activityOf(t), cell = 'px-3 py-2 align-top text-sm';

@@ -5,12 +5,13 @@
  * drawer closed or moved to another team are ignored. Opening, closing, focus and the backdrop stay with
  * DashboardUI's shared drawer; this module never calls google.script.run.
  */
-function teamDrawerViewBrowser_(bridge, getUi) {
+function teamDrawerViewBrowser_(bridge, getUi, getRequests) {
   'use strict';
   const delegated = new WeakSet();
   const READ = {timeoutMs:120000};
   const SECTIONS = {
     basic:['Project', 'Guide', 'Students', 'Review Committee', 'Repository'],
+    title:['Title'],
     progress:['Progress'],
     activity:['This Week']
   };
@@ -35,13 +36,49 @@ function teamDrawerViewBrowser_(bridge, getUi) {
   const stat = (label, value) => '<div class="' + CARD + '"><div class="' + CARD_LABEL + '">' + label + '</div><div class="' + CARD_VALUE + '">' + escape(value) + '</div></div>';
   const health = value => value === 'ontrack' ? ['success', 'On Track'] : value === 'monitor' ? ['warning', 'Monitor'] : ['danger', 'Attention'];
 
+  const TITLE_STATUS = {NOT_SUBMITTED:'Not submitted', NEEDS_REVIEW:'Awaiting guide', AWAITING_REVIEWER:'Awaiting reviewers', RETURNED:'Returned for revision', APPROVED:'Approved', REOPENED:'Reopened', UNAVAILABLE:'Unavailable'};
+  const ACTION_LABEL = {BASELINE:'Imported', SUBMIT:'Submitted', GUIDE_APPROVE:'Guide approved', RETURN:'Returned', REVIEWER_APPROVE:'Reviewer approved', REOPEN:'Reopened', CANCEL_REOPEN:'Reopening cancelled'};
+  const FIELD = 'mt-1 block w-full rounded-md border border-control px-3 py-2 text-sm';
+  const PRIMARY = 'border-0 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
+  const when = value => { const date = value ? new Date(value) : null; return date && Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '—'; };
+
+  /** The coordinator's title section: state, checklist, history and the reopen controls. */
+  function titleMarkup(data) {
+    const title = data.title, id = escape(title.teamId);
+    const status = TITLE_STATUS[title.status] || title.status;
+    const summary = row('Status', escape(status)) + row('Title in effect', escape((title.approved.value ? title.approved.title : title.proposal.title) || '—')) +
+      (title.approved.value ? row('First approved', escape(when(title.approved.at)) + (title.approved.by ? ' · ' + escape(title.approved.by) : '')) : '') +
+      (title.reopened && title.proposal.title ? row('Proposed change', escape(title.proposal.title)) : '') +
+      (title.reopen ? row('Reopened', escape(title.reopen.reason)) : '') +
+      (title.similarityNote ? row('Similarity', escape(title.similarityNote)) : '') +
+      (title.notes ? row('Latest note', escape(title.notes)) : '') +
+      (title.folderUrl ? row('Documents', '<a class="' + LINK + '" href="' + escape(title.folderUrl) + '" target="_blank" rel="noopener">Open team folder</a>') : '') +
+      (title.documents || []).map(doc => row(escape(doc.label), '<span class="' + (doc.present ? TONE.success : TONE.warning) + '">' + (doc.present ? 'Present' : 'Missing') + '</span>')).join('');
+    const activities = data.requirements && data.requirements.activities || {};
+    const errors = data.requirements && data.requirements.errors || [];
+    const checklist = Object.keys(activities).filter(key => activities[key].requirements.length || !activities[key].allowed).map(key => {
+      const result = activities[key];
+      return '<div class="mb-2"><div class="text-xs font-semibold text-muted">' + escape(key) + '</div>' + (result.requirements.length ? result.requirements.map(item =>
+        row(escape(item.label), '<span class="' + (item.met ? TONE.success : TONE.warning) + '">' + (item.met ? 'Met' : escape(item.reason || 'Not met')) + '</span>' + (item.diagnostic ? ' <span class="text-xs text-muted">' + escape(item.diagnostic) + '</span>' : ''))).join('') : '<p class="' + NOTE + '">' + escape(result.reason) + '</p>') + '</div>';
+    }).join('');
+    const history = (title.history || []).slice().reverse().map(item => '<tr><td class="pr-2 align-top text-muted">' + escape(item.revision) + '</td><td class="pr-2 align-top">' + escape(ACTION_LABEL[item.action] || item.action) +
+      '</td><td class="pr-2 align-top break-all">' + escape(item.actor) + '</td><td class="pr-2 align-top whitespace-nowrap">' + escape(when(item.at)) + '</td><td class="align-top break-words">' + escape(item.notes) + '</td></tr>').join('');
+    const controls = (title.can.reopen.allowed ? '<label class="text-xs font-semibold text-muted" for="title-reason-' + id + '">Reason for reopening</label><textarea id="title-reason-' + id + '" rows="2" maxlength="500" class="' + FIELD + '" data-title-reason></textarea>' +
+        '<div class="mt-2"><button type="button" class="' + PRIMARY + '" data-action="title-reopen" data-team="' + id + '" data-revision="' + escape(title.revision) + '">Reopen title</button></div>' : '') +
+      (title.can.cancel.allowed ? '<label class="text-xs font-semibold text-muted" for="title-reason-' + id + '">Reason for cancelling the reopening</label><textarea id="title-reason-' + id + '" rows="2" maxlength="500" class="' + FIELD + '" data-title-reason></textarea>' +
+        '<div class="mt-2"><button type="button" class="' + PRIMARY + '" data-action="title-cancel" data-team="' + id + '" data-revision="' + escape(title.revision) + '">Cancel reopening</button></div>' : '');
+    return block('Title', summary + (controls ? '<div class="mt-3">' + controls + '</div><p class="mt-2 text-sm text-danger" role="status" data-title-status></p>' : '')) +
+      (checklist || errors.length ? block('Submission requirements', (errors.length ? '<p class="text-sm text-danger">' + errors.map(escape).join('<br>') + '</p>' : '') + checklist) : '') +
+      (history ? block('Title history', '<table class="w-full text-xs"><tbody>' + history + '</tbody></table>') : '');
+  }
+
   /** The markup for one section from its DTO. */
   function sectionMarkup(section, data) {
+    if (section === 'title') return titleMarkup(data);
     if (section === 'progress') {
       const [tone, label] = health(data.health);
       return block('Progress',
-        row('Title Status', escape(data.titleStatus || '—')) + row('Guide Decision', escape(data.guideDecision || '—')) +
-        row('Reviewer Decision', escape(data.reviewerDecision || '—')) + row('Repository', escape(data.repoStatus || 'Pending')) +
+        row('Title Status', escape(TITLE_STATUS[data.titleStatus] || data.titleStatus || '—')) + row('Repository', escape(data.repoStatus || 'Pending')) +
         (data.reviews || []).map(review => row(escape(review.label), '<span class="' + (review.available === false ? TONE.danger : review.completed ? TONE.success : TONE.warning) + '">' +
           (review.available === false ? 'Unavailable' : review.completed ? 'Completed' : 'Pending') + '</span>')).join('') +
         row('Overall Health', '<span class="' + TONE[tone] + '">' + label + '</span>'));
@@ -69,9 +106,33 @@ function teamDrawerViewBrowser_(bridge, getUi) {
   const skeletonMarkup = section => '<div data-drawer-section="' + section + '" aria-busy="true">' +
     SECTIONS[section].map(label => block(escape(label), getUi().renderSkeleton('panel', 'Loading ' + label))).join('') + '</div>';
 
+  /** Reopen or cancel a reopening: one write with the revision the section showed; success reloads the section. */
+  function titleWrite(button, method, kind) {
+    const host = button.closest('[data-drawer-section="title"]'), reason = host && host.querySelector('[data-title-reason]');
+    const status = host && host.querySelector('[data-title-status]');
+    const text = reason ? reason.value.trim() : '';
+    if (!text) { if (status) status.textContent = 'Enter a reason.'; return; }
+    const teamId = button.getAttribute('data-team'), revision = Number(button.getAttribute('data-revision'));
+    const scope = kind + ':' + teamId, requestId = getRequests().idFor(scope, [revision, text].join('|'));
+    const done = getUi().busy.write(status, 'Saving…', [button]);
+    bridge.write(method, [{requestId, expectedRevision: revision, teamId, reason: text}]).then(() => {
+      getRequests().settle(scope);
+      done();
+      if (active) active.load('title');
+    }, error => {
+      getRequests().settle(scope, error);
+      done(error && error.message || 'Unable to save.');
+      if (error && (error.code === 'CONFLICT' || error.code === 'REJECTED') && active) active.load('title', error.message);
+    });
+  }
+
   function onClick(event) {
-    const button = event.target.closest ? event.target.closest('[data-action="drawer-retry"]') : null;
-    if (button && !button.disabled && active) active.load(button.getAttribute('data-section'));
+    const target = event.target.closest ? event.target.closest('[data-action]') : null;
+    if (!target || target.disabled) return;
+    const action = target.getAttribute('data-action');
+    if (action === 'drawer-retry' && active) active.load(target.getAttribute('data-section'));
+    else if (action === 'title-reopen') titleWrite(target, 'API_coordinator_reopenTitle', 'reopen');
+    else if (action === 'title-cancel') titleWrite(target, 'API_coordinator_cancelReopen', 'cancel');
   }
 
   /** Fills `content` with the three sections of `teamId`; `isOpen()` says whether the drawer still shows them. */
@@ -81,7 +142,7 @@ function teamDrawerViewBrowser_(bridge, getUi) {
     if (!delegated.has(content)) { delegated.add(content); content.addEventListener('click', onClick); }
     const sectionHost = section => content.querySelector('[data-drawer-section="' + section + '"]');
 
-    function load(section) {
+    function load(section, message) {
       const target = sectionHost(section);
       if (request !== generation || pending.has(section) || !target) return;
       pending.add(section);
@@ -96,6 +157,7 @@ function teamDrawerViewBrowser_(bridge, getUi) {
         if (!current()) return;
         pending.delete(section);
         target.innerHTML = sectionMarkup(section, data);
+        if (message) { const note = target.querySelector('[data-title-status]'); if (note) note.textContent = message; }
         getUi().busy.mark(target, false);
         if (section === 'progress' && (data.reviews || []).some(review => review.available === false)) showRetry('Some review data is unavailable.');
       }, error => {

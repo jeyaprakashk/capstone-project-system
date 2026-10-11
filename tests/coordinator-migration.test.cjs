@@ -7,7 +7,7 @@ const { coordinatorFixture } = require('./coordinator-fixture.cjs');
 
 const text = n => n.textContent.replace(/\s+/g, ' ').trim();
 const LOADING = 'loading';
-const TITLE_BADGE = { APPROVED: 'Approved', NEEDS_REVIEW: 'Review', REJECTED_BY_GUIDE: 'Rejected' };
+const TITLE_BADGE = { APPROVED: 'Approved', NEEDS_REVIEW: 'Review', RETURNED: 'Returned', REOPENED: 'Reopened', UNAVAILABLE: 'Unavailable' };
 const HEALTH_LABEL = { ontrack: 'On track', monitor: 'Monitor' };
 const isLoading = value => /^loading/i.test(value || '');
 
@@ -86,7 +86,11 @@ test('coordinator DTO preserves legacy facts except the deliberately removed dea
   const expected = JSON.parse(fs.readFileSync(path.join(__dirname,'invariants/snapshots/coordinator-legacy-facts.json'),'utf8'));
   for (const facts of Object.values(expected)) {
     facts.filters = facts.filters.filter(item => !item.filter.startsWith('deadline:'));
-    facts.rows.forEach(row => { delete row.deadlines; });
+    facts.rows.forEach(row => {
+      delete row.deadlines;
+      // Deliberate: a title returned by the guide or by the reviewer is one status, shown as "Returned".
+      if (row.titleStatus === 'REJECTED_BY_GUIDE' || row.titleStatus === 'REVISE_AWAITING_STUDENT') { row.titleStatus = 'RETURNED'; row.title = 'Returned'; }
+    });
   }
   assert.deepEqual(frozen,expected);
   for (const name of ['overview','progress']) {

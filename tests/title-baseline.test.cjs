@@ -8,6 +8,7 @@ const vm = require('node:vm');
 const { weeklyFixture } = require('./weekly-progress-fixture.cjs');
 const { coordinatorFixture } = require('./coordinator-fixture.cjs');
 const { combos, inside } = require('./title-baseline/combos.cjs');
+const { legacySteps } = require('./title-baseline/titlelog.cjs');
 const { expectBaseline, expectBaselineAs } = require('./title-baseline/golden.cjs');
 
 // The four states that mean the same in the old and the new model (tests/title-gate.test.cjs also checks them against status.json).
@@ -121,6 +122,7 @@ test('baseline: coordinator (title counts, the tracker status, health and the te
     'Student 1 Email': 's' + index + '@example.com', 'Student 1 Register No': String(1000 + index)
   }));
   g.f.status.rows.splice(1, g.f.status.rows.length, ...teams.map(team => g.f.ts.map(header => team[header] ?? '')));
+  g.f.syncTitleLog();
   g.f.roster.rows.splice(1, g.f.roster.rows.length, ...teams.map(team => g.f.tr.map(header => team[header] ?? '')));
   g.c.getRepoUrlMap_ = () => ({});
   g.c.getAllReviewCompletionStatus_ = () => ({});
@@ -140,12 +142,34 @@ test('baseline: coordinator (title counts, the tracker status, health and the te
     result.teams[combo.id] = {
       trackerTitleStatus: tracked.titleStatus,
       health: health.teams[id].health,
-      titleHealth: plain(g.c.assessProjectTeam_(g.f.status.rows[index + 1], TS, 'https://github.com/org/x', [], {}, schedule, clock, {missing: 0, active: false, currentLogged: true}, {repositoryOnly: true, ready: true, message: 'ok'})),
-      drawerProgress: {titleStatus: drawer.titleStatus, guideDecision: drawer.guideDecision, reviewerDecision: drawer.reviewerDecision, health: drawer.health},
-      drawerBasic: {title: basic.title, titleStatus: basic.titleStatus, guideDecision: basic.guideDecision, reviewerDecision: basic.reviewerDecision}
+      titleHealth: plain(g.c.assessProjectTeam_(g.f.status.rows[index + 1], TS, 'https://github.com/org/x', [], {}, schedule, clock, {missing: 0, active: false, currentLogged: true}, {repositoryOnly: true, ready: true, message: 'ok'}, tracked.titleStatus === 'APPROVED')),
+      drawerProgress: {titleStatus: drawer.titleStatus, health: drawer.health},
+      drawerBasic: {title: basic.title, titleStatus: basic.titleStatus}
     };
   });
-  expectBaseline('coordinator', result);
+  // The 32 old states collapse to the six new statuses: each team is compared with the old state that means the same, so a title that was
+  // never submitted but carried a Reviewer Decision is now simply not submitted, a guide rejection and a reviewer revision are both
+  // "returned", and the decisions themselves are no longer reported. Titles are normalised to upper case.
+  const REPRESENTATIVE = {NOT_SUBMITTED: 'title=no guide=- reviewer=-', NEEDS_REVIEW: 'title=yes guide=- reviewer=-', AWAITING_REVIEWER: 'title=yes guide=Approved reviewer=-',
+    APPROVED: 'title=yes guide=- reviewer=Approved', RETURNED: 'title=yes guide=Rejected reviewer=-'};
+  const OLD_TO_NEW = {NOT_SUBMITTED: 'NOT_SUBMITTED', NEEDS_REVIEW: 'NEEDS_REVIEW', AWAITING_REVIEWER: 'AWAITING_REVIEWER', APPROVED: 'APPROVED', REJECTED_BY_GUIDE: 'RETURNED', REVISE_AWAITING_STUDENT: 'RETURNED'};
+  const newStatusOf = combo => { const steps = legacySteps(combo.title, combo.guide, combo.reviewer); return !steps.length ? 'NOT_SUBMITTED' : steps.includes('RETURN') ? 'RETURNED' : steps.includes('REVIEWER_APPROVE') ? 'APPROVED' : steps.includes('GUIDE_APPROVE') ? 'AWAITING_REVIEWER' : 'NEEDS_REVIEW'; };
+  expectBaselineAs('coordinator', result, (recorded, id, all) => {
+    if (id === 'titleApproved') return list.filter(combo => newStatusOf(combo) === 'APPROVED').length;
+    if (id === 'needsAttention') {
+      const attention = Object.entries(all.teams).filter(([key, team]) => team.health === 'attention').length;
+      const wasAttention = list.filter(combo => all.teams[combo.id] && all.teams[combo.id].health === 'attention').length;
+      return recorded - wasAttention + list.filter(combo => all.teams[combo.id] && all.teams[REPRESENTATIVE[newStatusOf(combo)]].health === 'attention').length;
+    }
+    if (id === 'teams') {
+      return Object.fromEntries(list.filter(combo => all.teams[combo.id]).map(combo => {
+        const status = newStatusOf(combo), rep = all.teams[REPRESENTATIVE[status]];
+        return [combo.id, {trackerTitleStatus: status, health: rep.health, titleHealth: rep.titleHealth,
+          drawerProgress: {titleStatus: status, health: rep.drawerProgress.health}, drawerBasic: {title: combo.title ? 'PROJECT' : '', titleStatus: status}}];
+      }));
+    }
+    return recorded;
+  }, true);
 });
 
 test('baseline: the Guide reminder and Reviewer approval digests', () => {

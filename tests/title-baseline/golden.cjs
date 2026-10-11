@@ -25,11 +25,12 @@ function expectBaseline(name, actual) {
  * recorded entry into the form the new readers produce (for example the old status text into "approved or not"), so the comparison is
  * still against what the old code did, and the snapshot file itself is never regenerated.
  */
-function expectBaselineAs(name, actual, translate) {
+function expectBaselineAs(name, actual, translate, wholeObject) {
   const file = snapshotPath(name);
   assert.ok(fs.existsSync(file), 'Missing title baseline ' + name);
   const recorded = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const expected = Object.fromEntries(Object.entries(recorded).map(([id, entry]) => [id, translate(entry, id)]));
+  // With wholeObject the recorded snapshot is one object whose fields are translated one by one: translate(field, key, recordedObject).
+  const expected = Object.fromEntries(Object.entries(recorded).map(([id, entry]) => [id, wholeObject ? translate(entry, id, recorded) : translate(entry, id)]));
   assert.deepEqual(JSON.parse(JSON.stringify(actual)), expected, 'Title baseline ' + name + ': the TitleLog readers must give the old downstream result.');
 }
 

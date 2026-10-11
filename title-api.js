@@ -249,3 +249,17 @@ function API_title_get(teamId) {
     return buildTitleDto_(String(row[TS.TEAM_ID]).trim(), {email, roles}, activityContext_());
   });
 }
+
+/**
+ * The coordinator's title section of the team drawer: the Title DTO (with history) and the checklist of each gated activity for the
+ * team, including the checks' diagnostics, which only the coordinator sees.
+ */
+function coordinatorTitleSection_(teamId) {
+  const {TS, row} = titleTeamRow_(teamId);
+  const email = Session.getActiveUser().getEmail(), ctx = activityContext_();
+  const id = String(row[TS.TEAM_ID]).trim(), team = {teamId: id, semester: row[TS.SEMESTER]};
+  const title = buildTitleDto_(id, {email, roles: {coordinator: true}}, ctx);
+  const activities = {};
+  ACTIVITY_IDS_.forEach(activity => { activities[activity] = activityPreconditions_(activity, team, ctx); });
+  return {title, requirements: {errors: loadActivityRules_(ctx).errors.slice(), activities}};
+}

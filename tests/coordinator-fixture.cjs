@@ -22,6 +22,7 @@ function coordinatorFixture({ reviewsConfigured = true, progressFails = false } 
     { 'Team ID': 'T5', Title: 'Revise', 'Reviewer Decision': 'Revise', 'Guide Name': 'Dr. E', 'Student 1 Email': 'five@example.com', 'Student 1 Register No': '007' }
   ];
   f.status.rows.splice(1, f.status.rows.length, ...teams.map(t => f.ts.map(h => ({ ...base, ...t })[h] ?? '')));
+  f.syncTitleLog();
   f.roster.rows.splice(1, f.roster.rows.length, ...teams.map(t => f.tr.map(h => ({ ...base, ...t })[h] ?? '')));
   c.getRepoUrlMap_ = () => ({ t1: 'https://github.com/org/t1', t2: 'https://github.com/org/t2', t4: 'https://github.com/org/t4' });
   c.getAllReviewCompletionStatus_ = () => {

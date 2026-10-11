@@ -62,7 +62,7 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_publishing_get(assessmentId)` / `API_publishing_run(method, input)` | Coordinator | `method` is `publishInternalAssessment_` or `reopenInternalAssessment_`; `input` carries `requestId`, so a retry is safe | the existing publication report (`ready, config, teams, error`) / the existing publish or reopen result | `loadInternalAssessmentPublishing_` / `publishInternalAssessment_` / `reopenInternalAssessment_` called directly |
 | `API_student_previewGithub(profileUrl)` / `API_student_confirmGithub(token)` / `API_student_completeGithubSetup()` | Student | profile URL; the signed `token` returned by the preview | `{token, account:{githubId, username, displayName, profileUrl, avatarUrl}}` / `{ok, message}` / `{message}` | `previewStudentGithubAccount_` / `confirmStudentGithubAccount_` / `completeStudentGithubSetup_` called directly |
 | `API_shared_getTimeline()` / `API_shared_getRubrics()` | Any dashboard role | none | the existing project timeline (`schedule, milestones …`) / shared rubrics (`assessments …`) | `loadSharedProjectTimeline_` / `loadSharedRubrics_` called directly |
-| `API_coordinator_getTeamDrawer(teamId, section)` | Coordinator | `section` is `basic`, `progress` or `activity` | the existing team detail for that section, rendered by `TeamDrawerView` (`team-drawer-view.js`) | `loadCoordinatorDrawerSection_` called directly |
+| `API_coordinator_getTeamDrawer(teamId, section)` | Coordinator | `section` is `basic`, `title`, `progress` or `activity` | the existing team detail for that section, rendered by `TeamDrawerView` (`team-drawer-view.js`); the `title` section is `{title: TitleDto (with history), requirements:{errors, activities:{<activity>:{allowed, reason, requirements:[{label, met, reason, diagnostic?}]}}}}` and is where the coordinator reopens a title or cancels a reopening; `basic` and `progress` report `titleStatus` as above and no longer carry the guide and reviewer decisions | `loadCoordinatorDrawerSection_` called directly |
 
 For each endpoint record: required role, request fields and validation, the exact
 `data` fields and types, and which server HTML builder it replaces. Each endpoint has
@@ -96,7 +96,7 @@ Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invaria
           guideEvaluation:{available,completed}|null,
           reviews:[{key,label,completed:number|null,unavailable:number,known:boolean}] },
   reviewColumns:[{key,label}], reviewConfigurationError:boolean, partial:boolean,
-  teams:[{ teamId, guide, title, titleStatus, repoStatus:'ready'|'pending', githubMessage, githubTiming, repoUrl,
+  teams:[{ teamId, guide, title /* the title in effect */, titleStatus /* NOT_SUBMITTED|NEEDS_REVIEW|AWAITING_REVIEWER|RETURNED|APPROVED|REOPENED|UNAVAILABLE */, repoStatus:'ready'|'pending', githubMessage, githubTiming, repoUrl,
            registerNumbers:[string], emailRecipients:[string], health:'ontrack'|'monitor'|'attention'|'loading',
            guideEvaluation:string, reviews:{<key>:'Completed'|'Pending'|'Unavailable'|'Loading…'} }] }
 ```

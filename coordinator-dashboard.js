@@ -54,7 +54,11 @@ function getCoordinatorDashboardData_(deferAssessments, timings) {
 
   // Stats
   const total = statusRows.length;
-  const titleApproved = statusRows.filter(r => textEquals_(r[TS.REVIEWER_DECISION], 'Approved')).length;
+  // Every team's title state comes from TitleLog, read once; a team whose history is not valid is UNAVAILABLE and counts as not approved.
+  const titleIndex = measure('title_log', () => readTitleIndex_());
+  const titleOf = id => titleTryState_(titleIndex, id);
+  const approvedOf = id => { const title = titleOf(id); return !!title.state && title.state.approved.value; };
+  const titleApproved = statusRows.filter(r => approvedOf(r[TS.TEAM_ID])).length;
   const reposReady = statusRows.filter(r => repoUrlMap[normalizeText_(r[TS.TEAM_ID])]).length;
 
   let schedule = null;
@@ -75,7 +79,7 @@ function getCoordinatorDashboardData_(deferAssessments, timings) {
   statusRows.forEach(r => {
     const id = normalizeText_(r[TS.TEAM_ID]);
     if (!deferAssessments && schedule && clock) logSummaryByTeam[id] = getTeamLogWeekSummary_(r, TS, logsByTeam[id] || [], schedule, clock);
-    healthByTeam[id] = deferAssessments ? {health:'loading', severity:'low', issue:'', daysOverdue:0} : assessProjectTeam_(r, TS, repoUrlMap[id], logsByTeam[id] || [], reviewCompletion[id], schedule, clock, logSummaryByTeam[id], githubByTeam[id]);
+    healthByTeam[id] = deferAssessments ? {health:'loading', severity:'low', issue:'', daysOverdue:0} : assessProjectTeam_(r, TS, repoUrlMap[id], logsByTeam[id] || [], reviewCompletion[id], schedule, clock, logSummaryByTeam[id], githubByTeam[id], approvedOf(r[TS.TEAM_ID]));
   });
   const needsAttention = Object.values(healthByTeam).filter(h => h.health === 'attention').length;
 
@@ -92,9 +96,9 @@ function getCoordinatorDashboardData_(deferAssessments, timings) {
       teamId: r[TS.TEAM_ID],
       guide,
       emailRecipients:[...new Set(['GUIDE_EMAIL','S1_EMAIL','S2_EMAIL','S3_EMAIL','S4_EMAIL'].map(key => String((rosterRow && rosterRow[TR[key]]) || r[TS[key]] || '').trim().toLowerCase()).filter(email => /^[^\s@,;:?&#]+@[^\s@,;:?&#]+\.[^\s@,;:?&#]+$/.test(email)))],
-      title: r[TS.TITLE],
+      title: (() => { const title = titleOf(r[TS.TEAM_ID]); return title.state ? titleSummaryFromState_(title.state).title : ''; })(),
       registerNumbers: [1,2,3,4].map(number => String(r[TS['S' + number + '_REGNO']] || '').trim()).filter(Boolean),
-      titleStatus: getTeamStatus_(r),
+      titleStatus: (() => { const title = titleOf(r[TS.TEAM_ID]); return title.state ? title.state.status : 'UNAVAILABLE'; })(),
       repoStatus: githubByTeam[teamId].ready ? 'ready' : 'pending',
       githubMessage: githubByTeam[teamId].message,
       githubTiming: '',
@@ -119,7 +123,8 @@ function getCoordinatorDashboardData_(deferAssessments, timings) {
 
 function loadCoordinatorDrawerSection_(teamId, section) {
   return coordinatorRead_('drawer-' + section, () => {
-    if (!['basic','progress','activity'].includes(section)) throw new Error('Unknown drawer section.');
+    if (!['basic','progress','activity','title'].includes(section)) throw new Error('Unknown drawer section.');
+    if (section === 'title') return coordinatorTitleSection_(teamId);
     return getCoordinatorTeamDetails_(teamId, section);
   });
 }
@@ -161,11 +166,11 @@ function getCoordinatorTeamDetails_(teamId, section) {
     const logs = readLogEntries_(teamId);
     const progressRepoUrl = getRepoUrlForTeam_(teamId);
     const progressSetup = getCoordinatorRepositoryStatus_(progressRepoUrl);
+    const progressTitle = titleTryState_(readTitleIndex_(), teamId);
     return {
-      titleStatus:getTeamStatus_(statusRow), guideDecision:String(statusRow[TS.GUIDE_DECISION] || ''),
-      reviewerDecision:String(statusRow[TS.REVIEWER_DECISION] || ''),
+      titleStatus:progressTitle.state ? progressTitle.state.status : 'UNAVAILABLE',
       repoStatus:progressSetup.message,
-      health:assessProjectTeam_(statusRow, TS, progressRepoUrl, logs, reviews, context.schedule, context.clock, null, progressSetup).health,
+      health:assessProjectTeam_(statusRow, TS, progressRepoUrl, logs, reviews, context.schedule, context.clock, null, progressSetup, !!progressTitle.state && progressTitle.state.approved.value).health,
       reviews:getInternalReviews_().map(review => ({label:review.label, available:!!reviews[review.key] && reviews[review.key].available !== false, completed:!!reviews[review.key]?.completed}))
     };
   }
@@ -247,13 +252,14 @@ function getCoordinatorTeamDetails_(teamId, section) {
   const weekLogs = activity.logs === null ? 'Unavailable' : activity.logs;
   const weekCommits = activity.commits === null ? 'Unavailable' : activity.commits;
 
-  const health = assessProjectTeam_(statusRow, TS, repoUrl, logs, teamReview, schedule, clock, null, githubSetup).health;
+  const titleRead = titleTryState_(readTitleIndex_(), teamId), titleSummary = titleRead.state ? titleSummaryFromState_(titleRead.state) : null;
+  const health = assessProjectTeam_(statusRow, TS, repoUrl, logs, teamReview, schedule, clock, null, githubSetup, !!titleSummary && titleSummary.approved).health;
 
   return {
     teamId: teamId,
 
-    title: String(statusRow[TS.TITLE] || '').trim(),
-    problem: String(statusRow[TS.PROBLEM] || '').trim(),
+    title: titleSummary ? titleSummary.title : '',
+    problem: titleSummary ? titleSummary.problem : '',
 
     guideName: String(
       rosterRow
@@ -272,9 +278,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
     committeeNumber: String(committeeNumber || '').trim(),
     reviewers: reviewers,
 
-    titleStatus: getTeamStatus_(statusRow),
-    guideDecision: String(statusRow[TS.GUIDE_DECISION] || '').trim(),
-    reviewerDecision: String(statusRow[TS.REVIEWER_DECISION] || '').trim(),
+    titleStatus: titleSummary ? titleSummary.status : 'UNAVAILABLE',
 
     repoUrl: repoUrl || '',
     repoStatus: githubSetup.message,
@@ -291,7 +295,7 @@ function getCoordinatorTeamDetails_(teamId, section) {
 // HELPER FUNCTIONS
 // ===================================================================
 /** Evaluate deadlines once per team; commits never substitute for required logs. */
-function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock, logSummary, githubSetup) {
+function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock, logSummary, githubSetup, titleApproved) {
   if (!schedule || !clock) return {health:"monitor", severity:"low", issue:"Schedule unavailable; check configuration", daysOverdue:0};
   const issues = [];
   function overdue(due, complete, label) {
@@ -304,7 +308,8 @@ function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock
     ? {state:githubSetup.ready ? 'recorded' : clock.today > schedule.formation ? 'overdue' : 'pending', text:githubSetup.message}
     : githubSubmissionTiming_(githubSetup, schedule, clock);
   overdue(schedule.formation, timing.state !== 'overdue', githubSetup.repositoryOnly ? 'Repository URL missing' : 'GitHub username submissions overdue');
-  overdue(schedule.title, textEquals_(row[columns.REVIEWER_DECISION], 'Approved'), 'Title approval overdue');
+  if (titleApproved === undefined) titleApproved = titleGate_(row[columns.TEAM_ID]).approved;
+  overdue(schedule.title, titleApproved, 'Title approval overdue');
   for (const {key,label,day} of schedule.reviews) {
     if (review && review[key] && review[key].available !== false) overdue(day, review[key].completed, label + ' marks overdue');
   }
@@ -314,7 +319,7 @@ function assessProjectTeam_(row, columns, repoUrl, logs, review, schedule, clock
   if (issues.length) return { health:'attention', severity:issues[0].daysOverdue >= 14 ? 'high' : issues[0].daysOverdue >= 7 ? 'medium' : 'low',
     issue:issues.map(item => item.issue).join('; '), daysOverdue:issues[0].daysOverdue };
   const unavailable = schedule.reviews.some(({key}) => !review || !review[key] || review[key].available === false);
-  const pending = unavailable || !githubSetup.ready || timing.state === 'unknown' || !textEquals_(row[columns.REVIEWER_DECISION], 'Approved') || (weeks.active && !weeks.currentLogged);
+  const pending = unavailable || !githubSetup.ready || timing.state === 'unknown' || !titleApproved || (weeks.active && !weeks.currentLogged);
   return { health:pending ? 'monitor' : 'ontrack', severity:'low', issue:!githubSetup.ready ? githubSetup.message : timing.state === 'late' || timing.state === 'unknown' ? timing.text : '', daysOverdue:0 };
 }
 

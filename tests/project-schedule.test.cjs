@@ -36,6 +36,10 @@ function fixture(overrides = {}, runtime = {}) {
   const getSheet_=c.getSheet_;
   c.getSheet_=name=>name==='AssessmentDefinitions'?{getDataRange:()=>({getValues:()=>definitionRows})}:getSheet_(name);
   const schedule = c.getProjectSchedule_();
+  // The title is read from TitleLog; this fixture keeps the old-style team rows the tests set, translated to TitleLog rows on demand.
+  const statusKeys=Object.keys(vm.runInContext('FIELD_DEFINITIONS.TEAM_STATUS',c));
+  const statusAt=key=>statusKeys.indexOf(key);
+  installTitleLog(c,()=>(c.getSheetRows_('TeamStatus')||[]).filter(row=>row[statusAt('TEAM_ID')]).map(row=>({teamId:row[statusAt('TEAM_ID')],title:row[statusAt('TITLE')],guide:row[statusAt('GUIDE_DECISION')],reviewer:row[statusAt('REVIEWER_DECISION')]})));
   c.getTeamGithubSetup_=(id, options)=>({ready:!!options.repoUrl,usernamesComplete:!!options.repoUrl,message:'GitHub setup pending',verificationUnavailable:false});
   c.getTeamsGithubSetup_=(rows, columns, repos)=>Object.fromEntries(rows.map(row=>[c.normalizeText_(row[columns.TEAM_ID]),c.getTeamGithubSetup_(row[columns.TEAM_ID],{repoUrl:repos[c.normalizeText_(row[columns.TEAM_ID])]} )]));
   c.githubSubmissionTiming_=(setup, schedule, clock)=>({state:setup && !setup.usernamesComplete && clock.today>schedule.formation?'overdue':'on-time',text:'Submission timing'});
@@ -90,7 +94,7 @@ test('one and three configured reviews drive timeline, student marks and coordin
     assert.equal(dto.reviewColumns.length,count);assert(dto.reviewColumns.some(r=>r.label==='Review '+count));assert(!dto.reviewColumns.some(r=>r.label==='Review '+(count+1)));
     if(count===3) {
       const status={REVIEWER_DECISION:0,S1_EMAIL:1,S1_REGNO:2};
-      const health=f.c.assessProjectTeam_(['Approved','a@example.com','R1'],status,'repo',[],{review1:{completed:true},review2:{completed:true},review3:{completed:false}},f.schedule,f.clock('2026-12-01'));
+      const health=f.c.assessProjectTeam_(['Approved','a@example.com','R1'],status,'repo',[],{review1:{completed:true},review2:{completed:true},review3:{completed:false}},f.schedule,f.clock('2026-12-01'),undefined,undefined,true);
       assert(health.issue.includes('Review 3 marks overdue'));
     }
   }
@@ -164,7 +168,7 @@ test('attention waits until the day after each configured deadline',()=>{
   const {c,schedule:s,clock}=fixture();
   const columns={S1_EMAIL:0,REVIEWER_DECISION:1,S1_REGNO:2};
   const review={review1:{completed:true},review2:{completed:true}};
-  const health=(day,row=['student','Approved'],repo='url',r=review)=>{row[2]='R1';row[40]='W1';return c.assessProjectTeam_(row,columns,repo,[],r,s,clock(day));};
+  const health=(day,row=['student','Approved'],repo='url',r=review)=>{row[2]='R1';row[40]='W1';return c.assessProjectTeam_(row,columns,repo,[],r,s,clock(day),undefined,undefined,row[1]==='Approved');};
   assert.equal(health('2026-09-11',['student',''],'').health,'monitor');
   assert(health('2026-09-12',['student',''],'').issue.includes('GitHub username submissions overdue'));
   assert(!health('2026-09-16',['student','']).issue.includes('Title'));
@@ -303,10 +307,10 @@ test('unavailable reviews do not produce overdue review alerts or on-track healt
   const row=['Approved'];const columns={REVIEWER_DECISION:0};
   const now=clock('2026-12-01');
   c.getTeamLogWeekSummary_=()=>({missing:0,currentLogged:true});
-  const health=c.assessProjectTeam_(row,columns,'repo',[],reviews,schedule,now);
+  const health=c.assessProjectTeam_(row,columns,'repo',[],reviews,schedule,now,undefined,undefined,row[0]==='Approved');
   assert(!health.issue.includes('marks overdue'));
   row[1]='student@example.com';columns.S1_EMAIL=1;
-  assert.equal(c.assessProjectTeam_(row,columns,'repo',[],reviews,schedule,now).health,'monitor');
+  assert.equal(c.assessProjectTeam_(row,columns,'repo',[],reviews,schedule,now,undefined,undefined,row[0]==='Approved').health,'monitor');
 });
 
 test('drawer sections load independently, retry alone and ignore stale callbacks',async()=>{
@@ -319,24 +323,24 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   for(const file of ['data-bridge-client.js','title-requests.js','reviewer-view.js','guide-view.js','student-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','shared-tabs.js','system-status-actions.js','student-github-actions.js','system-status-view.js','student-weekly-view.js','student-results-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript_(),browser);vm.runInContext(c.getDashboardStartScript_(),browser);
   const section=name=>document.querySelector('[data-drawer-section="'+name+'"]');
   vm.runInContext("CoordinatorView.openTeam('A'); CoordinatorView.openTeam('B');",browser);
-  assert.deepEqual(requests.map(r=>r.section),['basic','progress','activity','basic','progress','activity']);
-  requests[3].success({title:'Team B project',students:[],reviewers:[]});await settle();
+  assert.deepEqual(requests.map(r=>r.section),['basic','title','progress','activity','basic','title','progress','activity']);
+  requests[4].success({title:'Team B project',students:[],reviewers:[]});await settle();
   assert(section('basic').textContent.includes('Team B project'));
   assert(!section('basic').textContent.includes('Overall Health'));
-  requests[5].success({weekLogs:4,weekCommits:2});await settle();
+  requests[7].success({weekLogs:4,weekCommits:2});await settle();
   assert(section('activity').textContent.includes('This Week'));
   assert(!section('activity').textContent.includes('Project'));
-  requests[4].failure({message:'marks unavailable'});await settle();
+  requests[6].failure({message:'marks unavailable'});await settle();
   assert(section('progress').textContent.includes('Unable to load progress: marks unavailable'));
   section('progress').querySelector('[data-action="drawer-retry"]').dispatchEvent(new window.Event('click',{bubbles:true}));await settle();
-  assert.equal(requests.length,7);assert.equal(requests[6].section,'progress');
-  requests[6].success({reviews:[],health:'ontrack'});await settle();
+  assert.equal(requests.length,9);assert.equal(requests[8].section,'progress');
+  requests[8].success({reviews:[],health:'ontrack'});await settle();
   assert(section('progress').textContent.includes('Overall Health'));
   const expected=section('basic').innerHTML;
   requests[0].success(null);await settle();requests[0].failure({message:'A response'});await settle();
   assert.equal(section('basic').innerHTML,expected);
   vm.runInContext("DashboardUI.closeDrawer('teamDrawer')",browser);
-  requests[3].success(null);await settle();
+  requests[4].success(null);await settle();
   assert.equal(section('basic').innerHTML,expected);
   // Release every held read so the bridge leaves no timers behind.
   requests.forEach(request=>request.success(null));await settle();
@@ -626,10 +630,11 @@ test('drawer basic and activity avoid marks; progress avoids roster and commit r
   c.getSheetRows_=name=>{reads.push(name);return [['T1','Project','1']];};
   c.getRepoUrlForTeam_=()=> 'https://github.com/example/project';
   c.getCommitteeInfo_=()=>null;c.getTeamStatus_=()=> 'APPROVED';
+  installTitleLog(c,()=>[{teamId:'T1',title:'Project',guide:'Approved',reviewer:''}]);
   c.getTeamReviewCompletionStatus_=()=>{throw Error('marks must not be read');};
   c.readActivityRows_=()=>{throw Error('logs must not be read');};
   c.weeklyActivityContext_=()=>{throw Error('schedule must not be read');};
-  assert.equal(c.getCoordinatorTeamDetails_('T1','basic').title,'Project');
+  assert.equal(c.getCoordinatorTeamDetails_('T1','basic').title,'PROJECT');
   c.weeklyActivityContext_=()=>({schedule,clock:clock('2026-09-22'),state:'active'});
   c.getTeamWeeklyActivity_=()=>({t1:{logs:3,commits:7}});
   reads.length=0;

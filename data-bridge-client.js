@@ -112,7 +112,7 @@ const TitleRequests = (${titleRequestsBrowser_.toString()})();`,
     has('reviewer') ? `const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations, () => SharedTabs, () => TitleRequests);` : '',
     has('coord') ? `const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => InternalAssessmentPublishing, () => SystemStatusActions);
 const CoordinatorView = (${coordinatorViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TeamDrawerView);
-const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI);` : '',
+const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TitleRequests);` : '',
     `const SharedTimelineView = (${sharedTimelineViewBrowser_.toString()})(() => DashboardUI);
 const SharedRubricsView = (${sharedRubricsViewBrowser_.toString()})(() => DashboardUI);`,
     has('coord') ? `const SystemStatusActions = (${systemStatusActionsBrowser_.toString()})(DataBridge, () => DashboardUI);` : '',
