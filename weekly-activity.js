@@ -121,8 +121,8 @@ function weeklyStoredGithubMapping_(teamId, knownStudents, knownRepoUrl) {
   const rows = readSheetRows_(sheet,2), students = knownStudents || weeklyStudents_();
   const members = students.filter(student=>textEquals_(student.teamId,teamId)).map(student=>{
     const identity = githubStudentIdentity_(student,rows,columns,students);
-    const submission = rows.filter(row=>emailsMatch_(row[1],student.email) && textEquals_(row[2],teamId)).slice(-1)[0];
-    return {email:student.email,label:student.regNo,username:String(submission && submission[3] || '').trim(),
+    const submission = rows.filter(row=>emailsMatch_(row[columns.EMAIL],student.email) && textEquals_(row[columns.TEAM_ID],teamId)).slice(-1)[0];
+    return {email:student.email,label:student.regNo,username:String(submission && submission[columns.USERNAME] || '').trim(),
       githubId:githubId_(submission && submission[columns.ID]),status:identity.state === 'available' ? 'valid' : 'unavailable'};
   });
   return {members,repoUrl:knownRepoUrl !== undefined ? knownRepoUrl : getRepoUrlForTeam_(teamId)};

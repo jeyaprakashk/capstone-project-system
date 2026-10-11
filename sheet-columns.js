@@ -1,7 +1,9 @@
 /**
  * SHEET CATALOG - one readable list of the sheets the code uses: tab name, access mode, headers, status and purpose.
- * Status: new (header-name access from the start), by-name (found by header name, but created and checked by its own code, not yet
- * by ensureSheet_), positional (some column is still read by position), migrated (by name and created through ensureSheet_).
+ * Status: new (header-name access from the start), by-name (found by header name, but the code that creates the sheet still has its own
+ * creation and checks, not yet ensureSheet_), positional (some column is still read by position), migrated (every access is by header
+ * name, and a sheet the code creates is created through ensureSheet_). The sheet-access audit in tests/sheet-catalog.test.cjs checks
+ * the migrated entries.
  * Specified in SHEET-HEADER-MATCHING-PLAN.md ("Sheet catalog"); the generated reference is SHEETS.md
  * (npm run build:sheets-doc). Every sheet the code touches is listed, except the master registry of the hub spreadsheet.
  *
@@ -55,10 +57,21 @@ function sheetCatalog_() {
         name: SHEET_NAMES.GITHUB_ACCOUNTS,
         access: 'view',
         headers: ['Timestamp', 'Email address', 'Team ID', 'GitHub Username', 'GitHub ID', 'GitHub Display Name', 'GitHub Profile URL'],
-        status: 'positional',
-        purpose: "Students' confirmed GitHub accounts. The first four columns are read by position, the last three by name.",
+        status: 'migrated',
+        purpose: "Students' confirmed GitHub accounts. Created by hand; no code creates it.",
         createAtRuntime: false,
-        code: []
+        code: [
+          {file: 'github-identity.js', role: 'read', functions: ['githubAccountColumns_', 'githubCaptureReady_']},
+          {file: 'github-identity.js', role: 'write', functions: ['writeGithubAccount_', 'refreshGithubAccountMetadata_']},
+          {file: 'student-github.js', role: 'read', functions: ['getStudentTeamGithubSetup_', 'previewStudentGithubAccount_']},
+          {file: 'student-github.js', role: 'write', functions: ['confirmStudentGithubAccount_']},
+          {file: 'team-github-setup.js', role: 'read', functions: ['getTeamsGithubSetup_', 'getTeamGithubSetup_']},
+          {file: 'github-invitation-resend.js', role: 'read', functions: ['resendExpiredStudentInvitations_']},
+          {file: 'guide-api.js', role: 'read', functions: ['buildGuideGithubDto_']},
+          {file: 'progress-eligibility.js', role: 'read', functions: ['reconcileProgressEligibility']},
+          {file: 'weekly-activity.js', role: 'read', functions: ['weeklyStoredGithubMapping_']},
+          {file: 'weekly-progress-phase2.js', role: 'read', functions: ['weeklyAIIdentifiers_']}
+        ]
       },
       weeklyWindows: {
         name: SHEET_NAMES.WEEKLY_WINDOWS,

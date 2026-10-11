@@ -173,10 +173,53 @@ test('both permanent schemas normalize only case and outer whitespace and never 
     const before=JSON.stringify(sheet.rows);read();assert.equal(JSON.stringify(sheet.rows),before);
     sheet.rows[0][3]='GitHub  Username';assert.throws(read,/header mismatch/);
     sheet.rows[0][3]='GitHub Username';[sheet.rows[0][0],sheet.rows[0][1]]=[sheet.rows[0][1],sheet.rows[0][0]];
-    assert.throws(read,/header mismatch/);
+    // GitHubAccounts is found by header name, so a swapped pair is accepted; Commits still requires its order.
+    if(type==='accounts')assert.equal(read().EMAIL,0);else assert.throws(read,/header mismatch/);
     [sheet.rows[0][0],sheet.rows[0][1]]=[sheet.rows[0][1],sheet.rows[0][0]];
     sheet.rows[0].push(type==='accounts'?'GitHub ID':'GitHub Author ID');assert.throws(read,/Duplicate/);
   }
+});
+
+// GitHubAccounts is found by header name (SHEET-HEADER-MATCHING-PLAN.md, phase 3).
+function shuffleAccounts(f){
+  const order=[6,3,0,5,1,4,2]; // URL, Username, Timestamp, Name, Email, ID, Team ID
+  f.accounts.rows.splice(0,Infinity,...f.accounts.rows.map(row=>order.map(i=>row[i])));
+  f.accounts.rows.forEach(row=>row.splice(3,0,'')); // an unmapped column inside the span
+  f.accounts.rows[0][3]='Notes';
+  return f;
+}
+
+test('accounts: a shuffled sheet with an extra column is read and written by header name',()=>{
+  const f=fixture(),preview=f.c.previewStudentGithubAccount_('https://github.com/canonical');
+  shuffleAccounts(f);
+  const columns=JSON.parse(JSON.stringify(f.c.githubAccountColumns_(f.accounts)));
+  assert.deepEqual(columns,{TIMESTAMP:2,EMAIL:5,TEAM_ID:7,USERNAME:1,ID:6,NAME:4,URL:0});
+  f.c.confirmStudentGithubAccount_(preview.token);
+  const header=f.accounts.rows[0],row=f.accounts.rows[1];
+  const at=name=>row[header.indexOf(name)];
+  assert.equal(f.accounts.rows.length,2);
+  assert.equal(at('Email address'),'one@example.com');assert.equal(at('Team ID'),'T1');assert.equal(at('GitHub Username'),'canonical');
+  assert.equal(at('GitHub ID'),'101');assert.equal(at('GitHub Display Name'),'Student');assert.equal(at('GitHub Profile URL'),'https://github.com/canonical');
+  assert.ok(at('Timestamp'));assert.equal(at('Notes'),'');
+  assert.equal(f.c.weeklyStoredGithubMapping_('T1',[{email:'one@example.com',teamId:'T1',regNo:'001'}],'https://github.com/org/team').members[0].username,'canonical');
+});
+
+test('accounts: a metadata refresh in a shuffled sheet changes only the stale cells and keeps the extra column',()=>{
+  const f=fixture();f.add('101','one@example.com','old');shuffleAccounts(f);
+  const header=f.accounts.rows[0];f.accounts.rows[1][header.indexOf('Notes')]='keep me';
+  const columns=f.c.githubAccountColumns_(f.accounts);
+  f.c.refreshGithubAccountMetadata_(f.accounts.rows[1],{githubId:'101',username:'renamed',displayName:'New Name',profileUrl:'https://github.com/renamed'});
+  const row=f.accounts.rows[1];
+  assert.equal(row[columns.USERNAME],'renamed');assert.equal(row[columns.NAME],'New Name');assert.equal(row[columns.URL],'https://github.com/renamed');
+  assert.equal(row[header.indexOf('Notes')],'keep me');assert.equal(row[columns.ID],'101');
+});
+
+test('accounts: a missing or repeated required header throws, naming it, and changes nothing',()=>{
+  const f=fixture(),before=JSON.stringify(f.accounts.rows);
+  f.accounts.rows[0][2]='Team';assert.throws(()=>f.c.githubAccountColumns_(f.accounts),/header mismatch/);
+  f.accounts.rows[0][2]='Team ID';f.accounts.rows[0].push('timestamp');assert.throws(()=>f.c.githubAccountColumns_(f.accounts),/Duplicate header: Timestamp/);
+  f.accounts.rows[0].pop();f.accounts.rows[0][5]='Name';assert.throws(()=>f.c.githubAccountColumns_(f.accounts),/required account columns are missing/);
+  f.accounts.rows[0][5]='GitHub Display Name';assert.equal(JSON.stringify(f.accounts.rows),before);
 });
 
 test('GitHub connection endpoints delegate to the existing functions and keep their messages',()=>{

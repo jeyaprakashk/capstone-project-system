@@ -58,19 +58,19 @@ function confirmStudentGithubAccount_(token) {
     if (owners.length !== 1) throw new Error('Student membership is ambiguous.');
     const account = preview.account;
     if (!githubId_(account.githubId)) throw new Error('Invalid account confirmation.');
-    const mine = rows.flatMap((row,i)=>emailsMatch_(row[1],student.email) && textEquals_(row[2],student.teamId) ? [{row,index:i+2}] : []);
+    const mine = rows.flatMap((row,i)=>emailsMatch_(row[columns.EMAIL],student.email) && textEquals_(row[columns.TEAM_ID],student.teamId) ? [{row,index:i+2}] : []);
     if (mine.some(item=>item.row[columns.ID] !== '' && item.row[columns.ID] != null && githubId_(item.row[columns.ID]) !== account.githubId)) throw new Error('Your GitHub account cannot be replaced. Contact the coordinator.');
     const duplicate = rows.some(row=>{
       if (githubId_(row[columns.ID]) !== account.githubId) return false;
-      const matches = students.filter(s=>emailsMatch_(s.email,row[1]) && textEquals_(s.teamId,row[2]));
+      const matches = students.filter(s=>emailsMatch_(s.email,row[columns.EMAIL]) && textEquals_(s.teamId,row[columns.TEAM_ID]));
       return matches.length !== 1 || !textEquals_(matches[0].regNo,owners[0].regNo);
     });
     if (duplicate) throw new Error('This GitHub account is assigned to another student. Contact the coordinator.');
     // Damaged existing account records require coordinator intervention, not student relinking.
-    if (mine.some(item=>item.row[3] && !githubId_(item.row[columns.ID]))) throw new Error('Your existing registration has no valid GitHub ID. Contact the coordinator.');
+    if (mine.some(item=>item.row[columns.USERNAME] && !githubId_(item.row[columns.ID]))) throw new Error('Your existing registration has no valid GitHub ID. Contact the coordinator.');
     if (mine.length > 1) throw new Error('Conflicting registration rows. Contact the coordinator.');
     let rowNumber = mine.length ? mine[0].index : sheet.getLastRow()+1;
-    if (!mine.length) sheet.getRange(rowNumber,1,1,3).setValues([[new Date(),student.email,student.teamId]]);
+    if (!mine.length) writeRecordSpan_(sheet,rowNumber,columns,{TIMESTAMP:new Date(),EMAIL:student.email,TEAM_ID:student.teamId},null);
     writeGithubAccount_(sheet,rowNumber,columns,account);
     SpreadsheetApp.flush();
     cache.remove(key);

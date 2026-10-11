@@ -61,7 +61,8 @@ test('every entry is well formed: unique keys and names, valid headers, access, 
       assert.ok(fs.existsSync(item.file), key + ' lists a missing file ' + item.file);
       const text = fs.readFileSync(item.file, 'utf8');
       item.functions.forEach(fn => assert.match(text, new RegExp('^function ' + fn + '\\s*\\(', 'm'), key + ': ' + fn + ' is not in ' + item.file));
-      assert.ok(text.includes(entry.name) || text.includes("'" + key + "'"), key + ': ' + item.file + ' does not refer to the sheet');
+      const constant = Object.entries(plain(vm.runInContext('SHEET_NAMES', c))).find(([, value]) => value === entry.name);
+      assert.ok(text.includes(entry.name) || text.includes("'" + key + "'") || (constant && text.includes('SHEET_NAMES.' + constant[0])), key + ': ' + item.file + ' does not refer to the sheet');
     });
     const headers = c.sheetCatalogHeaders_(entry);
     assert.ok(headers.length && headers.every(h => typeof h === 'string' && h.trim()), key + ' headers must be non-blank');
@@ -206,6 +207,51 @@ test('the headers listed in the catalog equal the constants the code validates a
 
 test('a sheet with a generated name has no specification until the caller supplies the name', () => {
   assert.throws(() => load().sheetSpec_('assessmentJournal'), /generated name/);
+});
+
+// The sheet-access audit (SHEET-HEADER-MATCHING-PLAN.md, section 8). A text-level tripwire against positional access creeping back
+// into a migrated sheet; it cannot see an index held in a variable. The shuffled-column tests are the proof.
+function functionSource(text, name) {
+  const start = text.search(new RegExp('^function ' + name + '\\s*\\(', 'm'));
+  assert.ok(start >= 0, name + ' not found');
+  const next = text.slice(start + 1).search(/^function /m);
+  return text.slice(start, next < 0 ? text.length : start + 1 + next);
+}
+
+test('audit: no function listed for a migrated sheet reads a row or a column by position', () => {
+  const c = load();
+  const offenders = [];
+  for (const [key, entry] of Object.entries(c.sheetCatalog_()).filter(([, entry]) => entry.status === 'migrated')) {
+    for (const item of entry.code) {
+      const text = fs.readFileSync(item.file, 'utf8');
+      for (const fn of item.functions) {
+        const source = stripComments(functionSource(text, fn));
+        for (const match of source.matchAll(/\b(?:row|r|item\.row|submission|saved|record|existingRow)\[\s*\d+\s*\]|getRange\([^,()]+,\s*\d+\s*[,)]/g)) {
+          offenders.push(key + ': ' + item.file + ' ' + fn + ' uses ' + match[0]);
+        }
+      }
+    }
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test('audit: a migrated sheet is named only in the functions the catalog lists for it', () => {
+  const c = load();
+  const constants = plain(vm.runInContext('SHEET_NAMES', c));
+  const offenders = [];
+  for (const [key, entry] of Object.entries(c.sheetCatalog_()).filter(([, entry]) => entry.status === 'migrated')) {
+    const constant = Object.keys(constants).find(name => constants[name] === entry.name);
+    if (!constant) continue;
+    const listed = new Set(entry.code.flatMap(item => item.functions.map(fn => item.file + ':' + fn)));
+    for (const file of rootScripts().filter(name => name !== 'sheet-columns.js' && name !== 'common-constants.js')) {
+      const text = stripComments(fs.readFileSync(file, 'utf8'));
+      for (const match of text.matchAll(new RegExp('SHEET_NAMES\\.' + constant + '\\b', 'g'))) {
+        const fn = enclosingFunction(text, match.index);
+        if (!listed.has(file + ':' + fn)) offenders.push(key + ': ' + file + ':' + fn + ' names the sheet but is not listed for it');
+      }
+    }
+  }
+  assert.deepEqual(offenders, []);
 });
 
 test('SHEETS.md is generated from the catalog and is up to date', () => {

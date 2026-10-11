@@ -21,11 +21,11 @@ function getTeamsGithubSetup_(rows, columns, repoUrlMap, usernameRows) {
   }
   const accountColumns = githubAccountColumns_(getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS));
   const latest = new Map();
-  usernameRows.forEach(row => latest.set(normalizeText_(row[2]) + ':' + normalizeEmail_(row[1]), row));
+  usernameRows.forEach(row => latest.set(normalizeText_(row[accountColumns.TEAM_ID]) + ':' + normalizeEmail_(row[accountColumns.EMAIL]), row));
   const names = [];
   rows.forEach(row => [1,2,3,4].forEach(n => {
     const saved = latest.get(normalizeText_(row[columns.TEAM_ID]) + ':' + normalizeEmail_(row[columns['S' + n + '_EMAIL']]));
-    const name = String(saved && saved[3] || '').trim();
+    const name = String(saved && saved[accountColumns.USERNAME] || '').trim();
     const id = githubId_(saved && saved[accountColumns.ID]);
     if (id) names.push('/user/' + id);
   }));
@@ -59,14 +59,14 @@ function getTeamGithubSetup_(teamId, options) {
   const accountColumns = githubAccountColumns_(getSheet_(SHEET_NAMES.GITHUB_ACCOUNTS));
   const latest = new Map();
   (options.usernameRows || getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS)).forEach(item => {
-    if (textEquals_(item[2], teamId)) latest.set(normalizeEmail_(item[1]), item);
+    if (textEquals_(item[accountColumns.TEAM_ID], teamId)) latest.set(normalizeEmail_(item[accountColumns.EMAIL]), item);
   });
   const validationCache = options.validationCache || new Map();
   const identityRows = options.usernameRows || getSheetRows_(SHEET_NAMES.GITHUB_ACCOUNTS);
   const members = [1, 2, 3, 4].filter(n => String(row[columns['S' + n + '_EMAIL']] || '').trim()).map(n => {
     const email = String(row[columns['S' + n + '_EMAIL']]).trim();
     const submission = latest.get(normalizeEmail_(email));
-    const username = String(submission && submission[3] || '').trim();
+    const username = String(submission && submission[accountColumns.USERNAME] || '').trim();
     const member = { email, label: String(row[columns['S' + n + '_REGNO']] || row[columns['S' + n + '_NAME']] || email), username,
       status: 'missing', submittedAt: null, access: 'unchecked' };
     member.githubId = githubId_(submission && submission[accountColumns.ID]);
@@ -94,14 +94,14 @@ function getTeamGithubSetup_(teamId, options) {
           if (!validationCache.has(metadataKey)) {
             // Same predicate refreshGithubAccountMetadata_ applies, on the rows already in memory: no write is needed
             // (and so no locked full-sheet scan) unless a stored value would change.
-            const stale = identityRows.some(item => emailsMatch_(item[1],submission[1]) && textEquals_(item[2],submission[2]) && githubId_(item[accountColumns.ID]) === check.githubId &&
-              (item[3] !== check.username || item[accountColumns.NAME] !== check.displayName || item[accountColumns.URL] !== check.profileUrl));
+            const stale = identityRows.some(item => emailsMatch_(item[accountColumns.EMAIL],submission[accountColumns.EMAIL]) && textEquals_(item[accountColumns.TEAM_ID],submission[accountColumns.TEAM_ID]) && githubId_(item[accountColumns.ID]) === check.githubId &&
+              (item[accountColumns.USERNAME] !== check.username || item[accountColumns.NAME] !== check.displayName || item[accountColumns.URL] !== check.profileUrl));
             // readOnly: a requirements check or dashboard load must not write the accounts sheet.
             if (stale && !options.readOnly) refreshGithubAccountMetadata_(submission,check);
             validationCache.set(metadataKey,true);
           }
         }
-        const timestamp = submission[0];
+        const timestamp = submission[accountColumns.TIMESTAMP];
         const ms = timestamp ? new Date(timestamp).getTime() : NaN;
         if (Number.isFinite(ms)) member.submittedAt = ms;
       }
