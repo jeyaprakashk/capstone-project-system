@@ -185,8 +185,6 @@ function provisionAllTeamRepos() {
 // Callers hold the script lock; an omitted team ID runs the coordinator batch.
 function provisionTeamRepos_(onlyTeamId) {
   const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const TR = getColumnMap_(SHEET_NAMES.TEAM_ROSTER, FIELD_DEFINITIONS.TEAM_ROSTER);
-  const roster = getSheetRows_(SHEET_NAMES.TEAM_ROSTER);
   const results = { success: [], failed: [], waiting: [] };
   getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row => row[TS.TEAM_ID] && (!onlyTeamId || textEquals_(row[TS.TEAM_ID], onlyTeamId))).forEach(row => {
     const teamId = row[TS.TEAM_ID];
@@ -196,16 +194,7 @@ function provisionTeamRepos_(onlyTeamId) {
         (setup.verificationUnavailable || setup.usernamesComplete ? results.failed : results.waiting).push({ teamId, reason: setup.message });
         return;
       }
-      // Preserve the existing guide/coordinator provisioning behavior without changing student membership.
-      const team = roster.find(item => textEquals_(item[TR.TEAM_ID], teamId));
-      const guide = String(team && team[TR.GUIDE_GITHUB_USERNAME] || '').trim();
-      const coordinator = String(getConfig_('COLLABORATOR_GITHUB_USERNAME') || '').trim();
-      const slug = getGithubRepoSlug_(setup.repoUrl);
-      const staff = [[guide, getConfig_('GUIDE_REPO_PERMISSION')], [coordinator, getConfig_('COLLABORATOR_REPO_PERMISSION') || 'maintain']];
-      if (staff.some(item => item[0])) {
-        const invitations = getGithubInvitations_(slug);
-        staff.filter(item => item[0]).forEach(([username, permission]) => ensureGithubPermission_(slug, username, permission, invitations));
-      }
+      // Only the students' own access is set up here. Guides and the coordinator reach every repository through the faculty group.
       results.success.push({ teamId, repoUrl: setup.repoUrl, students: setup.members.length, message: setup.message });
     } catch (err) { results.failed.push({ teamId, reason: err.message }); }
   });

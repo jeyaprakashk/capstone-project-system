@@ -199,3 +199,15 @@ test('timeliness uses all valid member timestamps, local deadline date, and repo
   f.outage('/user/');assert.equal(timing(),'unknown');
 });
 
+
+test('repository provisioning adds no guide or coordinator: only the students\' access is set up',()=>{
+  const f=fixture();
+  const original=f.c.getConfig_;
+  f.c.getConfig_=key=>key==='COLLABORATOR_GITHUB_USERNAME'?'coord-gh':original(key);
+  f.c.getSheetRows_=(name)=>name==='roster'?[['T1','guide-gh']]:name==='teams'?[f.team]:name==='users'?f.usernames:[];
+  const result=f.c.provisionTeamRepos_('T1');
+  assert.equal(result.failed.length,0);
+  assert.equal(result.success.length,1);
+  assert.equal(f.calls.some(call=>/coord-gh|guide-gh/.test(call.path||'')),false,'neither staff account is touched');
+  assert.doesNotMatch(fs.readFileSync('github-provisioning.js','utf8').split('function addMissingGuideCollaborators')[0],/GUIDE_REPO_PERMISSION|COLLABORATOR_REPO_PERMISSION|COLLABORATOR_GITHUB_USERNAME/);
+});
