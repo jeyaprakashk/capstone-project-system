@@ -21,7 +21,7 @@ function fixture(overrides = {}, runtime = {}) {
     CacheService:runtime.cache ? {getScriptCache:()=>runtime.cache} : undefined,
     HtmlService:{createHtmlOutputFromFile:name=>({getContent:()=>fs.readFileSync(path.join(__dirname,'..',name+'.html'),'utf8')})},
     PropertiesService:{getScriptProperties:()=>({getProperty:key=>properties.get(key)||null,setProperty:(key,value)=>properties.set(key,value)})},
-    SpreadsheetApp:{openById:()=>({getSheetByName:name=>name==='AssessmentDefinitions'?null:name==='Milestones'?milestones:sheet,getSheets:()=>[],getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),flush:()=>{}},
+    SpreadsheetApp:{getActiveSpreadsheet:()=>null,openById:()=>({getSheetByName:name=>name==='AssessmentDefinitions'?null:name==='Milestones'?milestones:sheet,getSheets:()=>[],getSpreadsheetTimeZone:()=> 'Asia/Kolkata'}),flush:()=>{}},
     Utilities:{getUuid:()=>require('node:crypto').randomUUID(),formatDate:(date,tz,pattern)=> {
       const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).map(p=>[p.type,p.value]));
       if(pattern==='yyyy-MM-dd') return `${parts.year}-${parts.month}-${parts.day}`;

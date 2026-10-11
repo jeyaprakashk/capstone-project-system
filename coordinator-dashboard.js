@@ -331,7 +331,7 @@ function getCoordinatorCommitteeConfiguration_() {
     const issues=[],links={},checkedAt=new Date().toISOString();let committees=[];
     try {
       const committeeSheet=getSheet_(SHEET_NAMES.REVIEW_COMMITTEE),teamSheet=getSheet_(SHEET_NAMES.TEAM_STATUS);
-      for(const [key,sheet] of [['committees',committeeSheet],['assignments',teamSheet]])if(sheet)links[key]='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit#gid='+sheet.getSheetId();
+      for(const [key,sheet] of [['committees',committeeSheet],['assignments',teamSheet]])if(sheet)links[key]='https://docs.google.com/spreadsheets/d/'+getSpreadsheetId_()+'/edit#gid='+sheet.getSheetId();
       if(!committeeSheet)return {valid:false,state:'definitions-missing',summary:'Review committee configuration required',issues:[{message:'The ReviewCommittee tab is missing.'}],committees,links,checkedAt};
       const RC=getColumnMap_(SHEET_NAMES.REVIEW_COMMITTEE,FIELD_DEFINITIONS.REVIEW_COMMITTEE);
       const rows=getSheetRows_(SHEET_NAMES.REVIEW_COMMITTEE);

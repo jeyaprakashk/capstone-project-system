@@ -108,7 +108,7 @@ test('the sheet is correct without the formatting: an end-to-end run with onCrea
   const lock = {held: false, hasLock() { return this.held; }, waitLock() { this.held = true; }, releaseLock() { this.held = false; }};
   const context = vm.createContext({
     console, PropertiesService: {getScriptProperties: () => ({getProperty: () => 'SHEET_ID'})},
-    SpreadsheetApp: {openById: () => spreadsheet, flush() {}}, LockService: {getScriptLock: () => lock}
+    SpreadsheetApp: {getActiveSpreadsheet: () => null, openById: () => spreadsheet, flush() {}}, LockService: {getScriptLock: () => lock}
   });
   ['common-constants.js', 'common-helpers.js', 'sheet-reads.js', 'ensure-sheet.js', 'sheet-columns.js', 'activity-dependencies-sheet.js']
     .forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), context, {filename: file}));

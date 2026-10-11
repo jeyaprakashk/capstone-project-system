@@ -111,7 +111,7 @@ function makeDriveContext(spec = {}) {
   const documents = Array.from({length: documentsFolders}, () => new FakeFolder('Team Documents'));
   base.folders.push(...documents);
   const context = vm.createContext({
-    SHEET_ID: 'sheet-1',
+    getSpreadsheetId_: () => 'sheet-1',
     getAcademicYear_: () => academicYear,
     DriveApp: {
       getRootFolder: () => rootFolder,

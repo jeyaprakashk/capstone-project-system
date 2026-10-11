@@ -29,7 +29,7 @@ function folderSummary_(folder) {
 function teamFoldersBase_() {
   let parents;
   try {
-    const iterator = DriveApp.getFileById(SHEET_ID).getParents();
+    const iterator = DriveApp.getFileById(getSpreadsheetId_()).getParents();
     parents = [];
     while (iterator.hasNext()) parents.push(iterator.next());
   } catch (error) {

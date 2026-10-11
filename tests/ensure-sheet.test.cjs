@@ -73,7 +73,7 @@ function makeEnv(options = {}) {
   const context = vm.createContext({
     console: {log: line => logs.push(line)},
     PropertiesService: {getScriptProperties: () => ({getProperty: () => 'SHEET_ID'})},
-    SpreadsheetApp: {openById: () => spreadsheet, flush() { spreadsheet.flushes++; }},
+    SpreadsheetApp: {getActiveSpreadsheet: () => null, openById: () => spreadsheet, flush() { spreadsheet.flushes++; }},
     LockService: {getScriptLock: () => lock}
   });
   ['common-helpers.js', 'sheet-reads.js'].forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), context, {filename: file}));

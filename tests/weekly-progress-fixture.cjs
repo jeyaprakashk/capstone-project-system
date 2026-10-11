@@ -20,7 +20,7 @@ function weeklyFixture() {
   const book={getSpreadsheetTimeZone:()=> 'Asia/Kolkata',getSheetByName:n=>sheets.get(n)||null,getSheets:()=>[...sheets.values()],insertSheet:n=>sheet(n,[])};
   const lock={hasLock:()=>locked,tryLock:()=>{if(locked)return false;locked=true;return true;},waitLock:()=>{locked=true;},releaseLock:()=>{locked=false;}};
   const c=vm.createContext({Date:Clock,console:{log(){},error:m=>errors.push(m)},PropertiesService:{getScriptProperties:()=>props},
-    SpreadsheetApp:{openById:()=>book,flush(){}},LockService:{getScriptLock:()=>lock},Session:{getActiveUser:()=>({getEmail:()=>user})},
+    SpreadsheetApp:{getActiveSpreadsheet:()=>book,openById:()=>book,flush(){}},LockService:{getScriptLock:()=>lock},Session:{getActiveUser:()=>({getEmail:()=>user})},
     Utilities:{getUuid:()=>crypto.randomUUID(),formatDate:(date,tz,pattern)=>pattern==='yyyy-MM-dd'?new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(date):date.toISOString()},
     MailApp:{sendEmail:(...args)=>{if(mailFails)throw Error('Mail unavailable');mails.push(args);}},
     ScriptApp:{getProjectTriggers:()=>triggers.slice(),deleteTrigger:t=>triggers.splice(triggers.indexOf(t),1),newTrigger:name=>({timeBased(){return this;},everyHours(n){this.hours=n;return this;},atHour(n){this.hour=n;return this;},everyDays(n){this.days=n;return this;},inTimezone(tz){this.timezone=tz;return this;},create(){triggers.push({getHandlerFunction:()=>name,hours:this.hours,hour:this.hour,days:this.days,timezone:this.timezone});}})}

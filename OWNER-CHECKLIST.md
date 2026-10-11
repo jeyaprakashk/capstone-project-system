@@ -41,6 +41,11 @@ state noted.
    triggers pick up the new code.
 9. **Backup.** Make a full copy of the live spreadsheet. Write down the number of rows in `TeamIntakeRaw` and the number of
    rows per team.
+10. **Check the live script is attached to the live spreadsheet** before the release that contains the spreadsheet-resolution
+    change (BUILD-ORDER.md item 5c). Open the live spreadsheet, choose Extensions, Apps Script, and confirm the project is the
+    one in `.clasp.json`. Then compare the spreadsheet's own ID (in its address) with the `SHEET_ID` script property: they
+    must be the same. If they differ, stop and tell the developer: the new code would switch to the attached spreadsheet.
+    On the rehearsal copy no `SHEET_ID` is needed, because the copy uses itself.
 
 ## C. Cutover day
 

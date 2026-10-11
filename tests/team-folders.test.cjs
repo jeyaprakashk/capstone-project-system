@@ -22,7 +22,7 @@ function fixture({ teams = [['T1', 'Semester 7'], ['T2', 'Semester 7']], year = 
   const parentFolders = { base, root };
   const rows = { current: teams.map(([id, sem]) => [id, sem]) };
   const c = loadSources(['team-folders.js'], {
-    SHEET_ID: 'sheet1', SHEET_NAMES: { TEAM_STATUS: 'Team Status' }, FIELD_DEFINITIONS: { TEAM_STATUS: {} },
+    getSpreadsheetId_: () => 'sheet1', SHEET_NAMES: { TEAM_STATUS: 'Team Status' }, FIELD_DEFINITIONS: { TEAM_STATUS: {} },
     getColumnMap_: () => ({ TEAM_ID: 0, SEMESTER: 1 }), getSheetRows_: () => rows.current, getAcademicYear_: () => year,
     normalizeText_: value => String(value === null || value === undefined ? '' : value).trim().toLowerCase(),
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },

@@ -18,7 +18,7 @@ function checkReviewConfiguration_() {
   const blocked=(state,summary,message)=>({valid:false,ready:false,state,registryState,canBootstrap:registryState==='MISSING',summary,count:0,issues:[{sheet:'AssessmentDefinitions',message}],checkedAt,links,storage:[]});
   try {
     const definitionsSheet=getSheet_('AssessmentDefinitions'),rubrics=getSheet_('Rubrics'),milestones=getSheet_('Milestones');
-    for(const [key,sheet] of [['definitions',definitionsSheet],['rubrics',rubrics],['config',milestones]])if(sheet)links[key]='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit#gid='+sheet.getSheetId();
+    for(const [key,sheet] of [['definitions',definitionsSheet],['rubrics',rubrics],['config',milestones]])if(sheet)links[key]='https://docs.google.com/spreadsheets/d/'+getSpreadsheetId_()+'/edit#gid='+sheet.getSheetId();
     if(!definitionsSheet){
       registryState='MISSING';
       return blocked('definitions-missing','AssessmentDefinitions is missing','Use Create assessment definitions tab to create its schema, then configure your graded assessments.');

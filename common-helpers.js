@@ -6,8 +6,6 @@
 // ===================================================================
 // CONFIGURATION
 // ===================================================================
-const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-
 let configExecutionValues_ = null;
 function getInternalReviews_() {
   return Object.freeze(getAssessmentDefinitions_().filter(d=>d.type==='REVIEW'));
@@ -16,15 +14,6 @@ function getInternalReviews_() {
 function getConfig_(key) {
   const targetKey = normalizeText_(key);
   if (configExecutionValues_) return requireConfigValue_(targetKey);
-  const sheetId =
-    PropertiesService.getScriptProperties()
-      .getProperty('SHEET_ID');
-
-  if (!sheetId) {
-    throw new Error(
-      'SHEET_ID is not configured in Script Properties.'
-    );
-  }
 
   const configSheet = getSheet_('Config');
 
@@ -68,11 +57,6 @@ function requireConfigValue_(key) {
  * @param {*} value
  */
 function setConfig_(key, value) {
-  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  if (!sheetId) {
-    throw new Error('SHEET_ID is not configured in Script Properties.');
-  }
-
   const configSheet = getSheet_('Config');
   if (!configSheet) {
     throw new Error('Config sheet not found.');
@@ -107,14 +91,31 @@ function setConfig_(key, value) {
 // Reuse the Spreadsheet object only during the current Apps Script execution.
 // This is NOT persistent data caching: every new web request opens the live
 // spreadsheet again, but repeated getSheet_() calls in the same request no
-// longer repeat SpreadsheetApp.openById().
+// longer repeat the lookup of the spreadsheet.
 let _spreadsheetExecutionHandle = null;
 
+/**
+ * The spreadsheet this project works on: the one the script is attached to when there is one (this project is
+ * container-bound), otherwise the spreadsheet named by the SHEET_ID script property. A copy of the spreadsheet and its
+ * script therefore works on the copy, never on the original, even if a SHEET_ID property points somewhere else.
+ */
 function getSpreadsheet_() {
   if (!_spreadsheetExecutionHandle) {
-    _spreadsheetExecutionHandle = SpreadsheetApp.openById(SHEET_ID);
+    const active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) {
+      _spreadsheetExecutionHandle = active;
+    } else {
+      const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+      if (!sheetId) throw new Error('SHEET_ID is not configured in Script Properties.');
+      _spreadsheetExecutionHandle = SpreadsheetApp.openById(sheetId);
+    }
   }
   return _spreadsheetExecutionHandle;
+}
+
+/** The ID of the spreadsheet getSpreadsheet_ returns, for Drive lookups and links. */
+function getSpreadsheetId_() {
+  return getSpreadsheet_().getId();
 }
 
 let sheetExecutionHandles_ = Object.create(null);

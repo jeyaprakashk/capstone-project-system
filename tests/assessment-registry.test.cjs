@@ -25,7 +25,7 @@ function coordinatorStorageSetup(){
  for(const file of ['milestone-config.js','marks-tracker.js','review-configuration.js','assessment-storage-setup.js','reviewer-evaluation.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
  c.getStudentsFromTeamStatusRow_=rosterReader;
  c.getInternalReviews_=()=>c.getAssessmentDefinitions_().filter(d=>d.type==='REVIEW');
- c.getCoordinatorEmail_=()=> 'coord@x';c.getConfig_=()=>'';c.SHEET_ID='main';
+ c.getCoordinatorEmail_=()=> 'coord@x';c.getConfig_=()=>'';c.getSpreadsheetId_=()=> 'main';
  c.SpreadsheetApp.openById=()=>{throw Error('Assessment setup must not open an external file');};
  return f;
 }

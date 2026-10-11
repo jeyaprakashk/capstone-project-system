@@ -6,7 +6,7 @@ const path=require('node:path');
 function fixture(shared=new Map()) {
  let rows=null, reads=0;
  const sheet={getDataRange:()=>({getValues:()=>{reads++;return rows;}})};
- const c=vm.createContext({SHEET_ID:'test',getSheet_:()=>rows?sheet:null,
+ const c=vm.createContext({getSpreadsheetId_:()=> 'test',getSheet_:()=>rows?sheet:null,
   CacheService:{getScriptCache:()=>({get:key=>shared.get(key)||null,put:(key,value)=>shared.set(key,value)})}});
 require('./milestone-fixture.cjs').install(c);
  vm.runInContext(fs.readFileSync(path.join(__dirname,'..','rubric-config.js'),'utf8'),c);
