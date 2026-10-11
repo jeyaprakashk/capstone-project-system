@@ -1,8 +1,40 @@
 # Activity dependencies engine: plan
 
-Status: proposal. This file frames the engine only. It refines section 7 of
-[TITLE-REVISION-PLAN.md](TITLE-REVISION-PLAN.md) (Phase 2) and changes nothing in it. Where the two differ, the title
-plan wins until this file is merged into it.
+Status: **built, except the student document upload that it was to gate.** The text after the two summary sections below is the plan as it was written. It refines section 7 of [TITLE-REVISION-PLAN.md](TITLE-REVISION-PLAN.md) (Phase 2) and changes nothing in it; where the two differ, the title plan wins.
+
+## What was planned
+
+A small engine that decides whether a student action may proceed, from rules a coordinator edits:
+
+- the `ActivityDependencies` sheet and its setup;
+- a loader that reads the sheet fresh on every request and validates it (any error denies every gated activity);
+- a check registry and contract, with two checks: `github` (item `READY`) and `drive` (an upload file name);
+- `activityPreconditions_` (all-of, nothing cached between requests, unverifiable is unmet, no active rows allows), and `studentRequirements_` to strip the coordinator-only `diagnostic`;
+- a read-only mode for `getTeamGithubSetup_` so the `github` check never writes the accounts sheet;
+- `API_coordinator_getRequirements` (coordinator only);
+- integration into the document upload endpoint (step 8);
+- tests for all of the above, and a "Not now" list (cross-request caching, expressions, plugins, a completion store).
+
+## What was implemented
+
+- `activity-engine.js`: `readActivityDependencyRows_`, the pure `parseActivityRules_`, `loadActivityRules_`, `activityPreconditions_`, `studentRequirements_`, and the fixed activity list `title.submit`, `title.resubmit`, `document.upload`.
+- `activity-check-github.js` and `activity-check-drive.js`, the read-only option (`readOnly`) on `getTeamGithubSetup_`, and `activity-requirements-api.js` with `API_coordinator_getRequirements` (in the entry-point guard and DATA-CONTRACTS.md).
+- The title endpoints call the engine for the student's submit checklist and for the coordinator report; the student DTO never carries a `diagnostic`.
+- Tests: `tests/activity-engine.test.cjs` and the title endpoint tests. Nothing in the "Not now" list was built.
+
+### Differences from the plan, with the reason
+
+| Plan | Implemented | Reason |
+|---|---|---|
+| Checks register themselves in a registry; file named `activity-preconditions.js` (open decision 2). | The registry is a function, `activityChecks_()`, in `activity-engine.js`; one file per check. | Apps Script has one global scope and load order is not guaranteed; a function does not depend on it. The plan left the file name open. |
+| Step 8: the document upload endpoint calls the engine for `document.upload`. | Not present. `document.upload` is still a valid activity id and the `drive` check still works, but no endpoint is gated by it. | The student document upload was built and then removed at the owner's request ("the documents will come from some other place later"). Students are not members of the shared drive, so they never receive a Drive link (rule recorded in AGENTS.md). Staff still see whether each document is present (`team-documents.js`, read-only). |
+| `readOnly` was a placeholder name (open decision 4). | The option is named `readOnly`. | Settled when the check was written. |
+| Measure the student dashboard load after the engine is in; split the checklist into its own call only if it is slow. | Not measured or split; the checklist is built in the same call as the title DTO. | No measurement is recorded in the repository, and no slowness was reported to me. If the student page is slow, this is the place to look first. |
+| Later kinds (`opens`, `title`, `weekly`, `review`, a repository-only `github`) and gating more activities. | Not built. | They were listed as future work (title plan F3 to F6) and no need appeared. |
+
+---
+
+## The plan as it was written
 
 **Position in the build order:** item 7 (the title plan's Phase 2). Its step 1 is the sheet in item 4; steps 2 to 6 need only the catalog and the test doubles; steps 7 and 8 need the endpoint and the upload. The full order is in [BUILD-ORDER.md](BUILD-ORDER.md).
 

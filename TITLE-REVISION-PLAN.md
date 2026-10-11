@@ -2,8 +2,44 @@
 
 Title submission, approval and coordinator reopening in the dashboard, with configurable submission requirements.
 
-Status: **final plan (revision 9), not implemented.** Nothing described here exists in the code yet. Each spreadsheet
-holds one semester, so Team ID alone identifies a team in the log.
+**Status: built and live.** The text after the two summary sections below is the plan as it was written (revision 9); its Notifications paragraph and cutover step 4 were already edited during the work. Each spreadsheet holds one semester, so Team ID alone identifies a team in the log.
+
+## What was planned
+
+Move title submission from the Google Form into the dashboard and hold all title state in one append-only log:
+
+- `TitleLog` as the only title store, with `titleGate_` as the one yes/no answer to "does this team have an approved title?";
+- student submit, guide and reviewer Approve/Return with required notes, coordinator reopen and cancel, similarity against the master registry, request IDs and the revision the user saw on every write;
+- configurable submission requirements (a completed GitHub setup and two documents in the team's Drive folder) through the precondition engine, with a minimal student document upload;
+- a baseline row per team in `TitleLog`, a read-only validator, a preparatory Release 0 that lets the old writers be stopped, and a cutover behind the `TITLE_CUTOVER` property;
+- downstream readers (weekly, review marking, eligibility, digests, coordinator health) switched to `titleGate_`, and the old paths removed;
+- notifications by e-mail, the end-of-semester registry export (F2) and the retirement of the frozen TeamStatus title columns (F12) as later work.
+
+## What was implemented
+
+All phases were built and the cutover was run:
+
+- **Server:** `title-log.js`, `title-history.js`, `title-gate.js`, `title-service.js`, `title-write.js` (the one write path: lock, cutover check, request ID, expected revision), `title-api.js`, `title-storage.js` (`setupTitleStorage`, `validateTitleLog`, `API_coordinator_validateTitleLog`), `title-cutover.js` (`setTitleCutover`, `clearTitleCutover`), the engine files described in ACTIVITY-DEPENDENCIES-PLAN.md, and `team-documents.js`.
+- **Browser:** `title-requests.js`, `student-title.js`, and the title sections of the student, guide, reviewer and coordinator views (reopen and cancel in the team drawer).
+- **Cutover:** Release 0 was deployed, the triggers were paused, `TITLE_CUTOVER` went `PAUSED`, the baseline was imported into `TitleLog` and validated, the new version was deployed and the cutover set to `LIVE`. A rehearsal on a copy of the spreadsheet came first; it walked a title through submit, approve, reopen, resubmit and approve again. A resubmission was then checked on the live sheet.
+- **Cleanup that finished the plan:** the Form handler, the old guide and reviewer decision paths, `getTeamStatus_` and the intake link were removed; `tests/title-removal.test.cjs` fails if a runtime module reads the old title columns; the one-time baseline import code was deleted after the cutover; the ten old title columns were removed from the frozen TeamStatus definition (F12) in a reviewed schema change.
+
+### Differences from the plan, with the reason
+
+| Plan | Implemented | Reason |
+|---|---|---|
+| The baseline is entered by hand (decision 4). | An editor-run `importTitleBaseline` copied it from TeamStatus, with the approval date taken from the master registry by year, semester and team; `validateTitleLog` checked the result. The import code was deleted after the cutover. | The plan's own cutover step 4 was changed before the build to an import function, presumably to avoid copying every team by hand (my inference; the commits do not record a reason). |
+| Students upload the two documents from the dashboard (section 8, `API_student_uploadDocument`, `can.upload`). | Built, then removed. Staff see only whether each document is present (`team-documents.js`); the student card has no documents and no Drive link. | Owner decision: the documents will come from another place later, and students are not members of the shared drive, so they never get a Drive link (rule recorded in AGENTS.md). `folderUrl` goes only to guides, reviewers and the coordinator. |
+| E-mail: approval notice, refusal report, guide and reviewer digests. | None. The project sends no e-mail. The digest triggers and `title-digests.js`, `intake-approval-workflow.js`, the notification callback and the dashboard-link helper were deleted. | Owner decision: the faculty now use the dashboard regularly. |
+| The TeamStatus title, decision, similarity and document-link columns stay in `FIELD_DEFINITIONS` (decision 2); retiring them is later work (F12). | Removed from the frozen definition and the schema snapshot. The columns remain in the live sheet until the owner deletes them after deploying. | The owner chose to retire them once nothing read them. Some test fixtures that model old-style rows put them back inside their own test context only. |
+| `TeamIntakeRaw` archived and deleted after Phase 8. | Deleted by the owner with a backup; code references removed. | See FORM-SHEET-RETIREMENT-PLAN.md. |
+| F2: end-of-semester registry export into the master registry. | Not built. | It is future work; this semester's approvals made after the cutover are not yet in the master registry. |
+| F3 to F11 (more requirement kinds, gating more activities, batch readiness, and so on). | Not built. | Listed in the plan as future work. |
+| Behaviour found in the rehearsal and live use matched the acceptance tests. | Fixes were made after the rehearsal: the reviewer's approve action in its modal, the pending-review badge counts, a reopened title opens the student's Title screen first with a notice on every screen, and the guide's Documents tab no longer shows a count (it counted a folder link, not work to do). | They were found by using the screens on the rehearsal copy and on the live sheet. |
+
+---
+
+## The plan as it was written
 
 Review history: revisions 3 to 8 were each reviewed independently (Codex) against the code, and every finding is
 addressed here. The reviews covered the cutover write barrier, request-ID recovery for title writes and uploads,

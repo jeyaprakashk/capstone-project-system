@@ -1,8 +1,32 @@
 # ActivityDependencies sheet: creation plan
 
-Status: proposal. This is step 1 of [ACTIVITY-DEPENDENCIES-PLAN.md](ACTIVITY-DEPENDENCIES-PLAN.md) (section 10), split out
-so the sheet can be reviewed and built on its own. The engine (steps 2 to 8) is not part of this plan. Where this file
-and [TITLE-REVISION-PLAN.md](TITLE-REVISION-PLAN.md) differ, the title plan wins.
+Status: **built.** The text after the two summary sections below is the plan as it was written.
+
+## What was planned
+
+Create one sheet, `ActivityDependencies`, with the header row `Activity | Kind | Item | Label | Active` and no data rows, through `ensureSheet_` in setup mode:
+
+- the name, headers and access mode (`edit`, a visible green tab) live in the sheet catalog, not in `SHEET_NAMES`, so the frozen schema snapshot is untouched;
+- a small module with the setup function and first-creation formatting (plain-text columns, a frozen header row, a Yes/No list for `Active`);
+- a temporary public `setupActivityDependencies`, removed once `setupTitleStorage` exists;
+- no sheet protection; the coordinator enters the rows at cutover; setup never inserts rows;
+- its own test file and entry in the guard test.
+
+## What was implemented
+
+`activity-dependencies-sheet.js` holds `ensureActivityDependenciesSheet_` (one `ensureSheet_` call in setup mode, with `onCreate` formatting) and `formatActivityDependenciesSheet_`. The sheet is defined in the catalog (`activityDependencies`, access `edit`). `setupTitleStorage` creates it together with `TitleLog`. `tests/activity-dependencies-sheet.test.cjs` covers the specification, the helper call, the formatting and its absence. The schema snapshot was not changed for it. The coordinator typed the rows at cutover.
+
+### Differences from the plan, with the reason
+
+| Plan | Implemented | Reason |
+|---|---|---|
+| A public `setupActivityDependencies` for the editor, removed later. | It does not exist in the final code. `setupTitleStorage` calls the private function directly. | This is the plan's own end state (decision 4). I found no trace of the temporary function in the final code or the entry-point guard. |
+| Plain statement that the sheet is read "by header name from the start". | Done, and the engine's loader compares headers with `textEquals_`. | As planned. |
+| Follow-up: the engine plan should say "every required header present (by name)". | The loader does exactly that (extra columns ignored; a missing or repeated required header is a misconfiguration). | As planned; the engine plan's wording was not edited. |
+
+---
+
+## The plan as it was written
 
 The sheet is created through the shared helper `ensureSheet_`, specified in [ENSURE-SHEET-PLAN.md](ENSURE-SHEET-PLAN.md).
 This plan therefore only supplies the sheet's specification and its setup entry point. Creation, header checking, repair,

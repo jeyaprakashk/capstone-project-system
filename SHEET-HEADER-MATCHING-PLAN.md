@@ -1,23 +1,46 @@
 # Header-name matching for fixed-layout sheets: plan
 
-Status: **mostly executed 2026-10-11.** Phase 1 (the catalog lists every sheet, completeness test on), phase 2 (`CommitCollectionStatus`),
-phase 3 (`GitHubAccounts`), phase 4 (`Config`, `Commits`; `LogEntries` was already by name) and phase 5 (the assessment journals, one unit)
-are built, each with shuffled-column, missing-header and duplicate-header tests, and the sheet-access audit runs over the sheets whose
-status is `migrated` in SHEETS.md. Differences from the plan as written:
+Status: **built.** The text after the two summary sections below is the plan as it was written.
 
-- `WeeklyReminders` was removed completely (sheet name, definition, catalog entry, snapshot): the reminder e-mail it served is gone.
-- `MasterRegistry` lives in the hub spreadsheet (HUB_SHEET_ID). The owner supplied its headers (Academic Year, Semester, TeamID, Guide Email,
-  Title, Repo URL, Team Members, Approved Date, Approved By) and it is now read by name (`readMasterRegistry_`); the code uses only four of them.
-- Sheets that were already read by name before this work (`TeamRoster`, `TeamStatus`, `ReviewCommittee`, `WeeklyWindows`, `GuideSignoff`,
-  `AIProgressAnalysis`, `AssessmentDefinitions`, `Milestones`, `Rubrics`) have status `by-name`: their `code` lists are not written, so the
-  audit does not cover them; shuffled-column tests do (below).
-- The `Repo URL` header of `TeamStatus` is now added by the editor-run `setupTeamStatusColumns`; a repository write no longer adds it and fails
-  with a clear message if it is missing.
-- Policy phase 6 was decided by the owner (Option B) and applied: AGENTS.md now freezes sheet names, header text and data but not column
-  order, and has a "Sheet access" section. Shuffled-column tests for the nine by-name sheets and a project-wide search for numeric sheet
-  indexes (`tests/sheet-position-guard.test.cjs`) were added instead of per-function lists for them.
+## What was planned
 
-The text below is the original plan.
+Make every sheet that was read by column number be read and written by header name, without renaming a header, moving a column or rewriting data:
+
+- **Phase 0:** a verified inventory of every creator, reader and writer per sheet, with baseline call traces.
+- **Phase 1:** building blocks (required-header validation with a duplicate check, record writers following rules W1 to W5, a sheet-access audit) and the completion of the sheet catalog so every sheet is listed.
+- **Phases 2 to 5:** one sheet per commit: `WeeklyReminders` and `CommitCollectionStatus` (pilot), `GitHubAccounts`, `MasterRegistry`, `Commits`, `LogEntries`, `Config`, then the assessment journals as one unit.
+- **Tests per sheet:** golden master, call-trace equivalence, shuffled columns, missing and duplicate header, interruption (fault injection) tests.
+- **Phase 6:** a separate decision whether to change the AGENTS.md rule that freezes column layouts.
+
+## What was implemented
+
+- **Catalog and generated `SHEETS.md`** list every sheet the code uses, with a completeness test that fails if the code names a sheet that is not listed, and a catalog audit for sheets whose status is `migrated`.
+- **By header name now:** `CommitCollectionStatus` (also created through `ensureSheet_` in runtime mode), `GitHubAccounts`, `Config` (Key and Value), `Commits`, the assessment journals (one unit: `assessment-registry.js`, `guide-evaluation.js`, `review-evaluation.js`, `publication-events.js`, `evaluation-lifecycle.js`), and the hub `MasterRegistry` (`readMasterRegistry_`, once the owner supplied its header row). `LogEntries`, `ProgressEligibility`, `TeamStatus`, `TeamRoster`, `ReviewCommittee`, `WeeklyWindows`, `GuideSignoff`, `AIProgressAnalysis`, `AssessmentDefinitions`, `Milestones` and `Rubrics` were already read by name.
+- **Writers:** one helper, `writeRecordSpan_` (one `setValues` over the span from the leftmost to the rightmost mapped column), plus the journal and commit appenders built on the same rule.
+- **Proof:** shuffled-column, missing-header and duplicate-header tests for every sheet (`tests/shuffled-columns.test.cjs` and each sheet's own tests), call-trace tests for the converted writers, and `tests/sheet-position-guard.test.cjs`, which searches every module for a number used as a sheet index.
+- **Policy (phase 6):** decided by the owner and applied. AGENTS.md freezes sheet names, header text and data but not column order, and has a "Sheet access" section.
+- **Status of ensureSheet_ adoption:** see ENSURE-SHEET-PLAN.md.
+
+### Differences from the plan, with the reason
+
+| Plan | Implemented | Reason |
+|---|---|---|
+| Pilot included `WeeklyReminders`. | `WeeklyReminders` was removed completely (sheet name, column definition, catalog entry, schema snapshot). | The weekly reminder e-mail was removed at the owner's request, so nothing read or wrote the sheet. |
+| `MasterRegistry` in phase 4, reading the first, second and fifth columns. | Done last, reading `Academic Year`, `Semester`, `TeamID` and `Title` by name. | Its header names are not defined anywhere in this project (it is in the hub spreadsheet); the owner had to supply them. The code needs only those four of its nine columns. |
+| Phase 0 written inventory and baseline traces. | No separate inventory document; the inventory was made by searching the source, and call-trace tests were written for the writers that changed (commit status, journals, commits). | Most readers were already by name; the baseline for each converted sheet is its existing test suite, which stayed green. |
+| Golden master capture for every reader. | Existing reader tests were kept as they were, and shuffled-column tests added. | Same reason: the behaviour on the current layout is pinned by the existing tests. |
+| A shared required-header validator. | Each sheet validates its own required headers with its own messages. | Existing tests depend on those messages; one common validator would have changed them. |
+| Writers `appendRecord_` and `writeRecords_`. | `writeRecordSpan_` and per-sheet appenders. | Only one general write shape was needed (a single row inside a span); the others are appends written where they are used. |
+| Interruption (fault-injection) tests at each write boundary. | Not built. | The converted writers make one `setValues` call in the same order as before; the call-trace tests assert that. |
+| The audit lists the functions that touch every migrated sheet. | The audit covers the sheets with a `code` list (status `migrated`). The nine sheets that were already by name keep status `by-name`, with shuffled-column tests and the project-wide search instead of function lists. | The owner asked for protection against column numbers in all code; function lists for `TeamStatus` (about 25 files) would need an edit with every change and cannot see an index held in a variable. |
+| Status values `new`, `migrated`, `positional`, `retiring`. | Added `by-name` (found by header name, not audited). | Needed for the nine sheets above. |
+| Behaviour unchanged for the current layout. | Four deliberate differences: the `Config` read starts at row 1 (header included, one read); a repeated required header now throws for `GitHubAccounts` and `Commits`; a new `CommitCollectionStatus` tab is hidden and red; journal sheets are recognised by header names, not by their first nine cells. | Each follows from reading by name; each is covered by a test. |
+| The `Repo URL` header of `TeamStatus` is not mentioned. | `setupTeamStatusColumns` (editor-run, coordinator only) adds it; a request no longer does. | A request path was repairing a header, which the plan's rule 3 forbids. |
+| `ensureSheet_` for every migrated sheet's creation. | Not for sheets whose creating code is reached from a dashboard request. | See ENSURE-SHEET-PLAN.md. |
+
+---
+
+## The plan as it was written
 
 **Sequencing (one gate).** The retirement of the form-bound sheets is planned first, in
 [FORM-SHEET-RETIREMENT-PLAN.md](FORM-SHEET-RETIREMENT-PLAN.md), and that plan is agreed before anything here is built.

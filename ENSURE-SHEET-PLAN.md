@@ -1,9 +1,42 @@
 # `ensureSheet_`: common sheet-creation helper plan
 
-Status: **built** (`ensure-sheet.js`, AGENTS.md "Creating and repairing sheets"). In use for `ActivityDependencies`, `TitleLog`, `LogEntries` and
-`ProgressEligibility` (setup mode) and `CommitCollectionStatus` (runtime mode). Not yet used where the creating code is reached from a
-dashboard request and so cannot run setup mode: the assessment journals, `AssessmentDefinitions`, `GuideSignoff` and `AIProgressAnalysis`
-keep their own creation code. The text below is the original plan.
+Status: **built.** The text after the two summary sections below is the plan as it was written.
+
+## What was planned
+
+One shared helper, `ensureSheet_`, that every setup path would use to create a sheet or bring its header row up to date:
+
+- three access modes (`system`, `view`, `edit`) that set the tab colour and visibility of a newly created sheet;
+- `setup` mode (editor-run only): create an absent sheet, write the header row of an empty one, append a missing header at the right end, and refuse (changing nothing) when a header is missing together with an unrecognised one, when a required header is repeated, or when content sits outside the header row;
+- `runtime` mode, only for a sheet whose catalog entry has `createAtRuntime: true`: create an absent sheet, validate, never repair;
+- a 30-second wait on the script lock (reusing a lock already held), a per-execution memo, an optional `onCreate` for cosmetic setup, and no public function;
+- repair built behind a switch and enabled in the same commit that updated AGENTS.md;
+- every sheet to move to it in the commit that migrates the sheet to header-name access.
+
+## What was implemented
+
+`ensure-sheet.js` and `tests/ensure-sheet.test.cjs` exist and follow the plan: the three modes, both call modes, the refusal rules, the lock handling, the memo, `onCreate`, and the switch `ENSURE_SHEET_REPAIR_ENABLED_` (now `true`). AGENTS.md has the "Creating and repairing sheets" section. It is used by:
+
+| Sheet | Mode | Called from |
+|---|---|---|
+| `ActivityDependencies` | setup | `setupTitleStorage` |
+| `TitleLog` | setup | `setupTitleStorage` |
+| `LogEntries` | setup | `setupWeeklySubmissionStorage` |
+| `ProgressEligibility` | setup | `setupProgressEligibilityStorage` |
+| `TeamStatus` (only the `Repo URL` header) | setup | `setupTeamStatusColumns` |
+| `CommitCollectionStatus` | runtime | the first status write |
+
+### Differences from the plan, with the reason
+
+| Plan | Implemented | Reason |
+|---|---|---|
+| Every migrated sheet moves to `ensureSheet_`. | Not used for the assessment journals, `AssessmentDefinitions`, `GuideSignoff` and `AIProgressAnalysis`. They keep their own creation code. | Their creating code is reached from coordinator buttons in the dashboard, which are request paths. Setup mode may run only in editor-run paths, and a request must never repair a header (AGENTS.md). Sheets that no code creates (for example `Config`, `GitHubAccounts`, `Commits`) have nothing to move. |
+| The `Repo URL` header of `TeamStatus` was not mentioned. | A repository write used to append the header itself. It no longer does: `setupTeamStatusColumns` (editor-run, coordinator only) adds it through `ensureSheet_`, and the write fails with a clear message if it is missing. | The old behaviour was a request path repairing a header, which the helper's own rule forbids. |
+| `TitleFormArchive` was to be created through the helper. | Not built. | The form-sheet archive was replaced by the owner's backup (see FORM-SHEET-RETIREMENT-PLAN.md). |
+
+---
+
+## The plan as it was written
 
 This is the shared helper that every setup path will use to create a sheet or bring it up to date. It is a building
 block of [SHEET-HEADER-MATCHING-PLAN.md](SHEET-HEADER-MATCHING-PLAN.md), whose decision 6 and policy item 7 define its

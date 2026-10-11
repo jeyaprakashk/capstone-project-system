@@ -1,10 +1,35 @@
 # Form-bound sheet retirement: plan
 
-Status: **executed 2026-10-11 by owner decision.** The owner took a full backup of the spreadsheet and deleted the `TeamIntakeRaw` tab, so the archive
-copy, the rename and the 14-day wait (sections 5 steps 4 to 8) were skipped: the backup is the archive. The code side (step 9) is done: `TEAM_INTAKE_RAW`
-is gone from `SHEET_NAMES`, `schema.json` was regenerated for that one line, the unused `formArchive` catalog entry and its run-time-headers support were
-removed, and `tests/title-removal.test.cjs` now fails on any `TeamIntakeRaw`, `RawLog` or `RAW_LOG` reference. Left for the owner: remove the Form settings
-from the `Config` tab. The text below is the original plan, kept for the record.
+Status: **executed 2026-10-11 by owner decision.** The text after the two summary sections below is the plan as it was written.
+
+## What was planned
+
+Retire every sheet that a Google Form fills, starting with `TeamIntakeRaw`, after the title log took over its job:
+
+- find the Form-bound sheets (the live check found `RawLog` and `Announcements` as well);
+- copy the Form-period history to a values-only archive sheet (`TitleFormArchive`) after a preflight, then verify the copy;
+- rename `TeamIntakeRaw` to `TeamIntakeRaw_retired`, wait at least 14 days and until a weekly deadline and a reviewer decision had passed, then unlink the Form and delete the sheet;
+- finish with one reviewed commit that removes `TEAM_INTAKE_RAW` from `SHEET_NAMES`, regenerates the schema snapshot, removes the Form settings from Config and extends the removal-check test.
+
+## What was implemented
+
+- The owner removed the `Announcements` and `RawLog` tabs, unlinked the intake Form and deleted the `TeamIntakeRaw` tab. No code read any of them.
+- The code step is done: `TEAM_INTAKE_RAW` is gone from `SHEET_NAMES`, `tests/invariants/snapshots/schema.json` was regenerated for that one line, and `tests/title-removal.test.cjs` now fails if a runtime file mentions `TeamIntakeRaw`, `RawLog` or `RAW_LOG`.
+- The title Form handler, the old title paths and the Form link had already been removed in the title work (Phases 4 and 8).
+
+### Differences from the plan, with the reason
+
+| Plan | Implemented | Reason |
+|---|---|---|
+| Archive sheet `TitleFormArchive`, with preflight, copy and verification functions. | Not built. The `formArchive` catalog entry and the run-time-headers support that existed only for it were removed. | The owner took a full backup of the spreadsheet before deleting the tab; the backup is the archive. |
+| Rename to `TeamIntakeRaw_retired` and wait 14 days and a weekly deadline before deleting. | Skipped. | Same backup; the owner decided to delete without the wait. |
+| `RawLog` and `Announcements` were to be handled as unknown Form sheets. | The owner removed both. | Nothing read them. |
+| Remove the Form settings from the Config tab. | Left to the owner. | The code cannot edit the live Config tab. The unused keys are `TEAM_INTAKE_FORM_URL_BASE`, `TEAM_INTAKE_TEAMID_ENTRY`, `WEEKLY_LOG_FORM_URL_BASE`, `WEEKLY_LOG_TEAMID_ENTRY`, `ANNOUNCEMENTS_FORM_URL`, `GUIDE_DASHBOARD_URL`, `SUBMISSION_REMINDER_HOURS`, `GUIDE_REPO_PERMISSION`, `COLLABORATOR_REPO_PERMISSION`, `COLLABORATOR_GITHUB_USERNAME` and `COLLABORATOR_REPOS_ACCESS`. |
+| Remove the Form-bound sheets in this plan only. | `WeeklyReminders` was removed later in a separate change. | It was not Form-bound; it became unused when the weekly reminder e-mail was removed. |
+
+---
+
+## The plan as it was written
 
 This plan retires every sheet that a Google Form fills, starting with `TeamIntakeRaw`. It comes **before**
 [SHEET-HEADER-MATCHING-PLAN.md](SHEET-HEADER-MATCHING-PLAN.md), which leaves these sheets untouched. It does not repeat the
