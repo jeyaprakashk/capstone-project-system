@@ -26,11 +26,11 @@ state noted.
 | # | Result | What it means, and what you do |
 |---|---|---|
 | 1 | **First run:** 23 tabs; linked Forms on `Announcements`, `TeamIntakeRaw` and `RawLog`. **Second run:** 21 tabs, `Announcements` and `RawLog` gone, no linked Form on any tab | Resolved by your removals; no code read either tab. Nothing to decide now (FORM-SHEET-RETIREMENT-PLAN.md, section 2a). `TeamIntakeRaw` is now an ordinary tab |
-| 2 | **No formulas** in any of the 23 tabs; no named ranges or charts. Pivot tables and filter views were not established | Good for the migration's write rule (no formulas to flatten). **You glance** at each tab's menu for pivot tables and filter views |
+| 2 | **No formulas** in any of the 23 tabs; no named ranges or charts. Pivot tables and filter views were not established | Good for the migration's write rule (no formulas to flatten). **Owner confirmed (2026-10-11): no pivot tables.** Filter views were not mentioned; check each tab's Data menu if you want to be certain |
 | 3 | **Pass.** No duplicate or blank titles in row 1 of any tab | Nothing to do |
-| 4 | **Pass, with a gap.** 2 direct users and 1 group on the shared drive; no direct student. The group's members were not inspected | **You confirm** the group is faculty only. A group that contains students is forbidden (TITLE-REVISION-PLAN.md, operator rule 6) |
+| 4 | **Pass.** 2 direct users and 1 group on the shared drive; no direct student | **Owner confirmed (2026-10-11): the group is faculty only.** Nothing more to do (TITLE-REVISION-PLAN.md, operator rule 6) |
 | 5 | **Not as expected.** Six triggers; `onTeamIntakeSubmit` (form submit) is still installed | Deleted at cutover step 0. The two title-reading triggers to pause are `reconcileProgressEligibility` and `sendGuideReminderDigest`; the reviewer digest is not scheduled |
-| 6 | **Not complete.** 62 team folders; 55 have both files. Missing both: `g8`, `g45`, `g35`, `g34`, `g32`, `g11`. Missing `Step2_Need_Analysis.docx`: `g46`. No duplicates | These seven teams cannot submit a title under the new flow until they upload the missing documents (the requirement rows). Cutover step 8 tells them. **You decide** whether to chase the documents before cutover |
+| 6 | **Not complete.** 62 team folders; 55 have both files. Missing both: `g8`, `g45`, `g35`, `g34`, `g32`, `g11`. Missing `Step2_Need_Analysis.docx`: `g46`. No duplicates | These seven teams cannot submit a title under the new flow until they upload the missing documents (the requirement rows). Cutover step 8 tells them. **Owner will finalise this later (2026-10-11)**: chase the documents before cutover, or tell the teams at cutover |
 
 ## B. Before cutover
 
