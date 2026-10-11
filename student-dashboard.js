@@ -39,10 +39,12 @@ function getStudentBaseData_(teamId, teamStatusRow) {
 
   perfLap = studentPerfLog_('TeamStatus row + column map', perfLap);
 
-  const titleStatus = getTeamStatus_(r);
-  const note = textEquals_(r[TS.REVIEWER_DECISION], 'Revise') ? r[TS.REVIEWER_NOTES]
-    : textEquals_(r[TS.GUIDE_DECISION], 'Rejected') ? r[TS.GUIDE_NOTES]
-    : '';
+  // The title state comes from TitleLog. A team whose history is not valid is UNAVAILABLE (and not approved), never an error page.
+  const titleRead = titleTryState_(readTitleIndex_(), teamId);
+  const titleState = titleRead.state || null;
+  const titleStatus = titleState ? titleState.status : 'UNAVAILABLE';
+  const summary = titleState ? titleSummaryFromState_(titleState) : null;
+  const note = summary ? summary.notes : '';
 
   const statusSheetForRepo = getSheet_(SHEET_NAMES.TEAM_STATUS);
   const repoCol = getOptionalHeaderIndex_(statusSheetForRepo, 'Repo URL');
@@ -58,7 +60,7 @@ function getStudentBaseData_(teamId, teamStatusRow) {
   perfLap = studentPerfLog_('Roster and title state', perfLap);
 
   studentPerfLog_('getStudentBaseData_ TOTAL', perfStart);
-  return { teamId, title: r[TS.TITLE], problem: r[TS.PROBLEM], titleStatus, note, repoUrl, rosterSlots, row: r };
+  return { teamId, title: summary ? summary.title : '', problem: summary ? summary.problem : '', titleStatus, titleState, note, repoUrl, rosterSlots, row: r };
 }
 
 function getStudentDashboardData_(email, teamId, teamStatusRow) {
@@ -78,7 +80,7 @@ function getStudentDashboardData_(email, teamId, teamStatusRow) {
 
   return {
     teamId, title: base.title, problem: base.problem,
-    titleStatus: base.titleStatus, note: base.note,
+    titleStatus: base.titleStatus, titleState: base.titleState, note: base.note,
     githubAccount, githubCaptureReady, githubState, githubText, githubUsername, githubNeedsUsername, githubReady, githubCanRetry, githubSetup, repoUrl: base.repoUrl,
     rosterSlots: base.rosterSlots, schedule, clock
   };

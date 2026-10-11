@@ -17,12 +17,16 @@ const SCENARIOS = {
 function studentFixture(name = 'approved', { review = true } = {}) {
   const s = SCENARIOS[name], f = weeklyFixture(), c = f.c;
   for (const file of ['milestone-config.js', 'assessment-registry.js', 'rubric-config.js', 'lucide-icons.js', 'icon-renderer.js', 'student-dashboard.js', 'student-github.js',
-    'assessment-history-view.js','dashboard-client-scripts.js', 'api-envelope.js', 'student-api.js', 'common-styles.js', 'busy-state.js']) vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
+    'assessment-history-view.js','dashboard-client-scripts.js', 'api-envelope.js', 'activity-engine.js', 'activity-check-github.js', 'activity-check-drive.js', 'team-folders.js', 'team-document-upload.js',
+    'title-cutover.js', 'title-write.js', 'title-api.js', 'student-api.js', 'common-styles.js', 'busy-state.js']) vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
   const day = Math.floor(Date.parse('2026-01-10') / 86400000);
   c.getProjectSchedule_ = () => ({ title: day, git: day - 2, timezone: 'Asia/Kolkata', assessments: [], milestones: [] });
   c.getProjectClock_ = () => ({ today: day + 1, now: new Date('2026-01-11T12:00:00Z') });
   c.getAssessmentDefinitions_ = () => [...(review ? [{ key: 'review1', type: 'REVIEW', label: 'Review 1' }, { key: 'review2', type: 'REVIEW', label: 'Review 2' }] : []), { key: 'guide_eval', type: 'GUIDE_EVALUATION', label: 'Guide Evaluation' }];
-  c.buildTeamIntakeLink_ = team => 'https://forms.example/intake?team=' + team;
+  // No Drive folder and no requirement rows (an empty ActivityDependencies sheet means nothing is required).
+  c.activityDriveFolder_ = () => ({ absent: true });
+  c.findTeamFolder_ = () => null;
+  f.sheet('ActivityDependencies', [['Activity', 'Kind', 'Item', 'Label', 'Active']]);
   f.user('one@example.com');
   f.set('Title', s.title); f.set('Guide Decision', s.guide || ''); f.set('Reviewer Decision', s.reviewer || '');
   f.set('Reviewer Notes', s.reviewerNotes || ''); f.set('Guide Notes', s.guideNotes || '');

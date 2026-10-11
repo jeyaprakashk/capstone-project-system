@@ -12,11 +12,12 @@ async function setup(dto, options = {}) {
   const { document, window } = parseHTML('<html><body><nav id="studentSideNav"></nav><div id="studentContent"></div></body></html>');
   const ctl = { fail: false };
   const calls = { jump: [], refresh: 0, weekly: 0, results: 0, logs: [], preview: [] };
-  const c = loadSources(['data-bridge-client.js', 'student-view.js'], { document, Promise, JSON, setTimeout, clearTimeout });
+  const c = loadSources(['data-bridge-client.js', 'title-requests.js', 'student-title.js', 'student-view.js'], { document, Promise, JSON, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const core = { teamId: dto.teamId, roster: dto.roster, titleApproved: dto.titleApproved, assessments: dto.assessments }, project = { setup: dto.setup, github: dto.github, title: dto.title };
   bridge.useFixtures({ API_student_getCore: () => core, API_student_getProject: () => ctl.fail ? JSON.stringify({ ok: false, error: { code: 'INTERNAL', message: 'Project setup is unavailable.' } }) : project });
   const ui = {
+    busy: require('./busy-fixture.cjs')(),
     beginContentLoading: () => () => {}, renderIcon: (name) => '<svg class="lucide-icon lucide-' + name + '"></svg>', renderSkeleton: (v, label) => '<span data-skeleton>' + String(label).replace(/[&<>"']/g, ch => '&#' + ch.charCodeAt(0) + ';') + '</span>'
   };
   // The student modules StudentView drives, passed in as they are in the shell.
@@ -24,8 +25,11 @@ async function setup(dto, options = {}) {
     weekly: { load: () => calls.weekly++ }, results: { all: () => calls.results++ },
     github: { focusGithubAccountForm: b => calls.jump.push(b), refreshGithubStatus: b => calls.refresh++, previewGithubAccount: (e, form) => calls.preview.push([e, form]) }
   };
-  vm.runInContext('globalThis.__make = ' + c.studentViewBrowser_.toString(), c);
-  const view = c.__make(bridge, () => ui, actions);
+  vm.runInContext('globalThis.__make = ' + c.studentViewBrowser_.toString() + '; globalThis.__makeTitle = ' + c.studentTitleBrowser_.toString(), c);
+  let view;
+  const requests = c.titleRequestsBrowser_();
+  actions.title = c.__makeTitle(bridge, () => ui, () => requests, () => view);
+  view = c.__make(bridge, () => ui, actions);
   const host = document.getElementById('studentContent');
   view.render(host, core);
   const projectLoaded = () => new Promise(resolve => view.reloadProject(resolve));
@@ -42,11 +46,11 @@ test('weekly progress appears only after title approval; the title action stays 
   for (const hook of ['[data-weekly-read]', '[data-weekly-status]', '[data-weekly-form]', '[data-weekly-detail]']) assert(approved.host.querySelector('#studentWeeklyProgress ' + hook), hook);
   assert.equal(approved.host.querySelector('#studentRecentActivity'), null);
   const needsTitle = (await setup(dtoFor('notSubmitted')));
-  const titleLink = host => Array.from(host.querySelectorAll('[data-step-card] a[target="_blank"]')).find(a => /title/i.test(norm(a)));
-  const action = titleLink(needsTitle.host);
-  assert.equal(action.getAttribute('href'), 'https://forms.example/intake?team=T1');
-  assert.equal(norm(action), 'Submit title');
-  assert.equal(norm(titleLink((await setup(dtoFor('revise'))).host)), 'Resubmit title');
+  const titleButton = host => host.querySelector('[data-title-form] button[type="submit"]');
+  assert.equal(norm(titleButton(needsTitle.host)), 'Submit title');
+  assert.equal(needsTitle.host.querySelector('a[href*="forms.example"]'), null, 'no Form link any more');
+  assert.equal(norm(titleButton((await setup(dtoFor('revise'))).host)), 'Resubmit title');
+  assert.equal(titleButton((await setup(dtoFor('needsReview'))).host), null, 'no form while the title is under review');
 });
 
 test('Title and GitHub each show one step card; pending setup is listed on GitHub only', async () => {
@@ -77,12 +81,12 @@ test('title submission and status remain available before GitHub setup is comple
     assert.doesNotMatch(norm(title), /Finish GitHub setup first|Locked/);
     assert.equal(title.querySelector('[data-action="show-tab"]'), null);
     assert.match(norm(title), /Approval due/);
-    const action = title.querySelector('a[target="_blank"]');
+    const button = title.querySelector('[data-title-form] button[type="submit"]');
     if (name === 'githubActive') {
-      assert.equal(action.getAttribute('href'), 'https://forms.example/intake?team=T1');
-      assert.equal(norm(action), 'Submit title');
+      assert.equal(norm(button), 'Submit title');
+      assert.equal(button.disabled, false);
     } else {
-      assert.equal(action, null);
+      assert.equal(button, null);
       assert.match(norm(title), /awaiting your guide/);
     }
   }
@@ -120,10 +124,10 @@ test('an unregistered student sees only account connection', async () => {
   const blocked = dtoFor('githubActive'); blocked.github.captureReady = false;
   const g = (await setup(blocked));
   assert.equal(g.host.querySelector('#studentGithubProfile').hasAttribute('disabled'), true);
-  assert.equal(g.host.querySelector('button[type="submit"]').hasAttribute('disabled'), true);
+  assert.equal(g.host.querySelector('[data-github-form] button[type="submit"]').hasAttribute('disabled'), true);
   const connected = dtoFor('githubActive'); connected.github.connected = true; connected.github.members[0].canConnect = false;
   const h = (await setup(connected));
-  assert.equal(h.host.querySelector('form'), null); assert.doesNotMatch(norm(h.host), /Retry GitHub setup/);
+  assert.equal(h.host.querySelector('form[data-github-form]'), null); assert.doesNotMatch(norm(h.host), /Retry GitHub setup/);
 });
 
 test('GitHub rows show each teammate with an icon; only the student can jump to the form', async () => {
@@ -159,7 +163,7 @@ test('the weekly panel does not depend on teammate setup and keeps repository an
   const f = (await setup(dto));
   assert(f.host.querySelector('#studentWeeklyProgress'));
   assert(norm(f.host).includes('https://github.com/org/team'));
-  assert(norm(f.host).includes('Current title: Project <i>X</i>'));
+  assert(norm(f.host).includes('Approved title: PROJECT <I>X</I>'));
   assert.equal(f.host.querySelectorAll('i').length, 0);
 });
 
@@ -176,7 +180,7 @@ test('escapes every interpolated value and rejects unsafe links', async () => {
   const evil = '<img src=x onerror=alert(1)>"\'&';
   const dto = dtoFor('revise');
   Object.assign(dto, { teamId: evil }); dto.roster = [{ name: evil, initials: evil, regno: evil, isMe: true }];
-  dto.title = { ...dto.title, currentTitle: evil, note: evil, intake: { url: 'javascript:alert(1)', label: evil } };
+  dto.title = { ...dto.title, proposal: { title: evil, problem: evil }, notes: evil, folderUrl: 'javascript:alert(1)', documents: [{ key: 'work', label: evil, present: true, uploadedBy: evil, uploadedAt: 'x' }] };
   dto.github.repoUrl = 'javascript:alert(2)'; dto.assessments = { reviews: [{ key: 'r"1', label: evil }], guideEvaluationLabel: evil };
   const f = (await setup(dto));
   assert.equal(f.host.querySelectorAll('img').length, 0);

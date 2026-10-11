@@ -24,18 +24,20 @@ function studentGithubDto_(d, email) {
   };
 }
 
-function studentTitleDto_(d, teamId, titleApproved) {
+/**
+ * The title card: the Title DTO (TitleLog state, what the student can do, the checklist and the documents) plus the screen's step state,
+ * status text and due date. GitHub is not asked again: the setup already read for this page is what the `github` requirement uses.
+ */
+function studentTitleDto_(d, teamId, titleApproved, email) {
   const label = STUDENT_TITLE_LABEL[d.titleStatus];
-  const active = label.state === 'active';
-  return {
-    locked:false,
-    state:label.state,
-    statusText:label.text,
-    currentTitle:String(d.title || ''),
-    note:String(d.note || ''),
-    intake:active ? {url:buildTeamIntakeLink_(teamId), label:d.title ? 'Resubmit title' : 'Submit title'} : null,
-    due:{date:formatProjectDay_(d.schedule.title), overdue:!titleApproved && d.clock.today > d.schedule.title}
-  };
+  const due = {date:formatProjectDay_(d.schedule.title), overdue:!titleApproved && d.clock.today > d.schedule.title};
+  if (!d.titleState) return {teamId:String(teamId), status:'UNAVAILABLE', state:label.state, statusText:label.text, due, can:null};
+  const ctx = activityContext_();
+  if (d.githubSetup) ctx.github[String(teamId).trim()] = {setup:d.githubSetup};
+  const dto = buildTitleDto_(String(teamId).trim(), {email, roles:{student:true}}, ctx);
+  // A student sees its own capabilities only: no staff decisions, no history, and the similarity note stays with the staff.
+  const {history, similarityNote, ...visible} = dto;
+  return {...visible, can:{submit:dto.can.submit, upload:dto.can.upload}, state:label.state, statusText:label.text, due};
 }
 
 /** Core DTO: team, roster, title approval and assessment labels. Needs sheet data only (getStudentBaseData_). */
@@ -45,7 +47,7 @@ function buildStudentCoreDto_(email, teamId, d) {
   return {
     teamId:String(teamId),
     roster:d.rosterSlots.map(s => ({name:String(s.name || ''), initials:initialsOf_(s.name), regno:String(s.regno || ''), isMe:emailsMatch_(s.email, email)})),
-    titleApproved:d.titleStatus === 'APPROVED',
+    titleApproved:!!d.titleState && d.titleState.approved.value,
     assessments:{reviews:definitions.filter(item => item.type === 'REVIEW').map(item => ({key:String(item.key), label:String(item.label)})), guideEvaluationLabel:String((guideEvaluation || {}).label || 'Guide Evaluation')}
   };
 }
@@ -53,7 +55,7 @@ function buildStudentCoreDto_(email, teamId, d) {
 /** Project DTO: setup state, GitHub and title cards. Needs the GitHub state (getStudentDashboardData_). */
 function buildStudentProjectDto_(email, teamId, d) {
   const githubDone = d.githubReady;
-  const titleApproved = d.titleStatus === 'APPROVED';
+  const titleApproved = !!d.titleState && d.titleState.approved.value;
   const label = STUDENT_TITLE_LABEL[d.titleStatus];
   const pendingSteps = [];
   if (!githubDone) pendingSteps.push('Step 1: ' + d.githubText);
@@ -64,7 +66,7 @@ function buildStudentProjectDto_(email, teamId, d) {
   return {
     setup:{complete:githubDone && titleApproved, pendingSteps},
     github:studentGithubDto_(d, email),
-    title:studentTitleDto_(d, teamId, titleApproved)
+    title:studentTitleDto_(d, teamId, titleApproved, email)
   };
 }
 

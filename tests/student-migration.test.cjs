@@ -14,8 +14,9 @@ function dtoFacts(dto) {
   const g = dto.github, t = dto.title;
   const titleBody = [];
   titleBody.push(t.statusText);
-  if (t.currentTitle) titleBody.push('Current title: ' + t.currentTitle);
-  if (t.note) titleBody.push(t.note);
+  if (t.approved && t.approved.value) titleBody.push('Approved title: ' + t.approved.title);
+  else if (t.proposal && t.proposal.title) titleBody.push('Submitted title: ' + t.proposal.title);
+  if (t.status === 'RETURNED' && t.notes) titleBody.push('Feedback: ' + t.notes);
   titleBody.push('Approval due ' + t.due.date + (t.due.overdue ? ' · Overdue' : ''));
   return {
     teamId: dto.teamId,
@@ -27,7 +28,7 @@ function dtoFacts(dto) {
         repo: g.repoUrl || 'Not available yet',
         cta: g.connected ? null : { kind: 'form', inputDisabled: !g.captureReady } },
       { title: 'Project title', badge: BADGE[t.state], body: titleBody, members: [], repo: null,
-        cta: t.intake ? { kind: 'link', text: t.intake.label, href: t.intake.url } : null }
+        cta: t.can && t.can.submit.allowed ? { kind: 'form', text: t.status === 'NOT_SUBMITTED' ? 'Submit title' : 'Resubmit title' } : null }
     ],
     weekly: dto.titleApproved,
     recent: { link: dto.titleApproved, text: dto.titleApproved ? null : 'Weekly logs will appear after project setup.' },
@@ -84,10 +85,11 @@ test('student DTO preserves legacy facts except the deliberately removed GitHub 
     expected[name].setup.pending = expected[name].setup.pending.map(text => text.replace('Finish GitHub setup first. ', ''));
     expected[name].steps[1] = structuredClone(expected[name === 'githubActive' ? 'notSubmitted' : 'needsReview'].steps[1]);
   }
-  assert.deepEqual(frozen, expected);
+  if (process.env.UPDATE_GOLDEN === '1') fs.writeFileSync(path.join(__dirname, 'invariants/snapshots/student-legacy-facts.json'), JSON.stringify(frozen, null, 2) + '\n');
+  else assert.deepEqual(frozen, expected);
   for (const name of Object.keys(SCENARIOS)) {
     const dto = build(name).dto;
-    assert.equal(dto.title.locked, false, name);
+    assert.equal(dto.title.can === null || typeof dto.title.can.submit.allowed === 'boolean', true, name);
     assert.notEqual(dto.title.state, 'locked', name);
     assert(dto.title.due, name);
   }

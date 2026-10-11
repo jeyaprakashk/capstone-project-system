@@ -187,8 +187,9 @@ The browser loads the student dashboard in two parts: `API_student_getCore` firs
   github:{ state:'done'|'waiting'|'active'|'locked', text, connected:boolean, captureReady:boolean,
            due:string, statusText, repoUrl,
            members:[{regno, status:'missing'|'joined'|'pending', canConnect:boolean, isMe:boolean}] },  // canConnect: this student, not yet connected; isMe: this student's own row
-  title:{ locked:false, state:'active'|'waiting'|'done', statusText, currentTitle, note,
-          intake:{url,label}|null, due:{date,overdue} },         // independent of GitHub setup; intake follows title status
+  title: TitleDto fields (see TitleDto) without `history` and `similarityNote`, with `can` limited to {submit, upload:{work,need}},
+         plus { state:'active'|'waiting'|'done', statusText, due:{date,overdue} },   // independent of GitHub setup; `can.submit` carries the checklist
+         // a team whose title history failed validation gets {teamId, status:'UNAVAILABLE', state, statusText, due, can:null}
   assessments:{ reviews:[{key,label}], guideEvaluationLabel } }
 ```
 
@@ -196,7 +197,7 @@ The view lays the DTO out as five screens (Weeks, Assessments, Title, GitHub, Te
 placeholders in the view (`#studentWeeklyProgress`, `#studentAssessment-<key>`,
 `#studentGuideEvaluation`, `#studentGithubProfile`); the GitHub connection uses the endpoints above through the bridge.
 Contract tests: `tests/student-migration.test.cjs` (snapshot `tests/invariants/snapshots/student-legacy-facts.json`,
-captured from the removed HTML for eight states, with explicit expectations for the removed GitHub title prerequisite).
+captured from the removed HTML for eight states, with explicit expectations for the removed GitHub title prerequisite; regenerated in the title-revision change for the title card: the Form link is replaced by the in-page title form and document upload, `StudentTitle` in `student-title.js`).
 
 ### GuideDashboard
 

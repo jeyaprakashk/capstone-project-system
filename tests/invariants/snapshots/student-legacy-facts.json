@@ -20,7 +20,7 @@
       "badge": "Action needed",
       "pending": [
         "Step 1: Waiting for GitHub account connection. Connect your GitHub account using your profile link.",
-        "Step 2: Not submitted yet. Finish GitHub setup first. Your team must submit a project title for approval."
+        "Step 2: Not submitted yet. Your team must submit a project title for approval."
       ]
     },
     "steps": [
@@ -52,13 +52,17 @@
       },
       {
         "title": "Project title",
-        "badge": "Locked",
+        "badge": "Action needed",
         "body": [
-          "Finish GitHub setup first."
+          "Not submitted yet",
+          "Approval due 2026-01-10T00:00:00.000Z · Overdue"
         ],
         "members": [],
         "repo": null,
-        "cta": null
+        "cta": {
+          "kind": "form",
+          "text": "Submit title"
+        }
       }
     ],
     "weekly": false,
@@ -101,7 +105,7 @@
       "badge": "Action needed",
       "pending": [
         "Step 1: Repository invitations must be accepted.",
-        "Step 2: Submitted — awaiting your guide's review. Finish GitHub setup first. Your team is waiting for approval; check the review status below."
+        "Step 2: Submitted — awaiting your guide's review. Your team is waiting for approval; check the review status below."
       ]
     },
     "steps": [
@@ -130,11 +134,11 @@
       },
       {
         "title": "Project title",
-        "badge": "Locked",
+        "badge": "Waiting",
         "body": [
-          "Finish GitHub setup first.",
-          "Current title: Project",
-          "Submitted — awaiting your guide's review"
+          "Submitted — awaiting your guide's review",
+          "Submitted title: PROJECT",
+          "Approval due 2026-01-10T00:00:00.000Z · Overdue"
         ],
         "members": [],
         "repo": null,
@@ -217,9 +221,8 @@
         "members": [],
         "repo": null,
         "cta": {
-          "kind": "link",
-          "text": "Submit title",
-          "href": "https://forms.example/intake?team=T1"
+          "kind": "form",
+          "text": "Submit title"
         }
       }
     ],
@@ -294,7 +297,7 @@
         "badge": "Waiting",
         "body": [
           "Submitted — awaiting your guide's review",
-          "Current title: Project",
+          "Submitted title: PROJECT",
           "Approval due 2026-01-10T00:00:00.000Z · Overdue"
         ],
         "members": [],
@@ -341,7 +344,7 @@
       "kind": "section",
       "badge": "Action needed",
       "pending": [
-        "Step 2: Reviewer Committee requested changes — resubmit needed. Your team must address the feedback below and resubmit the title."
+        "Step 2: Changes requested — update and resubmit. Your team must address the feedback below and resubmit the title."
       ]
     },
     "steps": [
@@ -372,17 +375,16 @@
         "title": "Project title",
         "badge": "Action needed",
         "body": [
-          "Reviewer Committee requested changes — resubmit needed",
-          "Current title: Project",
-          "Narrow the scope <b>",
+          "Changes requested — update and resubmit",
+          "Submitted title: PROJECT",
+          "Feedback: Narrow the scope <b>",
           "Approval due 2026-01-10T00:00:00.000Z · Overdue"
         ],
         "members": [],
         "repo": null,
         "cta": {
-          "kind": "link",
-          "text": "Resubmit title",
-          "href": "https://forms.example/intake?team=T1"
+          "kind": "form",
+          "text": "Resubmit title"
         }
       }
     ],
@@ -425,7 +427,7 @@
       "kind": "section",
       "badge": "Action needed",
       "pending": [
-        "Step 2: Guide requested changes — resubmit needed. Your team must address the feedback below and resubmit the title."
+        "Step 2: Changes requested — update and resubmit. Your team must address the feedback below and resubmit the title."
       ]
     },
     "steps": [
@@ -456,17 +458,16 @@
         "title": "Project title",
         "badge": "Action needed",
         "body": [
-          "Guide requested changes — resubmit needed",
-          "Current title: Project",
-          "Too broad",
+          "Changes requested — update and resubmit",
+          "Submitted title: PROJECT",
+          "Feedback: Too broad",
           "Approval due 2026-01-10T00:00:00.000Z · Overdue"
         ],
         "members": [],
         "repo": null,
         "cta": {
-          "kind": "link",
-          "text": "Resubmit title",
-          "href": "https://forms.example/intake?team=T1"
+          "kind": "form",
+          "text": "Resubmit title"
         }
       }
     ],
@@ -541,7 +542,7 @@
         "badge": "Waiting",
         "body": [
           "Guide-approved — awaiting Reviewer Committee",
-          "Current title: Project",
+          "Submitted title: PROJECT",
           "Approval due 2026-01-10T00:00:00.000Z · Overdue"
         ],
         "members": [],
@@ -618,7 +619,7 @@
         "badge": "Done",
         "body": [
           "Approved",
-          "Current title: Project <i>X</i>",
+          "Approved title: PROJECT <I>X</I>",
           "Approval due 2026-01-10T00:00:00.000Z"
         ],
         "members": [],

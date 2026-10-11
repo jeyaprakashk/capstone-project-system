@@ -7,7 +7,7 @@
  * (#studentWeeklyProgress, #studentAssessment-*, #studentGuideEvaluation,
  * [data-step-card], #studentGithubProfile, #githubSubmitStatus, #githubStatusRefresh).
  * It never calls google.script.run. Its screens' actions come from the student modules passed in
- * `actions` ({weekly, results, github}); getUi() supplies only shared UI services.
+ * `actions` ({weekly, results, github, title}); getUi() supplies only shared UI services.
  */
 function studentViewBrowser_(bridge, getUi, actions) {
   'use strict';
@@ -70,10 +70,7 @@ function studentViewBrowser_(bridge, getUi, actions) {
   }
   function titleCard(dto) {
     const t = dto.title;
-    const body = p(escape(t.statusText)) + (t.currentTitle ? p('<strong>Current title:</strong> ' + escape(t.currentTitle)) : '') + (t.note ? p(escape(t.note)) : '') +
-      p('Approval due ' + escape(t.due.date) + (t.due.overdue ? ' · Overdue' : ''), t.due.overdue ? 'text-danger' : 'text-ink-2');
-    const cta = t.intake ? '<div class="mt-4"><a class="' + PRIMARY + ' inline-block no-underline" href="' + escape(safeUrl(t.intake.url)) + '" target="_blank" rel="noopener">' + escape(t.intake.label) + '</a></div>' : '';
-    return stepCard('Project title', t.state, body, cta);
+    return stepCard('Project title', t.state, actions.title.markup(t), '');
   }
   // GitHub status screen: what is still pending for setup, then the GitHub card. The Title screen is the title card alone.
   function githubMarkup(project) {
@@ -150,7 +147,7 @@ function studentViewBrowser_(bridge, getUi, actions) {
       panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) +
       panelMarkup('title', state.tab, projectSlot('title', ui)) + panelMarkup('github', state.tab, projectSlot('github', ui)) +
       panelMarkup('team', state.tab, teamMarkup(dto)) + '</div>';
-    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); }
+    if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); host.addEventListener('change', onChange); }
     const side = document.getElementById('studentSideNav');
     if (side) {
       side.innerHTML = navMarkup(state.tab);
@@ -186,6 +183,7 @@ function studentViewBrowser_(bridge, getUi, actions) {
     if (target.hasAttribute('data-github-form-jump')) actions.github.focusGithubAccountForm(target);
     else if (action === 'github-refresh') actions.github.refreshGithubStatus(target);
     else if (action === 'project-retry') loadProject();
+    else if (action === 'title-upload') actions.title.pick(target);
     else if (action === 'show-tab') showTab(target.getAttribute('data-tab'));
   }
   function onKeydown(event) {
@@ -198,7 +196,13 @@ function studentViewBrowser_(bridge, getUi, actions) {
   }
   function onSubmit(event) {
     const form = event.target.closest ? event.target.closest('[data-github-form]') : null;
-    if (form) actions.github.previewGithubAccount(event, form);
+    if (form) { actions.github.previewGithubAccount(event, form); return; }
+    const titleForm = event.target.closest ? event.target.closest('[data-title-form]') : null;
+    if (titleForm) actions.title.submit(event, titleForm);
+  }
+  function onChange(event) {
+    const input = event.target.closest ? event.target.closest('[data-doc-input]') : null;
+    if (input) actions.title.upload(input);
   }
 
   function load() { return bridge.read('role:student', 'API_student_getCore', []); }

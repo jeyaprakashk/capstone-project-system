@@ -107,10 +107,11 @@ const STATUS_LABEL = {
 const STUDENT_TITLE_LABEL = {
   NOT_SUBMITTED: { text: 'Not submitted yet', state: 'active' },
   NEEDS_REVIEW: { text: "Submitted — awaiting your guide's review", state: 'waiting' },
-  REVISE_AWAITING_STUDENT: { text: 'Reviewer Committee requested changes — resubmit needed', state: 'active' },
   AWAITING_REVIEWER: { text: 'Guide-approved — awaiting Reviewer Committee', state: 'waiting' },
+  RETURNED: { text: 'Changes requested — update and resubmit', state: 'active' },
   APPROVED: { text: 'Approved', state: 'done' },
-  REJECTED_BY_GUIDE: { text: 'Guide requested changes — resubmit needed', state: 'active' }
+  REOPENED: { text: 'Reopened by the coordinator — you may submit a change', state: 'active' },
+  UNAVAILABLE: { text: 'The title cannot be shown right now — contact the coordinator', state: 'waiting' }
 };
 
 // ===================================================================
