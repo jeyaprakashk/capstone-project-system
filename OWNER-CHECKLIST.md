@@ -68,7 +68,7 @@ Code on the copy: `main` at `e20ade9` (Release 0 plus the spreadsheet-resolution
 | With `TITLE_CUTOVER` unset, Approve worked as before: the team moved to "Awaiting Reviewer" with "You approved — awaiting Reviewer." | **Pass** (screenshot) |
 | The deployed web app of the copy showed the dummy team that exists only in the copy, and the copy has **no** `SHEET_ID` property (owner confirmed), so `getActiveSpreadsheet()` works from a deployed web app of the bound script | **Pass** |
 | The Guide Decision cell for the dummy team became `Approved` (screenshot) | **Pass** |
-| The "Guide-Approved Title" email to `COORDINATOR_EMAIL` | **Not received. Open:** being diagnosed (Config value, spam, Executions log, a direct mail test). The decision path did not change how mail is sent; it only wrapped the write in the lock |
+| The "Guide-Approved Title" email to `COORDINATOR_EMAIL` | **Accepted as sent, not seen.** The owner had not changed `COORDINATOR_EMAIL` on the copy, so the message went to the original coordinator address, not to the owner. The dashboard reported success, which means the send did not throw. It was not read in a mailbox |
 
 What this confirms on real Google, beyond the local tests: editor-run functions use the pushed code; `ensureSheet_` creates a
 sheet with the right tab colour, header row and formatting; `getActiveSpreadsheet()` resolves the copy for an editor run; the
