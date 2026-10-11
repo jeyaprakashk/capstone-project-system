@@ -16,7 +16,8 @@ Where the two differ, the title plan wins until the changes in section 4 are app
 3. `TeamIntakeRaw` is then **deleted**.
 4. **Corrected 2026-10-11:** there are two more Form-bound sheets than the owner expected, `RawLog` and
    `Announcements`, each with a linked Form (found by the read-only check of OWNER-CHECKLIST section A). The owner did not
-   create the weekly Form behind `RawLog`. Section 2a sets out what is known and what the owner must decide.
+   create the weekly Form behind `RawLog`. **Update, same day:** a second check found both tabs gone (21 tabs, down from 23)
+   and no tab showing a linked Form, `TeamIntakeRaw` included. Section 2a records this.
 5. The intake Form is already **closed**, and the uploaded files have already been moved into the individual team folders
    under the shared drive; every eligible existing file was moved.
 6. The guide dashboard's document-submission date comes from the Drive upload record, with "Date unavailable" for older
@@ -54,7 +55,13 @@ confirmed).
 
 ## 2a. Other Form-bound sheets found on the live spreadsheet (2026-10-11)
 
-A read-only check of the live spreadsheet (23 tabs) showed linked Forms on **three** tabs, not one.
+**Current state (second read-only check, later the same day): 21 tabs; `Announcements` and `RawLog` are gone, and no tab
+shows a linked Form, including `TeamIntakeRaw`.** The owner removed the two tabs and unlinked the intake Form between the two
+checks. The record below is what the first check found; it stays here because it shows that these sheets existed and that
+no code used them. It is not recorded whether `RawLog` or `Announcements` were archived before they were removed; if their
+content matters, Sheets version history may still hold it.
+
+What the first check of the live spreadsheet (23 tabs) showed was linked Forms on **three** tabs, not one.
 
 | Tab | Linked Form | Read or written by the code | Known about it |
 |---|---|---|---|
@@ -74,12 +81,15 @@ response just lands in its sheet.
   the owner agrees.
 - Each linked Form is closed (stops accepting responses) and unlinked before its sheet is deleted, as in step 8.
 
-**Decisions for the owner (open).** For each of `RawLog` and `Announcements`:
-1. What is it for, and who uses it? (`Announcements` in particular.)
-2. Is its Form still accepting responses? Does anyone read the responses?
-3. Archive and delete, keep as it is, or delete without an archive?
+**Decisions for the owner: superseded.** `RawLog` and `Announcements` no longer exist, so nothing is left to retire for them.
+Their Forms may still exist in Drive and may hold their own stored responses; this plan does not touch them.
 
-Until these are decided the two sheets are left exactly as they are, and they do not block the title work or the cutover.
+**What the unlinking of the intake Form changes.**
+- `TeamIntakeRaw` is now an ordinary tab: Google no longer adds responses to it. The responses already in it stay.
+- The form-submit trigger `onTeamIntakeSubmit` can never fire again, but it is still installed; it is deleted at cutover step 0.
+- Step 8's "unlink the Form from its response sheet" is already done; step 8 only checks that no tab shows a linked Form.
+- Any response made after the unlink is stored only inside the Form, not in `TeamIntakeRaw`. The owner states the Form is
+  closed, so none is expected; the archive in step 4 copies what `TeamIntakeRaw` holds.
 
 ## 3. What data is still needed, and where it goes
 
@@ -246,7 +256,7 @@ by restoring a sheet alone, which is why it is separate and comes last.
 | The Form's headers are blank or repeat, so `ensureSheet_` would reject them | The step 3a preflight finds this before anything is created; the archive uses recorded de-duplicated headers or the process stops; the source is never edited |
 | The Form recreates a response sheet | The Form is already closed (owner); step 3 confirms its trigger is deleted; step 8 unlinks it before deleting the sheet |
 | Uploaded files are lost with the Form | Files live in Drive, not in the sheet; they are already in the team folders; the Form's folder is left alone |
-| A Form-bound sheet nobody knows about | Found: `RawLog` and `Announcements` (section 2a). They are left untouched until the owner decides; a read-only check of the live tabs is repeated before the cutover |
+| A Form-bound sheet nobody knows about | Found and since removed by the owner: `RawLog` and `Announcements` (section 2a). A read-only check of the live tabs is repeated before the cutover |
 | A trigger on the closed Form still exists | Step 3 checks the trigger list |
 | A reader is missed and breaks after deletion | The removal check plus the step 7 rename, which makes a missed reader fail while the sheet still exists; the period is only the time in which to exercise it; the backup remains |
 | The stale sheet is mistaken for live data during the verification period | Only coordinators can open the spreadsheet; the archive copy is clearly named; the sheet is deleted at the end of the period |
@@ -260,7 +270,7 @@ Decided by the owner (or delegated and recorded):
    assistant's recommendation.)
 2. **Form-period record:** a values-only archive, kept for one semester, as a `view` sheet created through `ensureSheet_`
    (for example `TitleFormArchive`). After a semester it can be deleted.
-3. **Weekly archive sheets:** corrected - `RawLog` exists with a linked Form, and so does `Announcements` (section 2a). Both are open decisions for the owner.
+3. **Weekly archive sheets:** corrected - `RawLog` and `Announcements` existed with linked Forms and have since been removed by the owner (section 2a). Nothing is left to decide.
 5. **The Form and its Drive folder:** already closed, with the files moved. Left closed and unlinked.
 
 4. **Verification period (step 7). Decided: 14 days, or until both a weekly submission deadline has passed and one reviewer

@@ -16,11 +16,16 @@ if they differ from this page, those plans win. Your steps belong to items 9 to 
    trigger and confirm the old Form-submit trigger is **deleted**.
 6. **Team folders.** Open each team folder and confirm it has `Step1_Work_Breakdown.docx` and `Step2_Need_Analysis.docx`.
 
-### Results of the Section A check (Codex, read-only, 2026-10-11)
+### Results of the Section A check (Codex, read-only, 2026-10-11, two runs)
+
+The second run was later the same day, after you removed two tabs and unlinked the Form: 21 tabs, no tab shows a linked Form
+(`TeamIntakeRaw` included), no formulas in any tab (a Find for `=` also matched ordinary link text, so only the formula-value
+scan counts), and the trigger list and team-folder exceptions are unchanged. The table shows the first run, with the later
+state noted.
 
 | # | Result | What it means, and what you do |
 |---|---|---|
-| 1 | **Not as expected.** 23 tabs; linked Forms on `Announcements`, `TeamIntakeRaw` and `RawLog` | Two more Form-bound sheets. No code reads either. **You decide** what `RawLog` and `Announcements` are for and whether to keep, archive or delete them (FORM-SHEET-RETIREMENT-PLAN.md, section 2a). They do not block the cutover |
+| 1 | **First run:** 23 tabs; linked Forms on `Announcements`, `TeamIntakeRaw` and `RawLog`. **Second run:** 21 tabs, `Announcements` and `RawLog` gone, no linked Form on any tab | Resolved by your removals; no code read either tab. Nothing to decide now (FORM-SHEET-RETIREMENT-PLAN.md, section 2a). `TeamIntakeRaw` is now an ordinary tab |
 | 2 | **No formulas** in any of the 23 tabs; no named ranges or charts. Pivot tables and filter views were not established | Good for the migration's write rule (no formulas to flatten). **You glance** at each tab's menu for pivot tables and filter views |
 | 3 | **Pass.** No duplicate or blank titles in row 1 of any tab | Nothing to do |
 | 4 | **Pass, with a gap.** 2 direct users and 1 group on the shared drive; no direct student. The group's members were not inspected | **You confirm** the group is faculty only. A group that contains students is forbidden (TITLE-REVISION-PLAN.md, operator rule 6) |
