@@ -71,7 +71,7 @@ function titleAuthorizer_(as) {
 
 /** Registry rows for the similarity check. A registry that cannot be read refuses the save. */
 function titleRegistryRows_() {
-  try { return getHubRegistrySheet_().getDataRange().getValues().slice(1); }
+  try { return readMasterRegistry_(); }
   catch (error) {
     console.error('Master registry could not be read: ' + (error && error.message || error));
     throw apiFail_('UNAVAILABLE', 'Could not check the master registry for title similarity. Please try again. Nothing was saved.');

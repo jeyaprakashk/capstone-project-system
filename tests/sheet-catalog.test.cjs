@@ -9,9 +9,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const ACCESS = ['system', 'view', 'edit'];
 const STATUS = ['new', 'by-name', 'positional', 'migrated', 'retiring'];
 // Sheets the code names that the catalog cannot list, each with its reason.
-const NOT_LISTED = {
-  MasterRegistry: 'it lives in the hub spreadsheet (HUB_SHEET_ID), not in this one, and the code reads it by position; its header names are not defined anywhere in this project'
-};
+const NOT_LISTED = {};
 const ROLES = ['setup', 'runtime-create', 'read', 'write'];
 // Only these entries may carry createAtRuntime: true. A new runtime creator needs a reviewed change to this list.
 const RUNTIME_CREATE_ALLOW_LIST = ['commitCollectionStatus'];

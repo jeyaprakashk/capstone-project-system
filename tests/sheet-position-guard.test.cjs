@@ -15,7 +15,6 @@ const HEADER_ROW = /^values\[\s*0\s*\]$/;
 
 // Each exception names its reason. An exception that no longer matches anything fails, so the list cannot go stale.
 const EXCEPTIONS = {
-  'title-service.js': 'the master registry of the hub spreadsheet is read by position until its header names are known (SHEET-HEADER-MATCHING-PLAN.md)',
   'sheet-reads.js': 'the shared reader reads whole rows from column A; it picks no column',
   'review-evaluation-client.js': 'a list of [pattern, label] pairs in the browser, not a sheet'
 };

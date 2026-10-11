@@ -534,6 +534,28 @@ function getHubRegistrySheet_() {
   return getNamedSheet_(SpreadsheetApp.openById(HUB_SHEET_ID), SHEET_NAMES.MASTER_REGISTRY);
 }
 
+/**
+ * The master registry of the hub spreadsheet, found by header name. The sheet has nine columns (see the catalog); the code needs
+ * only these four, so the others may change without a code change. A missing or repeated one of these throws.
+ */
+const MASTER_REGISTRY_USED_ = {academicYear: 'Academic Year', semester: 'Semester', teamId: 'TeamID', title: 'Title'};
+
+function masterRegistryRecords_(values) {
+  const header = (values && values[0]) || [];
+  const columns = {};
+  Object.entries(MASTER_REGISTRY_USED_).forEach(([key, name]) => {
+    const matches = header.flatMap((cell, index) => textEquals_(cell, name) ? [index] : []);
+    if (matches.length > 1) throw new Error('Duplicate header in MasterRegistry: ' + name + '.');
+    if (!matches.length) throw new Error('MasterRegistry header mismatch. Missing: ' + name + '.');
+    columns[key] = matches[0];
+  });
+  return values.slice(1).map(row => Object.fromEntries(Object.keys(columns).map(key => [key, row[columns[key]]])));
+}
+
+function readMasterRegistry_() {
+  return masterRegistryRecords_(getHubRegistrySheet_().getDataRange().getValues());
+}
+
 // ===================================================================
 // CONSTANTS (cached)
 // ===================================================================

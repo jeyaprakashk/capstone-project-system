@@ -6,8 +6,8 @@ are built, each with shuffled-column, missing-header and duplicate-header tests,
 status is `migrated` in SHEETS.md. Differences from the plan as written:
 
 - `WeeklyReminders` was removed completely (sheet name, definition, catalog entry, snapshot): the reminder e-mail it served is gone.
-- `MasterRegistry` lives in the hub spreadsheet and is read by position in `title-service.js` (`titleSimilarity_`). Its header names are not
-  defined anywhere in this project, so it waits for the owner to supply them.
+- `MasterRegistry` lives in the hub spreadsheet (HUB_SHEET_ID). The owner supplied its headers (Academic Year, Semester, TeamID, Guide Email,
+  Title, Repo URL, Team Members, Approved Date, Approved By) and it is now read by name (`readMasterRegistry_`); the code uses only four of them.
 - Sheets that were already read by name before this work (`TeamRoster`, `TeamStatus`, `ReviewCommittee`, `WeeklyWindows`, `GuideSignoff`,
   `AIProgressAnalysis`, `AssessmentDefinitions`, `Milestones`, `Rubrics`) have status `by-name`: their `code` lists are not written, so the
   audit does not cover them; shuffled-column tests do (below).

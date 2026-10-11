@@ -173,3 +173,16 @@ test('the shuffle really moves columns, so a position-based reader would give a 
   assert.ok(sheet.rows[0].includes('Team ID') && sheet.rows[0].includes('Extra'));
   assert.notEqual(sheet.rows[1][0], 'T1', 'column A no longer holds the team ID');
 });
+
+test('MasterRegistry (hub spreadsheet): records are the same from a shuffled sheet; a missing or repeated used header throws', () => {
+  const c = weeklyFixture().c;
+  const rows = [['Academic Year', 'Semester', 'TeamID', 'Guide Email', 'Title', 'Repo URL', 'Team Members', 'Approved Date', 'Approved By'],
+    ['2025-26', 'Even', 'T9', 'g@x', 'OLD TITLE', 'https://github.com/o/r', '001, 002', '2026-01-01', 'r@x'],
+    ['2026-27', 'Odd', 'T1', 'g@x', 'ANOTHER', '', '', '', '']];
+  const normal = plain(c.masterRegistryRecords_(rows)), moved = plain(c.masterRegistryRecords_(shuffledRows(rows)));
+  assert.deepEqual(moved, normal);
+  assert.deepEqual(normal[0], {academicYear: '2025-26', semester: 'Even', teamId: 'T9', title: 'OLD TITLE'});
+  assert.throws(() => c.masterRegistryRecords_([['Academic Year', 'Semester', 'Team ID', 'Title'], ['a', 'b', 'c', 'd']]), /Missing: TeamID/);
+  assert.throws(() => c.masterRegistryRecords_([['Academic Year', 'Semester', 'TeamID', 'Title', 'title'], ['a', 'b', 'c', 'd', 'e']]), /Duplicate header in MasterRegistry: Title/);
+  assert.deepEqual(plain(c.masterRegistryRecords_([['Title', 'TeamID', 'Semester', 'Academic Year']])), [], 'a registry with no rows is empty, not an error');
+});

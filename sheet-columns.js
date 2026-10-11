@@ -5,7 +5,7 @@
  * tests/sheet-catalog.test.cjs). Whether the code that creates a sheet goes through ensureSheet_ shows in `code` as a setup or
  * runtime-create entry.
  * Specified in SHEET-HEADER-MATCHING-PLAN.md ("Sheet catalog"); the generated reference is SHEETS.md
- * (npm run build:sheets-doc). Every sheet the code touches is listed, except the master registry of the hub spreadsheet.
+ * (npm run build:sheets-doc). Every sheet the code touches is listed (the master registry is in the hub spreadsheet).
  *
  * - Frozen sheets are referenced with headersFrom: 'FIELD_DEFINITIONS.<NAME>', never copied.
  * - `code` lists only code that exists: { file, role, functions }, role = setup | runtime-create | read | write.
@@ -186,6 +186,17 @@ function sheetCatalog_() {
           {file: 'progress-eligibility.js', role: 'setup', functions: ['setupProgressEligibilityStorage']},
           {file: 'progress-eligibility.js', role: 'read', functions: ['progressEligibilityStorage_']},
           {file: 'progress-eligibility.js', role: 'write', functions: ['writeProgressEligibility_']}
+        ]
+      },
+      masterRegistry: {
+        name: SHEET_NAMES.MASTER_REGISTRY,
+        access: 'view',
+        headers: ['Academic Year', 'Semester', 'TeamID', 'Guide Email', 'Title', 'Repo URL', 'Team Members', 'Approved Date', 'Approved By'],
+        status: 'migrated',
+        purpose: 'Approved titles of all years, for the similarity check. It is in the hub spreadsheet (HUB_SHEET_ID), not this one, and is read only: no code creates or writes it. The code needs only Academic Year, Semester, TeamID and Title.',
+        createAtRuntime: false,
+        code: [
+          {file: 'common-helpers.js', role: 'read', functions: ['getHubRegistrySheet_', 'masterRegistryRecords_', 'readMasterRegistry_']}
         ]
       },
       assessmentJournal: {

@@ -7,7 +7,7 @@
  *     authorize(teamId)                 -> {actor, roles: {student, guide, reviewer, coordinator}}; throws apiFail_ UNAUTHENTICATED/UNAUTHORIZED.
  *                                          Called before and again under the lock, so it must read the roster and committee fresh.
  *     unmetRequirements(state, user)    -> [string]   optional; submit only; runs outside the lock (GitHub and Drive calls).
- *     similarityContext(teamId, index)  -> {registryRows, academicYear, semester, others}   required for submit and a guide edit.
+ *     similarityContext(teamId, index)  -> {registryRows: [{academicYear, semester, teamId, title}], academicYear, semester, others}   required for submit and a guide edit.
  *   }
  * Returns {ok, revision, status, message}. A repeated request that already committed returns the stored result. No e-mail is sent.
  */

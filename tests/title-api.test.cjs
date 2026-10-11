@@ -43,7 +43,7 @@ function setup({cutover = 'LIVE', registryFails = false, activity = null} = {}) 
   c.getCoordinatorEmail_ = () => 'coord@x.edu';
   c.getDashboardUrl_ = () => 'https://dash.example';
   c.getAcademicYear_ = () => '2026-27';
-  c.getHubRegistrySheet_ = () => { if (registryFails) throw new Error('registry down'); return {getDataRange: () => ({getValues: () => [['y', 's', 't', 'g', 'title'], ['2025-26', 'Even', 'T9', 'g', 'OLD TITLE']]})}; };
+  c.getHubRegistrySheet_ = () => { if (registryFails) throw new Error('registry down'); return {getDataRange: () => ({getValues: () => [['Academic Year', 'Semester', 'TeamID', 'Guide Email', 'Title', 'Repo URL', 'Team Members', 'Approved Date', 'Approved By'], ['2025-26', 'Even', 'T9', 'g', 'OLD TITLE', '', '', '', '']]})}; };
   c.activityDriveFolder_ = () => ({absent: true});
   c.findTeamFolder_ =() => ({getUrl: () => 'https://drive.example/folder'});
   c.studentAccessOrThrow_ = () => {

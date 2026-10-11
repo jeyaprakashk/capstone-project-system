@@ -20,9 +20,8 @@ in search-result order using one batched value read. Writes remain limited to th
 intended cells. Readers do not persist data or width caches between calls.
 
 Every sheet the code uses is read and written by header name, so column order does not
-matter and extra columns are kept: see SHEETS.md for each sheet and its status. The
-exception is the master registry of the hub spreadsheet, whose columns are still read by
-position (the header names are not defined in this project). Full-width reads prevent
+matter and extra columns are kept: see SHEETS.md for each sheet and its status. This
+includes the master registry of the hub spreadsheet. Full-width reads prevent
 truncation. A missing or repeated required header throws and names the sheet and header.
 
 Deploy `sheet-reads.js` alongside all callers. `npm test` includes empty-sheet,

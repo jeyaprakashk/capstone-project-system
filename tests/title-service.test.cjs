@@ -181,9 +181,9 @@ test('every row the service builds passes the history rules, whatever legal path
 });
 
 const registry = [
-  ['2026-27', 'Odd', 'T9', 'g@x', 'SMART IRRIGATION SYSTEM', '', '', '', ''],
-  ['2026-27', 'Odd', 'T1', 'g@x', 'THE TEAMS OWN OLD ROW', '', '', '', ''],
-  ['2025-26', 'Even', 'T7', 'g@x', 'WATER QUALITY MONITOR', '', '', '', '']
+  {academicYear: '2026-27', semester: 'Odd', teamId: 'T9', title: 'SMART IRRIGATION SYSTEM'},
+  {academicYear: '2026-27', semester: 'Odd', teamId: 'T1', title: 'THE TEAMS OWN OLD ROW'},
+  {academicYear: '2025-26', semester: 'Even', teamId: 'T7', title: 'WATER QUALITY MONITOR'}
 ];
 const similarityContext = (extra = {}) => ({registryRows: registry, academicYear: '2026-27', semester: 'Odd', others: [], ...extra});
 

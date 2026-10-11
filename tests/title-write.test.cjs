@@ -197,7 +197,7 @@ test('a busy lock is UNAVAILABLE "Busy, try again." and writes nothing', () => {
 test('a title too similar to the registry is REJECTED, and nothing is written', () => {
   const {env, c, lockState} = setup();
   c.similarity_ = () => 0.9;
-  const deps = depsFor('student', {similarityContext: () => ({registryRows: [['2025-26', 'Even', 'T9', 'g', 'OLD TITLE']], academicYear: '2026-27', semester: 'Odd', others: []})});
+  const deps = depsFor('student', {similarityContext: () => ({registryRows: [{academicYear: '2025-26', semester: 'Even', teamId: 'T9', title: 'OLD TITLE'}], academicYear: '2026-27', semester: 'Odd', others: []})});
   fails(() => c.titleWrite_(request('submit', SUBMIT), deps), 'REJECTED', /90% similar to: "OLD TITLE"/);
   assert.equal(rowsOf(env).length, 0);
   assert.equal(lockState.releases, 1);

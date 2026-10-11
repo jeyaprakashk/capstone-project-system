@@ -170,9 +170,9 @@ function titleOtherTeamTitles_(index, teamId) {
 function titleSimilarity_(title, teamId, context) {
   let best = {score: 0, title: '', context: ''};
   (context.registryRows || []).forEach(record => {
-    if (textEquals_(record[0], context.academicYear) && textEquals_(record[1], context.semester) && textEquals_(record[2], teamId)) return;
-    const score = similarity_(title, record[4]);
-    if (score > best.score) best = {score, title: record[4], context: record[0] + ' - ' + record[1]};
+    if (textEquals_(record.academicYear, context.academicYear) && textEquals_(record.semester, context.semester) && textEquals_(record.teamId, teamId)) return;
+    const score = similarity_(title, record.title);
+    if (score > best.score) best = {score, title: record.title, context: record.academicYear + ' - ' + record.semester};
   });
   if (best.score >= TITLE_SIMILARITY_BLOCK_) {
     throw apiFail_('REJECTED', 'The title is ' + Math.round(best.score * 100) + '% similar to: "' + best.title + '" (' + best.context + '). Please revise the title.');

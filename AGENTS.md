@@ -39,9 +39,8 @@ setup mode never runs on a request. Every call names its `mode`.
 
 ## Sheet access
 
-Every sheet is read and written by header name, so column order does not matter and an extra column is harmless. The one
-exception is the master registry of the hub spreadsheet (`title-service.js`, `titleSimilarity_`), read by position until its
-header names are known; `tests/sheet-position-guard.test.cjs` lists it.
+Every sheet is read and written by header name, so column order does not matter and an extra column is harmless. This includes
+the master registry of the hub spreadsheet (`readMasterRegistry_`), which is read only.
 
 - Reach a sheet field through a column map built from the header row (`getColumnMap_`, `buildColumnMap_`, or the sheet's own
   `...Columns_` function). Never use a number as a row index or a `getRange` column. Header comparison is `textEquals_`
