@@ -7,6 +7,7 @@
  */
 const TEAM_DOCUMENTS_FOLDER_NAME_ = 'Team Documents';
 const TEAM_FOLDER_BATCH_ = 25;
+const TEAM_FOLDER_GRANT_BUDGET_MS_ = 240000;
 /** Fixed file names inside a team folder; the documents check (team-documents.js) reads the same names. */
 const TEAM_DOCUMENT_FILE_NAMES_ = Object.freeze({work: 'Step1_Work_Breakdown.docx', need: 'Step2_Need_Analysis.docx'});
 
@@ -69,7 +70,8 @@ function teamFolderPlan_() {
     if (seen[key]) return;
     seen[key] = true;
     const teamId = String(row[TS.TEAM_ID]);
-    try { named.push({teamId, key, name: teamFolderName_(year, row[TS.SEMESTER], teamId)}); }
+    const emails = [1, 2, 3, 4].map(n => normalizeEmail_(row[TS['S' + n + '_EMAIL']])).filter((email, index, list) => email && list.indexOf(email) === index);
+    try { named.push({teamId, key, emails, semester: row[TS.SEMESTER], name: teamFolderName_(year, row[TS.SEMESTER], teamId)}); }
     catch (error) { issues.push('Team ' + teamId + ' has no semester or Team ID that can be used in a folder name.'); }
   });
   const byName = Object.create(null);
@@ -105,6 +107,40 @@ function buildTeamFoldersDto_() {
 }
 
 /**
+ * Gives the students of a team viewer access to one team folder (and nothing else): the Drive permission "reader", with no
+ * notification e-mail. Students already on the folder are skipped, so it is safe to repeat. Never throws: returns
+ * {added:[email], skipped:[email], failed:[{email, reason}]}. A student is never made a member of the shared drive.
+ */
+function teamFolderGrantViewers_(folder, emails) {
+  const result = {added: [], skipped: [], failed: []};
+  if (!emails.length) return result;
+  const folderId = String(folder.getId());
+  let existing;
+  try {
+    const listed = Drive.Permissions.list(folderId, {supportsAllDrives: true, fields: 'permissions(id,type,role,emailAddress)'});
+    existing = new Set(((listed && listed.permissions) || []).map(item => normalizeEmail_(item.emailAddress)).filter(Boolean));
+  } catch (error) {
+    emails.forEach(email => result.failed.push({email, reason: 'The folder\'s sharing could not be read: ' + String(error && error.message || error)}));
+    return result;
+  }
+  emails.forEach(email => {
+    if (existing.has(email)) { result.skipped.push(email); return; }
+    try {
+      Drive.Permissions.create({type: 'user', role: 'reader', emailAddress: email}, folderId, {supportsAllDrives: true, sendNotificationEmail: false});
+      result.added.push(email);
+    } catch (error) {
+      result.failed.push({email, reason: String(error && error.message || 'Access could not be granted.')});
+    }
+  });
+  return result;
+}
+
+/** One line for a result's students that could not be added, or '' when all were. */
+function teamFolderShareReason_(sharing) {
+  return sharing.failed.length ? 'Students not added: ' + sharing.failed.map(item => item.email + ' (' + item.reason + ')').join('; ') : '';
+}
+
+/**
  * The write. Safe to run again: it re-reads Drive under a lock and skips folders that exist. A failed team is
  * reported and the batch continues. cursor is the last Team ID key handled by the previous batch.
  */
@@ -121,14 +157,57 @@ function createTeamFolders_(cursor) {
     const counts = teamFolderCounts_(documents.folder);
     const pending = teamFolderPlan_().teams.filter(team => !counts[team.name]);
     const batch = pending.filter(team => !cursor || team.key > cursor).slice(0, TEAM_FOLDER_BATCH_);
-    const created = [], failed = [];
+    const created = [], failed = [], notShared = [];
     batch.forEach(team => {
-      try { documents.folder.createFolder(team.name); created.push(team.teamId); }
-      catch (error) { failed.push({teamId: team.teamId, reason: String(error && error.message || 'Folder could not be created.')}); }
+      let folder;
+      try { folder = documents.folder.createFolder(team.name); created.push(team.teamId); }
+      catch (error) { failed.push({teamId: team.teamId, reason: String(error && error.message || 'Folder could not be created.')}); return; }
+      // The folder stands even if the students cannot be added; the team is listed so the owner can see it.
+      const reason = teamFolderShareReason_(teamFolderGrantViewers_(folder, team.emails));
+      if (reason) notShared.push({teamId: team.teamId, reason});
     });
     const last = batch.length ? batch[batch.length - 1].key : cursor || '';
     const remaining = pending.filter(team => team.key > last).length;
-    return {teamDocuments: {url: String(documents.folder.getUrl()), justCreated: !existed}, created, failed, remaining, nextCursor: remaining ? last : null};
+    return {teamDocuments: {url: String(documents.folder.getUrl()), justCreated: !existed}, created, failed, notShared, remaining, nextCursor: remaining ? last : null};
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * TEMPORARY, editor-run. Gives the students of every team that already has a folder viewer access to it, as createTeamFolders_ does
+ * for new folders. Safe to run again (it only adds the missing ones). It works in batches inside a time budget and keeps its place
+ * in the Script Property TEAM_FOLDER_GRANT_CURSOR, so run it again until it reports remaining 0. Delete this function, its guard
+ * entry and its test once the owner has run it (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, Phase 0).
+ */
+function grantExistingTeamFolderAccess() {
+  requireTriggerOrOperator_();
+  const properties = PropertiesService.getScriptProperties(), cursorKey = 'TEAM_FOLDER_GRANT_CURSOR';
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const documents = teamDocumentsFolderOrNull_();
+    if (!documents) throw new Error('Team Documents was not found next to the spreadsheet.');
+    const cursor = properties.getProperty(cursorKey) || '';
+    const counts = teamFolderCounts_(documents);
+    const plan = teamFolderPlan_().teams.filter(team => counts[team.name] && (!cursor || team.key > cursor));
+    const deadline = Date.now() + TEAM_FOLDER_GRANT_BUDGET_MS_;
+    const report = {added: [], skipped: [], failed: [], remaining: 0};
+    let last = cursor;
+    for (const team of plan) {
+      if (Date.now() >= deadline) break;
+      last = team.key;
+      const located = teamFolderIn_(documents, team.teamId, team.semester);
+      if (!located.folder) { report.failed.push({teamId: team.teamId, reason: 'The team has more than one folder of its name.'}); continue; }
+      const sharing = teamFolderGrantViewers_(located.folder, team.emails);
+      sharing.added.forEach(email => report.added.push({teamId: team.teamId, email}));
+      sharing.skipped.forEach(email => report.skipped.push({teamId: team.teamId, email}));
+      sharing.failed.forEach(item => report.failed.push({teamId: team.teamId, email: item.email, reason: item.reason}));
+    }
+    report.remaining = plan.filter(team => team.key > last).length;
+    if (report.remaining) properties.setProperty(cursorKey, last); else properties.deleteProperty(cursorKey);
+    console.log('Team folder access: ' + JSON.stringify({added: report.added.length, skipped: report.skipped.length, failed: report.failed, remaining: report.remaining}));
+    return report;
   } finally {
     lock.releaseLock();
   }

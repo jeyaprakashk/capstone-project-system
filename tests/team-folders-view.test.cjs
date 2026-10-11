@@ -134,3 +134,10 @@ test('create does nothing when the DTO says it cannot create', async () => {
   a.actions.createTeamFolders(); await a.settle();
   assert.equal(a.log.filter(entry => entry[0] === 'confirm' || entry[0] === 'write').length, 0);
 });
+
+test('students who could not be added are listed after the created count', async () => {
+  const a = actionsSetup({ write: () => ({ created: ['T2'], failed: [], notShared: [{ teamId: 'T2', reason: 'Students not added: ann@x.edu (No access)' }], nextCursor: null }) });
+  a.actions.recheckTeamFolders(); await a.settle();
+  a.actions.createTeamFolders(); await a.settle();
+  assert.match(a.status(), /1 team folder created\. Students could not be added to the folder of: T2 \(Students not added: ann@x\.edu \(No access\)\)\./);
+});

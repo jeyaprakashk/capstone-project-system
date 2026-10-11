@@ -154,7 +154,7 @@ function systemStatusActionsBrowser_(bridge, getUi) {
     button.disabled = true;
     recheck.disabled = true;
     getUi().busy.mark(card, true);
-    const created = [], failed = [];
+    const created = [], failed = [], notShared = [];
     let stopBusy = null;
     function finish(message) {
       creatingTeamFolders = false;
@@ -170,8 +170,9 @@ function systemStatusActionsBrowser_(bridge, getUi) {
       bridge.write('API_coordinator_createTeamFolders', [cursor]).then(result => {
         created.push(...result.created);
         failed.push(...result.failed);
+        notShared.push(...(result.notShared || []));
         if (result.nextCursor !== null) { if (card.isConnected) batch(result.nextCursor); else finish('Run paused because this section was closed. Recheck to continue.'); return; }
-        finish(created.length + ' team folder' + (created.length === 1 ? '' : 's') + ' created.' + (failed.length ? ' Failed: ' + failed.map(item => item.teamId + ' (' + item.reason + ')').join('; ') + '. Use Recheck, then create again to retry.' : ''));
+        finish(created.length + ' team folder' + (created.length === 1 ? '' : 's') + ' created.' + (failed.length ? ' Failed: ' + failed.map(item => item.teamId + ' (' + item.reason + ')').join('; ') + '. Use Recheck, then create again to retry.' : '') + (notShared.length ? ' Students could not be added to the folder of: ' + notShared.map(item => item.teamId + ' (' + item.reason + ')').join('; ') + '.' : ''));
       }, error => finish('Folder creation stopped: ' + errorMessage(error) + '. ' + created.length + ' created before the stop. Recheck, then create again to resume.'));
     }
     batch('');

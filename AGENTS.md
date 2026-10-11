@@ -72,9 +72,13 @@ history (one row per change, the latest row of a team is its state). Specified i
   in `title-service.js` and the history validation in `title-history.js`. A row is appended and never edited.
 - **Requirements** that gate a student action come from the `ActivityDependencies` sheet through the engine (`activity-engine.js`, the
   `github` and `drive` checks). Misconfiguration denies; nothing is cached between requests; a student never sees a check's `diagnostic`.
-- **Students never get a Drive link.** The team folders live in a shared drive that students are not members of, so no student DTO or
-  student view carries `folderUrl`, a document link or any folder link. Guides, reviewers and the coordinator get `folderUrl`.
-  `tests/student-title.test.cjs` and `tests/student-migration.test.cjs` fail if a student receives one.
+- **Students and Drive.** The team folders live in a shared drive that students are **not members of**. Each team's students are given
+  viewer access to **their own team's folder only** (`createTeamFolders_` adds them; nothing else does). Nothing in a team folder may be
+  hidden from them: what the app chooses to link cannot limit what a folder viewer sees in Drive. The app never shows a student a folder
+  link: no student DTO or student view carries `folderUrl`. Until the template-document submission ships (Phase 3 of
+  TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md) no student DTO carries any Drive link; after it, a student DTO may carry the link of an approved
+  document of the student's own team, and nothing else. Guides, reviewers and the coordinator get `folderUrl`.
+  `tests/student-title.test.cjs` and `tests/student-migration.test.cjs` fail if a student receives a link they may not have.
 - The browser sends title writes with a request ID from `TitleRequests` (`title-requests.js`) and the `revision` its DTO carried.
 - `TITLE_CUTOVER` is changed only by `setTitleCutover` and `clearTitleCutover`. The one-time import of the old title columns into
   `TitleLog` (cutover step 4) has been run and its code deleted, so nothing reads the old columns any more.

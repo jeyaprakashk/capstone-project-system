@@ -142,7 +142,7 @@ full backup and deleted the tab and the Forms directly, so there is no archive s
 - Do not edit `TitleLog` after cutover.
 - Never edit the `TITLE_CUTOVER` property by hand; only `setTitleCutover(...)` and `clearTitleCutover()` change it. To pause title writes later, run
   `setTitleCutover('PAUSED')`, then `setTitleCutover('LIVE')`.
-- Never add students, or a group that contains students, to the shared drive.
+- Never add students, or a group that contains students, to the shared drive as members. Students are viewers of their own team's folder only (the system adds them; do not add them by hand to other folders).
 - The end-of-semester registry export (title plan F2) has **not** been built. Before starting the next semester's spreadsheet, ask for it, or this semester's approved titles will not be in the master registry for the similarity check.
 - Column order does not matter to the code (AGENTS.md, "Sheet access"), so you may move or add columns. Do not rename a header or delete a column the code uses.
 
