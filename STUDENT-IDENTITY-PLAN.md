@@ -3,6 +3,27 @@
 Status: **plan, not built. Revision 15, a rewrite (2026-10-12).** It replaces revision 14 (1,227 lines). That text is in git history:
 `git show 2b16770:STUDENT-IDENTITY-PLAN.md`. Nothing described here exists in the code yet.
 
+**Prepared and parked (2026-10-12).** The plan is complete and ready to start, but the owner has decided to do the work later. Nothing is to
+be built until the owner says to start. The decisions are made; the three items below must be answered first.
+
+## Status and next steps
+
+| Item | State |
+|---|---|
+| Plan | Revision 15, complete. Decision 1 (start in the next semester's spreadsheet) is the recommendation and stands unless the owner overrules it. |
+| Academic sign-off | **Not yet recorded.** Phase 0 cannot finish without it. |
+| Next semester's start date | **Not yet known.** It sets when the branch must be finished. |
+| Implementation | Not started. No code, sheet, setting or branch has been created. |
+
+**When the owner says to start, in this order**
+1. Answer the three questions in [section 15](#15-questions-for-the-owner) and record the written sign-off in section 3.
+2. Create the branch `student-identity` from `main`, and note the date here so that fixes made on `main` afterwards can be merged into it.
+3. Phase 0 to Phase 5 in [section 12](#12-phases), one phase at a time, each with `npm test` green.
+4. Before the next semester's spreadsheet is prepared, merge the branch and follow [section 13](#13-starting-the-next-semester).
+
+**Continuing in a new session:** ask the assistant to read this file and AGENTS.md, then name the phase you are on. Search for a function
+by name before relying on a file or line mentioned here; the code moves.
+
 ## 1. What this does, in plain words
 
 Today a student is written down in several places: name, register number and e-mail are in both `TeamRoster` and `TeamStatus`,
@@ -304,7 +325,7 @@ builder; tests that key by register number key by ID; the schema snapshot is reg
 1. **Start in the next semester's spreadsheet (recommended), or convert the running semester?** Converting needs the maintenance window,
    journal rewrites and rollback of revision 14, which adds roughly half of that plan back. Say "next semester" to accept the
    recommendation.
-2. **Academic sign-off** (section 3). Who owns academic results, and has she or he accepted (a), (b) and (c)?
+2. **Academic sign-off** (section 3). Who owns academic results, and have they accepted (a), (b) and (c) in writing?
 3. **When does the next semester's spreadsheet need to be ready?** The branch must be finished before that date; the date sets how much
    work can be done in what order.
 
