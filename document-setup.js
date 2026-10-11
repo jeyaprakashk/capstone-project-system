@@ -1,7 +1,7 @@
 /**
  * DOCUMENT SETUP - the editor-run entry points of the template-document work (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, sections 9 and 11).
  *   setupDocumentStorage  creates the document sheets built so far (each phase adds its own). It installs no trigger.
- *   setupDocumentTriggers installs the daily triggers built so far, once each. Phase 1: the template scan.
+ *   setupDocumentTriggers installs the daily triggers built so far, once each: the template scan and the team-file scan.
  * Both start with requireTriggerOrOperator_(); neither changes or deletes data.
  */
 const DOCUMENT_TRIGGER_OWNER_KEY_ = 'DOCUMENT_TRIGGER_OWNER';
@@ -9,7 +9,8 @@ const DOCUMENT_TRIGGER_OWNER_KEY_ = 'DOCUMENT_TRIGGER_OWNER';
 function setupDocumentStorage() {
   requireTriggerOrOperator_();
   return {
-    templateFiles: ensureSheet_({...sheetSpec_('templateFiles'), mode: 'setup', onCreate: formatDocumentSheet_})
+    templateFiles: ensureSheet_({...sheetSpec_('templateFiles'), mode: 'setup', onCreate: formatDocumentSheet_}),
+    teamFileStatus: ensureSheet_({...sheetSpec_('teamFileStatus'), mode: 'setup', onCreate: formatDocumentSheet_})
   };
 }
 
@@ -22,7 +23,7 @@ function setupDocumentTriggers() {
   if (owner && !emailsMatch_(owner, email)) throw new Error('The existing document triggers belong to ' + owner + '. They must manage them.');
   const installed = ScriptApp.getProjectTriggers().map(trigger => trigger.getHandlerFunction());
   const created = [];
-  [['scanTemplateFiles', 2]].forEach(([handler, hour]) => {
+  [['scanTemplateFiles', 2], ['scanTeamFiles', 3]].forEach(([handler, hour]) => {
     if (installed.includes(handler)) return;
     ScriptApp.newTrigger(handler).timeBased().everyDays(1).atHour(hour).create();
     created.push(handler);

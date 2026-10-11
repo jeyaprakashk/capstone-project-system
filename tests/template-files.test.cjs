@@ -12,7 +12,7 @@ const file = name => ({type: 'file', name, path: name, sha: 'sha-' + name});
 
 function setup(listings) {
   const f = weeklyFixture();
-  ['document-sheets.js', 'template-files.js', 'document-setup.js', 'generated/github-template-manifest.js'].forEach(name => vm.runInContext(fs.readFileSync(name, 'utf8'), f.c, {filename: name}));
+  ['document-sheets.js', 'template-files.js', 'team-files.js', 'document-setup.js', 'generated/github-template-manifest.js'].forEach(name => vm.runInContext(fs.readFileSync(name, 'utf8'), f.c, {filename: name}));
   f.c.requireTriggerOrOperator_ = () => {};
   f.c.Session.getEffectiveUser = () => ({getEmail: () => 'owner@example.com'});
   const github = {listings: listings || {'1_Documents': [file('Step1_Work_Breakdown.docx'), file('Brand_New.docx'), file('notes.md'), {type: 'dir', name: 'extra'}], '5_Presentations': [file('Review1_Presentation.pptx')]}, calls: [], fail: null};
@@ -186,21 +186,22 @@ test('a write that fails part-way leaves valid rows, and the next scan converges
   assert.ok(writes >= 4, 'the scan makes several separate record writes (' + writes + ')');
 });
 
-test('setupDocumentTriggers installs the daily template scan once, for one owner', () => {
+test('setupDocumentTriggers installs the two daily scans once each, for one owner', () => {
   const {f} = setup();
   const first = plain(f.c.setupDocumentTriggers());
-  assert.deepEqual([first.created, first.owner], [['scanTemplateFiles'], 'owner@example.com']);
+  assert.deepEqual([first.created, first.owner], [['scanTemplateFiles', 'scanTeamFiles'], 'owner@example.com']);
   assert.equal(f.triggers.filter(trigger => trigger.getHandlerFunction() === 'scanTemplateFiles').length, 1);
   assert.deepEqual([f.triggers[0].days, f.triggers[0].hour], [1, 2]);
+  assert.deepEqual([f.triggers[1].days, f.triggers[1].hour], [1, 3]);
   assert.deepEqual(plain(f.c.setupDocumentTriggers()).created, []);
-  assert.equal(f.triggers.length, 1);
+  assert.equal(f.triggers.length, 2);
   f.c.Session.getEffectiveUser = () => ({getEmail: () => 'someone.else@example.com'});
   assert.throws(() => f.c.setupDocumentTriggers(), /belong to owner@example\.com/);
 });
 
 test('the entry points are guarded, and no module reads the Config tab for the template repository', () => {
-  for (const name of ['setupDocumentStorage', 'setupDocumentTriggers', 'scanTemplateFiles']) {
-    const source = fs.readFileSync(name === 'scanTemplateFiles' ? 'template-files.js' : 'document-setup.js', 'utf8');
+  for (const name of ['setupDocumentStorage', 'setupDocumentTriggers', 'scanTemplateFiles', 'scanTeamFiles']) {
+    const source = fs.readFileSync(name === 'scanTemplateFiles' ? 'template-files.js' : name === 'scanTeamFiles' ? 'team-files.js' : 'document-setup.js', 'utf8');
     const body = source.slice(source.indexOf('function ' + name + '('));
     assert.equal(body.slice(body.indexOf('{') + 1).trim().split(/\r?\n/)[0].trim(), 'requireTriggerOrOperator_();', name);
   }

@@ -254,6 +254,19 @@ function sheetCatalog_() {
           {file: 'template-files.js', role: 'read', functions: ['readTemplateFiles_']},
           {file: 'template-files.js', role: 'write', functions: ['writeTemplateFiles_']}
         ]
+      },
+      teamFileStatus: {
+        name: 'TeamFileStatus',
+        access: 'view',
+        headers: ['Team ID', 'Document ID', 'Repo Blob SHA', 'Team Changed', 'Last Team Commit', 'Latest Commit', 'Checked At'],
+        status: 'new',
+        purpose: 'For each team and listed template document: has a team member changed the file in the team repository (Yes, No or Unknown), written by a daily scan.',
+        createAtRuntime: false,
+        code: [
+          {file: 'document-setup.js', role: 'setup', functions: ['setupDocumentStorage']},
+          {file: 'team-files.js', role: 'read', functions: ['readTeamFileStatus_']},
+          {file: 'team-files.js', role: 'write', functions: ['writeTeamFileStatus_']}
+        ]
       }
     });
   }
