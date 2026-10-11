@@ -140,6 +140,36 @@ test('ensureSheet_ is only called directly, from a function listed in the catalo
   assert.deepEqual(offenders, []);
 });
 
+test('a setup function is an editor-run entry point or is reached only from setup code', () => {
+  const c = load();
+  const guardSource = fs.readFileSync('tests/entry-point-guard.test.cjs', 'utf8');
+  const guarded = new Set([...guardSource.match(/const GUARDED = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)].map(match => match[1]));
+  const setupFunctions = [];
+  Object.values(c.sheetCatalog_()).forEach(entry => entry.code.filter(item => item.role === 'setup')
+    .forEach(item => item.functions.forEach(fn => setupFunctions.push({file: item.file, fn}))));
+  const isSetup = (file, fn) => setupFunctions.some(item => item.file === file && item.fn === fn);
+  const sources = rootScripts().map(file => ({file, text: stripComments(fs.readFileSync(file, 'utf8'))}));
+  const problems = [];
+  for (const {file, fn} of setupFunctions) {
+    if (!fn.endsWith('_') && !fn.startsWith('API_')) {
+      if (!guarded.has(fn)) problems.push(fn + ' is a public setup function but is not a guarded entry point');
+      continue;
+    }
+    let callSites = 0;
+    for (const source of sources) {
+      for (const match of source.text.matchAll(new RegExp('(?<![A-Za-z0-9_$])' + fn + '\\s*\\(', 'g'))) {
+        // the definition itself ("function name(") is not a call site
+        if (source.text.slice(Math.max(0, match.index - 9), match.index) === 'function ') continue;
+        callSites++;
+        const caller = enclosingFunction(source.text, match.index);
+        if (!isSetup(source.file, caller) && !(guarded.has(caller))) problems.push(fn + ' is called from ' + source.file + ':' + caller + ', which is not setup code or an entry point');
+      }
+    }
+    if (!callSites) problems.push(fn + ' is a private setup function with no caller');
+  }
+  assert.deepEqual(problems, []);
+});
+
 test('the catalog adds no public function and no entry to SHEET_NAMES or FIELD_DEFINITIONS', () => {
   const text = fs.readFileSync('sheet-columns.js', 'utf8');
   const publicFunctions = [...text.matchAll(/^function ([A-Za-z0-9$]+)\s*\(/gm)].map(match => match[1]).filter(name => !name.endsWith('_'));

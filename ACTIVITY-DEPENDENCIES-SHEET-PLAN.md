@@ -90,8 +90,8 @@ ENSURE-SHEET-PLAN.md section 4. In summary for this sheet: it is created if abse
 are present; a missing header is appended silently once repair is enabled; a possible typo, a duplicate or a stray cell
 outside the header row throws and changes nothing. It never deletes or reorders a column and never writes a data row.
 
-Until the helper's repair branch is enabled (ENSURE-SHEET-PLAN sections 7 and 10), a missing header on an existing sheet
-throws like the other refusal cases.
+The helper's repair is enabled (BUILD-ORDER.md item 2, `eb643b2`), so a missing header on an existing sheet is appended at
+setup. **Built** as build order item 4: `activity-dependencies-sheet.js` and `tests/activity-dependencies-sheet.test.cjs`.
 
 ### Who can run it
 

@@ -22,7 +22,9 @@ function sheetCatalog_() {
         status: 'new',
         purpose: 'Rules that gate student actions. The coordinator fills the rows.',
         createAtRuntime: false,
-        code: []
+        code: [
+          {file: 'activity-dependencies-sheet.js', role: 'setup', functions: ['setupActivityDependencies', 'ensureActivityDependenciesSheet_']}
+        ]
       },
       titleLog: {
         name: 'TitleLog',
