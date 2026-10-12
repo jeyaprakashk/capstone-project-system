@@ -15,7 +15,8 @@ under "The plan as it was written".
 | [ACTIVITY-DEPENDENCIES-SHEET-PLAN.md](plans/ACTIVITY-DEPENDENCIES-SHEET-PLAN.md) | Built: the `ActivityDependencies` sheet. It has no rows, so no requirement is enforced. |
 | [ACTIVITY-DEPENDENCIES-PLAN.md](plans/ACTIVITY-DEPENDENCIES-PLAN.md) | Built: the engine, the `github` and `drive` checks and `API_coordinator_getRequirements`. |
 | [SHEET-HEADER-MATCHING-PLAN.md](plans/SHEET-HEADER-MATCHING-PLAN.md) | Built: every sheet is read and written by header name; AGENTS.md no longer freezes column order. |
+| [OWNER-CHECKLIST.md](plans/OWNER-CHECKLIST.md) | Completed: every owner step, A to D, is done (owner confirmed 2026-10-12). Section E (rules to keep) is still how the system is run. |
 | [FORM-SHEET-RETIREMENT-PLAN.md](plans/FORM-SHEET-RETIREMENT-PLAN.md) | Executed: the Form sheets are gone from the code; the owner's backup replaced the archive steps. |
 
 Still open and not archived: [STUDENT-IDENTITY-PLAN.md](../STUDENT-IDENTITY-PLAN.md) (not built), [BUILD-ORDER.md](../BUILD-ORDER.md) (item 14 is
-open) and [OWNER-CHECKLIST.md](../OWNER-CHECKLIST.md) (section D lists the remaining owner steps).
+open).
