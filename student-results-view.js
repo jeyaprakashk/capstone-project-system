@@ -88,7 +88,7 @@ function studentResultsViewBrowser_(bridge, getUi) {
 
   const reviewSpec = key => ({id:'studentAssessment-' + key, method:'API_student_getReviewResult', args:[key], render:review, eligibilityKey:key,
     label:host => host.dataset && host.dataset.assessmentLabel || key, failure:label => label + ' results unavailable.'});
-  const guideSpec = {id:'studentGuideEvaluation', method:'API_student_getGuideResult', args:[], render:guide,
+  const guideSpec = {id:'studentGuideEvaluation', method:'API_student_getGuideResult', args:[], render:guide, eligibilityKey:'guide_eval',
     label:host => host.dataset && host.dataset.assessmentLabel || 'Guide Evaluation', failure:() => 'Guide evaluation unavailable.'};
 
   return {

@@ -115,13 +115,14 @@ function API_student_getReviewResult(key) {
 }
 
 /**
- * The reviews the student's team is not eligible for (open, not yet entered, and a condition is not met), in one read for every review so the
- * Drive folder, the documents and the rules are read once. It is a label for an unpublished review and says nothing more than that.
+ * The assessments the student's team is not eligible for (not yet entered, and a condition is not met), in one read for every assessment the
+ * activity dependencies know, so the Drive folder, the documents and the rules are read once. It is a label for an unpublished assessment and
+ * says nothing more than that.
  */
 function API_student_getEligibility() {
   return apiHandle_(() => {
     const student = studentAccessOrThrow_();
-    return {notEligible: reviewsTeamNotEligible_(student.teamId, student.semester)};
+    return {notEligible: assessmentsTeamNotEligible_(student.teamId, student.semester)};
   });
 }
 
