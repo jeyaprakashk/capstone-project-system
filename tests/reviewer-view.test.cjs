@@ -31,7 +31,7 @@ function setup(dto) {
     calls.writes.push([method, args]);
     return state.writeError ? JSON.stringify({ ok: false, error: { code: 'REJECTED', message: state.writeError } }) : JSON.stringify({ ok: true, data: state.writeResult });
   });
-  const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: name => { assert(['tag','clipboard-check','ellipsis','triangle-alert'].includes(name), 'Unknown icon: ' + name); return ''; }, refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
+  const ui = { busy: require('./busy-fixture.cjs')(), renderSkeleton: (variant, label) => '<span role="status" aria-label="' + label + '" data-skeleton></span>', renderIcon: name => { assert(['tag','clipboard-check','ellipsis','triangle-alert'].includes(name), 'Unknown icon: ' + name); return ''; }, refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => { calls.loading++; return () => { calls.finished++; }; } };
   vm.runInContext('globalThis.__make = ' + c.reviewerViewBrowser_.toString(), c);
   const tabs = c.sharedTabsBrowser_(() => ui);
   const requests = c.titleRequestsBrowser_();
@@ -45,8 +45,10 @@ const stage = (f,key) => f.click(f.host.querySelector('[role=tab][data-stage='+k
 const panel = f => f.host.querySelector('[data-title-panel]');
 
 
-test('stage tabs use configured reviews and separate title status from action', () => {
+test('stage tabs use configured reviews and separate title status from action', async () => {
   const f=setup();f.view.render(f.host,dtoOf([team(1)]));
+  assert.equal(f.host.querySelectorAll('[role=tab] [data-tab-badge]').length,1,'a team still being checked is not counted as awaiting action');
+  await settleAll(f);
   assert.deepEqual(Array.from(f.host.querySelectorAll('[role=tab]')).map(n=>n.dataset.stage),['title','review1','review2']);
   const selected=f.host.querySelector('[role=tab][aria-selected=true]');
   assert.equal(selected.dataset.stage,'title');
@@ -154,8 +156,10 @@ test('failed decision retains panel and server message',async()=>{
   f.click(panel(f).querySelector('[data-decision=Approved]'));f.click(panel(f).querySelector('[data-action=submit-decision]'));await f.settle();
   assert.match(panel(f).textContent,/Rejected by server/);assert.equal(panel(f).querySelector('[data-action=submit-decision]').disabled,false);
 });
-test('review actions respect enabled and evaluation team candidates',()=>{
+test('review actions respect enabled and evaluation team candidates',async()=>{
   const dto=dtoOf([team(1),team(2)]),f=setup();dto.teams[1].reviews[0].enabled=false;f.view.render(f.host,dto);stage(f,'review1');
+  assert.deepEqual(Array.from(f.view.evaluationTeams('review1')),[],'nothing is open while its requirements are being read');
+  await settleAll(f);
   const enabled=f.host.querySelector('[data-action=marks]:not([disabled])');f.click(enabled);assert.deepEqual(f.calls.marks,[['T1','review1',enabled]]);
   assert.deepEqual(Array.from(f.view.evaluationTeams('review1')),['T1']);
 });
@@ -199,8 +203,10 @@ test('after first paint each team with an open review is asked for its full requ
   f.state.requirements = id => ({ teamId: id, reviews: id === 'T1' ? [refused('review1', 'Step3: Waiting for the guide to approve it.')] : [] });
   f.view.render(f.host, dto);
   stage(f, 'review1');
-  assert.equal(Array.from(rows(f)).map(r => r.querySelector('button')).filter(b => b && !b.disabled).length, 2, 'every enabled cell is open until its answer arrives');
+  assert.equal(Array.from(rows(f)).map(r => r.querySelector('button')).filter(b => b && !b.disabled).length, 0, 'no marks button is open until its answer arrives');
+  assert.equal(f.host.querySelectorAll('[data-team-spinner]').length, 2 * 2, 'a spinner on each team being checked, in the table and in the card');
   await settleAll(f);
+  assert.equal(f.host.querySelectorAll('[data-team-spinner]').length, 0, 'every spinner is gone once the answers are in');
   assert.deepEqual(f.calls.requirements.sort(), ['T1', 'T3'], 'a team with no open review is not asked');
   const t1 = Array.from(rows(f)).find(r => r.dataset.teamId === 'T1');
   assert.equal(dto.teams[0].reviews[0].enabled, false);
@@ -208,6 +214,8 @@ test('after first paint each team with an open review is asked for its full requ
   assert.equal(t1.querySelector('button[data-action=marks]').disabled, true);
   assert.match(text(t1), /Step3: Waiting for the guide to approve it\./);
   assert.equal(dto.teams[2].reviews[0].enabled, true, 'an unchanged answer leaves the cell');
+  const t3 = Array.from(rows(f)).find(r => r.dataset.teamId === 'T3');
+  assert.equal(t3.querySelector('button[data-action=marks]').disabled, false, 'and opens it once the answer is in');
   assert.equal(f.host.querySelector('[role=tab][data-stage=review1] [data-tab-badge]').textContent.trim(), '1', 'the pending count follows the answers');
 });
 
@@ -234,4 +242,44 @@ test('requirement reads run a few at a time, once per dashboard load, and a stal
   await settleAll(f2);
   assert.equal(next.teams[0].reviews[0].enabled, false, 'the current dashboard is updated');
   assert.equal(f2.calls.requirements.includes('T1'), true, 'the first load started before it was replaced');
+});
+
+test('a team being checked shows the shared spinner beside its ID, and its marks button is disabled until the answer is in', async () => {
+  const f = setup(); const dto = dtoOf([team(1), team(2, { reviews: [{ key: 'review1', enabled: false, actionLabel: 'Enter marks', note: 'Opens 2026-11-16' }] })]);
+  f.state.requirements = id => ({ teamId: id, reviews: [] });
+  f.view.render(f.host, dto); stage(f, 'review1');
+  const row = id => Array.from(rows(f)).find(r => r.dataset.teamId === id);
+  const spinner = row('T1').querySelector('[data-team-spinner]');
+  assert.ok(spinner, 'the team being checked has a spinner');
+  assert.match(spinner.innerHTML, /data-skeleton/, 'it is the shared spinner');
+  assert.equal(row('T1').querySelector('strong').textContent, 'T1', 'the ID stays readable');
+  assert.equal(row('T1').querySelector('button[data-action=marks]').disabled, true, 'disabled, not hidden');
+  assert.equal(row('T2').querySelector('[data-team-spinner]'), null, 'a team with nothing to check has no spinner');
+  assert.equal(f.host.querySelector('[data-team-card=T1] [data-team-spinner]') !== null, true, 'the mobile card shows it too');
+  f.click(row('T1').querySelector('button[data-action=marks]'));
+  assert.deepEqual(f.calls.marks, [], 'a disabled button opens nothing');
+  await settleAll(f);
+  assert.equal(row('T1').querySelector('[data-team-spinner]'), null);
+  assert.equal(row('T1').querySelector('button[data-action=marks]').disabled, false, 'the same cell is open once its requirements are met');
+  assert.deepEqual(Array.from(f.view.evaluationTeams('review1')), ['T1']);
+});
+
+test('a failed requirements read still settles the team: the spinner goes and the server-provided cell is used', async () => {
+  const f = setup(); const dto = dtoOf([team(1)]);
+  f.state.requirements = () => new Error('Drive is slow');
+  f.view.render(f.host, dto); stage(f, 'review1');
+  assert.ok(f.host.querySelector('[data-team-spinner]'));
+  await settleAll(f);
+  assert.equal(f.host.querySelector('[data-team-spinner]'), null, 'the spinner never stays');
+  assert.equal(f.host.querySelector('button[data-action=marks]').disabled, false, 'the server still refuses the entry itself if it must');
+});
+
+test('a refreshed dashboard checks its teams again, and the older dashboard cannot clear the new spinners', async () => {
+  const f = setup();
+  f.state.requirements = id => ({ teamId: id, reviews: [] });
+  f.view.render(f.host, dtoOf([team(1)]));
+  f.view.render(f.host, dtoOf([team(1), team(2)]));
+  assert.equal(f.host.querySelectorAll('[data-reviewer-body] [data-team-spinner]').length, 2, 'the new dashboard starts with both teams being checked');
+  await settleAll(f);
+  assert.equal(f.host.querySelectorAll('[data-team-spinner]').length, 0);
 });

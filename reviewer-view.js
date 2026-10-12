@@ -3,7 +3,7 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
   'use strict';
   const delegated = new WeakSet();
   const PAGE_SIZES = [10, 25, 50, 'all'];
-  const state = {dto:null, host:null, query:'', guide:'', status:'All', stage:null, page:1, size:10, busyTeam:null, panelTeam:null, decision:'', notes:'', toast:'', requirementsFor:null};
+  const state = {dto:null, host:null, query:'', guide:'', status:'All', stage:null, page:1, size:10, busyTeam:null, panelTeam:null, decision:'', notes:'', toast:'', requirementsFor:null, checking:new Set()};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
   const icon = (name, label) => getUi().renderIcon(name, label);
@@ -17,6 +17,10 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
 
   function stages() { return [{key:'title', label:'Title approval'}, ...state.dto.reviews.map(r => ({key:r.key, label:r.label}))]; }
   function review(team, key) { return team.reviews.find(r => r.key === key); }
+  /** A team whose requirements are still being read: its marks are not open until the answer is in, so a button never goes from enabled to disabled. */
+  const checking = team => state.checking.has(team.teamId);
+  const open = (team, cell) => !!cell && cell.enabled && !checking(team);
+  const spinner = team => checking(team) ? '<span class="inline-flex" data-team-spinner>' + getUi().renderSkeleton('inline', 'Checking requirements for ' + team.teamId) + '</span>' : '';
   function stageStatus(team, key) { const cell = review(team, key); return key === 'title' ? team.titleApproval.status.label : cell ? cell.actionLabel : 'Unavailable'; }
   function displayStatus(team, key) {
     if (key === 'title') return team.titleApproval.status.label;
@@ -25,7 +29,7 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
     if (!cell.enabled && team.titleApproval.status.label !== 'Approved') return 'Waiting for title';
     return cell.note && cell.note !== cell.actionLabel ? cell.note : '—';
   }
-  function pending(team, key) { return key === 'title' ? team.titleApproval.canDecide : !!review(team, key)?.enabled && !['View marks', 'Edit marks'].includes(review(team, key).actionLabel); }
+  function pending(team, key) { return key === 'title' ? team.titleApproval.canDecide : open(team, review(team, key)) && !['View marks', 'Edit marks'].includes(review(team, key).actionLabel); }
   function count(key) { return state.dto.teams.filter(team => pending(team, key)).length; }
   function filters() { return ['All', ...new Set(state.dto.teams.map(team => stageStatus(team, state.stage)))]; }
   function searchText(team) { return [team.teamId, team.guideName, ...team.registerNumbers, team.title, team.committee, team.titleApproval.status.label].join(' ').toLowerCase(); }
@@ -39,19 +43,19 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
     if (state.stage === 'title') return '<button type="button" class="' + (full ? 'w-full ' : '') + SECONDARY + '" data-action="open-title" data-team="' + id + '">' + (team.titleApproval.canDecide ? 'Review title' : 'View') + '</button>';
     const cell = review(team,state.stage);
     if (!cell || !cell.enabled && team.titleApproval.status.label !== 'Approved') return '';
-    return '<button type="button" class="' + (full ? 'w-full ' : '') + SECONDARY + '" data-action="marks" data-team="' + id + '" data-review="' + escape(state.stage) + '"' + (cell.enabled ? '' : ' disabled') + '>' + escape(cell.actionLabel) + '</button>';
+    return '<button type="button" class="' + (full ? 'w-full ' : '') + SECONDARY + '" data-action="marks" data-team="' + id + '" data-review="' + escape(state.stage) + '"' + (open(team, cell) ? '' : ' disabled') + '>' + escape(cell.actionLabel) + '</button>';
   }
   function teamRow(team, next) {
     const id = escape(team.teamId), status = displayStatus(team,state.stage), highlight = next === team.teamId ? 'bg-blue-50' : '';
     const statusPill = '<span class="' + PILL + ' ' + (state.stage === 'title' ? tone[team.titleApproval.status.tone] || tone.neutral : '') + '">' + escape(status) + '</span>';
     const registers = '<div class="flex flex-wrap gap-1">' + registerTags(team) + '</div>';
     const row = '<tr class="border-b border-gray-200 ' + highlight + '" data-team-id="' + id + '">' +
-      '<td class="w-20 px-4 py-4 align-top"><strong class="text-sm text-gray-900">' + id + '</strong></td>' +
+      '<td class="w-20 px-4 py-4 align-top"><div class="flex items-center gap-2"><strong class="text-sm text-gray-900">' + id + '</strong>' + spinner(team) + '</div></td>' +
       '<td class="w-64 px-4 py-4 align-top"><div class="text-xs text-gray-500">Committee ' + escape(team.committee || '—') + '</div><div class="mt-1 text-sm text-gray-700">' + escape(team.guideName || '—') + '</div><div class="mt-2">' + registers + '</div><div class="mt-2 flex flex-wrap gap-1">' + stageChips(team) + '</div></td>' +
       '<td class="px-4 py-4 align-top font-medium text-gray-900 break-words">' + escape(team.title || 'Not submitted') + '</td>' +
       '<td class="w-40 px-4 py-4 align-top">' + statusPill + '</td>' +
       '<td class="w-32 px-4 py-4 align-top">' + actionMarkup(team,false) + '</td></tr>';
-    const card = '<div class="border-b border-gray-200 p-4 ' + highlight + '" data-team-card="' + id + '"><div class="flex items-start justify-between gap-2"><div><strong class="text-sm text-gray-900">' + id + '</strong><div class="text-xs text-gray-500">Committee ' + escape(team.committee || '—') + '</div></div>' + statusPill + '</div><p class="mt-3 font-medium text-gray-900 break-words">' + escape(team.title || 'Not submitted') + '</p><p class="mt-1 text-sm text-gray-500">' + escape(team.guideName || '—') + '</p><div class="mt-2">' + registers + '</div><div class="mt-3 flex flex-wrap gap-1">' + stageChips(team) + '</div><div class="mt-3">' + actionMarkup(team,true) + '</div></div>';
+    const card = '<div class="border-b border-gray-200 p-4 ' + highlight + '" data-team-card="' + id + '"><div class="flex items-start justify-between gap-2"><div><div class="flex items-center gap-2"><strong class="text-sm text-gray-900">' + id + '</strong>' + spinner(team) + '</div><div class="text-xs text-gray-500">Committee ' + escape(team.committee || '—') + '</div></div>' + statusPill + '</div><p class="mt-3 font-medium text-gray-900 break-words">' + escape(team.title || 'Not submitted') + '</p><p class="mt-1 text-sm text-gray-500">' + escape(team.guideName || '—') + '</p><div class="mt-2">' + registers + '</div><div class="mt-3 flex flex-wrap gap-1">' + stageChips(team) + '</div><div class="mt-3">' + actionMarkup(team,true) + '</div></div>';
     return {row,card};
   }
   function paginationMarkup(total,bounds) {
@@ -97,32 +101,35 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
   }
   function render(host,dto) {
     state.host=host;state.dto=dto;
+    // Before the first paint of a dashboard: every team with an open review is being checked until its answer is in.
+    const queue=state.requirementsFor!==dto ? dto.teams.filter(team=>team.reviews.some(cell=>cell.enabled)).map(team=>team.teamId) : null;
+    if(queue)state.checking=new Set(queue);
     if(!stages().some(s=>s.key===state.stage)) state.stage=dto.teams.some(t=>t.titleApproval.canDecide)?'title':(dto.reviews[0]?.key||'title');
     if(!filters().includes(state.status))state.status='All';
     host.innerHTML='<div class="min-w-0 max-md:pb-16"><h2 class="text-xl font-semibold text-gray-900">Reviewer Dashboard</h2><p class="mt-1 text-sm text-gray-500">Review titles and assessments for your assigned teams.</p><p id="reviewerRefreshStatus" class="mt-1 text-sm text-gray-500" data-refresh-status role="status" aria-live="polite"></p>' + (dto.reviewError?'<p class="mt-3 text-sm text-red-700" role="status">Review marks are unavailable: ' + escape(dto.reviewError) + '</p>':'') + '<section class="mt-4 min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" aria-label="Assigned teams">' + tabsMarkup() + '<div ' + getTabs().panelAttributes('reviewerStage', state.stage) + ' data-reviewer-content>' + listMarkup() + '</div></section><div data-reviewer-panel>' + panelMarkup() + '</div>' + (state.toast?'<div class="fixed right-4 top-4 z-50 rounded-md bg-green-700 px-4 py-3 text-sm text-white shadow-lg" role="status" data-reviewer-toast>' + escape(state.toast) + '</div>':'') + '</div>';
     if(!delegated.has(host)){delegated.add(host);host.addEventListener('click',onClick);host.addEventListener('input',onInput);host.addEventListener('change',onChange);host.addEventListener('keydown',onKeydown);}
     getTabs().bind(host);
-    if(state.requirementsFor!==dto){state.requirementsFor=dto;loadRequirements(dto);}
+    if(queue){state.requirementsFor=dto;loadRequirements(dto,queue);}
   }
   /** The documents and GitHub rows of a review are read per team after first paint (Drive is slow): a cell they refuse is replaced by the
    * server's answer. A failed read leaves the cell as it was; the server still refuses the entry itself. */
   const REQUIREMENTS_READ={timeoutMs:120000},REQUIREMENTS_PARALLEL=3;
-  function loadRequirements(dto) {
-    const queue=dto.teams.filter(team=>team.reviews.some(cell=>cell.enabled)).map(team=>team.teamId);
-    let active=0,changed=false;
+  function loadRequirements(dto,queue) {
+    let active=0;
     const apply=(teamId,data)=>{
       const team=dto.teams.find(item=>item.teamId===teamId);
       if(!team||!data||!Array.isArray(data.reviews))return;
-      data.reviews.forEach(cell=>{const at=team.reviews.findIndex(item=>item.key===cell.key);if(at>=0&&JSON.stringify(team.reviews[at])!==JSON.stringify(cell)){team.reviews[at]=cell;changed=true;}});
-      if(state.dto===dto&&state.host&&changed)updateList();
+      data.reviews.forEach(cell=>{const at=team.reviews.findIndex(item=>item.key===cell.key);if(at>=0)team.reviews[at]=cell;});
     };
+    // The team is settled on every path: an answer replaces its cells, a failed read leaves them (the server still refuses the entry itself).
+    const settle=teamId=>{if(state.dto!==dto)return;state.checking.delete(teamId);if(state.host)updateList();};
     const next=()=>{
       while(active<REQUIREMENTS_PARALLEL&&queue.length){
         const teamId=queue.shift();active++;
         bridge.read('reviewer-requirements:'+teamId,'API_reviewer_getTeamRequirements',[teamId],REQUIREMENTS_READ).then(data=>apply(teamId,data),()=>{}).then(()=>{
-          active--;
+          active--;settle(teamId);
           if(state.dto!==dto)return;
-          if(queue.length)next();else if(!active&&changed&&state.host)render(state.host,dto);
+          if(queue.length)next();else if(!active&&state.host)render(state.host,dto);
         });
       }
     };
@@ -161,6 +168,6 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
     const scope='reviewer:'+team,requestId=getRequests().idFor(scope,[title.revision,action,notes].join('|'));
     bridge.write('API_reviewer_decideTitle',[{requestId,expectedRevision:title.revision,teamId:team,decision:action,notes}]).then(result=>{getRequests().settle(scope);const host=state.host,finish=getUi().beginContentLoading(host,'Refreshing assigned teams',{compact:true});return load().then(dto=>{finish();state.busyTeam=null;state.panelTeam=null;state.toast=result?.message||'Decision saved.';render(host,dto);setTimeout(()=>{state.toast='';q('[data-reviewer-toast]')?.remove();},4000);},error=>{finish();state.busyTeam=null;done('Refresh failed: '+error.message);});},error=>{getRequests().settle(scope,error);state.busyTeam=null;done(error.message||'Unable to submit decision.');if(error.code==='CONFLICT'||error.code==='REJECTED')refresh().then(()=>setStatus(team,error.message));});
   }
-  function evaluationTeams(key){return(state.dto?.teams||[]).filter(team=>team.reviews.some(r=>r.key===key&&r.enabled)).map(team=>team.teamId);}
+  function evaluationTeams(key){return(state.dto?.teams||[]).filter(team=>team.reviews.some(r=>r.key===key&&open(team,r))).map(team=>team.teamId);}
   return {load,render,refresh,decide,evaluationTeams,state};
 }
