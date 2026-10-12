@@ -17,13 +17,13 @@ const TEAM_ROWS = [
   ['T2', 'Odd', 'other.guide@x.edu', 'cat@x.edu', '', '', '', 'C2']
 ];
 
-function setup({cutover = 'LIVE', registryFails = false, activity = null} = {}) {
+function setup({registryFails = false, activity = null} = {}) {
   const lock = {held: false};
   const mails = [];
   const session = {email: 'ann@x.edu'};
-  const properties = {TITLE_CUTOVER: cutover};
+  const properties = {};
   const env = makeTitleEnv([HEADERS], {
-    files: ['title-cutover.js', 'activity-engine.js', 'title-service.js', 'title-write.js', 'team-folders.js', 'team-documents.js', 'title-api.js'],
+    files: ['activity-engine.js', 'title-service.js', 'title-write.js', 'team-folders.js', 'team-documents.js', 'title-api.js'],
     globals: {
       Utilities, Session: {getActiveUser: () => ({getEmail: () => session.email})},
       MailApp: {sendEmail: (to, subject, body) => mails.push({to, subject, body})},
@@ -206,13 +206,6 @@ test('a title like a registry title is refused and names the match', () => {
   const frame = call(c, 'API_student_submitTitle', SUBMIT());
   assert.equal(frame.error.code, 'REJECTED');
   assert.match(frame.error.message, /80% similar to: "OLD TITLE" \(2025-26 - Even\)/);
-  assert.equal(rows().length, 0);
-});
-
-test('while the cutover is not LIVE every write is refused as UNAVAILABLE', () => {
-  const {c, rows} = setup({cutover: ''});
-  const frame = call(c, 'API_student_submitTitle', SUBMIT());
-  assert.equal(frame.error.code, 'UNAVAILABLE');
   assert.equal(rows().length, 0);
 });
 

@@ -8,7 +8,6 @@ const vm = require('node:vm');
 
 const GUARDED = ['processWeeklySubmissionSchedule', 'fetchAllCommits', 'auditCommitHistory',
   'processWeeklyProgressAI', 'provisionAllTeamRepos', 'backfillExistingRepos', 'backfillMissingStudentCollaborators', 'setupTitleStorage', 'validateTitleLog',
-  'setTitleCutover', 'clearTitleCutover',
   'setupDocumentStorage', 'setupDocumentTriggers', 'scanTemplateFiles', 'scanTeamFiles'];
 // These check the coordinator themselves (coordinator-only setup and the daily reconciliation).
 const SELF_CHECKED = ['setupTeamStatusColumns', 'setupWeeklySubmissionStorage', 'setupProgressEligibilityStorage', 'setupWeeklyProgressPhase2Storage', 'setupWeeklyProgressPhase2Triggers', 'reconcileProgressEligibility'];

@@ -35,7 +35,7 @@ function fixture() {
   });
   const originalSheet=c.getSheet_;
   c.getSheet_=name=>name==='users'?{getLastColumn:()=>7,getLastRow:()=>usernames.length+1,getRange:(r,c,n)=>({getValues:()=>r===1?[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL']]:usernames})}:originalSheet(name);
-  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','template-files.js','github-provisioning.js','title-cutover.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
+  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','template-files.js','github-provisioning.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.weeklyStudents_=()=>[1,2].filter(n=>team[n+2]).map(n=>({teamId:team[0],email:team[n+2],regNo:team[n+7]}));
   c.refreshGithubAccountMetadata_=()=>{}; // Metadata persistence is exercised by account integration tests.
   c.updateTeamStatusRepoUrl_=(id,url)=>{if(failWrite)throw Error('Sheet write failed');team[7]=url;writes.push({id,url});};

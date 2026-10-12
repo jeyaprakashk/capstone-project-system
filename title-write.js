@@ -30,10 +30,6 @@ function titleCommittedResult_(rows, request, fingerprint) {
   return titleWriteResult_(request.action, found);
 }
 
-function titleRequireLive_() {
-  if (readTitleCutover_() !== 'LIVE') throw apiFail_('UNAVAILABLE', 'Title updates are paused for a short update.');
-}
-
 function titleWrite_(request, deps) {
   const action = request && request.action;
   if (!TITLE_LOG_ACTION_[action]) throw apiFail_('INVALID_INPUT', 'Unknown title action.');
@@ -50,10 +46,7 @@ function titleWrite_(request, deps) {
   const fingerprint = titleFingerprint_(action, teamId, input);
   const call = {action, requestId};
 
-  // 2. Early answer while the cutover is not LIVE. The binding check is under the lock.
-  titleRequireLive_();
-
-  // 3. A request that already committed returns its stored result before anything else.
+  // 2. A request that already committed returns its stored result before anything else.
   const early = readTitleLog_();
   const committed = titleCommittedResult_(early.rows, call, fingerprint);
   if (committed) return committed;
@@ -82,7 +75,6 @@ function titleWrite_(request, deps) {
   let row, result, state;
   try {
     // 7. Nothing read before the lock decides anything from here on.
-    titleRequireLive_();
     const log = readTitleLog_();
     const index = titleIndex_(log.rows, Date.now());
     // 8. Fresh authorization, the committed request, and the revision.

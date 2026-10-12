@@ -13,16 +13,16 @@ const Utilities = {
 const plain = value => JSON.parse(JSON.stringify(value));
 
 /** A fresh environment: a fake script lock and properties, and the real title modules. */
-function setup({cutover = 'LIVE', lockFails = false, onLock = null} = {}) {
+function setup({lockFails = false, onLock = null} = {}) {
   const lockState = {held: false, waits: 0, releases: 0};
-  const properties = {TITLE_CUTOVER: cutover};
+  const properties = {};
   const LockService = {getScriptLock: () => ({
     hasLock: () => lockState.held,
     waitLock() { lockState.waits++; if (onLock) onLock(properties); if (lockFails) throw new Error('timeout'); lockState.held = true; },
     releaseLock() { lockState.releases++; lockState.held = false; }
   })};
   const PropertiesService = {getScriptProperties: () => ({getProperty: key => properties[key] === undefined ? null : properties[key]})};
-  const env = makeTitleEnv([HEADERS], {files: ['title-cutover.js', 'title-service.js', 'title-write.js'], globals: {Utilities, LockService, PropertiesService}});
+  const env = makeTitleEnv([HEADERS], {files: ['title-service.js', 'title-write.js'], globals: {Utilities, LockService, PropertiesService}});
   env.context.similarity_ = () => 0;
   let tick = 0;
   env.next = () => env.setNow(NOW + (++tick) * HOUR);
@@ -77,22 +77,6 @@ test('the whole workflow runs through the write path and every history stays val
   assert.equal(gate.approved, true);
   assert.equal(gate.title, 'SMART CAMPUS ATTENDANCE');
   assert.deepEqual(Array.from(c.validateTitleHistory_(c.readTitleLog_().rows, Date.now())), []);
-});
-
-test('while the cutover is not LIVE nothing is written, and the lock is not even requested', () => {
-  for (const cutover of ['', 'PAUSED', 'bogus']) {
-    const {env, c, lockState} = setup({cutover});
-    fails(() => c.titleWrite_(request('submit', SUBMIT), depsFor('student')), 'UNAVAILABLE', /paused for a short update/);
-    assert.equal(rowsOf(env).length, 0);
-    assert.equal(lockState.waits, 0);
-  }
-});
-
-test('the cutover is read again under the lock: a change after the early check stops the write', () => {
-  const {env, c, lockState} = setup({onLock: properties => { properties.TITLE_CUTOVER = 'PAUSED'; }});
-  fails(() => c.titleWrite_(request('submit', SUBMIT), depsFor('student')), 'UNAVAILABLE', /paused/);
-  assert.equal(rowsOf(env).length, 0);
-  assert.deepEqual([lockState.waits, lockState.releases], [1, 1], 'the lock is released on refusal');
 });
 
 test('authorization failures stop the write, before and under the lock', () => {

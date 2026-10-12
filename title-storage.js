@@ -20,11 +20,10 @@ function formatTitleLogSheet_(sheet) {
 
 /**
  * The report for the coordinator, from the parsed log rows and the roster's team IDs. It changes nothing.
- * `live` is whether TITLE_CUTOVER is LIVE: before that, a roster team without a row is an error (the baseline is incomplete);
- * after it, only information (the team has not submitted yet).
- * Returns {ok, live, rows, rosterTeams, errors: [{kind, teamId, message}], information: [...], truncated}.
+ * A roster team without a row is information only (the team has not submitted yet).
+ * Returns {ok, rows, rosterTeams, errors: [{kind, teamId, message}], information: [...], truncated}.
  */
-function titleLogReport_(logRows, rosterTeamIds, nowMs, live) {
+function titleLogReport_(logRows, rosterTeamIds, nowMs) {
   const index = titleIndex_(logRows, nowMs);
   const roster = Object.create(null);
   rosterTeamIds.forEach(id => { const key = titleTeamKey_(id); if (key) roster[key] = String(id).trim(); });
@@ -34,8 +33,7 @@ function titleLogReport_(logRows, rosterTeamIds, nowMs, live) {
 
   Object.keys(roster).sort().forEach(key => {
     if (index.teams[key]) return;
-    if (live) add(information, {kind: 'NO_ROW', teamId: roster[key], message: 'Has not submitted a title yet.'});
-    else add(errors, {kind: 'NO_ROW', teamId: roster[key], message: 'On the roster but has no row in the log. Add its baseline row.'});
+    add(information, {kind: 'NO_ROW', teamId: roster[key], message: 'Has not submitted a title yet.'});
   });
   Object.keys(index.teams).sort().forEach(key => {
     const team = index.teams[key];
@@ -47,16 +45,16 @@ function titleLogReport_(logRows, rosterTeamIds, nowMs, live) {
       }
     });
   });
-  return {ok: errors.length === 0, live: !!live, rows: logRows.length, rosterTeams: Object.keys(roster).length, errors, information, truncated};
+  return {ok: errors.length === 0, rows: logRows.length, rosterTeams: Object.keys(roster).length, errors, information, truncated};
 }
 
 function buildTitleLogReport_() {
   const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const rosterIds = getSheetRows_(SHEET_NAMES.TEAM_STATUS).map(row => row[TS.TEAM_ID]).filter(id => String(id || '').trim() !== '');
-  return titleLogReport_(readTitleLog_().rows, rosterIds, Date.now(), readTitleCutover_() === 'LIVE');
+  return titleLogReport_(readTitleLog_().rows, rosterIds, Date.now());
 }
 
-/** Editor-run: the same report as API_coordinator_validateTitleLog, written to the execution log (cutover step 7). */
+/** Editor-run: the same report as API_coordinator_validateTitleLog, written to the execution log. */
 function validateTitleLog() {
   requireTriggerOrOperator_();
   const report = buildTitleLogReport_();

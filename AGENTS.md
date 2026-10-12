@@ -67,7 +67,7 @@ history (one row per change, the latest row of a team is its state). Specified i
 - **Read** a team's title only through `titleGate_(teamId)` (approved or not, and the title and problem in effect), or
   `titleSummary_` / `titleStateFromIndex_` when a screen needs the workflow state. Read the log once with `readTitleIndex_()` and pass
   the index for a list of teams. Never read the old title columns; `tests/title-removal.test.cjs` fails when a runtime module does.
-- **Write** only through `titleWrite_` (`title-write.js`): one path, one lock, the cutover check under the lock, a request ID and the
+- **Write** only through `titleWrite_` (`title-write.js`): one path, one lock, a request ID and the
   revision the user saw. Endpoints (`title-api.js`) resolve who the caller is and pass callbacks; the rules are
   in `title-service.js` and the history validation in `title-history.js`. A row is appended and never edited.
 - **Requirements** that gate a student action come from the `ActivityDependencies` sheet through the engine (`activity-engine.js`, the
@@ -79,8 +79,9 @@ history (one row per change, the latest row of a team is its state). Specified i
   link of a file of the student's own team, and nothing else; every other student DTO carries no Drive link. Guides, reviewers and the coordinator get `folderUrl`.
   `tests/student-title.test.cjs` and `tests/student-migration.test.cjs` fail if a student receives a link they may not have.
 - The browser sends title writes with a request ID from `TitleRequests` (`title-requests.js`) and the `revision` its DTO carried.
-- `TITLE_CUTOVER` is changed only by `setTitleCutover` and `clearTitleCutover`. The one-time import of the old title columns into
-  `TitleLog` (cutover step 4) has been run and its code deleted, so nothing reads the old columns any more.
+- There is no cutover switch any more: the `TITLE_CUTOVER` property and its editor functions were retired after the migration, and nothing
+  reads it. A maintenance mode, when it is built, will be a separate feature. The one-time import of the old title columns into `TitleLog`
+  has been run and its code deleted, so nothing reads the old columns any more.
 
 ## Layers
 
