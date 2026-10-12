@@ -186,17 +186,30 @@ test('a write that fails part-way leaves valid rows, and the next scan converges
   assert.ok(writes >= 4, 'the scan makes several separate record writes (' + writes + ')');
 });
 
-test('setupDocumentTriggers installs the two daily scans once each, for one owner', () => {
+test('setupDocumentTriggers installs the daily template scan and the team-file scan every 2 hours once each, for one owner', () => {
   const {f} = setup();
   const first = plain(f.c.setupDocumentTriggers());
-  assert.deepEqual([first.created, first.owner], [['scanTemplateFiles', 'scanTeamFiles'], 'owner@example.com']);
+  assert.deepEqual([first.created, first.replaced, first.owner, first.teamScan], [['scanTemplateFiles', 'scanTeamFiles'], [], 'owner@example.com', 'every 2 hours']);
   assert.equal(f.triggers.filter(trigger => trigger.getHandlerFunction() === 'scanTemplateFiles').length, 1);
   assert.deepEqual([f.triggers[0].days, f.triggers[0].hour], [1, 2]);
-  assert.deepEqual([f.triggers[1].days, f.triggers[1].hour], [1, 3]);
+  assert.deepEqual([f.triggers[1].getHandlerFunction(), f.triggers[1].hours, f.triggers[1].days], ['scanTeamFiles', 2, undefined]);
   assert.deepEqual(plain(f.c.setupDocumentTriggers()).created, []);
   assert.equal(f.triggers.length, 2);
   f.c.Session.getEffectiveUser = () => ({getEmail: () => 'someone.else@example.com'});
   assert.throws(() => f.c.setupDocumentTriggers(), /belong to owner@example\.com/);
+});
+
+test('setupDocumentTriggers replaces a team-file trigger from the former daily schedule once, and leaves the template scan alone', () => {
+  const {f} = setup();
+  f.c.ScriptApp.newTrigger('scanTemplateFiles').timeBased().everyDays(1).atHour(2).create();
+  f.c.ScriptApp.newTrigger('scanTeamFiles').timeBased().everyDays(1).atHour(3).create();
+  const outcome = plain(f.c.setupDocumentTriggers());
+  assert.deepEqual([outcome.created, outcome.replaced], [['scanTeamFiles'], ['scanTeamFiles']]);
+  const team = f.triggers.filter(trigger => trigger.getHandlerFunction() === 'scanTeamFiles');
+  assert.deepEqual(team.map(trigger => [trigger.hours, trigger.days]), [[2, undefined]]);
+  assert.equal(f.triggers.filter(trigger => trigger.getHandlerFunction() === 'scanTemplateFiles').length, 1);
+  assert.deepEqual(plain(f.c.setupDocumentTriggers()).created, [], 'the new schedule is kept');
+  assert.equal(f.triggers.length, 2);
 });
 
 test('the entry points are guarded, and no module reads the Config tab for the template repository', () => {

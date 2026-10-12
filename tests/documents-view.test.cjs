@@ -59,6 +59,30 @@ test('a student who cannot submit sees the reason, never a button', async () => 
   assert(text(f.host).includes('No team member has changed this file yet.'));
 });
 
+test('when the scan has not seen a change, the student sees when it last checked and can check GitHub now, which runs the submit preview', async () => {
+  const f = setup({ dto: dto([doc({ teamChanged: 'No', can: { submit: cap(false, 'No team member has changed this file yet.'), approve: cap(false), return: cap(false), reopen: cap(false), check: cap(true) } })]) });
+  await f.view.mount(f.host, '');
+  assert.equal(f.host.querySelector('[data-doc-action="submit"]'), null);
+  assert(text(f.host).includes('No team member has changed this file yet. (last checked 1 Jan 2030'));
+  assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
+  await f.click('[data-doc-action="check"]');
+  await f.settle();
+  assert.deepEqual(JSON.parse(JSON.stringify(f.calls[1])), ['API_student_previewDocument', [{ documentId: 'doc-0001' }]]);
+  assert.equal(f.control.dialogs.length, 1, 'a change found live goes straight to the Submit confirmation');
+  assert(f.calls.find(call => call[0] === 'API_student_submitDocument'));
+});
+
+test('a file not checked yet shows no check time, and there is no check button without can.check', async () => {
+  const f = setup({ dto: dto([doc({ teamChanged: '', checkedAt: '', can: { submit: cap(false, 'This file has not been checked yet.'), approve: cap(false), return: cap(false), reopen: cap(false), check: cap(true) } })]) });
+  await f.view.mount(f.host, '');
+  const card = text(f.host.querySelector('[data-document-card]'));
+  assert(card.includes('This file has not been checked yet.') && !card.includes('last checked'));
+  assert(f.host.querySelector('[data-doc-action="check"]'));
+  const g = setup({ dto: dto([doc({ teamChanged: 'No', can: { submit: cap(false, 'No team member has changed this file yet.'), approve: cap(false), return: cap(false), reopen: cap(false) } })]) });
+  await g.view.mount(g.host, '');
+  assert.equal(g.host.querySelector('[data-doc-action="check"]'), null);
+});
+
 test('submit previews the latest commit, asks the student to confirm, then sends the commit it showed', async () => {
   const f = setup();
   await f.view.mount(f.host, '');

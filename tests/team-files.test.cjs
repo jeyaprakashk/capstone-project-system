@@ -228,6 +228,55 @@ test('shuffled columns and an extra column are kept; two rows for one team and d
   assert.equal(JSON.stringify(env.sheet().rows), before);
 });
 
+test("GitHub is read without the script lock; the lock is held only for each team's sheet writes", () => {
+  const env = setup();
+  const second = addSecondTeam(env);
+  env.repo.files[STEP1] = 'a'; env.repo.commits[STEP1] = [commit('c1', ANN)];
+  second.files[STEP1] = 'z'; second.commits[STEP1] = [commit('d1', 201)];
+  const lock = env.f.c.LockService.getScriptLock(), held = [], waits = [];
+  const request = env.f.c.makeGithubRequest_, waitLock = lock.waitLock;
+  env.f.c.makeGithubRequest_ = (method, path) => { held.push(lock.hasLock()); return request(method, path); };
+  lock.waitLock = ms => { waits.push(ms); return waitLock(ms); };
+  const outcome = plain(env.f.c.scanTeamFiles());
+  assert.deepEqual([outcome.ok, outcome.teams], [true, 2]);
+  assert.ok(held.length > 0 && held.every(value => value === false), 'no GitHub call is made under the lock');
+  assert.equal(waits.length, 3, 'one short lock to start the run, then one per team');
+  assert.equal(lock.hasLock(), false);
+  assert.equal(env.f.properties.has('DOCUMENT_TEAM_SCAN_RUNNING'), false, 'the run marker is cleared');
+});
+
+test('a scan that is already running makes a second one skip; a marker left by a stopped run is ignored', () => {
+  const env = setup();
+  env.repo.files[STEP1] = 'a'; env.repo.commits[STEP1] = [commit('c1', ANN)];
+  env.f.time('2031-03-01T00:00:00Z');
+  env.f.properties.set('DOCUMENT_TEAM_SCAN_RUNNING', String(Date.parse('2031-02-28T23:58:00Z')));
+  assert.deepEqual(plain(env.f.c.scanTeamFiles()), {ok: false, reason: 'busy'});
+  assert.equal(env.table().length, 0);
+  assert.equal(env.f.properties.get('DOCUMENT_TEAM_SCAN_RUNNING'), String(Date.parse('2031-02-28T23:58:00Z')), 'the other run keeps its marker');
+  env.f.properties.set('DOCUMENT_TEAM_SCAN_RUNNING', String(Date.parse('2031-02-28T23:50:00Z')));
+  assert.equal(plain(env.f.c.scanTeamFiles()).ok, true);
+  assert.equal(env.result('T1', 'doc-0001')['Team Changed'], 'Yes');
+  assert.equal(env.f.properties.has('DOCUMENT_TEAM_SCAN_RUNNING'), false);
+});
+
+test("when the lock is busy at a team's write, the run stops before that team and the next run starts there", () => {
+  const env = setup();
+  const second = addSecondTeam(env);
+  env.repo.files[STEP1] = 'a'; env.repo.commits[STEP1] = [commit('c1', ANN)];
+  second.files[STEP1] = 'z'; second.commits[STEP1] = [commit('d1', 201)];
+  const lock = env.f.c.LockService.getScriptLock(), waitLock = lock.waitLock;
+  let calls = 0;
+  lock.waitLock = ms => { calls += 1; if (calls === 3) throw new Error('Lock timeout'); return waitLock(ms); };
+  const first = plain(env.f.c.scanTeamFiles());
+  assert.deepEqual([first.ok, first.teams, first.remaining], [true, 1, 1]);
+  assert.deepEqual(env.table().map(row => row['Team ID']), ['T1', 'T1']);
+  assert.equal(env.f.properties.get('DOCUMENT_TEAM_SCAN_CURSOR'), 't1');
+  lock.waitLock = waitLock;
+  const next = plain(env.f.c.scanTeamFiles());
+  assert.deepEqual([next.teams, next.remaining], [1, 0]);
+  assert.equal(env.result('T2', 'doc-0001')['Team Changed'], 'Yes');
+});
+
 test('the scan is a guarded entry point and a missing sheet is reported', () => {
   const env = setup();
   env.f.sheets.delete('TeamFileStatus');

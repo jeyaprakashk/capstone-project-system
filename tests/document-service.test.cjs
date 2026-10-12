@@ -55,7 +55,17 @@ test('who may do what in which status, with the project error codes', () => {
   assert.deepEqual([can('NEEDS_REVIEW', 'submit', roles('student'), changed).code, can('APPROVED', 'submit', roles('student'), changed).code], ['REJECTED', 'REJECTED']);
   assert.equal(can('NOT_SUBMITTED', 'submit', roles('guide'), changed).code, 'UNAUTHORIZED');
   assert.equal(can('NOT_SUBMITTED', 'submit', roles('student'), {teamChanged: 'No'}).code, 'REJECTED');
-  assert.equal(can('NOT_SUBMITTED', 'submit', roles('student'), {teamChanged: ''}).code, 'REJECTED');
+  assert.equal(can('NOT_SUBMITTED', 'submit', roles('student'), {teamChanged: 'No'}).reason, 'No team member has changed this file yet.');
+  const unchecked = can('NOT_SUBMITTED', 'submit', roles('student'), {teamChanged: ''});
+  assert.deepEqual([unchecked.code, unchecked.reason], ['REJECTED', 'This file has not been checked yet.'], 'no scan record is not reported as "no change"');
+  for (const status of ['NOT_SUBMITTED', 'RETURNED', 'REOPENED']) {
+    for (const teamChanged of ['No', '', 'Unknown']) assert.deepEqual(can(status, 'check', roles('student'), {teamChanged}), yes, status + ' ' + teamChanged);
+  }
+  assert.equal(can('NOT_SUBMITTED', 'check', roles('student'), changed).code, 'REJECTED', 'nothing to check: Submit is offered');
+  assert.equal(can('NEEDS_REVIEW', 'check', roles('student'), {teamChanged: 'No'}).code, 'REJECTED');
+  assert.equal(can('APPROVED', 'check', roles('student'), {teamChanged: 'No'}).code, 'REJECTED');
+  for (const role of ['guide', 'reviewer', 'coordinator']) assert.equal(can('NOT_SUBMITTED', 'check', roles(role), {teamChanged: 'No'}).code, 'UNAUTHORIZED', role);
+  assert.equal(can('UNAVAILABLE', 'check', roles('student'), {teamChanged: 'No'}).code, 'UNAVAILABLE');
   const unknown = can('NOT_SUBMITTED', 'submit', roles('student'), {teamChanged: 'Unknown', label: 'Step1.docx'});
   assert.deepEqual([unknown.code, unknown.reason], ['UNAVAILABLE', 'Could not verify: Step1.docx. Try again later.']);
   for (const action of ['approve', 'return']) {

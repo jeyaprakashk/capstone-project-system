@@ -1,7 +1,7 @@
 /**
- * TEAM FILES - process B of archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md (section 5): a daily scan that records, for every team and every
+ * TEAM FILES - process B of archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md (section 5): a scan every few hours that records, for every team and every
  * listed template document, whether a team member has changed the file in the team's repository. The student screen reads this
- * record; Submit checks GitHub again at the moment of the click.
+ * record; Submit (and the student's "Check GitHub now") checks GitHub again at the moment of the click.
  *
  * Team Changed is Yes when the file is present on the default branch, differs from the file the team received (the bundled template
  * manifest), and at least one commit that touched the path was made by a team member's linked GitHub account. It is No when that is
@@ -16,6 +16,12 @@ const TEAM_FILE_HISTORY_PAGE_SIZE_ = 100;
 const TEAM_FILE_HISTORY_PAGES_ = 10;
 const TEAM_FILE_SCAN_BUDGET_MS_ = 240000;
 const TEAM_FILE_SCAN_CURSOR_KEY_ = 'DOCUMENT_TEAM_SCAN_CURSOR';
+const TEAM_FILE_SCAN_RUN_KEY_ = 'DOCUMENT_TEAM_SCAN_RUNNING';
+/** Longer than any Apps Script execution (6 minutes): a run marker older than this was left by a run that was stopped. */
+const TEAM_FILE_SCAN_RUN_MS_ = 420000;
+const TEAM_FILE_LOCK_WAIT_MS_ = 30000;
+/** How often the scan trigger runs (setupDocumentTriggers): 1, 2, 4, 6, 8 or 12, the only values Apps Script accepts. A run takes at most about 4.5 minutes of trigger time. */
+const TEAM_FILE_SCAN_EVERY_HOURS_ = 2;
 
 /** The listed template documents: active, in the team template and without a name conflict. [{documentId, path}] */
 function listedTemplateDocuments_(records) {
@@ -164,13 +170,50 @@ function writeTeamFileStatus_(storage, record) {
   Object.assign(found.record, changed);
 }
 
-/** Daily trigger. Works through the teams in batches inside a time budget and remembers where it stopped. */
+/**
+ * Writes one team's records under the script lock, which is held only for these few sheet writes: the GitHub reads happen before, so
+ * title writes, submissions and evaluations are not kept waiting for a whole scan. Returns false when the lock could not be had.
+ */
+function teamFileWriteTeam_(status, records) {
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(TEAM_FILE_LOCK_WAIT_MS_); } catch (error) { return false; }
+  try {
+    records.forEach(record => writeTeamFileStatus_(status, record));
+    SpreadsheetApp.flush();
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Marks a scan as running (under the lock, so two runs cannot both start), or returns '' when another run started less than an
+ * execution's lifetime ago. The scan is the only writer of TeamFileStatus, so one run at a time keeps its row index exact.
+ */
+function teamFileScanStart_(properties) {
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(TEAM_FILE_LOCK_WAIT_MS_); } catch (error) { return ''; }
+  try {
+    const running = Number(properties.getProperty(TEAM_FILE_SCAN_RUN_KEY_) || 0), now = Date.now();
+    if (running && now - running < TEAM_FILE_SCAN_RUN_MS_) return '';
+    const token = String(now);
+    properties.setProperty(TEAM_FILE_SCAN_RUN_KEY_, token);
+    return token;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function teamFileScanEnd_(properties, token) {
+  if (properties.getProperty(TEAM_FILE_SCAN_RUN_KEY_) === token) properties.deleteProperty(TEAM_FILE_SCAN_RUN_KEY_);
+}
+
+/** Time trigger (every TEAM_FILE_SCAN_EVERY_HOURS_). Works through the teams in batches inside a time budget and remembers where it stopped. */
 function scanTeamFiles() {
   requireTriggerOrOperator_();
-  const lock = LockService.getScriptLock();
-  try { lock.waitLock(30000); }
-  catch (error) { console.error('Team file scan skipped: another job holds the lock.'); return {ok: false, reason: 'busy'}; }
   const properties = PropertiesService.getScriptProperties();
+  const token = teamFileScanStart_(properties);
+  if (!token) { console.error('Team file scan skipped: another scan or job is running.'); return {ok: false, reason: 'busy'}; }
   try {
     const documents = listedTemplateDocuments_(readTemplateFiles_().records);
     if (!documents.length) return {ok: true, teams: 0, remaining: 0};
@@ -185,11 +228,9 @@ function scanTeamFiles() {
     const cursor = properties.getProperty(TEAM_FILE_SCAN_CURSOR_KEY_) || '';
     const pending = teams.filter(team => team.slug && (!cursor || team.key > cursor));
     const deadline = Date.now() + TEAM_FILE_SCAN_BUDGET_MS_, nowIso = new Date().toISOString();
-    let last = cursor, scanned = 0, failed = 0;
+    let last = cursor, scanned = 0, failed = 0, busy = false;
     for (const team of pending) {
       if (Date.now() >= deadline) break;
-      last = team.key;
-      scanned += 1;
       let records;
       try {
         const stored = new Map(documents.map(document => {
@@ -203,17 +244,18 @@ function scanTeamFiles() {
         console.error('Team file scan: ' + team.teamId + ': ' + (error && error.message || error));
         records = documents.map(document => ({teamId: team.teamId, documentId: document.documentId, teamChanged: 'Unknown', checkedAt: nowIso}));
       }
-      records.forEach(record => writeTeamFileStatus_(status, record));
+      if (!teamFileWriteTeam_(status, records)) { busy = true; break; }
+      last = team.key;
+      scanned += 1;
     }
-    SpreadsheetApp.flush();
     const remaining = pending.filter(team => team.key > last).length;
     if (remaining) properties.setProperty(TEAM_FILE_SCAN_CURSOR_KEY_, last); else properties.deleteProperty(TEAM_FILE_SCAN_CURSOR_KEY_);
-    console.log('Team file scan: ' + scanned + ' teams, ' + failed + ' unreadable, ' + remaining + ' remaining.');
+    console.log('Team file scan: ' + scanned + ' teams, ' + failed + ' unreadable, ' + remaining + ' remaining' + (busy ? ' (stopped: the lock was busy)' : '') + '.');
     return {ok: true, teams: scanned, unreadable: failed, remaining};
   } catch (error) {
     console.error('Team file scan failed: ' + (error && error.message || error));
     return {ok: false, reason: 'failed', message: String(error && error.message || error)};
   } finally {
-    lock.releaseLock();
+    teamFileScanEnd_(properties, token);
   }
 }

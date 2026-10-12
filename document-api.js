@@ -169,7 +169,8 @@ function buildDocumentsDto_(teamId, viewer) {
         submit: documentCapability_(documentCanDo_(state, 'submit', user, extra)),
         approve: documentCapability_(documentCanDo_(state, 'approve', user, extra)),
         return: documentCapability_(documentCanDo_(state, 'return', user, extra)),
-        reopen: documentCapability_(documentCanDo_(state, 'reopen', user, extra))
+        reopen: documentCapability_(documentCanDo_(state, 'reopen', user, extra)),
+        check: documentCapability_(documentCanDo_(state, 'check', user, extra))
       }
     };
     return dto;

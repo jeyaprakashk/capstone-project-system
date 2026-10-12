@@ -96,7 +96,9 @@ function documentDenied_(code, reason) { return {allowed: false, reason, code}; 
 
 /**
  * Who may do what, in which status. user.roles = {student, guide, reviewer, coordinator} for THIS team. The code is UNAUTHORIZED for a
- * wrong role and REJECTED for a wrong status. extra.teamChanged ('Yes'|'No'|'Unknown'|'') applies to submit only.
+ * wrong role and REJECTED for a wrong status. extra.teamChanged ('Yes'|'No'|'Unknown'|'') applies to submit and check only; '' means the
+ * team scan has no record of the file yet. check is a student asking GitHub now (the live preview) when the scan's record does not allow
+ * a submission: the record is at most one scan old, and the live answer is the one Submit uses.
  */
 function documentCanDo_(state, action, user, extra) {
   const roles = (user && user.roles) || {};
@@ -108,7 +110,14 @@ function documentCanDo_(state, action, user, extra) {
     if (status === 'APPROVED') return documentDenied_('REJECTED', 'This document is approved. Ask the coordinator to reopen it to submit a new version.');
     const changed = extra && extra.teamChanged;
     if (changed === 'Unknown') return documentDenied_('UNAVAILABLE', 'Could not verify: ' + ((extra && extra.label) || 'this document') + '. Try again later.');
-    if (changed !== 'Yes') return documentDenied_('REJECTED', 'No team member has changed this file yet.');
+    if (changed === 'No') return documentDenied_('REJECTED', 'No team member has changed this file yet.');
+    if (changed !== 'Yes') return documentDenied_('REJECTED', 'This file has not been checked yet.');
+    return {allowed: true, reason: '', code: ''};
+  }
+  if (action === 'check') {
+    if (!roles.student) return documentDenied_('UNAUTHORIZED', 'Only a member of this team can check its documents.');
+    if (!DOCUMENT_FROM_.SUBMIT.includes(status)) return documentDenied_('REJECTED', 'This document cannot be submitted now.');
+    if (extra && extra.teamChanged === 'Yes') return documentDenied_('REJECTED', 'This file is already known to be changed by the team.');
     return {allowed: true, reason: '', code: ''};
   }
   if (action === 'approve' || action === 'return') {

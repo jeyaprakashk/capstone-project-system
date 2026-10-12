@@ -1,7 +1,8 @@
 /**
  * DOCUMENTS VIEW - browser module serialized into every dashboard page as `DocumentsView` (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md).
  * Renders the Documents DTO of one team (DATA-CONTRACTS.md, DocumentsDto) into a host element and sends the document writes through the
- * bridge: Submit (API_student_submitDocument, after a live preview the student confirms), Approve and Return
+ * bridge: Submit (API_student_submitDocument, after a live preview the student confirms; "Check GitHub now" runs the same preview when the
+ * team scan has not yet seen a team member's change), Approve and Return
  * (API_guide_decideDocument) and Reopen (API_coordinator_reopenDocument). Everything a person may do comes from the DTO's `can`; this
  * module decides nothing and reads no spreadsheet column. The request ID of a write comes from TitleRequests, so a retry of the same
  * content after a failure that may have committed is recognised by the server. It never calls google.script.run.
@@ -66,7 +67,11 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     if (can.submit.allowed) {
       html += '<div class="mt-3"><button type="button" class="' + PRIMARY + '" data-doc-action="submit"' + hooks + '>Submit the latest version</button></div>';
     } else if (dto.roles && dto.roles.student && ['NOT_SUBMITTED', 'RETURNED', 'REOPENED'].indexOf(doc.status) >= 0 && can.submit.reason) {
-      html += p(escape(can.submit.reason), 'text-warning');
+      const checked = doc.checkedAt && when(doc.checkedAt) ? ' <span class="text-muted">(last checked ' + escape(when(doc.checkedAt)) + ')</span>' : '';
+      html += p(escape(can.submit.reason) + checked, 'text-warning');
+    }
+    if (can.check && can.check.allowed) {
+      html += '<div class="mt-2"><button type="button" class="' + BUTTON + '" data-doc-action="check"' + hooks + '>Check GitHub now</button></div>';
     }
     if (can.approve.allowed || can.return.allowed) {
       html += '<label class="' + LABEL + '" for="docNotes-' + id + '">Notes for the team (required to return)</label>' +
@@ -198,7 +203,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     const host = event.currentTarget, action = button.getAttribute('data-doc-action'), card = button.closest('[data-document-card]');
     if (action === 'retry') { load(host); return; }
     if (!card || !hosts.get(host) || !hosts.get(host).dto) return;
-    if (action === 'submit') submit(host, card, button);
+    if (action === 'submit' || action === 'check') submit(host, card, button);
     else if (action === 'approve' || action === 'return') decide(host, card, button, action);
     else if (action === 'reopen') reopen(host, card, button);
   }

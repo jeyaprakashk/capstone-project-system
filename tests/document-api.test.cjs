@@ -335,6 +335,16 @@ test('Submit is unavailable until a team member has changed the file, and the re
   assert.deepEqual([second.teamChanged, second.can.submit.allowed, second.can.submit.reason], ['No', false, 'No team member has changed this file yet.']);
   assert.equal(doc(documents(env, STUDENT), 'doc-0001').can.submit.allowed, true);
   assert.deepEqual([second.can.submit.activity, second.can.submit.requirements], [null, []]);
+  assert.deepEqual([second.can.check.allowed, doc(documents(env, STUDENT), 'doc-0001').can.check.allowed], [true, false], 'a live check is offered only while the scan says no');
+  assert.equal(doc(documents(env, GUIDE, 'T1'), 'doc-0002').can.check.allowed, false);
+});
+
+test('a file the scan has not reached yet says "not checked yet", not "no change", and offers the live check', () => {
+  const env = setup();
+  env.f.sheets.get('TeamFileStatus').rows.splice(1);
+  const second = doc(documents(env, STUDENT), 'doc-0002');
+  assert.deepEqual([second.teamChanged, second.checkedAt, second.can.submit.allowed, second.can.submit.reason, second.can.check.allowed],
+    ['', '', false, 'This file has not been checked yet.', true]);
 });
 
 test('a document whose history breaks the rules is UNAVAILABLE with can null, and the others still work', () => {
