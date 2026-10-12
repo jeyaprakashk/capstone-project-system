@@ -71,7 +71,7 @@ history (one row per change, the latest row of a team is its state). Specified i
   revision the user saw. Endpoints (`title-api.js`) resolve who the caller is and pass callbacks; the rules are
   in `title-service.js` and the history validation in `title-history.js`. A row is appended and never edited.
 - **Requirements** that gate a student action come from the `ActivityDependencies` sheet through the engine (`activity-engine.js`, the
-  `github` and `drive` checks). Misconfiguration denies; nothing is cached between requests; a student never sees a check's `diagnostic`.
+  `github`, `drive` and `document` checks; `document` takes a Document ID from the scanned template list as its item). Misconfiguration denies; nothing is cached between requests; a student never sees a check's `diagnostic`.
 - **Students and Drive.** The team folders live in a shared drive that students are **not members of**. Each team's students are given
   viewer access to **their own team's folder only** (`createTeamFolders_` adds them; nothing else does). Nothing in a team folder may be
   hidden from them: what the app chooses to link cannot limit what a folder viewer sees in Drive. The app never shows a student a folder

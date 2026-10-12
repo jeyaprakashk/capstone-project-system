@@ -1,7 +1,7 @@
 /**
  * ACTIVITY ENGINE - the requirements a student action must meet before it runs (archive/plans/ACTIVITY-DEPENDENCIES-PLAN.md). Rows in the
  * ActivityDependencies sheet name a check kind and an item; this file reads them, validates them and runs the checks. The checks
- * live in activity-check-github.js and activity-check-drive.js. The sheet is read fresh on every request; nothing is cached
+ * live in activity-check-github.js, activity-check-drive.js and activity-check-document.js. The sheet is read fresh on every request; nothing is cached
  * between requests. Misconfiguration denies; an unverifiable check is unmet.
  *
  * The registry is a function, not a top-level list the check files add to, so it does not depend on the order the files load in.
@@ -14,7 +14,7 @@ const ACTIVITY_MISCONFIGURED_ = 'Submission requirements are misconfigured. Cont
  * `unverifiable: true` means the source could not be read; the engine words it as "Could not verify: <label>."
  */
 function activityChecks_() {
-  return {github: activityCheckGithub_(), drive: activityCheckDrive_()};
+  return {github: activityCheckGithub_(), drive: activityCheckDrive_(), document: activityCheckDocument_()};
 }
 
 /** A request's context: the loaded rules and the GitHub and Drive answers, kept for this request only. */

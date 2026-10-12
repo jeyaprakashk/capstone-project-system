@@ -10,7 +10,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const HEADERS = ['Activity', 'Kind', 'Item', 'Label', 'Active'];
 const WORK = 'Step1_Work_Breakdown.docx', NEED = 'Step2_Need_Analysis.docx';
 const FILES = ['common-constants.js', 'common-helpers.js', 'api-envelope.js', 'sheet-columns.js', 'activity-engine.js', 'activity-check-github.js',
-  'activity-check-drive.js', 'activity-requirements-api.js'];
+  'activity-check-drive.js', 'activity-check-document.js', 'activity-requirements-api.js', 'document-service.js', 'document-drive.js', 'team-files.js'];
 
 /**
  * spec: rows (sheet rows below the header), headers, present, github (preset name or {preset, overrides} or 'throws'), drive (makeDriveContext spec),
@@ -55,10 +55,10 @@ const parse = (rows, headers = HEADERS, present = true) => {
 
 // ---- the registry and the loader -------------------------------------------------------------------------------------------
 
-test('the registry has exactly the two release kinds, each with the full contract', () => {
+test('the registry has exactly the three kinds, each with the full contract', () => {
   const {c} = setup();
   const checks = c.activityChecks_();
-  assert.deepEqual(Object.keys(checks).sort(), ['drive', 'github']);
+  assert.deepEqual(Object.keys(checks).sort(), ['document', 'drive', 'github']);
   for (const check of Object.values(checks)) {
     assert.deepEqual(Object.keys(check).sort(), ['isMet', 'needsApprovedTitle', 'perStudent', 'validItem']);
   }
@@ -349,4 +349,82 @@ test('with no rows for an activity a title can be submitted whatever GitHub or D
   const env = setup({rows: [], github: 'throws'});
   env.c.activityPreconditions_('title.submit', TEAM, env.c.activityContext_());
   assert.equal(env.reads.github, 0, 'GitHub is not even asked when nothing requires it');
+});
+
+// ---- the document check (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, Phase 5) ------------------------------------------------------
+
+const DOC_ROW = ['title.submit', 'document', 'doc-0001', 'Work Breakdown approved', 'Yes'];
+const listed = (overrides = {}) => ({record: Object.assign({documentId: 'doc-0001', folder: '1_Documents', fileName: WORK, active: 'Yes', inTeamTemplate: 'Yes', nameConflict: 'No'}, overrides)});
+const journalRow = (revision, action, extra = {}) => Object.assign({teamId: 'T1', documentId: 'doc-0001', revision, action, requestId: 'r' + revision, rowNumber: revision + 1}, extra);
+function documentDecide(spec = {}) {
+  const env = setup({rows: [DOC_ROW], drive: spec.drive || {teams: {T1: {files: [{name: WORK}]}}}});
+  const c = env.c, rows = spec.journal || [];
+  c.readTemplateFiles_ = () => { if (spec.templateThrows) throw new Error('down'); return {records: spec.listed || [listed()]}; };
+  c.readDocumentJournal_ = () => {
+    if (spec.journalThrows) throw new Error('down');
+    return {rows, rowsFor: (teamId, documentId) => rows.filter(row => row.teamId === teamId && row.documentId === documentId)};
+  };
+  const files = env.drive.folderOf.T1 ? env.drive.folderOf.T1[0].files : [];
+  (spec.descriptions || []).forEach((description, index) => { files[index].getDescription = () => description; });
+  files.forEach(file => { if (!file.getDescription) file.getDescription = () => ''; });
+  return plain(c.activityPreconditions_('title.submit', TEAM, c.activityContext_()));
+}
+const reasonOf = result => result.requirements[0].reason;
+
+test('document: the item must be a Document ID, and an unlisted ID is a misconfiguration', () => {
+  const {c} = setup();
+  const check = c.activityChecks_().document;
+  assert.equal(check.validItem('doc-0001'), true);
+  assert.equal(check.validItem('doc-1'), false);
+  assert.equal(check.validItem(WORK), false);
+  for (const overrides of [{active: 'No'}, {inTeamTemplate: 'No'}, {nameConflict: 'Yes'}, {documentId: 'doc-0002'}]) {
+    const result = documentDecide({listed: [listed(overrides)], journal: [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE')]});
+    assert.equal(result.allowed, false, JSON.stringify(overrides));
+    assert.equal(reasonOf(result), 'Submission requirements are misconfigured. Contact the coordinator.');
+  }
+});
+
+test('document: approved and reopened content with one live file is met; a hand-placed file with no row is met', () => {
+  assert.equal(documentDecide({journal: [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE')]}).allowed, true);
+  assert.equal(documentDecide({journal: [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE'), journalRow(3, 'REOPEN')]}).allowed, true);
+  assert.equal(documentDecide({journal: []}).allowed, true, 'an existing file counts as approved');
+});
+
+test('document: not submitted, waiting for the guide and returned are unmet with their own sentence', () => {
+  const none = documentDecide({journal: [], drive: {teams: {T1: {files: []}}}});
+  assert.equal(none.allowed, false);
+  assert.equal(reasonOf(none), 'Not approved yet.');
+  assert.equal(reasonOf(documentDecide({journal: [journalRow(1, 'SUBMIT')]})), 'Waiting for the guide to approve it.');
+  assert.equal(reasonOf(documentDecide({journal: [journalRow(1, 'SUBMIT'), journalRow(2, 'RETURN')]})), 'Returned by the guide. Submit it again.');
+});
+
+test('document: an approved document whose file is gone, trashed or duplicated is unmet', () => {
+  const approved = [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE')];
+  assert.match(reasonOf(documentDecide({journal: approved, drive: {teams: {T1: {files: []}}}})), /missing/);
+  assert.match(reasonOf(documentDecide({journal: approved, drive: {teams: {T1: {files: [{name: WORK, trashed: true}]}}}})), /missing/);
+  assert.match(reasonOf(documentDecide({journal: approved, drive: {teams: {T1: {files: [{name: WORK}, {name: WORK}]}}}})), /More than one/);
+  assert.match(reasonOf(documentDecide({journal: approved, drive: {teams: {}}})), /Team folder not created/);
+});
+
+test('document: unreadable sources and an invalid journal are Could not verify, and the engine hides the diagnostic from the reason', () => {
+  const approved = [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE')];
+  for (const spec of [{templateThrows: true}, {journalThrows: true}, {journal: [journalRow(2, 'SUBMIT')]}, {drive: {unreadable: true, teams: {}}}]) {
+    const result = documentDecide(Object.assign({journal: approved}, spec));
+    assert.equal(result.allowed, false, JSON.stringify(spec));
+    assert.equal(reasonOf(result), 'Could not verify: Work Breakdown approved.', JSON.stringify(spec));
+  }
+});
+
+test('document: a Drive write whose journal row is missing is unmet until it is settled', () => {
+  const approved = [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE')];
+  const pending = documentDecide({journal: approved, descriptions: [JSON.stringify({v: 1, requestId: 'not-in-journal', teamId: 'T1', documentId: 'doc-0001', revision: 3})]});
+  assert.equal(pending.allowed, false);
+  assert.match(reasonOf(pending), /still being recorded/);
+  const settled = documentDecide({journal: approved, descriptions: [JSON.stringify({v: 1, requestId: 'r1', teamId: 'T1', documentId: 'doc-0001', revision: 1})]});
+  assert.equal(settled.allowed, true);
+});
+
+test('document: the existing drive kind is unchanged by a pending or returned submission', () => {
+  const result = decide({rows: [RULE.work], drive: {teams: {T1: {files: [{name: WORK}]}}}}).result;
+  assert.equal(result.allowed, true);
 });
