@@ -35,8 +35,7 @@ function fixture() {
   });
   const originalSheet=c.getSheet_;
   c.getSheet_=name=>name==='users'?{getLastColumn:()=>7,getLastRow:()=>usernames.length+1,getRange:(r,c,n)=>({getValues:()=>r===1?[['Timestamp','Email address','Team ID','GitHub Username','GitHub ID','GitHub Display Name','GitHub Profile URL']]:usernames})}:originalSheet(name);
-  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','github-template.js','github-provisioning.js','title-cutover.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
-  c.installGithubTemplate_=()=>({verified:true}); // Template installation has its own tests; setup only resumes it.
+  for(const file of ['github-identity.js','student-github.js','team-github-setup.js','template-files.js','github-provisioning.js','title-cutover.js','logbook-tracker.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.weeklyStudents_=()=>[1,2].filter(n=>team[n+2]).map(n=>({teamId:team[0],email:team[n+2],regNo:team[n+7]}));
   c.refreshGithubAccountMetadata_=()=>{}; // Metadata persistence is exercised by account integration tests.
   c.updateTeamStatusRepoUrl_=(id,url)=>{if(failWrite)throw Error('Sheet write failed');team[7]=url;writes.push({id,url});};
@@ -211,4 +210,41 @@ test('repository provisioning adds no guide or coordinator: only the students\' 
   assert.equal(f.calls.some(call=>/coord-gh|guide-gh/.test(call.path||'')),false,'neither staff account is touched');
   const source=fs.readFileSync('github-provisioning.js','utf8');
   assert.doesNotMatch(source,/GUIDE_REPO_PERMISSION|COLLABORATOR_REPO_PERMISSION|COLLABORATOR_GITHUB_USERNAME|addMissingGuideCollaborators/);
+});
+
+test('a new team repository is generated from the template repository, privately and without other branches', () => {
+  const f=fixture();f.team[7]='';f.repository(false);
+  assert.equal(f.repair().ready,true);
+  const generate=f.calls.filter(call=>call.method==='POST');
+  assert.equal(generate.length,1);
+  assert.equal(generate[0].path,'/repos/ece-kalasalingam/capstone-team-template/generate');
+  assert.equal(generate[0].payload.private,true);
+  assert.equal(generate[0].payload.include_all_branches,false);
+  assert.equal(generate[0].payload.name,'capstone-2026-27-odd-team-T1');
+  assert.equal(f.calls.some(call=>call.path.includes('/orgs/')),false,'the old empty-repository call is gone');
+  assert.equal(f.calls.some(call=>['PUT'].includes(call.method)&&call.path.includes('/contents/')),false,'no file is uploaded');
+});
+
+test('a template that is missing or not marked as a template stops creation in plain words and saves nothing', () => {
+  for(const status of [403,404]){
+    const f=fixture();f.team[7]='';f.repository(false);
+    const original=f.c.makeGithubRequest_;
+    f.c.makeGithubRequest_=(method,path,payload)=>method==='POST'?(f.calls.push({method,path,payload}),{status}):original(method,path,payload);
+    assert.throws(()=>f.repair(),/repository template is not available/);
+    assert.equal(f.writes.length,0);
+  }
+});
+
+test('the wait for a generated repository ends at once when it is ready, and gives a retry message when it is not', () => {
+  const f=fixture();
+  const sleeps=[];f.c.Utilities={sleep:ms=>sleeps.push(ms)};
+  f.c.makeGithubRequest_=()=>({status:200});
+  f.c.waitForTeamRepoContent_('org/repo','main');
+  assert.equal(sleeps.length,0);
+  let polls=0;
+  f.c.makeGithubRequest_=()=>{polls++;return {status:polls>=3?200:409};};
+  f.c.waitForTeamRepoContent_('org/repo','main');
+  assert.deepEqual([polls,sleeps.length],[3,2]);
+  f.c.makeGithubRequest_=()=>({status:409});
+  assert.throws(()=>f.c.waitForTeamRepoContent_('org/repo','main'),/still being created/);
 });

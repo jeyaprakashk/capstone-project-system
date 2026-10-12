@@ -14,7 +14,7 @@ const BASE1 = '68fa810f28c67de66c97a0d0140e2b70c0dcf54f';
 const ANN = 101, BOB = 102, ADMIN = 900;
 const TEMPLATE_HEADERS = ['Document ID', 'Folder', 'File Name', 'Extension', 'First Seen', 'Last Seen', 'Active', 'In Team Template', 'Name Conflict'];
 const FILES = ['document-sheets.js', 'template-files.js', 'team-files.js', 'document-service.js', 'document-journal.js', 'document-files.js', 'document-github.js', 'document-drive.js',
-  'document-write.js', 'document-api.js', 'document-setup.js', 'github-provisioning.js', 'api-envelope.js', 'student-api.js', 'title-api.js', 'generated/github-template-manifest.js'];
+  'document-write.js', 'document-api.js', 'document-setup.js', 'github-provisioning.js', 'api-envelope.js', 'student-api.js', 'title-api.js'];
 const commit = (sha, id, login, date) => ({sha, author: id === null ? null : {id, login: login || 'user' + id}, commit: {author: {date: date || '2030-01-02T03:04:05Z'}}});
 
 function setup() {

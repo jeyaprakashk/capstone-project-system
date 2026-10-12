@@ -15,7 +15,7 @@ function context() {
   for (const file of ['evaluation-lifecycle.js', 'review-academic-policy.js', 'marks-tracker.js', 'review-evaluation.js', 'reviewer-evaluation.js', 'guide-evaluation.js', 'publication-events.js',
     'internal-assessment-publishing.js', 'review-configuration.js', 'reviewer-dashboard.js', 'reviewer-api.js', 'guide-dashboard.js', 'guide-api.js', 'dashboard-router.js',
     'document-sheets.js', 'template-files.js', 'team-files.js', 'document-service.js', 'document-journal.js', 'document-files.js', 'document-github.js', 'document-drive.js',
-    'document-write.js', 'document-api.js', 'github-provisioning.js', 'generated/github-template-manifest.js']) {
+    'document-write.js', 'document-api.js', 'github-provisioning.js']) {
     vm.runInContext(fs.readFileSync(file, 'utf8'), c, { filename: file });
   }
   // Only the student (one@) and the guide (guide@) are in the roster; nobody sits on a Review committee.

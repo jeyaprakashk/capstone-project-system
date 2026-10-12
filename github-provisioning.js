@@ -70,15 +70,33 @@ function getTeamRepoName_(teamId, semester) {
   return `capstone-${year}-${term}-team-${team}`;
 }
 
+/**
+ * Creates a team repository from the template repository (REPO-FROM-TEMPLATE-PLAN.md): GitHub copies the template's default branch as the
+ * first commit. Returns the GitHub response. A template that is missing, not marked as a template or not readable is reported in plain
+ * words and nothing is created. The caller holds the script lock and has checked that the repository does not exist.
+ */
 function createTeamRepo_(repoName, teamId) {
   const ORG_NAME = getConfig_('GITHUB_ORG_NAME');
   const payload = {
+    owner: ORG_NAME,
     name: repoName,
     description: `Capstone project — Team ${teamId}`,
     private: true,
-    auto_init: false
+    include_all_branches: false
   };
-  return makeGithubRequest_('POST', `/orgs/${ORG_NAME}/repos`, payload);
+  const response = makeGithubRequest_('POST', `/repos/${TEMPLATE_REPOSITORY_}/generate`, payload);
+  if ([403, 404].includes(response.status)) throw new Error('The repository template is not available. Contact the coordinator.');
+  return response;
+}
+
+/** GitHub fills a generated repository a few seconds after it answers. Waits (about 30 s at most) until its default branch exists. */
+function waitForTeamRepoContent_(slug, branch) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const ref = makeGithubRequest_('GET', '/repos/' + slug + '/git/ref/heads/' + encodeURIComponent(branch || 'main'));
+    if (ref.status === 200) return;
+    if (attempt < 5) Utilities.sleep(5000);
+  }
+  throw new Error('The repository is still being created. Retry GitHub setup shortly.');
 }
 
 /**

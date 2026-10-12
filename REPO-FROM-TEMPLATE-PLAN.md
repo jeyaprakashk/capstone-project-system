@@ -1,6 +1,6 @@
 # New team repositories from the template repository (plan)
 
-Status: **plan only, nothing built.** Written 2026-10-12.
+Status: **built on `main` (2026-10-12), not pushed or deployed.** Phases 1 to 5 are done. Owner steps are in section 6.
 
 ## 1. What changes, in plain words
 
@@ -65,6 +65,10 @@ Order matters: phases 1 and 2 first (they remove the last readers of the bundle)
 1. In the template repository settings, tick **Template repository**.
 2. After the code is deployed, create **one** test team repository (or use a test team row) and check: folders `1_Documents`, `2_Evidence`, `3_Design_and_Code_Files`, `4_Photos_Videos_Results`, `5_Presentations` and `README.md` are there, the pptx is in `5_Presentations`, and the students received their invitations.
 3. Keep `Distribute-CapstoneReview1.ps1` outside the repository; it is a one-time tool and no longer needed once new repositories come from the template (template changes for **existing** repositories still need a script like it, by design: the system never changes a team's repository after creation).
+
+### After the build
+
+Before deploying: run `setupDocumentStorage` once (it adds the `Baseline Blob SHA` header). Delete any script property named `GITHUB_TEMPLATE_PENDING_*` (nothing reads it any more). The first daily team scan after deploy reads each file's baseline once; it makes about one extra GitHub call per team and document.
 
 ## 7. Not in this plan
 
