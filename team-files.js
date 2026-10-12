@@ -10,7 +10,7 @@
  */
 const TEAM_FILE_STATUS_FIELDS_ = Object.freeze({
   teamId: 'Team ID', documentId: 'Document ID', repoBlobSha: 'Repo Blob SHA', teamChanged: 'Team Changed',
-  lastTeamCommit: 'Last Team Commit', latestCommit: 'Latest Commit', checkedAt: 'Checked At'
+  lastTeamCommit: 'Last Team Commit', latestCommit: 'Latest Commit', checkedAt: 'Checked At', baselineSha: 'Baseline Blob SHA'
 });
 const TEAM_FILE_HISTORY_PAGE_SIZE_ = 100;
 const TEAM_FILE_HISTORY_PAGES_ = 10;
@@ -22,11 +22,6 @@ function listedTemplateDocuments_(records) {
   return records
     .filter(item => item.record.active === 'Yes' && item.record.inTeamTemplate === 'Yes' && item.record.nameConflict === 'No')
     .map(item => ({documentId: item.record.documentId, folder: item.record.folder, fileName: item.record.fileName, path: item.record.folder + '/' + item.record.fileName}));
-}
-
-/** path -> the blob SHA the team's repository was created with (the bundled manifest). */
-function teamFileBaselines_() {
-  return new Map(githubTemplateManifest_().map(entry => [entry.path, entry.sha]));
 }
 
 /** Normalized Team ID -> Set of the GitHub numeric IDs linked by that team's students. */
@@ -83,15 +78,62 @@ function teamFileHistory_(slug, branch, path, linkedIds) {
   return {teamChanged: 'Unknown', latestCommit: latest, lastTeamCommit: '', latestAuthor, teamAuthor: none, latestDate};
 }
 
-/** The TeamFileStatus records of one team for every listed document. `tree` comes from teamRepositoryTree_. */
-function teamFileRecords_(teamId, slug, documents, tree, baselines, linkedIds, nowIso) {
+/**
+ * The blob SHA a file had in the first commit that touched it in the team repository (what the team received from the template).
+ * Returns {status: 'ok', sha}, {status: 'none'} when the first commit is a linked team member's (the file is theirs, not the template's),
+ * or {status: 'unknown'} when GitHub failed or the history is longer than the search limit. Read once and then stored.
+ */
+function teamFileBaseline_(slug, branch, path, linkedIds) {
+  let oldest = null;
+  for (let page = 1; page <= TEAM_FILE_HISTORY_PAGES_; page++) {
+    const response = makeGithubRequest_('GET', '/repos/' + slug + '/commits?sha=' + encodeURIComponent(branch) + '&path=' + encodeURIComponent(path) +
+      '&per_page=' + TEAM_FILE_HISTORY_PAGE_SIZE_ + '&page=' + page);
+    if (response.status !== 200 || !Array.isArray(response.body)) return {status: 'unknown'};
+    if (response.body.length) oldest = response.body[response.body.length - 1];
+    if (response.body.length < TEAM_FILE_HISTORY_PAGE_SIZE_) {
+      if (!oldest) return {status: 'unknown'};
+      if (oldest.author && linkedIds.has(githubId_(oldest.author.id))) return {status: 'none'};
+      const content = makeGithubRequest_('GET', '/repos/' + slug + '/contents/' + path.split('/').map(encodeURIComponent).join('/') + '?ref=' + encodeURIComponent(String(oldest.sha)));
+      if (content.status !== 200 || !content.body || !content.body.sha) return {status: 'unknown'};
+      return {status: 'ok', sha: String(content.body.sha)};
+    }
+  }
+  return {status: 'unknown'};
+}
+
+/**
+ * What is known about one file of one team repository: {present, blobSha, teamChanged, latestCommit, lastTeamCommit, latestAuthor,
+ * teamAuthor, latestDate, baselineSha}. `storedBaseline` is the baseline already kept for the file (blank when none yet); `baselineSha`
+ * is set only when this call read it for the first time. Unknown is never turned into No.
+ */
+function teamFileChange_(slug, tree, path, linkedIds, storedBaseline) {
+  const none = {login: '', id: ''};
+  const base = {teamChanged: 'No', latestCommit: '', lastTeamCommit: '', latestAuthor: none, teamAuthor: none, latestDate: '', baselineSha: ''};
+  const blobSha = tree.blobs.get(path);
+  if (!blobSha) return Object.assign(base, {present: false, blobSha: ''});
+  if (!linkedIds.size) return Object.assign(base, {present: true, blobSha});
+  let baseline = storedBaseline || '', fresh = '';
+  if (!baseline) {
+    const found = teamFileBaseline_(slug, tree.branch, path, linkedIds);
+    if (found.status === 'unknown') return Object.assign(base, {present: true, blobSha, teamChanged: 'Unknown'});
+    if (found.status === 'ok') { baseline = found.sha; fresh = found.sha; }
+  }
+  if (baseline && blobSha === baseline) return Object.assign(base, {present: true, blobSha, baselineSha: fresh});
+  const history = teamFileHistory_(slug, tree.branch, path, linkedIds);
+  return Object.assign(base, history, {present: true, blobSha, baselineSha: fresh});
+}
+
+/**
+ * The TeamFileStatus records of one team for every listed document. `tree` comes from teamRepositoryTree_; `stored` maps a Document ID to
+ * the baseline already kept for it (blank when none yet).
+ */
+function teamFileRecords_(teamId, slug, documents, tree, stored, linkedIds, nowIso) {
   return documents.map(document => {
-    const base = {teamId, documentId: document.documentId, checkedAt: nowIso};
-    const sha = tree.blobs.get(document.path);
-    if (!sha) return Object.assign(base, {repoBlobSha: '', teamChanged: 'No', lastTeamCommit: '', latestCommit: ''});
-    if (sha === baselines.get(document.path) || !linkedIds.size) return Object.assign(base, {repoBlobSha: sha, teamChanged: 'No', lastTeamCommit: '', latestCommit: ''});
-    const history = teamFileHistory_(slug, tree.branch, document.path, linkedIds);
-    return Object.assign(base, {repoBlobSha: sha, teamChanged: history.teamChanged, lastTeamCommit: history.lastTeamCommit, latestCommit: history.latestCommit});
+    const change = teamFileChange_(slug, tree, document.path, linkedIds, stored.get(document.documentId));
+    const record = {teamId, documentId: document.documentId, checkedAt: nowIso, repoBlobSha: change.blobSha, teamChanged: change.teamChanged,
+      lastTeamCommit: change.lastTeamCommit, latestCommit: change.latestCommit};
+    if (change.baselineSha) record.baselineSha = change.baselineSha;
+    return record;
   });
 }
 
@@ -132,7 +174,7 @@ function scanTeamFiles() {
   try {
     const documents = listedTemplateDocuments_(readTemplateFiles_().records);
     if (!documents.length) return {ok: true, teams: 0, remaining: 0};
-    const status = readTeamFileStatus_(), baselines = teamFileBaselines_(), accounts = teamLinkedGithubIds_(), repoUrls = getRepoUrlMap_();
+    const status = readTeamFileStatus_(), accounts = teamLinkedGithubIds_(), repoUrls = getRepoUrlMap_();
     const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
     const teams = [];
     getSheetRows_(SHEET_NAMES.TEAM_STATUS).forEach(row => {
@@ -150,7 +192,11 @@ function scanTeamFiles() {
       scanned += 1;
       let records;
       try {
-        records = teamFileRecords_(team.teamId, team.slug, documents, teamRepositoryTree_(team.slug), baselines, accounts.get(team.key) || new Set(), nowIso);
+        const stored = new Map(documents.map(document => {
+          const kept = status.index.get(team.key + '|' + document.documentId);
+          return [document.documentId, kept ? String(kept.record.baselineSha || '') : ''];
+        }));
+        records = teamFileRecords_(team.teamId, team.slug, documents, teamRepositoryTree_(team.slug), stored, accounts.get(team.key) || new Set(), nowIso);
       } catch (error) {
         // GitHub could not be read for this team: its rows say Unknown, never a left-over Yes.
         failed += 1;

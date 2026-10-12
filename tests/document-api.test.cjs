@@ -153,8 +153,8 @@ test('a newer commit, an unchanged file, a file that is not in the repository an
   const env = setup();
   const stale = submit(env, {expectedCommit: 'c100001'});
   assert.deepEqual([stale.error.code, stale.error.message], ['CONFLICT', 'A newer version was committed. Review it and submit again.']);
-  env.github.repo.files[STEP2].sha = BASE1;
-  env.f.c.teamFileBaselines_ = () => new Map([[STEP1, BASE1], [STEP2, BASE1]]);
+  // the team never changed STEP2: its first commit is the administrator's and holds the same content
+  env.github.repo.commits[STEP2] = [commit('d100001', ADMIN, 'admin'), commit('d000001', ADMIN, 'admin')];
   assert.equal(submit(env, {documentId: 'doc-0002', expectedCommit: 'd100001'}).error.code, 'REJECTED');
   delete env.github.repo.files[STEP2];
   assert.match(submit(env, {documentId: 'doc-0002', expectedCommit: 'd100001'}).error.message, /not in your team repository/);

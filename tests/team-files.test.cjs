@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const {weeklyFixture} = require('./weekly-progress-fixture.cjs');
 
 const plain = value => JSON.parse(JSON.stringify(value));
-const HEADERS = ['Team ID', 'Document ID', 'Repo Blob SHA', 'Team Changed', 'Last Team Commit', 'Latest Commit', 'Checked At'];
+const HEADERS = ['Team ID', 'Document ID', 'Repo Blob SHA', 'Team Changed', 'Last Team Commit', 'Latest Commit', 'Checked At', 'Baseline Blob SHA'];
 const TEMPLATE_HEADERS = ['Document ID', 'Folder', 'File Name', 'Extension', 'First Seen', 'Last Seen', 'Active', 'In Team Template', 'Name Conflict'];
 const STEP1 = '1_Documents/Step1_Work_Breakdown.docx', STEP2 = '1_Documents/Step2_Need_Analysis.docx';
 const BASE = {[STEP1]: '68fa810f28c67de66c97a0d0140e2b70c0dcf54f', [STEP2]: '4dd722ac'};
@@ -16,7 +16,7 @@ const ADMIN = 900, ANN = 101, BOB = 102;
 
 function setup() {
   const f = weeklyFixture();
-  ['github-provisioning.js', 'document-sheets.js', 'template-files.js', 'team-files.js', 'document-setup.js', 'generated/github-template-manifest.js']
+  ['github-provisioning.js', 'document-sheets.js', 'template-files.js', 'team-files.js', 'document-setup.js']
     .forEach(name => vm.runInContext(fs.readFileSync(name, 'utf8'), f.c, {filename: name}));
   f.c.requireTriggerOrOperator_ = () => {};
   f.c.setupDocumentStorage();
@@ -39,6 +39,10 @@ function setup() {
     if (path.includes('/git/trees/')) {
       if (github.failTree === slug) return {status: 502, body: null};
       return {status: 200, body: {truncated: !!repo.truncated, tree: Object.entries(repo.files).map(([file, sha]) => ({path: file, type: 'blob', sha}))}};
+    }
+    if (path.startsWith('/repos/' + slug + '/contents/')) {
+      const file = decodeURIComponent(path.split('/contents/')[1].split('?')[0]), baseline = (repo.baselines && repo.baselines[file]) || 'tpl-' + file;
+      return baseline ? {status: 200, body: {sha: baseline}} : {status: 404, body: null};
     }
     const url = new URL('https://x' + path), file = url.searchParams.get('path'), page = Number(url.searchParams.get('page'));
     if (repo.failCommits) return {status: 502, body: null};
@@ -72,13 +76,18 @@ test('the catalog headers and the code constants agree, and setupDocumentStorage
 test('absent and unchanged files are No, with no history call', () => {
   const env = setup();
   env.repo.files[STEP2] = BASE[STEP2];
-  // STEP1 is absent from the repository; STEP2 equals the baseline sha of the manifest
-  env.f.c.teamFileBaselines_ = () => new Map([[STEP1, BASE[STEP1]], [STEP2, BASE[STEP2]]]);
+  // STEP1 is absent from the repository; STEP2 equals what its first commit held
+  env.repo.baselines = {[STEP2]: BASE[STEP2]};
+  env.repo.commits[STEP2] = [commit('c0', ADMIN)];
   const outcome = plain(env.f.c.scanTeamFiles());
   assert.deepEqual([outcome.ok, outcome.teams, outcome.remaining], [true, 1, 0]);
   assert.deepEqual([env.result('T1', 'doc-0001')['Team Changed'], env.result('T1', 'doc-0001')['Repo Blob SHA']], ['No', '']);
   assert.deepEqual([env.result('T1', 'doc-0002')['Team Changed'], env.result('T1', 'doc-0002')['Repo Blob SHA']], ['No', BASE[STEP2]]);
-  assert.equal(env.github.calls.filter(call => call.includes('/commits?')).length, 0);
+  assert.equal(env.github.calls.filter(call => call.includes('/commits?')).length, 1, 'the baseline is read from the first commit');
+  assert.equal(env.result('T1', 'doc-0002')['Baseline Blob SHA'], BASE[STEP2]);
+  env.github.calls.length = 0;
+  env.f.c.scanTeamFiles();
+  assert.equal(env.github.calls.filter(call => call.includes('/commits?') || call.includes('/contents/')).length, 0, 'a stored baseline is never read again');
 });
 
 test('a linked teammate commit makes it Yes, even when the administrator committed on top of it', () => {
@@ -108,7 +117,7 @@ test('the search goes as far back as it needs to: page 5 is found, a short histo
   env.repo.commits[STEP2] = long(150, -1);
   env.f.c.scanTeamFiles();
   assert.deepEqual([env.result('T1', 'doc-0001')['Team Changed'], env.result('T1', 'doc-0001')['Last Team Commit']], ['Yes', 'k420']);
-  assert.equal(env.github.calls.filter(call => call.includes('/commits?') && call.includes('Step1')).length, 5);
+  assert.equal(env.github.calls.filter(call => call.includes('/commits?') && call.includes('Step1')).length, 10, 'five pages for the baseline, five for the search');
   assert.equal(env.result('T1', 'doc-0002')['Team Changed'], 'No');
   const limit = setup();
   limit.repo.files[STEP1] = 'a';
@@ -225,4 +234,23 @@ test('the scan is a guarded entry point and a missing sheet is reported', () => 
   const outcome = plain(env.f.c.scanTeamFiles());
   assert.deepEqual([outcome.ok, outcome.reason], [false, 'failed']);
   assert.match(outcome.message, /TeamFileStatus does not exist/);
+});
+
+test('the baseline is the content of the first commit: a file a teammate created has none, and an unreadable first commit is Unknown', () => {
+  const env = setup();
+  env.repo.files[STEP1] = 'a'; env.repo.files[STEP2] = 'b';
+  env.repo.commits[STEP1] = [commit('c2', ADMIN), commit('c1', BOB)];
+  env.repo.commits[STEP2] = [commit('d2', BOB), commit('d1', ADMIN)];
+  env.repo.baselines = {[STEP1]: 'x'};
+  env.f.c.scanTeamFiles();
+  const one = env.result('T1', 'doc-0001'), two = env.result('T1', 'doc-0002');
+  assert.deepEqual([one['Team Changed'], one['Baseline Blob SHA']], ['Yes', ''], 'created by a teammate: no baseline, changed by the team');
+  assert.deepEqual([two['Team Changed'], two['Baseline Blob SHA']], ['Yes', 'tpl-' + STEP2]);
+  const broken = setup();
+  broken.repo.files[STEP1] = 'a';
+  broken.repo.commits[STEP1] = [commit('c1', ADMIN)];
+  broken.repo.baselines = {};
+  broken.f.c.makeGithubRequest_ = ((original) => (method, path) => path.includes('/contents/') ? {status: 502, body: null} : original(method, path))(broken.f.c.makeGithubRequest_);
+  broken.f.c.scanTeamFiles();
+  assert.deepEqual([broken.result('T1', 'doc-0001')['Team Changed'], broken.result('T1', 'doc-0001')['Baseline Blob SHA']], ['Unknown', '']);
 });

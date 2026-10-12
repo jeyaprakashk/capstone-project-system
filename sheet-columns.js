@@ -260,7 +260,7 @@ function sheetCatalog_() {
       teamFileStatus: {
         name: 'TeamFileStatus',
         access: 'view',
-        headers: ['Team ID', 'Document ID', 'Repo Blob SHA', 'Team Changed', 'Last Team Commit', 'Latest Commit', 'Checked At'],
+        headers: ['Team ID', 'Document ID', 'Repo Blob SHA', 'Team Changed', 'Last Team Commit', 'Latest Commit', 'Checked At', 'Baseline Blob SHA'],
         status: 'new',
         purpose: 'For each team and listed template document: has a team member changed the file in the team repository (Yes, No or Unknown), written by a daily scan.',
         createAtRuntime: false,

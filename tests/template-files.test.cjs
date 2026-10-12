@@ -12,7 +12,7 @@ const file = name => ({type: 'file', name, path: name, sha: 'sha-' + name});
 
 function setup(listings) {
   const f = weeklyFixture();
-  ['document-sheets.js', 'template-files.js', 'team-files.js', 'document-setup.js', 'generated/github-template-manifest.js'].forEach(name => vm.runInContext(fs.readFileSync(name, 'utf8'), f.c, {filename: name}));
+  ['document-sheets.js', 'template-files.js', 'team-files.js', 'document-setup.js'].forEach(name => vm.runInContext(fs.readFileSync(name, 'utf8'), f.c, {filename: name}));
   f.c.requireTriggerOrOperator_ = () => {};
   f.c.Session.getEffectiveUser = () => ({getEmail: () => 'owner@example.com'});
   const github = {listings: listings || {'1_Documents': [file('Step1_Work_Breakdown.docx'), file('Brand_New.docx'), file('notes.md'), {type: 'dir', name: 'extra'}], '5_Presentations': [file('Review1_Presentation.pptx')]}, calls: [], fail: null};
@@ -54,8 +54,8 @@ test('the first scan lists the supported files only, with Document IDs, and flag
     ['doc-0001', '1_Documents', 'Step1_Work_Breakdown.docx', 'docx'],
     ['doc-0002', '1_Documents', 'Brand_New.docx', 'docx'],
     ['doc-0003', '5_Presentations', 'Review1_Presentation.pptx', 'pptx']]);
-  assert.deepEqual(rows.map(row => [row.Active, row['In Team Template'], row['Name Conflict']]), [['Yes', 'Yes', 'No'], ['Yes', 'No', 'No'], ['Yes', 'No', 'No']]);
-  // the bundled manifest has no presentation, so the pptx is not in the team template and cannot be submitted yet
+  assert.deepEqual(rows.map(row => [row.Active, row['In Team Template'], row['Name Conflict']]), [['Yes', 'Yes', 'No'], ['Yes', 'Yes', 'No'], ['Yes', 'Yes', 'No']]);
+  // every file found in the template repository is in the team template; whether a team has it is the team scan's business
   assert.ok(rows.every(row => row['First Seen'] && row['First Seen'] === row['Last Seen']));
   assert.deepEqual(setup().github.calls.length, 0);
 });

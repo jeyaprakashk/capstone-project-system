@@ -50,7 +50,7 @@ function templateFilesFound_(responses) {
  * row carries only the fields that changed; a new row carries everything and rowNumber null. Throws, changing nothing, when two rows
  * share a folder and filename or a Document ID is not valid or repeats.
  */
-function templateFilesPlan_(existing, found, manifestPaths, nowIso) {
+function templateFilesPlan_(existing, found, nowIso) {
   const keyOf = (folder, fileName) => folder + '/' + fileName;
   const byKey = new Map(), ids = new Set();
   let highest = 0;
@@ -71,13 +71,12 @@ function templateFilesPlan_(existing, found, manifestPaths, nowIso) {
     highest += 1;
     rows.push({item: null, record: {
       documentId: templateDocumentId_(highest), folder: file.folder, fileName: file.fileName, extension: file.extension,
-      firstSeen: nowIso, lastSeen: nowIso, active: 'Yes', inTeamTemplate: 'No', nameConflict: 'No'
+      firstSeen: nowIso, lastSeen: nowIso, active: 'Yes', inTeamTemplate: 'Yes', nameConflict: 'No'
     }});
   });
   rows.forEach(row => {
     const key = keyOf(row.record.folder, row.record.fileName);
-    if (foundKeys.has(key)) { row.record.lastSeen = nowIso; row.record.active = 'Yes'; } else row.record.active = 'No';
-    row.record.inTeamTemplate = manifestPaths.has(key) ? 'Yes' : 'No';
+    if (foundKeys.has(key)) { row.record.lastSeen = nowIso; row.record.active = 'Yes'; row.record.inTeamTemplate = 'Yes'; } else row.record.active = 'No';
   });
   const counts = Object.create(null);
   rows.filter(row => row.record.active === 'Yes').forEach(row => {
@@ -95,10 +94,6 @@ function templateFilesPlan_(existing, found, manifestPaths, nowIso) {
   return {writes};
 }
 
-/** The paths of the template files the teams' repositories were created with (the bundled manifest). */
-function templateManifestPaths_() {
-  return new Set(githubTemplateManifest_().map(entry => entry.path));
-}
 
 /** Reads the template folders from GitHub. Throws on any failure so the sheet is left alone. */
 function templateRepositoryResponses_() {
@@ -135,7 +130,7 @@ function scanTemplateFiles() {
   try {
     const found = templateFilesFound_(templateRepositoryResponses_());
     const storage = readTemplateFiles_();
-    const plan = templateFilesPlan_(storage.records, found, templateManifestPaths_(), new Date().toISOString());
+    const plan = templateFilesPlan_(storage.records, found, new Date().toISOString());
     writeTemplateFiles_(storage, plan.writes);
     const added = plan.writes.filter(write => !write.rowNumber).length;
     console.log('Template scan: ' + found.length + ' files found, ' + added + ' added, ' + (plan.writes.length - added) + ' rows updated.');

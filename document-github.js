@@ -18,14 +18,14 @@ function documentLiveFile_(team, document) {
   let tree;
   try { tree = teamRepositoryTree_(slug); }
   catch (error) { console.error('Document check: ' + team.teamId + ': ' + (error && error.message || error)); throw documentUnverified_(document); }
-  const none = {login: '', id: ''};
-  const base = {slug, branch: tree.branch, path: document.path, latestAuthor: none, teamAuthor: none, latestCommit: '', lastTeamCommit: '', latestDate: ''};
-  const blobSha = tree.blobs.get(document.path);
-  if (!blobSha) return Object.assign(base, {present: false, blobSha: '', teamChanged: 'No'});
   const linked = teamLinkedGithubIds_().get(documentTeamKey_(team.teamId)) || new Set();
-  if (blobSha === teamFileBaselines_().get(document.path) || !linked.size) return Object.assign(base, {present: true, blobSha, teamChanged: 'No'});
-  const history = teamFileHistory_(slug, tree.branch, document.path, linked);
-  return Object.assign(base, history, {present: true, blobSha});
+  let stored = '';
+  try {
+    const kept = readTeamFileStatus_().index.get(documentTeamKey_(team.teamId) + '|' + document.documentId);
+    stored = kept ? String(kept.record.baselineSha || '') : '';
+  } catch (error) { console.error('TeamFileStatus could not be read: ' + (error && error.message || error)); }
+  const change = teamFileChange_(slug, tree, document.path, linked, stored);
+  return Object.assign({slug, branch: tree.branch, path: document.path}, change);
 }
 
 /** The bytes of the file at one commit, as Apps Script's signed byte array. UNAVAILABLE on any GitHub failure; INVALID_INPUT when too large. */
