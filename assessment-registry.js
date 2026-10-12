@@ -19,7 +19,7 @@ function parseAssessmentDefinitions_(rows,timezone) {
   const headers=(rows[0]||[]).map(normalizeText_);
   const cols=ASSESSMENT_DEFINITION_HEADERS_.map(h=>{const i=headers.indexOf(normalizeText_(h));if(i<0||headers.lastIndexOf(normalizeText_(h))!==i)throw new Error('AssessmentDefinitions requires exactly one '+h+' column.');return i;});
   const definitions=rows.slice(1).filter(r=>r.some(v=>String(v??'').trim())).map((row,index)=>{
-    const [id,type,label,sequence,weight,opening,due,prerequisites,policy,journal]=cols.map(c=>row[c]);
+    const [id,type,label,sequence,weight,opening,due,,policy,journal]=cols.map(c=>row[c]); // the Prerequisites cell is kept for the header but not read: order comes from Sequence
     const key=normalizeText_(id),kind=String(type||'').trim().toUpperCase();
     const fail=message=>{throw new Error('AssessmentDefinitions row '+(index+2)+': '+message);};
     if(!/^[a-z][a-z0-9_-]{0,39}$/.test(key))fail('Invalid assessment ID.');
@@ -35,23 +35,14 @@ function parseAssessmentDefinitions_(rows,timezone) {
     if(String(opening??'').trim()==='' || String(due??'').trim()==='')fail('Opening and due date are required.');
     const opens=projectDay_(opening,timezone),day=projectDay_(due,timezone);
     if(opens>day)fail('Opening must not follow due date.');
-    let required=[];
-    try{required=String(prerequisites||'').trim()?JSON.parse(prerequisites):[];}catch(e){fail('Prerequisites must be a JSON array.');}
-    if(!Array.isArray(required) || required.some(p=>!p || typeof p.assessmentId!=='string'||p.condition!=='RECORDED'))fail('Prerequisites require assessmentId and condition RECORDED.');
-    required=required.map(p=>({assessmentId:normalizeText_(p.assessmentId),condition:p.condition}));
-    if(new Set(required.map(p=>p.assessmentId)).size!==required.length)fail('Duplicate prerequisite.');
-    if(kind==='SEE' && required.length)fail('SEE Prerequisites must be blank or [].');
     if(kind==='SEE' && String(journal??'').trim())fail('SEE Journal must be blank; no storage is required.');
     const storage=kind==='SEE'?'':String(journal||'').trim() || 'Assessment_'+key;
     if(storage.length>100 || /[\[\]:*?\/\\]/.test(storage) || ['teamstatus','rubrics','milestones','assessmentdefinitions'].includes(normalizeText_(storage)))fail('Invalid journal name.');
-    return {key,type:kind,label:String(label).trim(),sequence:Number(sequence),weight:Number(weight),opens,day,prerequisites:required,academicPolicyVersion:kind==='SEE'?'':policy,journal:storage,journalConfigured:!!String(journal||'').trim(),gradedBy:kind==='SEE'?'SEE Committee (includes external members)':kind==='REVIEW'?'Review Committee':'Project Guide'};
+    return {key,type:kind,label:String(label).trim(),sequence:Number(sequence),weight:Number(weight),opens,day,academicPolicyVersion:kind==='SEE'?'':policy,journal:storage,journalConfigured:!!String(journal||'').trim(),gradedBy:kind==='SEE'?'SEE Committee (includes external members)':kind==='REVIEW'?'Review Committee':'Project Guide'};
   });
   if(new Set(definitions.map(d=>d.key)).size!==definitions.length)throw new Error('Duplicate assessment ID.');
   if(new Set(definitions.filter(d=>d.type!=='SEE').map(d=>normalizeText_(d.journal))).size!==definitions.filter(d=>d.type!=='SEE').length)throw new Error('Assessment journals must be distinct.');
   if(definitions.reduce((n,d)=>n+d.weight,0)>100.000001)throw new Error('Assessment weights exceed 100%.');
-  const visiting=new Set(),done=new Set();
-  const visit=d=>{if(visiting.has(d.key))throw new Error('Cyclic assessment prerequisites.');if(done.has(d.key))return;visiting.add(d.key);d.prerequisites.forEach(p=>{const prior=definitions.find(x=>x.key===p.assessmentId);if(!prior)throw new Error('Unknown prerequisite '+p.assessmentId);if(prior.type==='SEE')throw new Error('SEE cannot be a RECORDED prerequisite; completion is not recorded in this app.');visit(prior);});visiting.delete(d.key);done.add(d.key);};
-  definitions.forEach(visit);
   return definitions.sort((a,b)=>a.sequence-b.sequence||a.key.localeCompare(b.key));
 }
 // Set only inside withAssessmentDefinitions_, so a request parses the definitions tab once.
@@ -87,11 +78,14 @@ function assessmentRubric_(definition) {
   const key=definition.key;
   return parseRubricRows_([rows[0],...rows.slice(1).filter(r=>normalizeText_(r[col])===key)],[{key}])[key];
 }
-/** `loaded` lets a bulk caller hand over records it already read: {definition(id), reviewRecords(key), guideRecords()}. */
-function assessmentPrerequisiteBlock_(definition,team,loaded) {
+/** An assessment opens only after every other graded assessment with a lower Sequence is recorded (Submitted or Published) for the team; SEE is
+ * never recorded in this app, so it is skipped. Equal sequences do not block each other. Returns the first message, or ''.
+ * `loaded` lets a bulk caller hand over what it already read: {definitions, reviewRecords(key), guideRecords()}. */
+function assessmentSequenceBlock_(definition,team,loaded) {
+  if(definition.type!=='REVIEW')return '';
   const source=loaded||{};
-  for(const prerequisite of definition.prerequisites) {
-    const prior=(source.definition||assessmentDefinition_)(prerequisite.assessmentId);
+  const earlier=(source.definitions||requireAssessmentDefinitions_()).filter(d=>d.type!=='SEE'&&d.sequence<definition.sequence);
+  for(const prior of earlier) {
     let recorded;
     if(prior.type==='REVIEW'){const latest=reviewLatest_((source.reviewRecords||(key=>reviewRecords_(key).records))(prior.key),team);recorded=!!latest&&['Submitted','Published'].includes(latest.status);}
     else {const roster=guideRoster_(team,guideActor_(false),true),records=(source.guideRecords||(()=>guideRecords_().records))();recorded=roster.students.every(s=>{const latest=guideLatest_(records,roster.team,s.register);return latest&&['Submitted','Published'].includes(latest.status);});}

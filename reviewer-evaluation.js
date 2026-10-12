@@ -11,8 +11,10 @@ function reviewerTeamContext_(teamId) {
   return {TS,row,committee,students,team:String(row[TS.TEAM_ID]),title:titleGate_(row[TS.TEAM_ID]).title};
 }
 
-/** Progress for the given team rows. `onlyKey` limits the work to one Review; its prerequisites are still read once each. */
-function getReviewerReviewProgress_(rows, onlyKey) {
+/** Progress for the given team rows. `onlyKey` limits the work to one Review; the journals it needs are still read once each. `gate` asks for
+ * the review's ActivityDependencies rows too: an array of kinds evaluates only those (the dashboard's cheap first pass), `true` evaluates all
+ * (slow: Drive and GitHub, so one team at a time). Without it no row is read: counts and completion never need the gate. */
+function getReviewerReviewProgress_(rows, onlyKey, gate) {
   const TS=getColumnMap_(SHEET_NAMES.TEAM_STATUS,FIELD_DEFINITIONS.TEAM_STATUS);
   const result={reviews:[],teams:Object.create(null),error:''};
   let definitions;
@@ -26,10 +28,12 @@ function getReviewerReviewProgress_(rows, onlyKey) {
   };
   let guide=null;
   const loaded={
+    definitions,
     definition:id=>{const found=definitions.find(d=>d.key===normalizeText_(id));if(!found)throw new Error('Unknown assessment. Configure '+id+' in AssessmentDefinitions.');return found;},
     reviewRecords:key=>history(key).records,
     guideRecords:()=>guide||(guide=guideRecords_().records)
   };
+  if (gate) { loaded.activityContext=activityContext_(); if (Array.isArray(gate)) loaded.activityContext.kinds=gate; }
   result.reviews.filter(review=>!onlyKey||review.key===onlyKey).forEach(review=>{
     let current,config,error='';
     try {config=reviewConfiguration_(review.key);current=history(review.key);if(!current.sheet)throw new Error(assessmentStorageMissing_(reviewHistoryName_(review.key)));}

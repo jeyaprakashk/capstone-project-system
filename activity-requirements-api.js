@@ -6,7 +6,7 @@
 function activityRulesReport_(ctx) {
   const loaded = loadActivityRules_(ctx);
   const rules = {};
-  ACTIVITY_IDS_.forEach(id => { rules[id] = (loaded.rules[id] || []).map(rule => ({kind: rule.kind, item: rule.item, label: rule.label})); });
+  activityIds_().forEach(id => { rules[id] = (loaded.rules[id] || []).map(rule => ({kind: rule.kind, item: rule.item, label: rule.label})); });
   return {rules, errors: loaded.errors.slice()};
 }
 
@@ -20,7 +20,7 @@ function buildRequirementsReport_(teamId) {
   if (!row) throw apiFail_('NOT_FOUND', 'Team not found.');
   const team = {teamId: String(row[TS.TEAM_ID]).trim(), semester: row[TS.SEMESTER]};
   const activities = {};
-  ACTIVITY_IDS_.forEach(id => { activities[id] = activityPreconditions_(id, team, ctx); });
+  activityIds_().forEach(id => { activities[id] = activityPreconditions_(id, team, ctx); });
   return {...report, teamId: team.teamId, activities};
 }
 

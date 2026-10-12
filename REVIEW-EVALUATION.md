@@ -4,11 +4,13 @@ The marking interface is the web-app `ReviewEvaluations` drawer. The assessment 
 
 ## Instance configuration
 
-Each row in `AssessmentDefinitions` defines an instance: Assessment ID, Type (`REVIEW`), Label, Sequence, Weight (%), Opening, Due Date, Prerequisites, Academic Policy Version and Journal. Instances use a supported code-controlled policy; configuration binds the version rather than implementing policy.
+Each row in `AssessmentDefinitions` defines an instance: Assessment ID, Type (`REVIEW`), Label, Sequence, Weight (%), Opening, Due Date, Prerequisites (kept, not read), Academic Policy Version and Journal. Instances use a supported code-controlled policy; configuration binds the version rather than implementing policy.
 
-Journal defaults to `Assessment_<assessmentId>` in the main spreadsheet identified by `SHEET_ID`. An explicit Journal binding overrides the default. Assessment ID selects the matching criteria from `Rubrics`. IDs, labels, rubrics, dates and prerequisites are configuration; adding Review 3 or an arbitrary future REVIEW does not require another engine or endpoint.
+Journal defaults to `Assessment_<assessmentId>` in the main spreadsheet identified by `SHEET_ID`. An explicit Journal binding overrides the default. Assessment ID selects the matching criteria from `Rubrics`. IDs, labels, rubrics, dates and sequence are configuration; adding Review 3 or an arbitrary future REVIEW does not require another engine or endpoint.
 
-Prerequisites are definition-driven JSON entries such as `[{"assessmentId":"design_gate","condition":"RECORDED"}]`. The common evaluator enforces them. Opening is explicit, not calculated from a Review number.
+Order of entry comes from Sequence: a Review opens for a team only after every other non-SEE assessment with a lower Sequence is Submitted or Published for that team (`assessmentSequenceBlock_`; staff are exempt). Equal sequences do not block each other. The Prerequisites column is not read. Opening is explicit, not calculated from a Review number.
+
+**Requirements.** Each Review is also an activity of the activity engine, named by its Assessment ID (`review1`, `review2`, ...; every `REVIEW` row of `AssessmentDefinitions` is one, so a later Review needs only rows). The coordinator's `ActivityDependencies` rows for that activity must all be met before a team's marks can be entered: the project title approved (`title` / `approved`), guide-approved documents (`document` / `doc-NNNN`), and so on. The title is one of these rows, not a separate check in code: a review with no `title` row has no title requirement, and with no rows at all there is no requirement. The engine's reason lists every unmet requirement and is shown as the entry button's note. Reading Drive and GitHub for every team is too slow for the dashboard load, so the load evaluates only the `title` rows; the other rows are read per team afterwards (`API_reviewer_getTeamRequirements`) and the cells are updated. Opening or saving an evaluation always evaluates every row on the server. It applies to reading and to every save through `reviewEligibility_`, and a Submitted or Published evaluation stays readable whatever the rows say.
 
 ## Coordinator setup and readiness
 
@@ -25,7 +27,7 @@ System Status presents two separate concerns:
 
 `READY` means configuration and journal checks succeeded. `MISSING` means storage must be created. `EMPTY` means an existing blank journal needs initialization. `ERROR` identifies a configuration/storage problem that must be corrected. These are server results, not rules reimplemented by the browser.
 
-Team entry availability additionally requires the existing assignment, title approval, opening, prerequisite and lifecycle checks. A ready journal alone does not authorize or unlock an evaluation.
+Team entry availability additionally requires the existing assignment, the review's activity requirements (the title approval is one of them), opening, sequence and lifecycle checks. A ready journal alone does not authorize or unlock an evaluation.
 
 **Create missing assessment storage** calls `prepareReviewAssessmentStorage_()`. It authorizes the Coordinator/PD, obtains a script lock, revalidates configuration and invokes `provisionAssessmentJournals_()` for all supported configured assessments, including Guide. No new Drive file is created or shared.
 
@@ -35,7 +37,7 @@ The resolver uses an explicit/default name and the existing normalized name look
 
 `Reviewer dashboard → Enter marks / View marks → ReviewEvaluations.open(team, assessmentId, button) → loadReviewEvaluation_ → shared drawer → saveReviewEvaluationDraft_ / submitReviewEvaluation_ → append revision`
 
-The generic APIs load the configured rubric, current roster and latest evaluation. Server checks enforce authorization, prerequisites, lifecycle, input completeness, revision concurrency and request idempotency. Team criteria are assessed once; Individual criteria and attendance facts are entered per student. Drafts may remain incomplete; submission and makeup follow the existing academic strategy.
+The generic APIs load the configured rubric, current roster and latest evaluation. Server checks enforce authorization, sequence, the review's activity requirements, lifecycle, input completeness, revision concurrency and request idempotency. Team criteria are assessed once; Individual criteria and attendance facts are entered per student. Drafts may remain incomplete; submission and makeup follow the existing academic strategy.
 
 ## Persistence and publication
 
@@ -53,7 +55,7 @@ The finalized evaluation revision is authoritative for academic assessment. Publ
 
 For every configured REVIEW, assigned reviewers can select **Edit absence details** on a student with an existing absence or pending makeup, then **Save absence details** or **Cancel editing** without reopening the team evaluation. Completed absence cases remain accessible even when another student has pending makeup. Only the selected student's absence fields become editable; rubric marks stay locked. The summary previews unsaved outcomes using the same policy as the server.
 
-`recordReviewAbsence_({assessmentId, team, student, revision, token, requestId, absence})` uses the shared command lifecycle and appends an `absenceCorrection` revision. It checks reviewer assignment, prerequisites, finalized status, existing-absence eligibility, configuration/roster compatibility, concurrency and idempotency. It accepts only absence facts, validates supporting evidence, and rejects attended classifications without the required normal individual scores; those cases require coordinator reopening.
+`recordReviewAbsence_({assessmentId, team, student, revision, token, requestId, absence})` uses the shared command lifecycle and appends an `absenceCorrection` revision. It checks reviewer assignment, sequence, finalized status, existing-absence eligibility, configuration/roster compatibility, concurrency and idempotency. It accepts only absence facts, validates supporting evidence, and rejects attended classifications without the required normal individual scores; those cases require coordinator reopening.
 
 Corrections preserve original submission timing, common team scores, individual rubric evidence, makeup drafts/completed evidence and provenance, earlier events, and other students. Corrected facts determine evidence applicability under the current policy. An automatic event stores actor, timestamp, request ID, and before/after facts and outcomes; no correction reason is required. The corrected student needs publication and the evaluation returns to Submitted. Existing published snapshots remain visible with an update pending until explicit republication.
 

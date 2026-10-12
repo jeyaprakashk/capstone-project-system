@@ -24,7 +24,7 @@ function serverFixture(email = 'reviewer@example.com') {
   const progress = {
     reviews: [{ key: 'review1', label: 'Review 1' }, { key: 'review2', label: 'Review 2' }], error: '',
     teams: {
-      t1: { review1: { available: true, readable: true, status: 'Open', markedStudents: 0, totalStudents: 2, prerequisiteReason: 'Title not approved' }, review2: { available: false, error: 'Storage missing' } },
+      t1: { review1: { available: true, readable: true, status: 'Open', markedStudents: 0, totalStudents: 2, sequenceReason: 'Title not approved' }, review2: { available: false, error: 'Storage missing' } },
       t2: { review1: { available: true, readable: true, status: 'Draft', markedStudents: 1, totalStudents: 1 }, review2: { available: true, readable: true, status: '', reason: '', markedStudents: 1, totalStudents: 3 } },
       t3: { review1: { available: true, readable: false, status: 'Submitted', completed: true, markedStudents: 2, totalStudents: 2 } },
       t5: { review1: { available: true, readable: true, status: 'Published', completed: true, markedStudents: 1, totalStudents: 1 }, review2: { available: true, readable: true, status: '', completed: true, markedStudents: 1, totalStudents: 1 } }
@@ -119,4 +119,37 @@ test('review marking endpoints map save kinds to the existing rules and keep the
   assert.equal(JSON.parse(f.c.API_review_save('nope', {})).error.code, 'INVALID_INPUT');
   f.c.loadReviewEvaluation_ = () => { throw new Error('You are not an assigned reviewer for this team.'); };
   assert.deepEqual(JSON.parse(f.c.API_review_getEvaluation('T1', 'review1')).error, { code: 'REJECTED', message: 'You are not an assigned reviewer for this team.' });
+});
+
+test('a review whose ActivityDependencies rows are unmet is disabled and shows the unmet requirements; a met one is enabled', () => {
+  const { c, progress } = serverFixture();
+  const cell = () => JSON.parse(c.API_reviewer_getDashboard()).data.teams.find(t => t.teamId === 'T2').reviews.find(r => r.key === 'review1');
+  progress.teams.t2.review1 = { available: true, readable: false, editable: false, status: 'Not started', reason: 'Step3: Waiting for the guide to approve it.', markedStudents: 0, totalStudents: 1 };
+  assert.deepEqual({ enabled: cell().enabled, note: cell().note }, { enabled: false, note: 'Step3: Waiting for the guide to approve it.' });
+  progress.teams.t2.review1 = { available: true, readable: true, editable: true, status: 'Not started', reason: '', markedStudents: 0, totalStudents: 1 };
+  assert.equal(cell().enabled, true);
+  assert.equal(cell().actionLabel, 'Enter marks');
+  progress.teams.t2.review1 = { available: true, readable: true, editable: true, status: 'Not started', reason: '', sequenceReason: 'Submit Review 1 before entering Review 2 marks.', markedStudents: 0, totalStudents: 1 };
+  assert.equal(cell().enabled, false, 'an earlier assessment that is not recorded also disables it');
+});
+
+test('the dashboard asks only for the cheap rows; the per-team endpoint asks for every row, for an assigned team only', () => {
+  const { c, progress } = serverFixture();
+  const asked = [];
+  const stub = c.getReviewerReviewProgress_;
+  c.getReviewerReviewProgress_ = (rows, onlyKey, gate) => { asked.push({teams: rows.map(r => String(r[0])), gate}); return stub(rows, onlyKey, gate); };
+  JSON.parse(c.API_reviewer_getDashboard());
+  assert.deepEqual(Array.from(asked[0].gate), ['title'], 'the dashboard evaluates the title rows only');
+  progress.teams.t2.review1 = { available: true, readable: false, status: 'Not started', reason: 'Step3: Waiting for the guide to approve it.', markedStudents: 0, totalStudents: 1 };
+  const frame = JSON.parse(c.API_reviewer_getTeamRequirements(' t2 '));
+  assert.equal(frame.ok, true);
+  assert.equal(frame.data.teamId, 'T2');
+  assert.equal(asked[1].gate, true, 'every kind');
+  assert.deepEqual(Array.from(asked[1].teams), ['T2'], 'one team');
+  assert.deepEqual(frame.data.reviews.map(cell => cell.key), ['review1', 'review2']);
+  assert.deepEqual({enabled: frame.data.reviews[0].enabled, note: frame.data.reviews[0].note}, {enabled: false, note: 'Step3: Waiting for the guide to approve it.'});
+  for (const other of ['OTHER', 'T99', '', undefined]) assert.equal(JSON.parse(c.API_reviewer_getTeamRequirements(other)).error.code, 'NOT_FOUND', String(other));
+  const nobody = serverFixture(); nobody.c.getCommitteeNumbersForReviewer_ = () => [];
+  assert.equal(JSON.parse(nobody.c.API_reviewer_getTeamRequirements('T2')).error.code, 'UNAUTHORIZED');
+  assert.equal(JSON.parse(serverFixture('').c.API_reviewer_getTeamRequirements('T2')).error.code, 'UNAUTHENTICATED');
 });

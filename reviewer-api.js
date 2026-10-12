@@ -13,11 +13,10 @@ function reviewerTitleStatus_(title) {
   return title.state ? {...REVIEWER_TITLE_STATUS_[title.state.status]} : {tone:'warning', label:'Unavailable'};
 }
 
-function reviewerReviewCellDto_(row, TS, review, progress, title) {
+function reviewerReviewCellDto_(row, TS, review, progress) {
   const state = (progress.teams[normalizeReviewKey_(row[TS.TEAM_ID])] || {})[review.key];
-  const titleApproved = !!(title.state && title.state.approved.value);
   const available = !!(state && state.available);
-  const enabled = available && !!state.readable && titleApproved && !state.prerequisiteReason;
+  const enabled = available && !!state.readable && !state.sequenceReason;
   const hint = !available ? ((state && state.error) || 'Marks unavailable.') : (state.reason || state.status);
   const completed = !!(state && state.completed);
   return {
@@ -54,14 +53,15 @@ function reviewerTeamDto_(row, TS, progress, title, folderUrl) {
       folderUrl:String(folderUrl || ''),
       notes:summary ? summary.notes : ''
     },
-    reviews:progress.reviews.map(review => reviewerReviewCellDto_(row, TS, review, progress, title))
+    reviews:progress.reviews.map(review => reviewerReviewCellDto_(row, TS, review, progress))
   };
 }
 
 /** Pure DTO builder over getReviewerDashboardData_(); no sheet or layout knowledge leaves it. */
 function buildReviewerDto_(data) {
   const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
-  const progress = getReviewerReviewProgress_(data.assigned);
+  // Only the cheap rows (the title) gate a cell on first paint; the documents and GitHub are read per team by API_reviewer_getTeamRequirements.
+  const progress = getReviewerReviewProgress_(data.assigned, undefined, ['title']);
   const folders = teamFolderUrls_(data.assigned.map(row => ({teamId:row[TS.TEAM_ID], semester:row[TS.SEMESTER]})));
   return {
     summary:{pending:data.pending.length, approved:data.approved.length, awaitingGuide:data.notYetGuideApproved.length, total:data.total},
@@ -80,6 +80,21 @@ function reviewerEmailOrThrow_() {
 
 function API_reviewer_getDashboard() {
   return apiHandle_(() => withDashboardRead_(() => buildReviewerDto_(getReviewerDashboardData_(reviewerEmailOrThrow_()))));
+}
+
+/**
+ * One assigned team's review cells with every ActivityDependencies requirement evaluated (documents, GitHub, ...). That reads Drive, so the
+ * dashboard asks for it per team after first paint and replaces the cells it showed. The same rules refuse the entry itself on the server.
+ */
+function API_reviewer_getTeamRequirements(teamId) {
+  return apiHandle_(() => withDashboardRead_(() => {
+    const email = reviewerEmailOrThrow_(), TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+    const wanted = normalizeText_(teamId), mine = new Set(getCommitteeNumbersForReviewer_(email).map(normalizeText_));
+    const row = wanted && getSheetRows_(SHEET_NAMES.TEAM_STATUS).find(r => normalizeText_(r[TS.TEAM_ID]) === wanted && mine.has(normalizeText_(r[TS.COMMITTEE_NUMBER])));
+    if (!row) throw apiFail_('NOT_FOUND', 'Team not found.');
+    const progress = getReviewerReviewProgress_([row], undefined, true);
+    return {teamId:String(row[TS.TEAM_ID]), reviews:progress.error ? [] : progress.reviews.map(review => reviewerReviewCellDto_(row, TS, review, progress))};
+  }));
 }
 
 /** Review marking: the rules code authorizes (assigned reviewer, or staff) and keeps its messages; the drawer reads and saves through the bridge. */

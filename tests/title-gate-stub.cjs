@@ -1,7 +1,14 @@
 // For test contexts that exercise something other than the title (Review marking, publishing, schedules): a stand-in for the title
 // reader whose answer comes from the old-style team row the fixture already keeps, so a test can still say "this team's title is
 // approved" or "is not" without a TitleLog sheet. The real gate is tested in title-gate.test.cjs and through the weekly fixture.
+// It also stands in for the activity engine, which Review entry asks for the team's ActivityDependencies rows. The stand-in acts as if the
+// review has one `title` / `approved` row: the review is allowed exactly when the title is. A test of other rows replaces
+// `activityPreconditions_` after calling this.
 function stubTitleGate(context, read) {
+  context.activityContext_ = () => ({});
+  context.activityPreconditions_ = () => read().approved ? {allowed: true, requirements: [], reason: ''}
+    : {allowed: false, requirements: [{label: 'Project title approved', met: false, reason: 'The project title has not been approved yet.'}],
+      reason: 'Project title approved: The project title has not been approved yet.'};
   context.readTitleIndex_ = () => ({teams: {}});
   context.titleGate_ = () => {
     const state = read();

@@ -3,7 +3,7 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
   'use strict';
   const delegated = new WeakSet();
   const PAGE_SIZES = [10, 25, 50, 'all'];
-  const state = {dto:null, host:null, query:'', guide:'', status:'All', stage:null, page:1, size:10, busyTeam:null, panelTeam:null, decision:'', notes:'', toast:''};
+  const state = {dto:null, host:null, query:'', guide:'', status:'All', stage:null, page:1, size:10, busyTeam:null, panelTeam:null, decision:'', notes:'', toast:'', requirementsFor:null};
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
   const icon = (name, label) => getUi().renderIcon(name, label);
@@ -102,6 +102,31 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
     host.innerHTML='<div class="min-w-0 max-md:pb-16"><h2 class="text-xl font-semibold text-gray-900">Reviewer Dashboard</h2><p class="mt-1 text-sm text-gray-500">Review titles and assessments for your assigned teams.</p><p id="reviewerRefreshStatus" class="mt-1 text-sm text-gray-500" data-refresh-status role="status" aria-live="polite"></p>' + (dto.reviewError?'<p class="mt-3 text-sm text-red-700" role="status">Review marks are unavailable: ' + escape(dto.reviewError) + '</p>':'') + '<section class="mt-4 min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" aria-label="Assigned teams">' + tabsMarkup() + '<div ' + getTabs().panelAttributes('reviewerStage', state.stage) + ' data-reviewer-content>' + listMarkup() + '</div></section><div data-reviewer-panel>' + panelMarkup() + '</div>' + (state.toast?'<div class="fixed right-4 top-4 z-50 rounded-md bg-green-700 px-4 py-3 text-sm text-white shadow-lg" role="status" data-reviewer-toast>' + escape(state.toast) + '</div>':'') + '</div>';
     if(!delegated.has(host)){delegated.add(host);host.addEventListener('click',onClick);host.addEventListener('input',onInput);host.addEventListener('change',onChange);host.addEventListener('keydown',onKeydown);}
     getTabs().bind(host);
+    if(state.requirementsFor!==dto){state.requirementsFor=dto;loadRequirements(dto);}
+  }
+  /** The documents and GitHub rows of a review are read per team after first paint (Drive is slow): a cell they refuse is replaced by the
+   * server's answer. A failed read leaves the cell as it was; the server still refuses the entry itself. */
+  const REQUIREMENTS_READ={timeoutMs:120000},REQUIREMENTS_PARALLEL=3;
+  function loadRequirements(dto) {
+    const queue=dto.teams.filter(team=>team.reviews.some(cell=>cell.enabled)).map(team=>team.teamId);
+    let active=0,changed=false;
+    const apply=(teamId,data)=>{
+      const team=dto.teams.find(item=>item.teamId===teamId);
+      if(!team||!data||!Array.isArray(data.reviews))return;
+      data.reviews.forEach(cell=>{const at=team.reviews.findIndex(item=>item.key===cell.key);if(at>=0&&JSON.stringify(team.reviews[at])!==JSON.stringify(cell)){team.reviews[at]=cell;changed=true;}});
+      if(state.dto===dto&&state.host&&changed)updateList();
+    };
+    const next=()=>{
+      while(active<REQUIREMENTS_PARALLEL&&queue.length){
+        const teamId=queue.shift();active++;
+        bridge.read('reviewer-requirements:'+teamId,'API_reviewer_getTeamRequirements',[teamId],REQUIREMENTS_READ).then(data=>apply(teamId,data),()=>{}).then(()=>{
+          active--;
+          if(state.dto!==dto)return;
+          if(queue.length)next();else if(!active&&changed&&state.host)render(state.host,dto);
+        });
+      }
+    };
+    next();
   }
   function updateList() { q('[data-reviewer-content]').innerHTML=listMarkup(); }
   function updatePanel() { q('[data-reviewer-panel]').innerHTML=panelMarkup(); }

@@ -6,7 +6,7 @@
    registry is missing. This creates only the ten required headers.
 2. Open **Assessment definitions** and explicitly configure ID `guide_eval`,
    type `GUIDE_EVALUATION`, label, sequence, weight, opening,
-   due date, prerequisites and policy `guide-bands-v3-target-level-2`.
+   due date and policy `guide-bands-v3-target-level-2`.
    No Guide instance or academic setting is seeded.
 3. Maintain the criteria in `Rubrics`. Its `Assessment ID` column
    must contain `guide_eval` for each Guide criterion. Guide criteria must be Individual with

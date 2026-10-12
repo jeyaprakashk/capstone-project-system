@@ -260,7 +260,8 @@ test('SHEETS.md is generated from the catalog and is up to date', () => {
   const {render} = require('../scripts/build-sheets-doc.cjs');
   const expected = render();
   assert.ok(fs.existsSync('SHEETS.md'), 'run npm run build:sheets-doc');
-  assert.equal(fs.readFileSync('SHEETS.md', 'utf8'), expected, 'SHEETS.md is out of date; run npm run build:sheets-doc');
+  // A Windows checkout may turn the committed LF into CRLF (core.autocrlf); the content is what is compared.
+  assert.equal(fs.readFileSync('SHEETS.md', 'utf8').replace(/\r\n/g, '\n'), expected, 'SHEETS.md is out of date; run npm run build:sheets-doc');
   assert.match(expected, /`ActivityDependencies`.*Visible, green tab \(`edit`\)/);
   assert.match(expected, /`TitleLog`.*Visible, red tab \(`view`\)/);
   assert.ok(!expected.includes('\r'), 'the generated file uses LF line endings');

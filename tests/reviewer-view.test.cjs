@@ -16,12 +16,18 @@ const dtoOf = teams => ({ summary: { pending: teams.length, approved: 0, awaitin
 
 function setup(dto) {
   const { document, window } = parseHTML('<html><body><div id="reviewerContent"></div></body></html>');
-  const calls = { marks: [], refresh: 0, loading: 0, finished: 0, writes: [] };
+  const calls = { marks: [], refresh: 0, loading: 0, finished: 0, writes: [], requirements: [], inflight: 0, peak: 0 };
   const c = loadSources(['data-bridge-client.js', 'shared-tabs.js', 'title-requests.js', 'reviewer-view.js'], { document, Promise, setTimeout, clearTimeout, Intl, Date });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
-  const state = { dto: dto || dtoOf([team(1)]), writeResult: { message: 'Saved' }, writeError: null, readError: null };
+  const state = { dto: dto || dtoOf([team(1)]), writeResult: { message: 'Saved' }, writeError: null, readError: null, requirements: null };
   bridge.useTransport(async (method, args) => {
     if (method === 'API_reviewer_getDashboard') return state.readError ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: state.readError } }) : JSON.stringify({ ok: true, data: state.dto });
+    if (method === 'API_reviewer_getTeamRequirements') {
+      calls.requirements.push(args[0]); calls.inflight++; calls.peak = Math.max(calls.peak, calls.inflight);
+      await new Promise(resolve => setImmediate(resolve)); calls.inflight--;
+      const answer = state.requirements ? state.requirements(args[0]) : { teamId: args[0], reviews: [] };
+      return answer instanceof Error ? JSON.stringify({ ok: false, error: { code: 'UNAVAILABLE', message: answer.message } }) : JSON.stringify({ ok: true, data: answer });
+    }
     calls.writes.push([method, args]);
     return state.writeError ? JSON.stringify({ ok: false, error: { code: 'REJECTED', message: state.writeError } }) : JSON.stringify({ ok: true, data: state.writeResult });
   });
@@ -182,4 +188,50 @@ test('refresh preserves content on failure and reports review errors',async()=>{
   const f=setup();f.view.render(f.host,dtoOf([team(1)]));f.state.readError='offline';assert.equal(await f.view.refresh(),false);assert.equal(rows(f).length,1);
   f.state.readError=null;f.state.dto={...dtoOf([team(1),team(2)]),reviewError:'Unavailable'};assert.equal(await f.view.refresh(),true);
   assert.equal(rows(f).length,2);assert.match(f.host.textContent,/Review marks are unavailable: Unavailable/);
+});
+
+const refused = (key, note) => ({ key, enabled: false, actionLabel: 'Enter marks', note });
+const settleAll = async f => { for (let i = 0; i < 60; i++) await f.settle(); };
+
+test('after first paint each team with an open review is asked for its full requirements, and a refused cell is disabled with the reason', async () => {
+  const approved = { status: { tone: 'success', label: 'Approved' }, canDecide: false, canApprove: false, approveBlockedReason: '', revision: 3, submittedTitle: 'T', problem: '', similarityFlag: '', folderUrl: '', notes: '' };
+  const f = setup(); const dto = dtoOf([team(1, { titleApproval: approved }), team(2, { reviews: [{ key: 'review1', enabled: false, actionLabel: 'Enter marks', note: 'Not yet' }] }), team(3, { titleApproval: approved })]);
+  f.state.requirements = id => ({ teamId: id, reviews: id === 'T1' ? [refused('review1', 'Step3: Waiting for the guide to approve it.')] : [] });
+  f.view.render(f.host, dto);
+  stage(f, 'review1');
+  assert.equal(Array.from(rows(f)).map(r => r.querySelector('button')).filter(b => b && !b.disabled).length, 2, 'every enabled cell is open until its answer arrives');
+  await settleAll(f);
+  assert.deepEqual(f.calls.requirements.sort(), ['T1', 'T3'], 'a team with no open review is not asked');
+  const t1 = Array.from(rows(f)).find(r => r.dataset.teamId === 'T1');
+  assert.equal(dto.teams[0].reviews[0].enabled, false);
+  assert.equal(dto.teams[0].reviews[0].note, 'Step3: Waiting for the guide to approve it.');
+  assert.equal(t1.querySelector('button[data-action=marks]').disabled, true);
+  assert.match(text(t1), /Step3: Waiting for the guide to approve it\./);
+  assert.equal(dto.teams[2].reviews[0].enabled, true, 'an unchanged answer leaves the cell');
+  assert.equal(f.host.querySelector('[role=tab][data-stage=review1] [data-tab-badge]').textContent.trim(), '1', 'the pending count follows the answers');
+});
+
+test('a failed requirements read leaves the cell as it was and does not disturb the dashboard', async () => {
+  const f = setup(); const dto = dtoOf([team(1), team(2)]);
+  f.state.requirements = id => id === 'T1' ? new Error('Drive is slow') : { teamId: id, reviews: [refused('review1', 'Waiting.')] };
+  f.view.render(f.host, dto); await settleAll(f);
+  assert.equal(dto.teams[0].reviews[0].enabled, true, 'the failed team keeps its cell');
+  assert.equal(dto.teams[1].reviews[0].enabled, false);
+  assert.equal(f.calls.writes.length, 0, 'a requirements read is never a write');
+});
+
+test('requirement reads run a few at a time, once per dashboard load, and a stale dashboard ignores its answers', async () => {
+  const f = setup(); const dto = dtoOf([1, 2, 3, 4, 5, 6, 7].map(n => team(n)));
+  f.state.requirements = id => ({ teamId: id, reviews: [refused('review1', 'Waiting.')] });
+  f.view.render(f.host, dto);
+  stage(f, 'review1'); stage(f, 'title'); stage(f, 'review1');
+  await settleAll(f);
+  assert.equal(f.calls.requirements.length, 7, 'switching stages does not read again');
+  assert(f.calls.peak <= 3, 'at most three at a time, saw ' + f.calls.peak);
+  const next = dtoOf([team(9)]); const f2 = setup();
+  f2.state.requirements = id => ({ teamId: id, reviews: [refused('review1', 'Waiting.')] });
+  f2.view.render(f2.host, dtoOf([team(1), team(2)])); f2.view.render(f2.host, next);
+  await settleAll(f2);
+  assert.equal(next.teams[0].reviews[0].enabled, false, 'the current dashboard is updated');
+  assert.equal(f2.calls.requirements.includes('T1'), true, 'the first load started before it was replaced');
 });

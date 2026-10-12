@@ -74,7 +74,7 @@ Browser interaction checks use the repository's DOM test environment. No live Ap
 
 ## Review 3 verification
 
-The integration test adds Review 3 through spreadsheet fixture rows, gives it an 80-point Team / 20-point Individual rubric and configures Review 2 as its RECORDED prerequisite. The existing registry provisions its journal in the test environment.
+The integration test adds Review 3 through spreadsheet fixture rows, gives it an 80-point Team / 20-point Individual rubric and orders it after Review 2 by Sequence. The existing registry provisions its journal in the test environment.
 
 The same production code discovers Review 3, renders its publishing section, publishes the team, reads the frozen student result, reopens the Review, retains the old publication, resubmits and republishes one student. The other students remain under correction with their previous snapshots. No Review 3 engine or publishing endpoint was added.
 

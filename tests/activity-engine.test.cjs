@@ -10,11 +10,13 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const HEADERS = ['Activity', 'Kind', 'Item', 'Label', 'Active'];
 const WORK = 'Step1_Work_Breakdown.docx', NEED = 'Step2_Need_Analysis.docx';
 const FILES = ['common-constants.js', 'common-helpers.js', 'api-envelope.js', 'sheet-columns.js', 'activity-engine.js', 'activity-check-github.js',
-  'activity-check-drive.js', 'activity-check-document.js', 'activity-requirements-api.js', 'document-service.js', 'document-drive.js', 'team-files.js'];
+  'activity-check-drive.js', 'activity-check-document.js', 'activity-check-title.js', 'activity-requirements-api.js', 'document-service.js', 'document-drive.js', 'team-files.js', 'github-identity.js', 'weekly-activity.js'];
 
 /**
  * spec: rows (sheet rows below the header), headers, present, github (preset name or {preset, overrides} or 'throws'), drive (makeDriveContext spec),
- * teamRows (the TeamStatus roster for the endpoint).
+ * teamRows (the TeamStatus roster for the endpoint), commits (the Commits tab rows: {authorId, username, message}), collection (the team's
+ * CommitCollectionStatus: 'ok', 'error' or ''), commitsThrow (reading the Commits tab throws), title ('approved', 'unapproved' or 'throws'),
+ * definitions (the AssessmentDefinitions rows, or 'throws').
  */
 function setup(spec = {}) {
   const drive = makeDriveContext(spec.drive || {teams: {T1: {files: [{name: WORK}, {name: NEED}]}}});
@@ -32,6 +34,11 @@ function setup(spec = {}) {
   const stub = githubSetupStub(typeof github === 'string' ? github : github.preset, typeof github === 'string' ? {} : github.overrides);
   c.getTeamGithubSetup_ = (teamId, options) => { reads.github++; return stub.fn(teamId, options); };
   c.githubStubCalls = stub.calls;
+  c.readCollectedCommits_ = () => { if (spec.commitsThrow) throw new Error('Commits tab unreadable.'); return spec.commits || []; };
+  c.readCommitCollectionStatus_ = () => spec.collection === undefined ? 'ok' : spec.collection;
+  c.readTitleIndex_ = () => { if (spec.title === 'throws') throw new Error('Title log unreadable.'); return {index: true}; };
+  c.titleGate_ = (teamId, index) => { if (!index || index.index !== true) throw new Error('titleGate_ needs the index.'); return {approved: spec.title !== 'unapproved'}; };
+  c.getAssessmentDefinitions_ = () => { if (spec.definitions === 'throws') throw new Error('Definitions unreadable.'); return spec.definitions || []; };
   c.getColumnMap_ = () => ({TEAM_ID: 0, SEMESTER: 1});
   c.getSheetRows_ = () => spec.teamRows || [['T1', 'Odd'], ['T2', 'Odd']];
   c.coordinatorAccessOrThrow_ = () => {};
@@ -55,16 +62,19 @@ const parse = (rows, headers = HEADERS, present = true) => {
 
 // ---- the registry and the loader -------------------------------------------------------------------------------------------
 
-test('the registry has exactly the three kinds, each with the full contract', () => {
+test('the registry has exactly the four kinds, each with the full contract', () => {
   const {c} = setup();
   const checks = c.activityChecks_();
-  assert.deepEqual(Object.keys(checks).sort(), ['document', 'drive', 'github']);
+  assert.deepEqual(Object.keys(checks).sort(), ['document', 'drive', 'github', 'title']);
   for (const check of Object.values(checks)) {
     assert.deepEqual(Object.keys(check).sort(), ['isMet', 'needsApprovedTitle', 'perStudent', 'validItem']);
   }
   assert.equal(checks.github.validItem('READY'), true);
   assert.equal(checks.github.validItem('ready'), false);
-  assert.equal(checks.github.validItem('REPOSITORY'), false);
+  for (const item of ['USERNAMES', 'REPOSITORY', 'COMMITS']) assert.equal(checks.github.validItem(item), true, item);
+  for (const item of ['repository', 'COMMIT', '']) assert.equal(checks.github.validItem(item), false, item);
+  assert.equal(checks.title.validItem('approved'), true);
+  assert.equal(checks.title.validItem('APPROVED'), false);
   assert.equal(checks.drive.validItem(WORK), true);
   assert.equal(checks.drive.validItem('Other.docx'), false);
 });
@@ -82,6 +92,7 @@ test('every kind of misconfiguration is reported with its row and the whole gate
     'activity not trimmed': [[' title.submit', 'github', 'READY', 'L', 'Yes'], /unknown activity/],
     'unknown kind': [['title.submit', 'weekly', 'READY', 'L', 'Yes'], /unknown kind/],
     'invalid github item': [['title.submit', 'github', 'REPO', 'L', 'Yes'], /invalid item/],
+    'invalid title item': [['title.submit', 'title', 'confirmed', 'L', 'Yes'], /invalid item/],
     'item with a stray space': [['title.submit', 'drive', WORK + ' ', 'L', 'Yes'], /invalid item/],
     'drive item outside the upload names': [['title.submit', 'drive', 'Other.docx', 'L', 'Yes'], /invalid item/],
     'blank label': [['title.submit', 'github', 'READY', '  ', 'Yes'], /label is blank/],
@@ -427,4 +438,164 @@ test('document: a Drive write whose journal row is missing is unmet until it is 
 test('document: the existing drive kind is unchanged by a pending or returned submission', () => {
   const result = decide({rows: [RULE.work], drive: {teams: {T1: {files: [{name: WORK}]}}}}).result;
   assert.equal(result.allowed, true);
+});
+
+// ---- the github items, the title kind and the review activities ------------------------------------------------------------------
+
+const ITEM = (item, activity = 'title.submit') => [activity, 'github', item, item + ' label', 'Yes'];
+const REVIEW_DEFINITIONS = [{key: 'review1', type: 'REVIEW'}, {key: 'review2', type: 'REVIEW'}, {key: 'guide_eval', type: 'GUIDE_EVALUATION'}, {key: 'see', type: 'SEE'}];
+const only = (spec, item) => decide({...spec, rows: [ITEM(item)]}).result.requirements[0];
+const commitBy = (authorId, extra = {}) => ({authorId, username: 'user' + authorId, message: 'Add the parser', ...extra});
+
+test('github USERNAMES: met when every username is valid, unmet with the setup message, unverifiable when GitHub cannot say', () => {
+  assert.equal(only({github: 'noRepository'}, 'USERNAMES').met, true, 'a missing repository does not matter to this item');
+  for (const preset of ['missingUsername', 'invalidUsername']) {
+    const answer = only({github: preset}, 'USERNAMES');
+    assert.equal(answer.met, false, preset);
+    assert.match(answer.reason, /Waiting for valid GitHub usernames/, preset);
+  }
+  const unavailable = only({github: 'verificationUnavailable'}, 'USERNAMES');
+  assert.equal(unavailable.reason, 'Could not verify: USERNAMES label.');
+  assert.equal(unavailable.diagnostic, 'GITHUB_MEMBER_UNVERIFIED');
+  assert.equal(only({github: 'throws'}, 'USERNAMES').diagnostic, 'GITHUB_ERROR');
+});
+
+test('github REPOSITORY: met when the repository is saved and verified, whatever the members\' access', () => {
+  assert.equal(only({github: 'ready'}, 'REPOSITORY').met, true);
+  assert.equal(only({github: 'missingAccess'}, 'REPOSITORY').met, true, 'access is not this item');
+  assert.match(only({github: 'noRepository'}, 'REPOSITORY').reason, /has not been created yet/);
+  assert.match(only({github: 'missingUsername'}, 'REPOSITORY').reason, /once every teammate has a valid GitHub username/);
+  assert.equal(only({github: 'repositoryUnverified'}, 'REPOSITORY').diagnostic, 'GITHUB_REPOSITORY_UNVERIFIED');
+  assert.equal(only({github: 'verificationUnavailable'}, 'REPOSITORY').diagnostic, 'GITHUB_MEMBER_UNVERIFIED');
+});
+
+test('github COMMITS: every member needs a commit of their own that the weekly rule would count', () => {
+  const both = [commitBy('101'), commitBy('102')];
+  assert.equal(only({commits: both}, 'COMMITS').met, true);
+  assert.equal(only({commits: [commitBy('101'), commitBy(102)]}, 'COMMITS').met, true, 'the author ID may be a number');
+  assert.equal(only({commits: [commitBy('101')]}, 'COMMITS').reason, 'No commit yet from: R002.');
+  assert.equal(only({commits: []}, 'COMMITS').reason, 'No commit yet from: R001, R002.');
+  const notCounted = {
+    'a bot': commitBy('102', {username: 'dependabot[bot]'}),
+    'an unknown author': commitBy('102', {username: '(unknown)'}),
+    'the template\'s first commit': commitBy('102', {message: 'Initial commit: Capstone project for Team T1'}),
+    'an unlinked author': commitBy('', {username: 'student2'}),
+    'another member\'s ID': commitBy('101', {username: 'student2'})
+  };
+  for (const [name, row] of Object.entries(notCounted)) {
+    const answer = only({commits: [commitBy('101'), row]}, 'COMMITS');
+    assert.equal(answer.met, false, name);
+    assert.equal(answer.reason, 'No commit yet from: R002.', name);
+  }
+});
+
+test('github COMMITS: a missing commit is "Could not verify" while the collection failed or has not run; found commits still count', () => {
+  const missingOne = [commitBy('101')];
+  assert.equal(only({commits: missingOne, collection: 'error'}, 'COMMITS').diagnostic, 'COMMITS_COLLECTION_FAILED');
+  assert.equal(only({commits: missingOne, collection: ''}, 'COMMITS').diagnostic, 'COMMITS_NOT_COLLECTED');
+  assert.equal(only({commits: missingOne, collection: 'error'}, 'COMMITS').reason, 'Could not verify: COMMITS label.');
+  assert.equal(only({commits: [commitBy('101'), commitBy('102')], collection: 'error'}, 'COMMITS').met, true, 'every member is already proven');
+  assert.equal(only({commits: [commitBy('101'), commitBy('102')], commitsThrow: true}, 'COMMITS').diagnostic, 'COMMITS_UNREADABLE');
+  assert.equal(only({commitsThrow: true}, 'COMMITS').diagnostic, 'COMMITS_UNREADABLE');
+});
+
+test('github COMMITS: without every valid username it says so, and the Commits tab is not read', () => {
+  const env = setup({rows: [ITEM('COMMITS')], github: 'missingUsername'});
+  let reads = 0;
+  env.c.readCollectedCommits_ = () => { reads++; return []; };
+  const result = plain(env.c.activityPreconditions_('title.submit', TEAM, env.c.activityContext_()));
+  assert.match(result.requirements[0].reason, /Waiting for valid GitHub usernames/);
+  assert.equal(reads, 0);
+  assert.equal(only({github: 'verificationUnavailable'}, 'COMMITS').diagnostic, 'GITHUB_MEMBER_UNVERIFIED');
+  assert.equal(only({github: 'throws'}, 'COMMITS').diagnostic, 'GITHUB_ERROR');
+});
+
+test('github: READY is unchanged, and all four items share one setup read per request', () => {
+  const env = setup({rows: ['USERNAMES', 'REPOSITORY', 'COMMITS', 'READY'].map(item => ITEM(item)), commits: [commitBy('101'), commitBy('102')]});
+  const result = plain(env.c.activityPreconditions_('title.submit', TEAM, env.c.activityContext_()));
+  assert.equal(result.allowed, true);
+  assert.equal(env.reads.github, 1);
+  assert.equal(result.requirements.length, 4);
+});
+
+test('title: met once the title is approved, unmet before, "Could not verify" when the history cannot be read', () => {
+  const rule = [['review1', 'title', 'approved', 'Project title approved', 'Yes']];
+  const decideReview = spec => decide({rows: rule, definitions: REVIEW_DEFINITIONS, ...spec}, 'review1').result;
+  assert.equal(decideReview({title: 'approved'}).allowed, true);
+  const unmet = decideReview({title: 'unapproved'});
+  assert.equal(unmet.allowed, false);
+  assert.equal(unmet.requirements[0].reason, 'The project title has not been approved yet.');
+  const unreadable = decideReview({title: 'throws'});
+  assert.equal(unreadable.requirements[0].reason, 'Could not verify: Project title approved.');
+  assert.equal(unreadable.requirements[0].diagnostic, 'TITLE_HISTORY_UNAVAILABLE');
+});
+
+test('title: the title index is read once per request and a title row is refused under title.submit and title.resubmit', () => {
+  const env = setup({rows: [['review1', 'title', 'approved', 'A', 'Yes'], ['review1', 'title', 'approved', 'B', 'Yes']], definitions: REVIEW_DEFINITIONS});
+  let reads = 0;
+  const original = env.c.readTitleIndex_;
+  env.c.readTitleIndex_ = () => { reads++; return original(); };
+  assert.equal(plain(env.c.activityPreconditions_('review1', TEAM, env.c.activityContext_())).allowed, true);
+  assert.equal(reads, 1);
+  for (const activity of ['title.submit', 'title.resubmit']) {
+    const errors = parse([[activity, 'title', 'approved', 'L', 'Yes']]).errors;
+    assert.match(errors[0], /needs an approved title/, activity);
+  }
+});
+
+test('review activities: each REVIEW assessment is an activity; the guide evaluation, SEE and unknown keys are not', () => {
+  const ids = spec => setup(spec).c.activityIds_();
+  assert.deepEqual(plain(ids({definitions: REVIEW_DEFINITIONS})), ['title.submit', 'title.resubmit', 'review1', 'review2']);
+  assert.deepEqual(plain(ids({definitions: 'throws'})), ['title.submit', 'title.resubmit'], 'unreadable definitions leave the title activities');
+  assert.deepEqual(plain(ids({})), ['title.submit', 'title.resubmit']);
+  const {c} = setup({definitions: REVIEW_DEFINITIONS});
+  const rows = [['review1', 'github', 'READY', 'L', 'Yes'], ['review2', 'title', 'approved', 'L', 'Yes']];
+  const good = plain(c.parseActivityRules_({present: true, headers: HEADERS, rows}, c.activityChecks_()));
+  assert.deepEqual(good.errors, []);
+  assert.deepEqual(Object.keys(good.rules), ['review1', 'review2']);
+  for (const activity of ['guide_eval', 'see', 'review3', 'Review1']) {
+    const bad = plain(c.parseActivityRules_({present: true, headers: HEADERS, rows: [[activity, 'github', 'READY', 'L', 'Yes']]}, c.activityChecks_()));
+    assert.match(bad.errors[0], /unknown activity/, activity);
+  }
+});
+
+test('review activities: a later review needs only rows, and the report lists each review', () => {
+  const env = setup({rows: [['review3', 'title', 'approved', 'Title', 'Yes']], definitions: [...REVIEW_DEFINITIONS, {key: 'review3', type: 'REVIEW'}]});
+  assert.equal(plain(env.c.activityPreconditions_('review3', TEAM, env.c.activityContext_())).allowed, true);
+  const frame = JSON.parse(env.c.API_coordinator_getRequirements('T1'));
+  assert.deepEqual(frame.data.errors, []);
+  assert.deepEqual(Object.keys(frame.data.rules), ['title.submit', 'title.resubmit', 'review1', 'review2', 'review3']);
+  assert.deepEqual(Object.keys(frame.data.activities), ['title.submit', 'title.resubmit', 'review1', 'review2', 'review3']);
+  assert.equal(frame.data.rules.review3.length, 1);
+});
+
+test('review activities: the review rows decide the review, the title activities are unaffected, and unmet items are all listed', () => {
+  const rows = [['review1', 'title', 'approved', 'Project title approved', 'Yes'], ['review1', 'github', 'COMMITS', 'Every member has committed', 'Yes'], RULE.github];
+  const env = setup({rows, definitions: REVIEW_DEFINITIONS, title: 'unapproved', commits: [commitBy('101')]});
+  const review = plain(env.c.activityPreconditions_('review1', TEAM, env.c.activityContext_()));
+  assert.equal(review.allowed, false);
+  assert.deepEqual(review.requirements.map(item => item.met), [false, false]);
+  assert.equal(review.reason, 'Project title approved: The project title has not been approved yet. Every member has committed: No commit yet from: R002.');
+  assert.equal(plain(env.c.activityPreconditions_('title.submit', TEAM, env.c.activityContext_())).allowed, true, 'only its own rows apply');
+  assert.equal(plain(env.c.activityPreconditions_('review2', TEAM, env.c.activityContext_())).allowed, true, 'no rows allows');
+});
+
+test('source rules: the new check files add no public function and never write', () => {
+  for (const file of ['activity-check-title.js', 'activity-check-github.js']) {
+    const text = fs.readFileSync(file, 'utf8');
+    assert.deepEqual([...text.matchAll(/^function ([A-Za-z0-9_$]+)\s*\(/gm)].map(match => match[1]).filter(name => !name.endsWith('_')), [], file);
+    assert.doesNotMatch(text, /setValues|appendRow|LockService|MailApp|setProperty/, file);
+  }
+});
+
+test('a context that lists kinds evaluates only those rows; the others are skipped, not met', () => {
+  const rows = [['review1', 'title', 'approved', 'Title', 'Yes'], ['review1', 'github', 'COMMITS', 'Commits', 'Yes'], ['review1', 'drive', WORK, 'Work', 'Yes']];
+  const env = setup({rows, definitions: REVIEW_DEFINITIONS, title: 'unapproved', commits: []});
+  const run = kinds => { const ctx = env.c.activityContext_(); if (kinds) ctx.kinds = kinds; return plain(env.c.activityPreconditions_('review1', TEAM, ctx)); };
+  assert.deepEqual(run(['title']).requirements.map(item => item.label), ['Title'], 'only the title row ran');
+  assert.equal(run(['title']).allowed, false);
+  assert.equal(env.reads.github, 0, 'GitHub was not asked');
+  assert.deepEqual(run().requirements.map(item => item.label), ['Title', 'Commits', 'Work'], 'no list means every kind');
+  assert.deepEqual(run(['document']), {allowed: true, requirements: [], reason: ''}, 'no row of that kind means nothing to meet');
+  assert.deepEqual(run([]).requirements, []);
 });

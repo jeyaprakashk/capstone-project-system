@@ -87,7 +87,7 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions) {
       '<div class="mt-2"><button class="' + BUTTON + '" type="button" id="createAssessmentDefinitionsButton" hidden disabled data-action="bootstrap-definitions">Create assessment definitions tab</button></div>' +
       note('First create the definitions schema, then use Assessment definitions to enter the academic configuration. Setup never supplies assessment instances or policy choices.') +
       '<ul id="reviewAssessmentReadiness" aria-label="Readiness by assessment" class="m-0 mt-2 grid list-none grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2 p-0"></ul>' +
-      note('Storage readiness is separate from team entry availability, which also checks reviewer assignment, opening dates and prerequisites.') +
+      note('Storage readiness is separate from team entry availability, which also checks reviewer assignment, opening dates, earlier assessments and activity requirements.') +
       '<div id="assessmentStorageSetup" class="mt-3"><div>' + note('Prepare configured assessment journals. Existing assessment data stays unchanged.') +
       '<div class="mt-2"><button type="button" id="initializeAssessmentStorageButton" disabled aria-describedby="reviewConfigurationSummary" class="' + PRIMARY + '" data-action="storage-init">Create missing assessment storage</button></div></div>' +
       '<p id="assessmentStorageStatus" role="status" aria-live="polite" class="mt-2 text-sm text-ink-2 empty:hidden"></p><ul id="assessmentStorageResults" class="mt-1 text-sm empty:hidden"></ul></div>' +

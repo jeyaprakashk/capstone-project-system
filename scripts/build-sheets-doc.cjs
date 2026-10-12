@@ -56,7 +56,8 @@ module.exports = {render};
 if (require.main === module) {
   const expected = render();
   if (process.argv.includes('--check')) {
-    const actual = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : '';
+    // A Windows checkout may turn the committed LF into CRLF (core.autocrlf); the content is what is compared.
+    const actual = fs.existsSync(target) ? fs.readFileSync(target, 'utf8').replace(/\r\n/g, '\n') : '';
     if (actual !== expected) {
       console.error('SHEETS.md is out of date. Run npm run build:sheets-doc and commit the result.');
       process.exit(1);

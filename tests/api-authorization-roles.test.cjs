@@ -50,6 +50,7 @@ const ENDPOINTS = {
   API_guide_saveEvaluationDraft: [[{ ...REQUEST, token: 'x', scores: {} }], [...OUTSIDER, 'one@example.com']],
   API_guide_submitEvaluation: [[{ ...REQUEST, token: 'x', scores: {} }], [...OUTSIDER, 'one@example.com']],
   API_reviewer_getDashboard: [[], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
+  API_reviewer_getTeamRequirements: [[TEAM], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
   API_review_getEvaluation: [[TEAM, 'review1'], ['outsider@example.com', 'one@example.com']],
   API_review_save: [['draft', { ...REQUEST, scores: {} }], ['outsider@example.com', 'one@example.com']],
   API_publishing_get: [['review1'], [...OUTSIDER, 'one@example.com', 'guide@example.com']],

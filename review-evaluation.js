@@ -6,13 +6,16 @@ function reviewConfiguration_(key) {
   const criteria=assessmentRubric_(d);
   return {key:d.key,label:d.label,criteria,maximum:criteria.reduce((n,c)=>n+c.maxMarks,0),due:d.day,opens:d.opens,
     timezone:getSpreadsheet_().getSpreadsheetTimeZone(),weight:d.weight/100,academicPolicyVersion:d.academicPolicyVersion,
-    prerequisites:d.prerequisites,sequence:d.sequence};
+    sequence:d.sequence};
 }
 
-/** Team readiness is independent of Review sequence. */
-function reviewEligibility_(row, columns, index) {
-  return titleGate_(row[columns.TEAM_ID], index).approved
-    ? {eligible:true,reason:''} : {eligible:false,reason:'Approve the project title before entering review marks.'};
+/** Team readiness is independent of Review sequence. It is the team's rows in ActivityDependencies for the review (the project title
+ * approved, documents approved, ...) and nothing else: no row, no requirement. `activity` = {key, ctx}; without it the rows are not read
+ * (a locked or not yet open review never needs them). The engine's reason lists each unmet requirement. */
+function reviewEligibility_(row, columns, activity) {
+  if (!activity) return {eligible:true,reason:''};
+  const gate=activityPreconditions_(activity.key,{teamId:String(row[columns.TEAM_ID]).trim(),semester:row[columns.SEMESTER]},activity.ctx);
+  return gate.allowed ? {eligible:true,reason:''} : {eligible:false,reason:gate.reason};
 }
 
 function reviewContext_(teamId, staff, key) {
@@ -22,13 +25,14 @@ function reviewContext_(teamId, staff, key) {
   if (rows.length !== 1) throw new Error('Team is missing or ambiguous.');
   const row = rows[0], committee = String(row[columns.COMMITTEE_NUMBER] || '').trim();
   if (!staff && !getCommitteeNumbersForReviewer_(actor).some(n=>textEquals_(n,committee))) throw new Error('You are not an assigned reviewer for this team.');
-  if(!staff){const block=assessmentPrerequisiteBlock_(assessmentDefinition_(key),row[columns.TEAM_ID]);if(block)throw new Error(block);}
+  if(!staff){const block=assessmentSequenceBlock_(assessmentDefinition_(key),row[columns.TEAM_ID]);if(block)throw new Error(block);}
   const students = getStudentsFromTeamStatusRow_(row,columns).map(s=>({register:normalizeReviewKey_(s.regNo),name:String(s.name || ''),email:normalizeEmail_(s.email)}));
   if (!students.length || new Set(students.map(s=>s.register)).size !== students.length) throw new Error('Student roster is missing or ambiguous.');
   const roster = {team:normalizeReviewKey_(row[columns.TEAM_ID]),committee,students};
   const committeeInfo=getCommitteeInfo_(committee) || {};
-  const titleIndex = readTitleIndex_(), gate = titleGate_(row[columns.TEAM_ID], titleIndex);
-  return {actor,roster,eligibility:reviewEligibility_(row,columns,titleIndex),details:{team:String(row[columns.TEAM_ID]),
+  const titleIndex = readTitleIndex_(), gate = titleGate_(row[columns.TEAM_ID], titleIndex), ctx = activityContext_();
+  ctx.title = {index:titleIndex};
+  return {actor,roster,eligibility:reviewEligibility_(row,columns,{key,ctx}),details:{team:String(row[columns.TEAM_ID]),
     title:gate.title,problem:gate.problem,committee,
     reviewers:[1,2,3,4].map(n=>({name:String(committeeInfo['reviewer'+n+'Name'] || ''),email:String(committeeInfo['reviewer'+n+'Email'] || '')})).filter(r=>r.name || r.email),
     guideName:String(row[columns.GUIDE_NAME] || ''),guideEmail:String(row[columns.GUIDE_EMAIL] || '')}};
@@ -260,13 +264,16 @@ function reviewProgress_(row, columns, records, config, definition, loaded) {
   const markedStudents=submitted?latest.students.filter(isComplete).length:0;
   const recorded=submitted;
   const completed=submitted && markedStudents===totalStudents;
-  const prerequisiteReason=assessmentPrerequisiteBlock_(definition||assessmentDefinition_(config.key),row[columns.TEAM_ID],loaded);
-  // The title index is read once per progress run (kept in `loaded` when the caller has one). A team whose title history is not valid
-  // is simply not eligible here; the coordinator sees why on the title screen.
+  const sequenceReason=assessmentSequenceBlock_(definition||assessmentDefinition_(config.key),row[columns.TEAM_ID],loaded);
+  // The ActivityDependencies rows of the review are read only while the entry could still be opened (it is open and not yet submitted): a
+  // locked or not yet open review never needs them, and they can cost a Drive lookup per team. A bulk run (`loaded`) evaluates them only when
+  // its caller asked for the gate, with one engine context for the whole run; a direct call evaluates them with a context of its own.
+  const needsRows=!(latest && latest.status!=='Draft') && projectDay_(new Date(),config.timezone)>=config.opens;
   let eligibility;
-  try { eligibility=reviewEligibility_(row,columns,loaded ? (loaded.titleIndex=loaded.titleIndex || readTitleIndex_()) : undefined); }
-  catch(error) { eligibility={eligible:false,reason:'The title history is unavailable. Contact the coordinator.'}; }
-  const availability=reviewAvailability_({eligibility:{...eligibility,...(prerequisiteReason?{reason:prerequisiteReason}:{})}},config,latest);
-  return {completed,recorded,prerequisiteReason,markedStudents,totalStudents,available:true,status:latest?latest.status:'Not started',...availability};
+  const ctx=loaded ? loaded.activityContext : activityContext_();
+  try { eligibility=reviewEligibility_(row,columns,needsRows && ctx ? {key:config.key,ctx} : undefined); }
+  catch(error) { eligibility={eligible:false,reason:'The review requirements could not be checked. Contact the coordinator.'}; }
+  const availability=reviewAvailability_({eligibility:{...eligibility,...(sequenceReason?{reason:sequenceReason}:{})}},config,latest);
+  return {completed,recorded,sequenceReason,markedStudents,totalStudents,available:true,status:latest?latest.status:'Not started',...availability};
 }
 function loadPublishedReviewEvaluation_(key) {return loadPublishedAssessment_(key);}

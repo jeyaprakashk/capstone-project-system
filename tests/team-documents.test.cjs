@@ -18,7 +18,7 @@ function setup(files = [], driveSpec = {}) {
   const c = drive.context;
   if (drive.folderOf.T1) files.forEach(file => drive.folderOf.T1[0].files.push(file));
   c.console = {error() {}, log() {}};
-  ['activity-engine.js', 'activity-check-drive.js', 'activity-check-document.js', 'team-documents.js'].forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), c, {filename: file}));
+  ['activity-engine.js', 'activity-check-drive.js', 'activity-check-document.js', 'activity-check-title.js', 'team-documents.js'].forEach(file => vm.runInContext(fs.readFileSync(file, 'utf8'), c, {filename: file}));
   return c;
 }
 const TEAM = {teamId: 'T1', semester: 'Odd'};

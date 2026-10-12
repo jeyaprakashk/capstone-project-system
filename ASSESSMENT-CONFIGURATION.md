@@ -5,7 +5,7 @@
 | Source | Responsibility |
 | --- | --- |
 | `Milestones` | Non-assessment lifecycle events and project logging schedule. |
-| `AssessmentDefinitions` | Sole graded-assessment registry: identity, type, label, sequence, weight, opening/due dates, prerequisites, policy binding and journal binding. |
+| `AssessmentDefinitions` | Sole graded-assessment registry: identity, type, label, sequence, weight, opening/due dates, policy binding and journal binding. Sequence is also the order of entry (see below); the Prerequisites column is kept but not read. |
 | `Rubrics` | Criteria grouped by `Assessment ID`, matching the ID in `AssessmentDefinitions`. |
 | Configured Journal / `Assessment_<assessmentId>` | Append-only assessment revisions and publication events. Not a reviewer cell-entry grid. |
 
@@ -31,8 +31,8 @@ Legitimate lifecycle events, including start, formation, title and report, remai
    compatible existing journals remain unchanged. Reviewers/Guides enter marks
    through their existing evaluation interfaces when entry rules permit.
 
-Creation supplies no assessment rows, dates, weights,
-prerequisites or policy bindings. A repeat bootstrap validates the existing tab
+Creation supplies no assessment rows, dates, weights
+or policy bindings. A repeat bootstrap validates the existing tab
 without writing. An existing invalid or blank tab is not overwritten or repaired.
 If creation fails after inserting the tab but before writing its header, the next
 read reports invalid configuration; the Coordinator must correct it through the
@@ -54,11 +54,11 @@ Bootstrap writes exactly these headers, in this order:
 | Assessment ID | Required, normalized stable ID; letter followed by up to 39 letters, digits, underscores or hyphens. Unique. |
 | Type | `REVIEW`, `GUIDE_EVALUATION` (`guide_eval` only), or `SEE` (`see` only; reserved for SEE). |
 | Label | Required display label. |
-| Sequence | Required positive integer; sorts registry instances, with ID as tie-breaker. |
+| Sequence | Required positive integer; sorts registry instances, with ID as tie-breaker, and sets the order of entry: a Review opens for a team only after every other graded assessment with a lower Sequence is Submitted or Published for that team. Equal sequences do not block each other; SEE is never recorded in this app, so it is skipped. |
 | Weight (%) | Required numeric percentage greater than zero and at most 100; total at most 100. |
 | Opening | Required valid date, not later than Due Date. |
 | Due Date | Required valid date. |
-| Prerequisites | Optional; blank means none. SEE requires blank or `[]` and cannot be referenced as a prerequisite. Otherwise JSON array of `assessmentId` and `condition: "RECORDED"`; references must exist, be unique and acyclic. |
+| Prerequisites | Not used. The header must stay (header text is frozen), but its cells are ignored and may hold anything. Order of entry comes from Sequence. |
 | Academic Policy Version | Required supported binding: `review-attendance-v1` for REVIEW or `guide-bands-v3-target-level-2` for Guide. Must be blank for SEE. Policy implementation remains code-controlled. |
 | Journal | Must be blank for SEE, which has no journal. Otherwise optional; defaults to `Assessment_<assessmentId>`. Journal bindings must be distinct, valid and compatible with existing storage. |
 
@@ -101,7 +101,7 @@ them for presentation, rejects colliding IDs, and orders by due date then sequen
 The timeline includes the configured label, opening/due dates and sequence, with
 opening/due information exposed in the date tooltip and accessible label.
 
-Additional REVIEW instances use the same policy, lifecycle, prerequisite evaluator,
+Additional REVIEW instances use the same policy, lifecycle, sequence rule,
 makeup, reopening, revision and journal mechanisms. No numbered instance or
 duplicate evaluation engine is created in JavaScript. Guide is the supported
 individual strategy. SEE is display-only and has no evaluation or publication
@@ -117,8 +117,8 @@ Local regression tests cover exact schema creation, no seeded rows, authorizatio
 lock conflicts, idempotency, existing/invalid tab preservation, missing/empty/invalid
 states, Reviewer messages, Guide registry-only configuration and provisioning,
 timeline composition, arbitrary future REVIEW instances, rubric authority,
-prerequisites, journal preservation, UI retries and loading cleanup. The existing
-Review 3 lifecycle/publication tests use a distinct rubric and configured prerequisite.
+the sequence rule, journal preservation, UI retries and loading cleanup. The existing
+Review 3 lifecycle/publication tests use a distinct rubric and the sequence rule.
 
 Run `npm test` for the complete suite. No live spreadsheet action or deployment is
 part of this implementation.
@@ -156,8 +156,8 @@ SEE does not extend the weekly logging period, which still ends at report submis
 
 System Status shows SEE storage as **Not required - evaluated outside this app**.
 A valid SEE-only configuration is ready without storage setup. An invalid or missing
-SEE rubric still requires correction. Internal assessment prerequisites cannot use
-SEE completion because this app never records it. Coordinator progress shows SEE
+SEE rubric still requires correction. The sequence rule skips SEE
+because this app never records its completion. Coordinator progress shows SEE
 only when configured, with no completion percentage or overdue marking alerts.
 
 Configure this through the existing definitions and rubric tabs; no SEE journal,

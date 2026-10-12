@@ -12,12 +12,29 @@ or spreadsheet data while doing so.
   moved or added by hand. Editor-run `ensureSheet_` may initialize an empty existing sheet or append missing headers
   during setup, under the "Creating and repairing sheets" rules below.
 - Academic rules: Review rubrics, attendance/makeup policy, eligibility,
-  deadlines, publishing, weights and prerequisites.
+  deadlines, publishing, weights and the order of entry (see "Review entry" below for the rules that were
+  deliberately moved out of code).
 - Role detection and server-side authorization.
 
 `tests/invariants/` guards these. `npm run test:invariants` must stay green and its
 snapshots must not be regenerated for a migration. Regenerate (`UPDATE_GOLDEN=1`)
 only for a deliberate, reviewed rule or schema change made outside a migration.
+
+## Review entry
+
+Whether a team's marks can be entered for a Review is decided by two things, both reviewed and approved as a deliberate rule change
+(October 2026), not by prerequisite JSON or a title check in code:
+
+- **Order: `Sequence`.** A Review opens for a team only after every other non-SEE assessment with a lower `Sequence` in
+  `AssessmentDefinitions` is Submitted or Published for that team (`assessmentSequenceBlock_`; staff are exempt, equal sequences do not
+  block each other). The `Prerequisites` header stays (header text is frozen) but its cells are not read.
+- **Requirements: `ActivityDependencies` rows.** Each `REVIEW` assessment is an activity named by its Assessment ID (`review1`, ...).
+  The rows for it (`title` / `approved`, `document` / `doc-NNNN`, `github` items) must all be met; the project title is one such row, not
+  a check in code. A Review with no `title` row has no title requirement, so a new Review gets its rows when it is added. The gate applies
+  to reading and to every save (`reviewEligibility_`); a Submitted or Published evaluation stays readable.
+
+Changing these rows or the Sequence values is a configuration change by the coordinator. Changing how they are evaluated is a rule
+change and follows the paragraph above.
 
 ## Creating and repairing sheets
 
@@ -71,7 +88,7 @@ history (one row per change, the latest row of a team is its state). Specified i
   revision the user saw. Endpoints (`title-api.js`) resolve who the caller is and pass callbacks; the rules are
   in `title-service.js` and the history validation in `title-history.js`. A row is appended and never edited.
 - **Requirements** that gate a student action come from the `ActivityDependencies` sheet through the engine (`activity-engine.js`, the
-  `github`, `drive` and `document` checks; `document` takes a Document ID from the scanned template list as its item). Misconfiguration denies; nothing is cached between requests; a student never sees a check's `diagnostic`.
+  `github`, `drive`, `document` and `title` checks; `document` takes a Document ID from the scanned template list as its item). Misconfiguration denies; nothing is cached between requests; a student never sees a check's `diagnostic`.
 - **Students and Drive.** The team folders live in a shared drive that students are **not members of**. Each team's students are given
   viewer access to **their own team's folder only** (`createTeamFolders_` adds them; nothing else does). Nothing in a team folder may be
   hidden from them: what the app chooses to link cannot limit what a folder viewer sees in Drive. The app never shows a student a folder

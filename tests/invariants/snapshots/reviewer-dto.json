@@ -190,13 +190,13 @@
       "reviews": [
         {
           "key": "review1",
-          "enabled": false,
+          "enabled": true,
           "actionLabel": "View marks",
           "note": "Published"
         },
         {
           "key": "review2",
-          "enabled": false,
+          "enabled": true,
           "actionLabel": "Edit marks",
           "note": "Completed"
         }

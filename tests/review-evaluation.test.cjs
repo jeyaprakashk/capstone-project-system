@@ -33,7 +33,7 @@ function fixture() {
   stubTitleGate(c,()=>({approved:row[TS.REVIEWER_DECISION]==='Approved' && String(row[TS.TITLE]||'').trim()!=='',title:row[TS.TITLE],problem:row[TS.PROBLEM]}));
   sheet('Review1Evaluations',[Array.from(vm.runInContext('Object.values(ASSESSMENT_JOURNAL_FIELDS_)',c))]);
   sheet('Review2Evaluations',[Array.from(vm.runInContext('Object.values(ASSESSMENT_JOURNAL_FIELDS_)',c))]);
-  c.getAssessmentDefinitions_=()=>reviews.map((r,i)=>({...r,type:'REVIEW',sequence:i+1,opens:r.opens??r.day-7,academicPolicyVersion:r.academicPolicyVersion||'review-attendance-v1',journal:r.journal||'Review'+(i+1)+'Evaluations',prerequisites:r.prerequisites??(i?[{assessmentId:reviews[i-1].key,condition:'RECORDED'}]:[])}));
+  c.getAssessmentDefinitions_=()=>reviews.map((r,i)=>({...r,type:'REVIEW',sequence:i+1,opens:r.opens??r.day-7,academicPolicyVersion:r.academicPolicyVersion||'review-attendance-v1',journal:r.journal||'Review'+(i+1)+'Evaluations'}));
   c.assessmentRubric_=d=>reviews.find(r=>r.key===d.key).rubric;
   const load=()=>c.loadReviewEvaluation_('T1','review1');
   const input=(d=load())=>({team:'T1',revision:d.revision,token:d.token,requestId:crypto.randomUUID(),teamScores:{T:{level:3,marks:48,remark:''}},
@@ -118,8 +118,8 @@ test('existing submission timestamps are used when submission day is absent',()=
 });
 test('assigned committee authorization and replaceable title eligibility apply on every write',()=>{
   const f=fixture(),input=f.input();f.actor('outsider@x');assert.throws(f.load,/assigned reviewer/);assert.throws(()=>f.c.submitReviewEvaluation_({...(input),assessmentId:'review1'}),/assigned reviewer/);
-  f.actor('reviewer@x');f.row[3]='Revise';assert.throws(f.load,/Approve/);assert.throws(()=>f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'}),/Approve/);
-  f.row[3]='Approved';f.row[2]='';assert.throws(f.load,/Approve/);assert.equal(f.tables.Review1Evaluations.length,1);
+  f.actor('reviewer@x');f.row[3]='Revise';assert.throws(f.load,/title has not been approved/);assert.throws(()=>f.c.saveReviewEvaluationDraft_({...(input),assessmentId:'review1'}),/title has not been approved/);
+  f.row[3]='Approved';f.row[2]='';assert.throws(f.load,/title has not been approved/);assert.equal(f.tables.Review1Evaluations.length,1);
 });
 test('mixed scores share team criteria and compute individual totals and weights',()=>{
   const f=fixture();f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});const d=f.load();
@@ -215,7 +215,6 @@ test('browser source is serializable and uses an in-dashboard page with existing
 
 test('Review 2 checks history on load and save, and reopening removes completion',()=>{
   const f=fixture();
-  f.reviews[0].prerequisites=[];f.reviews[1].prerequisites=[{assessmentId:'review1',condition:'RECORDED'}];
   f.today(20030);
   assert.throws(()=>f.c.loadReviewEvaluation_('T1','review2'),/Submit Review 1/);
   f.c.submitReviewEvaluation_({...(f.input()),assessmentId:'review1'});assert.equal(f.c.loadReviewEvaluation_('T1','review2').config.key,'review2');
@@ -1422,4 +1421,76 @@ test('initial loading errors leave team navigation disabled until an evaluation 
   const f=browserFixture(true);f.context.ReviewerView.evaluationTeams=()=>['T1','T2'];f.api.open('T1',f.trigger);
   assert.equal(f.teamSelect.disabled,true);f.requests[0].failure({message:'Offline'});
   assert.equal(f.teamSelect.disabled,true);assert(f.teamSteps.every(b=>b.disabled));assert.match(f.drawer.innerHTML,/Retry/);
+});
+
+// ---- the review's ActivityDependencies rows (documents approved, ...) gate Review entry together with the title -----------------------
+
+const UNMET={allowed:false,requirements:[{label:'Step3',met:false,reason:'Waiting for the guide to approve it.'}],reason:'Step3: Waiting for the guide to approve it.'};
+const MET={allowed:true,requirements:[],reason:''};
+function gated(f,answer=()=>UNMET){const asked=[];f.c.activityPreconditions_=(id,team,ctx)=>{asked.push({id,teamId:team.teamId,ctx});return answer(id);};return asked;}
+
+test('Review entry is refused with the engine\'s reason on load and on every save, and allowed again when the rows are met',()=>{
+ const f=fixture(),input=f.input();let answer=UNMET;const asked=gated(f,()=>answer);
+ assert.throws(()=>f.load(),/Step3: Waiting for the guide to approve it\./);
+ assert.deepEqual([asked[0].id,asked[0].teamId],['review1','T1'],'the review key is the activity');
+ assert.throws(()=>f.c.saveReviewEvaluationDraft_({...input,assessmentId:'review1'}),/Step3: Waiting for the guide to approve it\./);
+ assert.throws(()=>f.c.submitReviewEvaluation_({...input,assessmentId:'review1'}),/Step3: Waiting for the guide to approve it\./);
+ assert.equal(f.tables.Review1Evaluations.length,1,'nothing was written');
+ const blocked=f.progress();
+ assert.equal(blocked.available,true);assert.equal(blocked.readable,false);assert.equal(blocked.editable,false);
+ assert.equal(blocked.reason,'Step3: Waiting for the guide to approve it.');assert.equal(blocked.sequenceReason,'');
+ answer=MET;
+ assert.equal(f.load().config.key,'review1');
+ assert.equal(f.c.submitReviewEvaluation_({...f.input(),assessmentId:'review1'}).status,'Submitted');
+ assert.equal(f.progress().reason,'');
+});
+
+test('the title is a requirement row like any other: without a row an unapproved title does not block, with one it does',()=>{
+ const f=fixture();f.row[3]='Pending';
+ gated(f,()=>MET);
+ assert.equal(f.load().config.key,'review1','no title row, so no title requirement');
+ assert.equal(f.progress().reason,'');
+ const title={allowed:false,requirements:[{label:'Project title approved',met:false,reason:'The project title has not been approved yet.'}],reason:'Project title approved: The project title has not been approved yet.'};
+ gated(f,()=>title);
+ assert.throws(()=>f.load(),/Project title approved: The project title has not been approved yet./);
+ assert.equal(f.progress().reason,title.reason);
+});
+
+test('a submitted Review stays readable when its rows become unmet, and progress does not ask the engine for it',()=>{
+ const f=fixture();f.c.submitReviewEvaluation_({...f.input(),assessmentId:'review1'});
+ const asked=gated(f);
+ assert.equal(f.load().status,'Submitted');
+ const state=f.progress();assert.equal(state.readable,true);assert.equal(state.reason,'');
+ assert.equal(asked.filter(a=>a.id==='review1').length,1,'only the load asked, not the progress run');
+});
+
+test('a Review that is not open yet does not ask the engine for the dashboard, and shows its opening',()=>{
+ const f=fixture();f.today(19990);const asked=gated(f);
+ const state=f.progress();assert.match(state.reason,/^Opens /);
+ assert.equal(asked.length,0);
+});
+
+test('the dashboard progress run shares one engine context for every team and review',()=>{
+ const f=fixture(),asked=gated(f,()=>MET);
+ const result=f.c.getReviewerReviewProgress_([f.row,f.row],undefined,['title']);
+ assert.equal(result.error,'');
+ assert(asked.length>=2);assert(asked.every(a=>a.ctx===asked[0].ctx),'one context');
+ assert.equal(result.teams.t1.review1.available,true);
+});
+
+test('a bulk progress run reads no requirement unless it asks for the gate; it can ask for some kinds or all',()=>{
+ const run=gate=>{const f=fixture(),asked=gated(f,()=>MET);f.c.getReviewerReviewProgress_([f.row],undefined,gate);return asked;};
+ assert.equal(run(undefined).length,0,'counts and completion never need the rows');
+ assert.equal(run(false).length,0);
+ const cheap=run(['title']);assert(cheap.length>0);assert.deepEqual(Array.from(cheap[0].ctx.kinds),['title']);
+ const all=run(true);assert(all.length>0);assert.equal(all[0].ctx.kinds,undefined,'every kind');
+});
+
+test('a bulk run with the gate still keeps a refused team from being readable, and a direct call evaluates every kind',()=>{
+ const f=fixture();gated(f,()=>UNMET);
+ const bulk=f.c.getReviewerReviewProgress_([f.row],'review1',true).teams.t1.review1;
+ assert.equal(bulk.readable,false);assert.equal(bulk.reason,UNMET.reason);
+ const none=f.c.getReviewerReviewProgress_([f.row],'review1').teams.t1.review1;
+ assert.equal(none.readable,true,'no gate asked, no rows read');
+ const direct=gated(f,()=>MET);f.progress();assert.equal(direct[0].ctx.kinds,undefined);
 });

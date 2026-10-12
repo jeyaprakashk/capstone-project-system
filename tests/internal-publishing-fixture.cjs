@@ -21,7 +21,7 @@ function publishingFixture(key='review1') {
   stubTitleGate(c,()=>({approved:row[cols.REVIEWER_DECISION]==='Approved',title:row[cols.TITLE]}));
   c.getMilestones_=()=>[];
   c.guideConfiguration_=()=>({criteria:[criteria[1]],maximum:40,weight:.2,due:20000,timezone:'UTC'});
-  c.getAssessmentDefinitions_=()=>['review1','review2'].map((key,i)=>({key,type:'REVIEW',label:key,sequence:i+1,day:20000,opens:19993,weight:25,academicPolicyVersion:'review-attendance-v1',journal:'Review'+(i+1)+'Evaluations',prerequisites:[]})).concat([{key:'guide_eval',type:'GUIDE_EVALUATION',label:'Guide Evaluation',sequence:3,day:20000,opens:19990,weight:20,academicPolicyVersion:'guide-bands-v3-target-level-2',journal:'GuideEvaluations',prerequisites:[]}]);
+  c.getAssessmentDefinitions_=()=>['review1','review2'].map((key,i)=>({key,type:'REVIEW',label:key,sequence:1,day:20000,opens:19993,weight:25,academicPolicyVersion:'review-attendance-v1',journal:'Review'+(i+1)+'Evaluations'})).concat([{key:'guide_eval',type:'GUIDE_EVALUATION',label:'Guide Evaluation',sequence:3,day:20000,opens:19990,weight:20,academicPolicyVersion:'guide-bands-v3-target-level-2',journal:'GuideEvaluations'}]);
   c.requireAssessmentDefinitions_=()=>c.getAssessmentDefinitions_();
   c.assessmentRubric_=()=>criteria;
   for(const name of ['Review1Evaluations','Review2Evaluations','GuideEvaluations']){

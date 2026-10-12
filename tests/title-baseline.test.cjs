@@ -67,18 +67,21 @@ test('baseline: review marking (eligibility, the reviewer status, who can decide
   for (const combo of combos()) {
     const f = fixtureFor(combo);
     const c = f.c;
-    load(c, ['reviewer-api.js', 'reviewer-dashboard.js', 'review-evaluation.js']);
+    load(c, ['reviewer-api.js', 'reviewer-dashboard.js', 'review-evaluation.js', 'activity-engine.js', 'activity-check-title.js']);
     f.set('Review Committee Number', 'C1');
     c.getCommitteeNumbersForReviewer_ = () => ['C1'];
     const TS = c.getColumnMap_('TeamStatus', inside(c, 'FIELD_DEFINITIONS.TEAM_STATUS'));
     const row = f.status.rows[1];
-    const progress = {reviews: [{key: 'review1'}], teams: {t1: {review1: {available: true, readable: true, completed: false, status: 'Draft', markedStudents: 0, totalStudents: 2, reason: '', prerequisiteReason: ''}}}};
+    // Review marking is gated by the review's `title` / `approved` row of ActivityDependencies; the real title check stands behind the engine here.
+    c.activityPreconditions_ = (id, team, ctx) => { const answer = c.activityCheckTitle_().isMet(team, 'approved', ctx); return answer.met ? {allowed: true, requirements: [], reason: ''} : {allowed: false, requirements: [], reason: 'Project title approved: ' + answer.reason}; };
+    const eligibility = c.reviewEligibility_(row, TS, {key: 'review1', ctx: c.activityContext_()});
+    const progress = {reviews: [{key: 'review1'}], teams: {t1: {review1: {available: true, readable: eligibility.eligible, completed: false, status: 'Draft', markedStudents: 0, totalStudents: 2, reason: eligibility.reason, sequenceReason: ''}}}};
     const data = c.getReviewerDashboardData_('reviewer@example.com');
     const title = data.titles['t1'];
     const team = c.reviewerTeamDto_(row, TS, progress, title, '');
     const ids = rows => rows.map(r => String(r[TS.TEAM_ID]));
     result[combo.id] = {
-      reviewEligibility: plain(c.reviewEligibility_(row, TS)),
+      reviewEligibility: plain(eligibility),
       reviewerStatus: plain(c.reviewerTitleStatus_(title)),
       titleApproval: {status: plain(team.titleApproval.status), canDecide: team.titleApproval.canDecide},
       marksCellEnabled: team.reviews[0].enabled,
@@ -91,8 +94,12 @@ test('baseline: review marking (eligibility, the reviewer status, who can decide
   const projected = Object.fromEntries(Object.entries(result).map(([id, entry]) => [id, SAME_MEANING.has(id) ? entry : {reviewEligibility: entry.reviewEligibility, marksCellEnabled: entry.marksCellEnabled}]));
   // One recorded quirk is not kept: the old dashboard listed a reviewer-approved team that had no Guide Decision as also awaiting the
   // guide. An approved title has always passed the guide now, so it is in one group only.
-  expectBaselineAs('review-marking', projected, (entry, id) => !SAME_MEANING.has(id) ? {reviewEligibility: entry.reviewEligibility, marksCellEnabled: entry.marksCellEnabled}
-    : id === 'title=yes guide=- reviewer=Approved' ? {...entry, dashboard: {...entry.dashboard, notYetGuideApproved: []}} : entry);
+  // The gate moved from code into the review's `title` / `approved` row of ActivityDependencies: the same states are refused, with the row's
+  // words instead of the old sentence. Only that sentence is translated; the recorded snapshot is untouched.
+  const moved = entry => ({...entry, reviewEligibility: entry.reviewEligibility.eligible ? entry.reviewEligibility
+    : {eligible: false, reason: 'Project title approved: The project title has not been approved yet.'}});
+  expectBaselineAs('review-marking', projected, (entry, id) => !SAME_MEANING.has(id) ? moved({reviewEligibility: entry.reviewEligibility, marksCellEnabled: entry.marksCellEnabled})
+    : id === 'title=yes guide=- reviewer=Approved' ? moved({...entry, dashboard: {...entry.dashboard, notYetGuideApproved: []}}) : moved(entry));
 });
 
 test('baseline: eligibility (the title date and the resulting eligibility, now from TitleLog)', () => {

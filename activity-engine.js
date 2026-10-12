@@ -1,7 +1,7 @@
 /**
  * ACTIVITY ENGINE - the requirements a student action must meet before it runs (archive/plans/ACTIVITY-DEPENDENCIES-PLAN.md). Rows in the
  * ActivityDependencies sheet name a check kind and an item; this file reads them, validates them and runs the checks. The checks
- * live in activity-check-github.js, activity-check-drive.js and activity-check-document.js. The sheet is read fresh on every request; nothing is cached
+ * live in activity-check-github.js, activity-check-drive.js, activity-check-document.js and activity-check-title.js. The sheet is read fresh on every request; nothing is cached
  * between requests. Misconfiguration denies; an unverifiable check is unmet.
  *
  * The registry is a function, not a top-level list the check files add to, so it does not depend on the order the files load in.
@@ -10,14 +10,26 @@ const ACTIVITY_IDS_ = Object.freeze(['title.submit', 'title.resubmit']);
 const ACTIVITY_MISCONFIGURED_ = 'Submission requirements are misconfigured. Contact the coordinator.';
 
 /**
+ * Every activity a row may name: the title activities above plus the key of each REVIEW assessment in AssessmentDefinitions (`review1`, ...),
+ * so a later review needs only rows. A definitions sheet that cannot be read leaves only the title activities.
+ */
+function activityIds_() {
+  let reviews = [];
+  try { reviews = getAssessmentDefinitions_().filter(definition => definition.type === 'REVIEW').map(definition => definition.key); }
+  catch (error) { console.error('Review activities could not be listed: ' + (error && error.message || error)); }
+  return [...ACTIVITY_IDS_, ...reviews];
+}
+
+/**
  * kind -> {needsApprovedTitle, perStudent, validItem(item), isMet(team, item, ctx) -> {met, reason, unverifiable?, diagnostic?}}
  * `unverifiable: true` means the source could not be read; the engine words it as "Could not verify: <label>."
  */
 function activityChecks_() {
-  return {github: activityCheckGithub_(), drive: activityCheckDrive_(), document: activityCheckDocument_()};
+  return {github: activityCheckGithub_(), drive: activityCheckDrive_(), document: activityCheckDocument_(), title: activityCheckTitle_()};
 }
 
-/** A request's context: the loaded rules and the GitHub and Drive answers, kept for this request only. */
+/** A request's context: the loaded rules and the GitHub and Drive answers, kept for this request only. `ctx.kinds`, when set, limits the
+ * rows evaluated to those kinds (a dashboard's cheap first pass); the other rows are skipped, not met. */
 function activityContext_() {
   return {rules: null, github: Object.create(null), drive: Object.create(null)};
 }
@@ -30,8 +42,8 @@ function readActivityDependencyRows_() {
   return {present: true, headers: (values[0] || []).map(cell => String(cell === null || cell === undefined ? '' : cell)), rows: values.slice(1)};
 }
 
-/** Pure. data = {present, headers, rows}. Returns {rules: {activityId: [{kind, item, label}]}, errors: [string]}. */
-function parseActivityRules_(data, checks) {
+/** Pure. data = {present, headers, rows}. Returns {rules: {activityId: [{kind, item, label}]}, errors: [string]}. `activityIds` defaults to activityIds_(). */
+function parseActivityRules_(data, checks, activityIds) {
   const rules = Object.create(null), errors = [];
   if (!data.present) return {rules, errors: ['The ActivityDependencies sheet is missing.']};
   const required = sheetSpec_('activityDependencies').headers;
@@ -45,13 +57,14 @@ function parseActivityRules_(data, checks) {
   });
   if (errors.length) return {rules, errors};
   const cell = (row, header) => { const value = row[position[header]]; return value === null || value === undefined ? '' : String(value); };
+  const known = activityIds || activityIds_();
   data.rows.forEach((row, offset) => {
     const where = 'Row ' + (offset + 2) + ': ';
     if (required.every(header => cell(row, header).trim() === '')) return;
     const activity = cell(row, 'Activity'), item = cell(row, 'Item'), label = cell(row, 'Label').trim();
     const kind = cell(row, 'Kind').trim().toLowerCase(), active = cell(row, 'Active').trim().toLowerCase();
     const problems = [];
-    if (!ACTIVITY_IDS_.includes(activity)) problems.push('unknown activity "' + activity + '"');
+    if (!known.includes(activity)) problems.push('unknown activity "' + activity + '"');
     const check = checks[kind];
     if (!check) problems.push('unknown kind "' + cell(row, 'Kind').trim() + '"');
     else if (!check.validItem(item)) problems.push('invalid item "' + item + '" for kind ' + kind);
@@ -85,7 +98,7 @@ function loadActivityRules_(ctx) {
 function activityPreconditions_(activityId, team, ctx) {
   const loaded = loadActivityRules_(ctx);
   if (loaded.errors.length) return {allowed: false, requirements: [], reason: ACTIVITY_MISCONFIGURED_};
-  const rows = loaded.rules[activityId] || [];
+  const rows = (loaded.rules[activityId] || []).filter(rule => !ctx.kinds || ctx.kinds.includes(rule.kind));
   if (!rows.length) return {allowed: true, requirements: [], reason: ''};
   const checks = activityChecks_();
   const requirements = rows.map(rule => {

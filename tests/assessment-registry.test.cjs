@@ -4,7 +4,7 @@ function setup(){
  const f=publishingFixture(),c=f.c;
  vm.runInContext(fs.readFileSync('rubric-config.js','utf8'),c);
  const headers=Array.from(vm.runInContext('ASSESSMENT_DEFINITION_HEADERS_',c));
- const rows=[headers,...['review1','review2','review3'].map((key,i)=>[key,'REVIEW','Review '+(i+1),i+1,20,'2024-01-01','2024-02-01',i?JSON.stringify([{assessmentId:'review'+i,condition:'RECORDED'}]):'[]','review-attendance-v1','Journal_'+key])];
+ const rows=[headers,...['review1','review2','review3'].map((key,i)=>[key,'REVIEW','Review '+(i+1),i+1,20,'2024-01-01','2024-02-01','','review-attendance-v1','Journal_'+key])];
  const rubrics=[['Assessment ID','Order','PI','Criterion','CO','Max Marks','Type',...Array.from({length:6},(_,i)=>'Level '+i)],...['review1','review2','review3'].flatMap((key,i)=>[[key,1,'PI1','Team','CO1',i===2?80:60,'Team',...Array(6).fill('Descriptor')],[key,2,'PI2','Individual','CO2',i===2?20:40,'Individual',...Array(6).fill('Descriptor')]])];
  const base=c.getSheet_,extra={};
  const sheet=(data,name)=>({getName:()=>name,getSheetId:()=>42,getDataRange:()=>({getValues:()=>data.map(r=>r.slice())}),getLastRow:()=>data.findLastIndex(r=>r.some(v=>String(v??'')!==''))+1,getMaxRows:()=>1000,getRange:(r,col,n,w)=>({setValues:values=>values.forEach((row,i)=>data[r-1+i]=row.slice())})});
@@ -136,15 +136,15 @@ test('blank-looking formula cells are preserved and block initialization before 
 });
 
 test('future arbitrary REVIEW IDs use definition-derived default storage through the same setup action',()=>{
- const f=coordinatorStorageSetup();f.rows[3][0]='design_gate';f.rubrics.slice(1).filter(r=>r[0]==='review3').forEach(r=>r[0]='design_gate');f.rows[3][2]='Design Gate';f.rows[3][7]='[]';f.rows[3][9]='';f.actor('coord@x');
+ const f=coordinatorStorageSetup();f.rows[3][0]='design_gate';f.rubrics.slice(1).filter(r=>r[0]==='review3').forEach(r=>r[0]='design_gate');f.rows[3][2]='Design Gate';f.rows[3][3]=1;f.rows[3][9]='';f.actor('coord@x');
  const result=f.c.prepareReviewAssessmentStorage_([]);assert(result.journals.some(j=>j.assessment==='design_gate'&&j.journal==='Assessment_design_gate'&&j.created));
  f.actor('reviewer@x');const d=f.c.loadReviewEvaluation_('g18','design_gate'),input={assessmentId:'design_gate',team:'g18',revision:d.revision,token:d.token,requestId:crypto.randomUUID(),teamScores:{PI1:{level:3,marks:64,remark:''}},students:d.roster.students.map(s=>({register:s.register,absence:{type:'NORMAL'},scores:{PI2:{level:3,marks:16,remark:''}}}))};
  f.c.saveReviewEvaluationDraft_(input);const current=f.c.loadReviewEvaluation_('g18','design_gate');f.c.submitReviewEvaluation_({...input,revision:current.revision,token:current.token,requestId:crypto.randomUUID()});
  assert(f.tables.Assessment_design_gate.slice(1).every(row=>row[0]==='design_gate'));assert.equal(f.tables.Assessment_design_gate.length,7);assert.equal(f.tables.Journal_review1.length,1);
 });
-test('spreadsheet Review 3 provisions, evaluates, reopens and reloads with a distinct rubric and configured prerequisite',()=>{
+test('spreadsheet Review 3 provisions, evaluates, reopens and reloads with a distinct rubric and the sequence rule',()=>{
  const f=setup(),c=f.c;f.actor('coord@x');const created=c.provisionAssessmentJournals();assert.equal(created.length,3);assert(created.every(x=>x.created));assert(c.provisionAssessmentJournals().every(x=>!x.created));
- f.actor('reviewer@x');assert.throws(()=>c.loadReviewEvaluation_('G18','review3'),/Submit Review 2/);
+ f.actor('reviewer@x');assert.throws(()=>c.loadReviewEvaluation_('G18','review3'),/Submit Review 1 before entering Review 3/);
  for(const id of ['review1','review2','review3']){
   const d=c.loadReviewEvaluation_('G18',id),input={assessmentId:id,team:'G18',revision:d.revision,token:d.token,requestId:crypto.randomUUID(),teamScores:{PI1:{level:3,marks:d.config.criteria[0].maxMarks*.8,remark:''}},students:d.roster.students.map(s=>({register:s.register,absence:{type:'REVIEW_DAY_ABSENCE',approved:true},scores:{}}))};
   c.submitReviewEvaluation_(input);assert.equal(c.loadReviewEvaluation_('G18',id).evaluation.students[0].assessment.status,'MAKEUP_PENDING');
@@ -155,8 +155,8 @@ test('spreadsheet Review 3 provisions, evaluates, reopens and reloads with a dis
  f.actor('coord@x');c.reopenReviewEvaluation_({assessmentId:'review3',team:'G18',revision:2,requestId:crypto.randomUUID(),reason:'Correction'});f.actor('reviewer@x');assert.equal(c.loadReviewEvaluation_('G18','review3').evaluation.students[0].total,80);
  assert.equal(f.tables.Journal_review1.length,4);assert.equal(f.tables.Journal_review3.length,10);
 });
-test('registry rejects duplicates, cycles, unknown prerequisites, unsupported policy and missing explicit opening',()=>{
- for(const mutate of [r=>r.push(r[1].slice()),r=>r[1][7]='[{"assessmentId":"review3","condition":"RECORDED"}]',r=>r[2][7]='[{"assessmentId":"missing","condition":"RECORDED"}]',r=>r[1][8]='unsupported',r=>r[1][5]='',r=>r[2][9]=r[1][9]]){const f=setup();mutate(f.rows);assert.throws(()=>f.c.getAssessmentDefinitions_());}
+test('registry rejects duplicates, unsupported policy and missing explicit opening',()=>{
+ for(const mutate of [r=>r.push(r[1].slice()),r=>r[1][8]='unsupported',r=>r[1][5]='',r=>r[2][9]=r[1][9]]){const f=setup();mutate(f.rows);assert.throws(()=>f.c.getAssessmentDefinitions_());}
 });
 test('journal provisioning never overwrites incompatible existing data',()=>{
  const f=setup();f.rows[1][9]='Review1Evaluations';f.tables.Review1Evaluations[0][0]='Bad';f.actor('coord@x');const before=JSON.stringify(f.tables);assert.throws(()=>f.c.provisionAssessmentJournals(),/Incompatible/);assert.equal(JSON.stringify(f.tables),before);
@@ -315,14 +315,12 @@ test('SEE configuration is display-only, normalized and shares the overall weigh
  assert(!f.c.getInternalReviews_().some(d=>d.key==='see'));assert(!f.c.publicationDefinitions_().some(d=>d.key==='see'));
 });
 
-test('SEE rejects unsupported identity, policy, storage, prerequisites, dates and total weights',()=>{
+test('SEE rejects unsupported identity, policy, storage, dates and total weights',()=>{
  const mutations=[
   [r=>r[4][0]='external',/reserved for SEE/],
   [r=>r[4][1]='REVIEW',/reserved for SEE/],
   [r=>r[4][8]='review-attendance-v1',/Policy Version must be blank/],
   [r=>r[4][9]='Assessment_see',/Journal must be blank/],
-  [r=>r[4][7]='[{"assessmentId":"review1","condition":"RECORDED"}]',/SEE Prerequisites/],
-  [r=>r[1][7]='[{"assessmentId":"see","condition":"RECORDED"}]',/SEE cannot be a RECORDED prerequisite/],
   [r=>r[4][4]=41,/weights exceed/],
   [r=>r[4][4]=0,/Weight must/],
   [r=>r[4][5]='',/Opening and due date/],
@@ -330,7 +328,7 @@ test('SEE rejects unsupported identity, policy, storage, prerequisites, dates an
   [r=>r[4][5]='2024-03-02',/Opening must not follow/]
  ];
  for(const [mutate,error] of mutations){const f=seeSetup();mutate(f.rows);assert.throws(()=>f.c.getAssessmentDefinitions_(),error);}
- const f=seeSetup();f.rows[4][7]='[]';assert.equal(f.c.assessmentDefinition_('see').prerequisites.length,0);
+ const f=seeSetup();f.rows[4][7]='[]';assert.equal(f.c.assessmentDefinition_('see').prerequisites,undefined);
 });
 
 test('mixed and SEE-only readiness validates rubrics without resolving or provisioning SEE storage',()=>{
@@ -429,4 +427,68 @@ test('storage setup visibility follows journals even when rubrics are invalid',(
  f.rubrics[1][5]=-1;r=c.getCoordinatorReviewConfiguration_();assert.equal(r.valid,false);assert.equal(r.storageComplete,true);assert.equal(r.canInitializeStorage,false);
  delete f.extra.Journal_review1;r=c.getCoordinatorReviewConfiguration_();assert.equal(r.storageComplete,false);assert.equal(r.canInitializeStorage,false);
  const only=seeSetup(true);only.actor('coord@x');r=only.c.getCoordinatorReviewConfiguration_();assert.equal(r.storageComplete,true);assert.equal(r.canInitializeStorage,false);
+});
+
+// ---- order comes from Sequence: an assessment opens after every lower-sequence assessment is recorded ---------------------------------
+
+const SEQUENCE_DEFINITIONS=[{key:'review1',type:'REVIEW',label:'Review 1',sequence:1},{key:'review2',type:'REVIEW',label:'Review 2',sequence:2},
+ {key:'guide_eval',type:'GUIDE_EVALUATION',label:'Guide Evaluation',sequence:3},{key:'see',type:'SEE',label:'End Review (SEE)',sequence:4}];
+function sequenceBlock(key,{reviews={},guide=[],definitions=SEQUENCE_DEFINITIONS,team='g18'}={}){
+ const c=setup().c;c.guideActor_=()=>'guide@x';c.guideRoster_=()=>({team:'g18',students:[{register:'s1'},{register:'s2'}]});
+ const loaded={definitions,reviewRecords:k=>(reviews[k]||[]).map((status,i)=>({team:'g18',revision:i+1,status})),
+  guideRecords:()=>guide.map(([student,status])=>({team:'g18',student,revision:1,status}))};
+ return c.assessmentSequenceBlock_(definitions.find(d=>d.key===key),team,loaded);
+}
+
+test('the first sequence is never blocked',()=>{
+ assert.equal(sequenceBlock('review1'),'');
+ assert.equal(sequenceBlock('review1',{reviews:{review1:['Draft']}}),'');
+});
+
+test('a later Review waits until every lower-sequence assessment is Submitted or Published for the team',()=>{
+ assert.equal(sequenceBlock('review2'),'Submit Review 1 before entering Review 2 marks.');
+ assert.equal(sequenceBlock('review2',{reviews:{review1:['Draft']}}),'Submit Review 1 before entering Review 2 marks.','a draft is not recorded');
+ assert.equal(sequenceBlock('review2',{reviews:{review1:['Draft','Submitted']}}),'');
+ assert.equal(sequenceBlock('review2',{reviews:{review1:['Published']}}),'');
+});
+
+test('a gap in the sequence still waits for every lower one, and equal sequences do not block each other',()=>{
+ const gap=[{key:'a',type:'REVIEW',label:'A',sequence:1},{key:'b',type:'REVIEW',label:'B',sequence:5},{key:'c',type:'REVIEW',label:'C',sequence:9}];
+ assert.equal(sequenceBlock('c',{definitions:gap,reviews:{b:['Submitted']}}),'Submit A before entering C marks.','the first unrecorded one is named');
+ assert.equal(sequenceBlock('c',{definitions:gap,reviews:{a:['Submitted'],b:['Submitted']}}),'');
+ const equal=[{key:'a',type:'REVIEW',label:'A',sequence:2},{key:'b',type:'REVIEW',label:'B',sequence:2}];
+ assert.equal(sequenceBlock('a',{definitions:equal}),'');
+ assert.equal(sequenceBlock('b',{definitions:equal}),'');
+});
+
+test('a lower-sequence guide evaluation counts only when every student is recorded; SEE is skipped and never gated',()=>{
+ const defs=[{key:'guide_eval',type:'GUIDE_EVALUATION',label:'Guide Evaluation',sequence:1},{key:'see',type:'SEE',label:'End Review (SEE)',sequence:2},{key:'review1',type:'REVIEW',label:'Review 1',sequence:3}];
+ assert.equal(sequenceBlock('review1',{definitions:defs}),'Submit Guide Evaluation before entering Review 1 marks.');
+ assert.equal(sequenceBlock('review1',{definitions:defs,guide:[['s1','Submitted']]}),'Submit Guide Evaluation before entering Review 1 marks.','one of two students');
+ assert.equal(sequenceBlock('review1',{definitions:defs,guide:[['s1','Submitted'],['s2','Published']]}),'','SEE (sequence 2) never blocks');
+ assert.equal(sequenceBlock('guide_eval'),'','only a Review is gated here');
+ assert.equal(sequenceBlock('see'),'');
+});
+
+test('another team\'s records do not unlock a Review',()=>{
+ const c=setup().c;
+ const loaded={definitions:SEQUENCE_DEFINITIONS,reviewRecords:()=>[{team:'g99',revision:1,status:'Submitted'}],guideRecords:()=>[]};
+ assert.equal(c.assessmentSequenceBlock_(SEQUENCE_DEFINITIONS[1],'g18',loaded),'Submit Review 1 before entering Review 2 marks.');
+});
+
+test('the Prerequisites cell is ignored: any content loads, and no prerequisite is carried',()=>{
+ for(const cell of ['','[]','not json','[{"assessmentId":"missing","condition":"OTHER"}]','[{"assessmentId":"review3","condition":"RECORDED"}]']){
+  const f=setup();f.rows[1][7]=cell;f.rows[2][7]=cell;
+  const defs=f.c.getAssessmentDefinitions_();
+  assert.deepEqual(defs.map(d=>d.key),['review1','review2','review3'],cell);
+  assert(defs.every(d=>d.prerequisites===undefined),cell);
+ }
+});
+
+test('the reviewer path blocks Review 2 until Review 1 is submitted and unblocks after, from the sheet\'s Sequence alone',()=>{
+ const f=setup(),c=f.c;f.actor('coord@x');c.provisionAssessmentJournals();f.actor('reviewer@x');
+ assert.throws(()=>c.loadReviewEvaluation_('G18','review2'),/Submit Review 1 before entering Review 2 marks\./);
+ const d=c.loadReviewEvaluation_('G18','review1');
+ c.submitReviewEvaluation_({assessmentId:'review1',team:'G18',revision:d.revision,token:d.token,requestId:crypto.randomUUID(),teamScores:{PI1:{level:3,marks:d.config.criteria[0].maxMarks*.8,remark:''}},students:d.roster.students.map(s=>({register:s.register,absence:{type:'REVIEW_DAY_ABSENCE',approved:true},scores:{}}))});
+ assert.equal(c.loadReviewEvaluation_('G18','review2').config.key,'review2');
 });
