@@ -78,12 +78,12 @@ function studentViewBrowser_(bridge, getUi, actions) {
     return pending + '<div class="mt-3">' + githubCard(project) + '</div>';
   }
   function titleMarkup(project) { return '<div>' + titleCard(project) + '</div>'; }
-  const TABS = [['weeks', 'Weeks', 'calendar'], ['assessments', 'Assessments', 'clipboard-check'], ['title', 'Title', 'file-text'], ['github', 'GitHub', 'git-branch'], ['team', 'Team', 'users']];
+  const TABS = [['weeks', 'Weeks', 'calendar'], ['assessments', 'Assessments', 'clipboard-check'], ['title', 'Title', 'file-text'], ['documents', 'Documents', 'folder'], ['github', 'GitHub', 'git-branch'], ['team', 'Team', 'users']];
   // The screen links live in the shell sidebar (#studentSideNav, below the role separator); the view fills it.
   // Below md the links become a bottom bar (icon over label); from md up they are a sidebar group after the last menu item.
   const TAB = 'border-0 flex w-full flex-col items-center justify-center gap-1 border-t-2 border-t-transparent bg-transparent px-1 py-2 text-xs text-ink-2 hover:bg-tint aria-[current=page]:border-t-primary aria-[current=page]:font-semibold aria-[current=page]:text-primary md:flex-row md:justify-start md:gap-2 md:rounded-lg md:border-t-0 md:px-3 md:text-left md:text-sm md:aria-[current=page]:bg-tint';
   function navMarkup(active) {
-    return '<nav aria-label="Student sections" class="grid grid-cols-5 md:flex md:flex-col md:gap-1">' + TABS.map(t =>
+    return '<nav aria-label="Student sections" class="grid grid-cols-6 md:flex md:flex-col md:gap-1">' + TABS.map(t =>
       '<button type="button" class="' + TAB + '" id="studentTab-' + t[0] + '" aria-controls="studentPanel-' + t[0] + '"' + (t[0] === active ? ' aria-current="page"' : '') + ' data-student-tab="' + t[0] + '">' + icon(t[2]) + t[1] + '</button>').join('') + '</nav>';
   }
   function panelMarkup(key, active, body) {
@@ -153,7 +153,7 @@ function studentViewBrowser_(bridge, getUi, actions) {
     const ui = getUi();
     host.innerHTML = '<div class="min-w-0">' + reopenedNotice(dto) +
       panelMarkup('weeks', state.tab, weeklyMarkup(dto, ui)) + panelMarkup('assessments', state.tab, assessmentsMarkup(dto, ui)) +
-      panelMarkup('title', state.tab, projectSlot('title', ui)) + panelMarkup('github', state.tab, projectSlot('github', ui)) +
+      panelMarkup('title', state.tab, projectSlot('title', ui)) + panelMarkup('documents', state.tab, '<div data-documents-host></div>') + panelMarkup('github', state.tab, projectSlot('github', ui)) +
       panelMarkup('team', state.tab, teamMarkup(dto)) + '</div>';
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); }
     const side = document.getElementById('studentSideNav');
@@ -169,6 +169,7 @@ function studentViewBrowser_(bridge, getUi, actions) {
     state.loaded[key] = true;
     if (key === 'weeks' && state.dto.titleApproved) actions.weekly.load();
     else if (key === 'assessments') actions.results.all();
+    else if (key === 'documents') actions.documents.mount(state.host.querySelector('[data-documents-host]'), '');
     else if ((key === 'github' || key === 'title') && !state.loaded.project) loadProject();
   }
   function showTab(key) {

@@ -37,7 +37,7 @@ function setup(data = { basic: BASIC, title: TITLE, progress: PROGRESS, activity
   const ui = { busy:require('./busy-fixture.cjs')(), renderSkeleton: (v, l) => '<span data-skeleton aria-label="' + l + '">…</span>', renderExpandableText: t => '<details data-expandable>' + String(t).slice(0, 10) + '</details>' };
   vm.runInContext('globalThis.__make = ' + c.teamDrawerViewBrowser_.toString(), c);
   const titleRequests = c.titleRequestsBrowser_();
-  const view = c.__make(bridge, () => ui, () => titleRequests);
+  const view = c.__make(bridge, () => ui, () => titleRequests, () => ({ mount() {} }));
   const host = document.getElementById('content');
   const flush = () => new Promise(r => setImmediate(r));
   return { view, host, requests, writes, fail, flush, window, open: { value: true } };

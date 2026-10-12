@@ -5,7 +5,7 @@
  * drawer closed or moved to another team are ignored. Opening, closing, focus and the backdrop stay with
  * DashboardUI's shared drawer; this module never calls google.script.run.
  */
-function teamDrawerViewBrowser_(bridge, getUi, getRequests) {
+function teamDrawerViewBrowser_(bridge, getUi, getRequests, getDocuments) {
   'use strict';
   const delegated = new WeakSet();
   const READ = {timeoutMs:120000};
@@ -138,7 +138,8 @@ function teamDrawerViewBrowser_(bridge, getUi, getRequests) {
   /** Fills `content` with the three sections of `teamId`; `isOpen()` says whether the drawer still shows them. */
   function mount(content, teamId, isOpen) {
     const request = ++generation, pending = new Set();
-    content.innerHTML = Object.keys(SECTIONS).map(skeletonMarkup).join('');
+    content.innerHTML = Object.keys(SECTIONS).map(skeletonMarkup).join('') + '<div data-documents-host></div>';
+    getDocuments().mount(content.querySelector('[data-documents-host]'), teamId);
     if (!delegated.has(content)) { delegated.add(content); content.addEventListener('click', onClick); }
     const sectionHost = section => content.querySelector('[data-drawer-section="' + section + '"]');
 

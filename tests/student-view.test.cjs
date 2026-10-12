@@ -11,7 +11,7 @@ const dtoFor = (name, options) => studentDto(name, options);
 async function setup(dto, options = {}) {
   const { document, window } = parseHTML('<html><body><nav id="studentSideNav"></nav><div id="studentContent"></div></body></html>');
   const ctl = { fail: false };
-  const calls = { jump: [], refresh: 0, weekly: 0, results: 0, logs: [], preview: [] };
+  const calls = { documents: [], jump: [], refresh: 0, weekly: 0, results: 0, logs: [], preview: [] };
   const c = loadSources(['data-bridge-client.js', 'title-requests.js', 'student-title.js', 'student-view.js'], { document, Promise, JSON, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const core = { teamId: dto.teamId, roster: dto.roster, titleApproved: dto.titleApproved, titleStatus: dto.titleStatus, assessments: dto.assessments }, project = { setup: dto.setup, github: dto.github, title: dto.title };
@@ -22,7 +22,7 @@ async function setup(dto, options = {}) {
   };
   // The student modules StudentView drives, passed in as they are in the shell.
   const actions = {
-    weekly: { load: () => calls.weekly++ }, results: { all: () => calls.results++ },
+    weekly: { load: () => calls.weekly++ }, documents: { mount: (host, team) => calls.documents.push([host, team]) }, results: { all: () => calls.results++ },
     github: { focusGithubAccountForm: b => calls.jump.push(b), refreshGithubStatus: b => calls.refresh++, previewGithubAccount: (e, form) => calls.preview.push([e, form]) }
   };
   vm.runInContext('globalThis.__make = ' + c.studentViewBrowser_.toString() + '; globalThis.__makeTitle = ' + c.studentTitleBrowser_.toString(), c);
@@ -228,10 +228,10 @@ test('the endpoint authorizes on the server and returns safe errors', async () =
   assert.equal(failure.error.code, 'INTERNAL'); assert.doesNotMatch(failure.error.message, /column/);
 });
 
-test('the student screens are sidebar links: Weeks, Assessments, Title, GitHub and Team, with the first needed screen open', async () => {
+test('the student screens are sidebar links: Weeks, Assessments, Title, Documents, GitHub and Team, with the first needed screen open', async () => {
   const names = f => Array.from(f.document.querySelectorAll('#studentSideNav [data-student-tab]')).map(t => norm(t));
   const approved = (await setup(dtoFor('approved'))), setupFirst = (await setup(dtoFor('notSubmitted')));
-  assert.deepEqual(names(approved), ['Weeks', 'Assessments', 'Title', 'GitHub', 'Team']);
+  assert.deepEqual(names(approved), ['Weeks', 'Assessments', 'Title', 'Documents', 'GitHub', 'Team']);
   const open = host => Array.from(host.querySelectorAll('[data-student-panel]')).filter(p => !p.hidden).map(p => p.getAttribute('data-student-panel'));
   assert.deepEqual(open(approved.host), ['weeks']);
   assert.deepEqual(open(setupFirst.host), ['github']);
@@ -255,6 +255,10 @@ test('selecting a link shows its panel, supports arrow keys and survives a re-re
   assert.equal(tab('title').getAttribute('aria-current'), 'page'); assert.equal(tab('weeks').hasAttribute('aria-current'), false);
   const key = (el, name) => { const e = new f.window.Event('keydown', { bubbles: true, cancelable: true }); e.key = name; el.dispatchEvent(e); };
   key(tab('title'), 'ArrowDown');
+  assert.deepEqual(open(), ['documents']);
+  assert.equal(f.calls.documents.length, 1, 'the Documents screen loads when first shown');
+  assert.equal(f.calls.documents[0][1], '');
+  key(tab('documents'), 'ArrowDown');
   assert.deepEqual(open(), ['github']);
   key(tab('github'), 'ArrowDown');
   assert.deepEqual(open(), ['team']);
@@ -266,7 +270,7 @@ test('selecting a link shows its panel, supports arrow keys and survives a re-re
   assert.deepEqual(open(), ['github']);
   f.view.render(f.host, dtoFor('approved'));
   assert.deepEqual(open(), ['github']);
-  assert.equal(f.document.querySelectorAll('#studentSideNav [data-student-tab]').length, 5);
+  assert.equal(f.document.querySelectorAll('#studentSideNav [data-student-tab]').length, 6);
 });
 
 test('the sidebar links use only utilities', async () => {

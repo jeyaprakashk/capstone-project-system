@@ -181,6 +181,7 @@ Returned by `API_documents_get`. One entry per listed template document (active,
 
 ```
 { teamId, scannedAt /* the latest team scan time, '' if none */,
+  roles:{student, guide, reviewer, coordinator} /* the caller's roles on this team, booleans */,
   documents:[{ documentId, fileName, folder, extension,
     status, state /* active|waiting|done, as for titles */, statusText, revision, existing /* a hand-placed file counts as APPROVED */,
     teamChanged /* Yes|No|Unknown|'' (from the daily team scan) */, checkedAt, returnedNotes /* the guide's notes when RETURNED */,

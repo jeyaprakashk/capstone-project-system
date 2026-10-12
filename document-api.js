@@ -174,7 +174,7 @@ function buildDocumentsDto_(teamId, viewer) {
     };
     return dto;
   });
-  return {teamId: team.teamId, scannedAt, documents};
+  return {teamId: team.teamId, scannedAt, roles: {student: !!roles.student, guide: !!roles.guide, reviewer: !!roles.reviewer, coordinator: !!roles.coordinator}, documents};
 }
 
 /** API_documents_get(teamId?): any signed-in person with a role on the team. A student sees its own team only. */

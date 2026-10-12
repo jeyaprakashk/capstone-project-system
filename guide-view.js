@@ -7,7 +7,7 @@
  * The workspace tab strip, its styles and its keyboard handling come from SharedTabs.
  * Elements that GuideWeekly toggles with `hidden` carry no display utilities.
  */
-function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests) {
+function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests, getDocuments) {
   'use strict';
   const delegated = new WeakSet();
   const state = {dto:null, host:null, busyTeam:null, commits:{}};
@@ -131,7 +131,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests) {
     return (team.folderUrl
       ? '<div class="flex items-center justify-between gap-3 py-2 text-sm"><strong>Team folder</strong><a class="' + BUTTON + '" href="' + escape(safeUrl(team.folderUrl)) + '" target="_blank" rel="noopener">Open team folder</a></div>'
       : p('The team folder has not been created yet.')) +
-      p('Open the folder to review the team’s documents.');
+      '<div data-documents-host data-documents-team="' + escape(team.teamId) + '"></div>';
   }
 
   function selectorMarkup(team, index) {
@@ -271,6 +271,9 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests) {
     const visible = Array.from(state.host.querySelectorAll('[data-guide-team]')).find(el => !el.hasAttribute('hidden'));
     const github = visible && visible.querySelector('[data-guide-view="github"]');
     if (github && !github.hasAttribute('hidden')) ensureCommits(visible.getAttribute('data-guide-team'));
+    const documents = visible && visible.querySelector('[data-guide-view="documents"]');
+    const host = documents && !documents.hasAttribute('hidden') ? documents.querySelector('[data-documents-host]') : null;
+    if (host && !host.hasAttribute('data-documents-mounted')) { host.setAttribute('data-documents-mounted', ''); getDocuments().mount(host, host.getAttribute('data-documents-team')); }
   }
 
   function onClick(event) {
