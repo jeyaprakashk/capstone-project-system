@@ -305,13 +305,19 @@ function reviewsTeamNotEligible_(teamId,semester) {
   }
 }
 function reviewTeamNotEligibleRead_(key,teamId,semester,shared) {
+  // One log line says why a team was or was not labelled, so a label that does not show can be explained from the execution log.
+  const said=(why,result)=>{console.log('Eligibility label '+key+' team '+teamId+': '+(result?'NOT ELIGIBLE':'no label')+' ('+why+')');return result;};
   const definition=assessmentDefinition_(key);
-  if(definition.type!=='REVIEW' || projectDay_(new Date(),getSpreadsheet_().getSpreadsheetTimeZone())<definition.opens)return false;
+  if(definition.type!=='REVIEW')return said('not a review',false);
+  if(projectDay_(new Date(),getSpreadsheet_().getSpreadsheetTimeZone())<definition.opens)return said('not open yet',false);
   const latest=reviewLatest_(reviewRecords_(key).records,teamId);
-  if(latest && latest.status!=='Draft')return false;
-  if(assessmentSequenceBlock_(definition,teamId))return true;
+  if(latest && latest.status!=='Draft')return said('already entered: '+latest.status,false);
+  if(assessmentSequenceBlock_(definition,teamId))return said('an earlier assessment is not recorded',true);
   const ctx=shared || Object.assign(activityContext_(),{hint:true});
   const gate=activityPreconditions_(key,{teamId:String(teamId).trim(),semester},ctx);
-  return gate.requirements.some(item=>!item.met && !/^Could not verify/.test(item.reason));
+  const unmet=gate.requirements.filter(item=>!item.met && !/^Could not verify/.test(item.reason));
+  if(unmet.length)return said('unmet: '+unmet.map(item=>item.label).join(', '),true);
+  if(!gate.requirements.length)return said(gate.allowed ? 'no requirement rows for this review' : 'requirement rows are misconfigured',false);
+  return said(gate.allowed ? 'all requirements met' : 'could not verify: '+gate.requirements.filter(item=>!item.met).map(item=>item.label).join(', '),false);
 }
 function loadPublishedReviewEvaluation_(key) {return loadPublishedAssessment_(key);}
