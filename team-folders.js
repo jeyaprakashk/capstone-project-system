@@ -7,7 +7,6 @@
  */
 const TEAM_DOCUMENTS_FOLDER_NAME_ = 'Team Documents';
 const TEAM_FOLDER_BATCH_ = 25;
-const TEAM_FOLDER_GRANT_BUDGET_MS_ = 240000;
 /** Fixed file names inside a team folder; the documents check (team-documents.js) reads the same names. */
 const TEAM_DOCUMENT_FILE_NAMES_ = Object.freeze({work: 'Step1_Work_Breakdown.docx', need: 'Step2_Need_Analysis.docx'});
 
@@ -169,45 +168,6 @@ function createTeamFolders_(cursor) {
     const last = batch.length ? batch[batch.length - 1].key : cursor || '';
     const remaining = pending.filter(team => team.key > last).length;
     return {teamDocuments: {url: String(documents.folder.getUrl()), justCreated: !existed}, created, failed, notShared, remaining, nextCursor: remaining ? last : null};
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-/**
- * TEMPORARY, editor-run. Gives the students of every team that already has a folder viewer access to it, as createTeamFolders_ does
- * for new folders. Safe to run again (it only adds the missing ones). It works in batches inside a time budget and keeps its place
- * in the Script Property TEAM_FOLDER_GRANT_CURSOR, so run it again until it reports remaining 0. Delete this function, its guard
- * entry and its test once the owner has run it (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, Phase 0).
- */
-function grantExistingTeamFolderAccess() {
-  requireTriggerOrOperator_();
-  const properties = PropertiesService.getScriptProperties(), cursorKey = 'TEAM_FOLDER_GRANT_CURSOR';
-  const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
-  try {
-    const documents = teamDocumentsFolderOrNull_();
-    if (!documents) throw new Error('Team Documents was not found next to the spreadsheet.');
-    const cursor = properties.getProperty(cursorKey) || '';
-    const counts = teamFolderCounts_(documents);
-    const plan = teamFolderPlan_().teams.filter(team => counts[team.name] && (!cursor || team.key > cursor));
-    const deadline = Date.now() + TEAM_FOLDER_GRANT_BUDGET_MS_;
-    const report = {added: [], skipped: [], failed: [], remaining: 0};
-    let last = cursor;
-    for (const team of plan) {
-      if (Date.now() >= deadline) break;
-      last = team.key;
-      const located = teamFolderIn_(documents, team.teamId, team.semester);
-      if (!located.folder) { report.failed.push({teamId: team.teamId, reason: 'The team has more than one folder of its name.'}); continue; }
-      const sharing = teamFolderGrantViewers_(located.folder, team.emails);
-      sharing.added.forEach(email => report.added.push({teamId: team.teamId, email}));
-      sharing.skipped.forEach(email => report.skipped.push({teamId: team.teamId, email}));
-      sharing.failed.forEach(item => report.failed.push({teamId: team.teamId, email: item.email, reason: item.reason}));
-    }
-    report.remaining = plan.filter(team => team.key > last).length;
-    if (report.remaining) properties.setProperty(cursorKey, last); else properties.deleteProperty(cursorKey);
-    console.log('Team folder access: ' + JSON.stringify({added: report.added.length, skipped: report.skipped.length, failed: report.failed, remaining: report.remaining}));
-    return report;
   } finally {
     lock.releaseLock();
   }
