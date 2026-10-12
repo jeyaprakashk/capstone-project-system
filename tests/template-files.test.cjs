@@ -1,4 +1,4 @@
-// Process A of TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md: the daily template scan, the TemplateFiles sheet and the document setup.
+// Process A of archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md: the daily template scan, the TemplateFiles sheet and the document setup.
 // GitHub is faked; the sheet is the in-memory fake of the weekly fixture, so the real header-name code runs.
 const {test} = require('node:test');
 const assert = require('node:assert/strict');

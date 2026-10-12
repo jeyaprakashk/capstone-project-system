@@ -1,5 +1,5 @@
 /**
- * DOCUMENT API - the endpoints of the template-document submission (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, section 9). JSON only. Each
+ * DOCUMENT API - the endpoints of the template-document submission (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, section 9). JSON only. Each
  * write endpoint resolves who the caller is for the team and hands the action to documentWrite_ with the callbacks it needs; nothing
  * here decides a workflow state (document-service.js does). Who a caller is for a team comes from the same functions the title
  * endpoints use (titleTeamRow_, titleTeamRowFor_, titleRolesFor_, titleAuthorizer_), so the roster is read in one way.

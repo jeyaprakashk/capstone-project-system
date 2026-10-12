@@ -1,5 +1,5 @@
 /**
- * DOCUMENT JOURNAL - the append-only DocumentSubmissions sheet (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, section 3). One row per event
+ * DOCUMENT JOURNAL - the append-only DocumentSubmissions sheet (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, section 3). One row per event
  * (SUBMIT, APPROVE, RETURN, REOPEN); the latest row of a team and document gives its status. Read and written by header name through
  * the shared document-sheet helpers. A row is appended and never edited.
  */

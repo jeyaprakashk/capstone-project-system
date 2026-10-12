@@ -1,5 +1,5 @@
 /**
- * DOCUMENT GITHUB - the live reads a submission needs (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, sections 5 and 6). Nothing here writes. It
+ * DOCUMENT GITHUB - the live reads a submission needs (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, sections 5 and 6). Nothing here writes. It
  * reuses the team-file scan's helpers (team-files.js), so "changed by the team" means the same thing on the screen and at Submit.
  * Anything GitHub cannot answer is UNAVAILABLE ("Could not verify"): the answer is never guessed.
  */

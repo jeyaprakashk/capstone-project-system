@@ -182,7 +182,7 @@ test('an invalid cursor is rejected', () => {
   assert.throws(() => fixture().c.createTeamFolders_(5), /Invalid continuation cursor/);
 });
 
-// ---- students are given viewer access to their own team's folder (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, Phase 0) ----
+// ---- students are given viewer access to their own team's folder (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, Phase 0) ----
 
 const ANN = 'ann@x.edu', BOB = 'bob@x.edu', CAT = 'cat@x.edu';
 const withStudents = () => [['T1', 'Semester 7', ANN, ' BOB@x.edu ', '', ANN], ['T2', 'Semester 7', CAT]];

@@ -1,5 +1,5 @@
 /**
- * DOCUMENTS VIEW - browser module serialized into every dashboard page as `DocumentsView` (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md).
+ * DOCUMENTS VIEW - browser module serialized into every dashboard page as `DocumentsView` (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md).
  * Renders the Documents DTO of one team (DATA-CONTRACTS.md, DocumentsDto) into a host element and sends the document writes through the
  * bridge: Submit (API_student_submitDocument, after a live preview the student confirms), Approve and Return
  * (API_guide_decideDocument) and Reopen (API_coordinator_reopenDocument). Everything a person may do comes from the DTO's `can`; this

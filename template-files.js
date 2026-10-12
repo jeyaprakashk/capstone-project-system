@@ -1,5 +1,5 @@
 /**
- * TEMPLATE FILES - process A of TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md (section 4): a daily scan that keeps the list of the Office and PDF
+ * TEMPLATE FILES - process A of archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md (section 4): a daily scan that keeps the list of the Office and PDF
  * files in the capstone template repository. The list knows nothing about teams. It sets and changes no requirement, copies no file,
  * and submits nothing; it only writes the TemplateFiles sheet.
  *

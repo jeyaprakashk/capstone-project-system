@@ -1,5 +1,5 @@
 /**
- * DOCUMENT DRIVE - the team folder side of a submission (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, decisions 6 and 7). The folder is found
+ * DOCUMENT DRIVE - the team folder side of a submission (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, decisions 6 and 7). The folder is found
  * with the existing findTeamFolder_; a document is the file with its exact name in that folder. One file updates in place (the earlier
  * content is kept forever first), none creates, several is refused. The content and the description are written in one Drive call, and
  * the description carries the submission record that settlement relies on.

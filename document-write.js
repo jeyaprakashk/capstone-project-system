@@ -1,5 +1,5 @@
 /**
- * DOCUMENT WRITE - the one path every document action takes: submit, approve, return and reopen (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md,
+ * DOCUMENT WRITE - the one path every document action takes: submit, approve, return and reopen (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md,
  * decision 14 and section 6). The endpoints (document-api.js) say who the caller is and pass callbacks; this file owns the order of
  * the checks, the lock, the settlement of an interrupted write and the append. The rules are in document-service.js. It is built
  * like titleWrite_ (title-write.js), which it deliberately does not reuse.

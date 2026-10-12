@@ -1,5 +1,5 @@
 /**
- * DOCUMENT SETUP - the editor-run entry points of the template-document work (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, sections 9 and 11).
+ * DOCUMENT SETUP - the editor-run entry points of the template-document work (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, sections 9 and 11).
  *   setupDocumentStorage  creates the document sheets built so far (each phase adds its own). It installs no trigger.
  *   setupDocumentTriggers installs the daily triggers built so far, once each: the template scan and the team-file scan.
  * Both start with requireTriggerOrOperator_(); neither changes or deletes data.

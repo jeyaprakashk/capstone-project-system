@@ -1,4 +1,4 @@
-// Process B of TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md: the daily team-file scan and the TeamFileStatus sheet.
+// Process B of archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md: the daily team-file scan and the TeamFileStatus sheet.
 // GitHub is faked per repository (default branch, files, and the commits of each path); the sheets are the in-memory fakes of the weekly fixture.
 const {test} = require('node:test');
 const assert = require('node:assert/strict');

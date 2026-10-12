@@ -177,7 +177,7 @@ Capability = { allowed, reason, activity ('title.submit'|'title.resubmit'|null),
 
 ### DocumentsDto
 
-Returned by `API_documents_get`. One entry per listed template document (active, in the team template, no name conflict; TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md). Dates are ISO strings. The statuses and error codes are the project's own: a document is `NOT_SUBMITTED`, `NEEDS_REVIEW`, `APPROVED`, `RETURNED`, `REOPENED` or `UNAVAILABLE` (its journal failed validation: `can` is null and only that document is affected). `REJECTED` is an error code, never a status.
+Returned by `API_documents_get`. One entry per listed template document (active, in the team template, no name conflict; archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md). Dates are ISO strings. The statuses and error codes are the project's own: a document is `NOT_SUBMITTED`, `NEEDS_REVIEW`, `APPROVED`, `RETURNED`, `REOPENED` or `UNAVAILABLE` (its journal failed validation: `can` is null and only that document is affected). `REJECTED` is an error code, never a status.
 
 ```
 { teamId, scannedAt /* the latest team scan time, '' if none */,

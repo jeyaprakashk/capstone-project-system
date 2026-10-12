@@ -1,5 +1,5 @@
 /**
- * TEAM FILES - process B of TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md (section 5): a daily scan that records, for every team and every
+ * TEAM FILES - process B of archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md (section 5): a daily scan that records, for every team and every
  * listed template document, whether a team member has changed the file in the team's repository. The student screen reads this
  * record; Submit checks GitHub again at the moment of the click.
  *

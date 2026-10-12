@@ -71,7 +71,7 @@ function getTeamRepoName_(teamId, semester) {
 }
 
 /**
- * Creates a team repository from the template repository (REPO-FROM-TEMPLATE-PLAN.md): GitHub copies the template's default branch as the
+ * Creates a team repository from the template repository (archive/plans/REPO-FROM-TEMPLATE-PLAN.md): GitHub copies the template's default branch as the
  * first commit. Returns the GitHub response. A template that is missing, not marked as a template or not readable is reported in plain
  * words and nothing is created. The caller holds the script lock and has checked that the repository does not exist.
  */

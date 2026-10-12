@@ -15,6 +15,8 @@ under "The plan as it was written".
 | [ACTIVITY-DEPENDENCIES-SHEET-PLAN.md](plans/ACTIVITY-DEPENDENCIES-SHEET-PLAN.md) | Built: the `ActivityDependencies` sheet. It has no rows, so no requirement is enforced. |
 | [ACTIVITY-DEPENDENCIES-PLAN.md](plans/ACTIVITY-DEPENDENCIES-PLAN.md) | Built: the engine, the `github` and `drive` checks and `API_coordinator_getRequirements`. |
 | [SHEET-HEADER-MATCHING-PLAN.md](plans/SHEET-HEADER-MATCHING-PLAN.md) | Built: every sheet is read and written by header name; AGENTS.md no longer freezes column order. |
+| [TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md](plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md) | Built: students submit template documents, guides approve or return them, the coordinator reopens, and the `document` requirement kind exists. |
+| [REPO-FROM-TEMPLATE-PLAN.md](plans/REPO-FROM-TEMPLATE-PLAN.md) | Built: new team repositories are generated from the template repository; the bundled template was deleted. |
 | [OWNER-CHECKLIST.md](plans/OWNER-CHECKLIST.md) | Completed: every owner step, A to D, is done (owner confirmed 2026-10-12). Section E (rules to keep) is still how the system is run. |
 | [FORM-SHEET-RETIREMENT-PLAN.md](plans/FORM-SHEET-RETIREMENT-PLAN.md) | Executed: the Form sheets are gone from the code; the owner's backup replaced the archive steps. |
 

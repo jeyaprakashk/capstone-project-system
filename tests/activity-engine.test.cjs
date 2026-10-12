@@ -351,7 +351,7 @@ test('with no rows for an activity a title can be submitted whatever GitHub or D
   assert.equal(env.reads.github, 0, 'GitHub is not even asked when nothing requires it');
 });
 
-// ---- the document check (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, Phase 5) ------------------------------------------------------
+// ---- the document check (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, Phase 5) ------------------------------------------------------
 
 const DOC_ROW = ['title.submit', 'document', 'doc-0001', 'Work Breakdown approved', 'Yes'];
 const listed = (overrides = {}) => ({record: Object.assign({documentId: 'doc-0001', folder: '1_Documents', fileName: WORK, active: 'Yes', inTeamTemplate: 'Yes', nameConflict: 'No'}, overrides)});

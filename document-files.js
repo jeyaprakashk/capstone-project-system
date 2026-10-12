@@ -1,5 +1,5 @@
 /**
- * DOCUMENT FILES - what is checked in a file before it is copied to Drive (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, section 7). Pure apart
+ * DOCUMENT FILES - what is checked in a file before it is copied to Drive (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, section 7). Pure apart
  * from Utilities.unzip. Every problem is a plain sentence for the student; the file is never changed.
  */
 const DOCUMENT_MAX_BYTES_ = 10 * 1024 * 1024;

@@ -1,6 +1,6 @@
 /**
  * DOCUMENT SHEETS - shared reading and appending for the three template-document sheets (TemplateFiles, TeamFileStatus,
- * DocumentSubmissions). Specified in TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, section 3. Every column is found by header name, so column
+ * DocumentSubmissions). Specified in archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, section 3. Every column is found by header name, so column
  * order and extra columns do not matter; a missing or repeated required header throws. The sheets are created only by the editor-run
  * setupDocumentStorage (ensureSheet_); nothing here creates or repairs a header.
  */

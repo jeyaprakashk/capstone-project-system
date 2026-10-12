@@ -1,5 +1,5 @@
 /**
- * ACTIVITY CHECK: document (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, decision 9 and Phase 5). The item is a Document ID of the scanned template
+ * ACTIVITY CHECK: document (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, decision 9 and Phase 5). The item is a Document ID of the scanned template
  * list. It is met when the team's document is approved (APPROVED, REOPENED, or a hand-placed file with no journal row) and exactly one live
  * file of that name stands in the team folder. It fails closed: a TemplateFiles sheet, a journal or a Drive folder that cannot be read is
  * "Could not verify", an outstanding Drive write that is not yet in the journal is unmet until it is settled, and an item that is not a

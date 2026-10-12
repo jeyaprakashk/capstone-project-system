@@ -1,5 +1,5 @@
 /**
- * DOCUMENT SERVICE - the rules of the template-document submission (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, sections 6 to 9 and 14). Pure:
+ * DOCUMENT SERVICE - the rules of the template-document submission (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, sections 6 to 9 and 14). Pure:
  * no sheet, GitHub or Drive. It decides the status of a document from its journal rows, who may do what, how an input is normalized,
  * what the fingerprint of a request is, and the next journal row. documentWrite_ (document-write.js) owns the order of the checks, the
  * lock and the append; the endpoints (document-api.js) say who the caller is.
