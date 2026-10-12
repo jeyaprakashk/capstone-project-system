@@ -8,6 +8,7 @@
 function studentResultsViewBrowser_(bridge, getUi) {
   'use strict';
   const busy = new Set();
+  let eligibility = null;
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const mark = value => value === null || value === undefined || !Number.isFinite(Number(value)) ? 'Pending' : String(value);
   const BUTTON = 'border-0 rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint';
@@ -40,6 +41,16 @@ function studentResultsViewBrowser_(bridge, getUi) {
       '<span class="text-xs font-semibold text-success">' + (result.underCorrection ? 'Under correction' : 'Published') + '</span><span class="text-xs text-primary">View marks</span></summary><div class="mt-2">' + body + '</div></details>';
   }
 
+  /** The reviews the team is not eligible for, read once for every panel of a load (a failed read says none). */
+  function notEligible() {
+    if (!eligibility) eligibility = bridge.read('student-eligibility', 'API_student_getEligibility', [], {timeoutMs:60000}).then(function(data) { return data && Array.isArray(data.notEligible) ? data.notEligible : []; }, function() { return []; });
+    return eligibility;
+  }
+  function unpublished(label, flagged) {
+    return '<div class="flex items-center justify-between gap-2 text-sm"><strong class="text-ink">' + esc(label) + '</strong>' +
+      (flagged ? '<span class="font-semibold text-danger" data-not-eligible>Not Eligible</span>' : '<span class="text-muted">Not published</span>') + '</div>';
+  }
+
   /** Loads one panel; the host decides what "current" means, so a re-rendered dashboard ignores stale replies. */
   function load(spec) {
     const host = document.getElementById(spec.id);
@@ -49,10 +60,17 @@ function studentResultsViewBrowser_(bridge, getUi) {
     const finish = getUi().beginContentLoading(host, 'Loading ' + label + ' results', {compact:true});
     const current = () => document.getElementById(spec.id) === host;
     bridge.read('student-result:' + spec.id, spec.method, spec.args, {timeoutMs:60000}).then(function(result) {
+      if (!result && spec.eligibilityKey) {
+        // Nothing published: say Not Eligible when the team is not eligible for this review, else Not published.
+        notEligible().then(function(keys) {
+          finish(); busy.delete(spec.id);
+          if (current()) host.innerHTML = unpublished(label, keys.indexOf(spec.eligibilityKey) >= 0);
+        });
+        return;
+      }
       finish(); busy.delete(spec.id);
       if (!current()) return;
-      if (!result) { host.innerHTML = '<div class="flex items-center justify-between gap-2 text-sm"><strong class="text-ink">' + esc(label) + '</strong><span class="text-muted">Not published</span></div>'; return; }
-      host.innerHTML = summary(result, spec.render(result));
+      host.innerHTML = result ? summary(result, spec.render(result)) : unpublished(label, false);
     }, function(error) {
       finish(); busy.delete(spec.id);
       if (!current() || (error && error.superseded)) return;
@@ -68,15 +86,15 @@ function studentResultsViewBrowser_(bridge, getUi) {
     });
   }
 
-  const reviewSpec = key => ({id:'studentAssessment-' + key, method:'API_student_getReviewResult', args:[key], render:review,
+  const reviewSpec = key => ({id:'studentAssessment-' + key, method:'API_student_getReviewResult', args:[key], render:review, eligibilityKey:key,
     label:host => host.dataset && host.dataset.assessmentLabel || key, failure:label => label + ' results unavailable.'});
   const guideSpec = {id:'studentGuideEvaluation', method:'API_student_getGuideResult', args:[], render:guide,
     label:host => host.dataset && host.dataset.assessmentLabel || 'Guide Evaluation', failure:() => 'Guide evaluation unavailable.'};
 
   return {
-    review:key => load(reviewSpec(key)),
+    review:key => { eligibility = null; load(reviewSpec(key)); },
     guide:() => load(guideSpec),
     /** Every placeholder the Student dashboard rendered. */
-    all:function() { document.querySelectorAll('[data-review-result]').forEach(host => load(reviewSpec(host.dataset.reviewResult))); load(guideSpec); }
+    all:function() { eligibility = null; document.querySelectorAll('[data-review-result]').forEach(host => load(reviewSpec(host.dataset.reviewResult))); load(guideSpec); }
   };
 }

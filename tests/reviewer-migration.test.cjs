@@ -153,3 +153,14 @@ test('the dashboard asks only for the cheap rows; the per-team endpoint asks for
   assert.equal(JSON.parse(nobody.c.API_reviewer_getTeamRequirements('T2')).error.code, 'UNAUTHORIZED');
   assert.equal(JSON.parse(serverFixture('').c.API_reviewer_getTeamRequirements('T2')).error.code, 'UNAUTHENTICATED');
 });
+
+test('a review that is open but not met shows only Not Eligible, and the other reasons keep their words', () => {
+  const { c, progress } = serverFixture();
+  const cell = () => JSON.parse(c.API_reviewer_getDashboard()).data.teams.find(t => t.teamId === 'T2').reviews.find(r => r.key === 'review1');
+  progress.teams.t2.review1 = { available: true, readable: false, status: 'Not started', notEligible: true, reason: 'Step3: Not approved yet. Step4: Not approved yet.', markedStudents: 0, totalStudents: 1 };
+  assert.deepEqual({ enabled: cell().enabled, note: cell().note }, { enabled: false, note: 'Not Eligible' });
+  progress.teams.t2.review1 = { available: true, readable: false, status: 'Not started', notEligible: false, reason: 'Opens 2026-11-16', markedStudents: 0, totalStudents: 1 };
+  assert.equal(cell().note, 'Opens 2026-11-16');
+  progress.teams.t2.review1 = { available: false, error: 'Storage missing', notEligible: true };
+  assert.equal(cell().note, 'Storage missing', 'unavailable marks keep their own message');
+});

@@ -28,6 +28,9 @@ function activityChecks_() {
   return {github: activityCheckGithub_(), drive: activityCheckDrive_(), document: activityCheckDocument_(), title: activityCheckTitle_()};
 }
 
+/** What a check costs to run (the title log is read once, Drive and GitHub are not): the order a `hint` context runs the rows in. */
+const ACTIVITY_KIND_COST_ = Object.freeze({title: 0, document: 1, drive: 2, github: 3});
+
 /** A request's context: the loaded rules and the GitHub and Drive answers, kept for this request only. `ctx.kinds`, when set, limits the
  * rows evaluated to those kinds (a dashboard's cheap first pass); the other rows are skipped, not met. */
 function activityContext_() {
@@ -93,7 +96,9 @@ function loadActivityRules_(ctx) {
 
 /**
  * {allowed, requirements: [{label, met, reason, diagnostic?}], reason}. Every active row is run; nothing stops at the first failure.
- * `team` = {teamId, semester}.
+ * `team` = {teamId, semester}. A context with `hint` set is for a yes-or-no label, not for a gate: the rows run from the cheapest kind to the dearest
+ * and stop at the first one that is definitely unmet, and the document check answers from its journal when it has a row. The result then lists
+ * only the rows that ran; `allowed` and the unmet rows it does list are still true.
  */
 function activityPreconditions_(activityId, team, ctx) {
   const loaded = loadActivityRules_(ctx);
@@ -101,15 +106,18 @@ function activityPreconditions_(activityId, team, ctx) {
   const rows = (loaded.rules[activityId] || []).filter(rule => !ctx.kinds || ctx.kinds.includes(rule.kind));
   if (!rows.length) return {allowed: true, requirements: [], reason: ''};
   const checks = activityChecks_();
-  const requirements = rows.map(rule => {
+  const ordered = ctx.hint ? rows.map((rule, at) => ({rule, at})).sort((a, b) => (ACTIVITY_KIND_COST_[a.rule.kind] - ACTIVITY_KIND_COST_[b.rule.kind]) || (a.at - b.at)).map(entry => entry.rule) : rows;
+  const requirements = [];
+  for (const rule of ordered) {
     let answer;
     try { answer = checks[rule.kind].isMet(team, rule.item, ctx); }
     catch (error) { console.error('Requirement check failed (' + rule.kind + '/' + rule.item + '): ' + (error && error.message || error)); answer = {met: false, unverifiable: true}; }
     const item = {label: rule.label, met: answer.met === true, reason: ''};
     if (!item.met) item.reason = answer.unverifiable ? 'Could not verify: ' + rule.label + '.' : String(answer.reason || 'Not met.');
     if (answer.diagnostic) item.diagnostic = answer.diagnostic;
-    return item;
-  });
+    requirements.push(item);
+    if (ctx.hint && !item.met && !answer.unverifiable) break;
+  }
   const unmet = requirements.filter(item => !item.met);
   return {allowed: unmet.length === 0, requirements, reason: unmet.length ? unmet.map(item => item.label + ': ' + item.reason).join(' ') : ''};
 }

@@ -599,3 +599,81 @@ test('a context that lists kinds evaluates only those rows; the others are skipp
   assert.deepEqual(run(['document']), {allowed: true, requirements: [], reason: ''}, 'no row of that kind means nothing to meet');
   assert.deepEqual(run([]).requirements, []);
 });
+
+// ---- a hint context: a yes-or-no label, cheapest rows first, stop at the first unmet, documents from the journal ----------------------------------
+
+function hintRun(spec = {}) {
+  const env = setup({rows: spec.rows || [DOC_ROW], drive: spec.drive || {teams: {T1: {files: [{name: WORK}]}}}, github: spec.github, title: spec.title, definitions: REVIEW_DEFINITIONS, commits: spec.commits});
+  const c = env.c, journal = spec.journal || [];
+  c.readTemplateFiles_ = () => ({records: [listed()]});
+  c.readDocumentJournal_ = () => ({rows: journal, rowsFor: (teamId, documentId) => journal.filter(row => row.teamId === teamId && row.documentId === documentId)});
+  const drive = {folders: 0, files: 0};
+  const folders = env.drive.documents[0];
+  const lookup = folders.getFoldersByName.bind(folders);
+  folders.getFoldersByName = name => { drive.folders++; return lookup(name); };
+  (env.drive.folderOf.T1 || []).forEach(folder => {
+    const byName = folder.getFilesByName.bind(folder);
+    folder.getFilesByName = name => { drive.files++; return byName(name); };
+    folder.files.forEach(file => { file.getDescription = () => ''; });
+  });
+  const ctx = c.activityContext_();
+  if (spec.hint !== false) ctx.hint = true;
+  const activity = spec.activity || 'title.submit';
+  return {result: plain(c.activityPreconditions_(activity, TEAM, ctx)), drive, env};
+}
+
+test('hint: a document with a journal row is answered from the journal, with no Drive read', () => {
+  const approved = hintRun({journal: [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE')]});
+  assert.equal(approved.result.allowed, true);
+  assert.deepEqual(approved.drive, {folders: 0, files: 0});
+  const reopened = hintRun({journal: [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE'), journalRow(3, 'REOPEN')]});
+  assert.equal(reopened.result.allowed, true);
+  const waiting = hintRun({journal: [journalRow(1, 'SUBMIT')]});
+  assert.equal(waiting.result.requirements[0].reason, 'Waiting for the guide to approve it.');
+  const returned = hintRun({journal: [journalRow(1, 'SUBMIT'), journalRow(2, 'RETURN')]});
+  assert.equal(returned.result.requirements[0].reason, 'Returned by the guide. Submit it again.');
+  assert.deepEqual(waiting.drive, {folders: 0, files: 0});
+  assert.deepEqual(returned.drive, {folders: 0, files: 0});
+});
+
+test('hint: a document with no row still asks Drive, so a hand-placed file counts; an invalid journal falls through to the strict answer', () => {
+  const placed = hintRun({journal: []});
+  assert.equal(placed.result.allowed, true, 'a hand-placed file with no row is approved');
+  assert(placed.drive.folders > 0 && placed.drive.files > 0, 'Drive was asked');
+  const none = hintRun({journal: [], drive: {teams: {T1: {files: []}}}});
+  assert.equal(none.result.requirements[0].reason, 'Not approved yet.');
+  assert.equal(none.result.allowed, false);
+  const broken = hintRun({journal: [journalRow(1, 'APPROVE')]});
+  assert.equal(broken.result.requirements[0].diagnostic, 'DOCUMENT_JOURNAL_INVALID', 'a journal that cannot be read in order is not trusted');
+});
+
+test('hint: the strict gate is unchanged: an approved row still needs its one file in the folder', () => {
+  const approvedRows = [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE')];
+  const strict = hintRun({hint: false, journal: approvedRows, drive: {teams: {T1: {files: []}}}});
+  assert.equal(strict.result.requirements[0].reason, 'The approved file is missing from the team folder.');
+  const hint = hintRun({journal: approvedRows, drive: {teams: {T1: {files: []}}}});
+  assert.equal(hint.result.allowed, true, 'the hint trusts the journal');
+});
+
+test('hint: rows run cheapest first and stop at the first one definitely unmet', () => {
+  const rows = [['review1', 'github', 'COMMITS', 'Commits', 'Yes'], ['review1', 'document', 'doc-0001', 'Doc', 'Yes'], ['review1', 'title', 'approved', 'Title', 'Yes']];
+  const stops = hintRun({rows, activity: 'review1', title: 'unapproved'});
+  assert.deepEqual(stops.result.requirements.map(item => item.label), ['Title'], 'the title is cheapest and unmet, so nothing else ran');
+  assert.equal(stops.env.reads.github, 0, 'GitHub was not asked');
+  assert.deepEqual(stops.drive, {folders: 0, files: 0}, 'Drive was not asked');
+  const next = hintRun({rows, activity: 'review1', title: 'approved', journal: [journalRow(1, 'SUBMIT')]});
+  assert.deepEqual(next.result.requirements.map(item => item.label), ['Title', 'Doc'], 'order is title, then documents, then GitHub');
+  assert.equal(next.env.reads.github, 0);
+  assert.equal(next.result.allowed, false);
+  const all = hintRun({rows, activity: 'review1', title: 'approved', journal: [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE')], commits: [commitBy('101'), commitBy('102')]});
+  assert.deepEqual(all.result.requirements.map(item => item.label), ['Title', 'Doc', 'Commits']);
+  assert.equal(all.result.allowed, true);
+});
+
+test('hint: a row that could not be verified does not stop the run, and without the hint every row runs in sheet order', () => {
+  const rows = [['review1', 'document', 'doc-0001', 'Doc', 'Yes'], ['review1', 'title', 'approved', 'Title', 'Yes']];
+  const unverifiable = hintRun({rows, activity: 'review1', title: 'throws', journal: [journalRow(1, 'SUBMIT')]});
+  assert.deepEqual(unverifiable.result.requirements.map(item => item.label), ['Title', 'Doc'], 'an unreadable title is not a definite failure, so the next row ran');
+  const strict = hintRun({rows, activity: 'review1', hint: false, title: 'unapproved', journal: [journalRow(1, 'SUBMIT')]});
+  assert.deepEqual(strict.result.requirements.map(item => item.label), ['Doc', 'Title'], 'the gate runs every row, in the sheet\'s order');
+});

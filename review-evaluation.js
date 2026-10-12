@@ -274,6 +274,44 @@ function reviewProgress_(row, columns, records, config, definition, loaded) {
   try { eligibility=reviewEligibility_(row,columns,needsRows && ctx ? {key:config.key,ctx} : undefined); }
   catch(error) { eligibility={eligible:false,reason:'The review requirements could not be checked. Contact the coordinator.'}; }
   const availability=reviewAvailability_({eligibility:{...eligibility,...(sequenceReason?{reason:sequenceReason}:{})}},config,latest);
-  return {completed,recorded,sequenceReason,markedStudents,totalStudents,available:true,status:latest?latest.status:'Not started',...availability};
+  // `notEligible`: the entry could be opened (it is open, not yet submitted) but a condition is not met. The dashboards say only that.
+  const notEligible=needsRows && (!eligibility.eligible || !!sequenceReason);
+  return {completed,recorded,sequenceReason,notEligible,markedStudents,totalStudents,available:true,status:latest?latest.status:'Not started',...availability};
+}
+
+/**
+ * Whether a student's team is not eligible for a review that is open and not yet entered: an earlier assessment is not recorded, or a row of
+ * ActivityDependencies is definitely unmet. What cannot be told (a misconfigured sheet, a source that could not be read) is not "not eligible".
+ * It labels an unpublished review on the student's dashboard and says nothing more than that. The definitions are parsed once, and the rows
+ * run as a hint: cheapest first, stopping at the first one that is unmet. `ctx` is the hint context a caller shares between reviews.
+ */
+function reviewTeamNotEligible_(key,teamId,semester,ctx) {
+  try { return withAssessmentDefinitions_(()=>reviewTeamNotEligibleRead_(key,teamId,semester,ctx)); }
+  catch(error) {
+    console.error('Review eligibility could not be told for team '+teamId+': '+(error && error.message || error));
+    return false;
+  }
+}
+/** The keys of every review the team is not eligible for, from one set of reads: the definitions, the rows, the documents and the Drive folder are each read once. */
+function reviewsTeamNotEligible_(teamId,semester) {
+  try {
+    return withAssessmentDefinitions_(()=>{
+      const ctx=activityContext_();ctx.hint=true;
+      return getAssessmentDefinitions_().filter(d=>d.type==='REVIEW' && reviewTeamNotEligible_(d.key,teamId,semester,ctx)).map(d=>d.key);
+    });
+  } catch(error) {
+    console.error('Review eligibility could not be told for team '+teamId+': '+(error && error.message || error));
+    return [];
+  }
+}
+function reviewTeamNotEligibleRead_(key,teamId,semester,shared) {
+  const definition=assessmentDefinition_(key);
+  if(definition.type!=='REVIEW' || projectDay_(new Date(),getSpreadsheet_().getSpreadsheetTimeZone())<definition.opens)return false;
+  const latest=reviewLatest_(reviewRecords_(key).records,teamId);
+  if(latest && latest.status!=='Draft')return false;
+  if(assessmentSequenceBlock_(definition,teamId))return true;
+  const ctx=shared || Object.assign(activityContext_(),{hint:true});
+  const gate=activityPreconditions_(key,{teamId:String(teamId).trim(),semester},ctx);
+  return gate.requirements.some(item=>!item.met && !/^Could not verify/.test(item.reason));
 }
 function loadPublishedReviewEvaluation_(key) {return loadPublishedAssessment_(key);}

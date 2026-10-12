@@ -1494,3 +1494,59 @@ test('a bulk run with the gate still keeps a refused team from being readable, a
  assert.equal(none.readable,true,'no gate asked, no rows read');
  const direct=gated(f,()=>MET);f.progress();assert.equal(direct[0].ctx.kinds,undefined);
 });
+
+test('progress marks a review notEligible only while it could be entered and a condition is not met',()=>{
+ const f=fixture();gated(f,()=>UNMET);
+ assert.equal(f.progress().notEligible,true);
+ gated(f,()=>MET);assert.equal(f.progress().notEligible,false);
+ f.today(19990);gated(f,()=>UNMET);
+ const closed=f.progress();assert.equal(closed.notEligible,false,'not open yet: its opening date is the reason');assert.match(closed.reason,/^Opens /);
+ f.today(20030);gated(f,()=>MET);
+ const second=f.c.reviewProgress_(f.row,f.TS,f.c.reviewRecords_('review2').records,f.c.reviewConfiguration_('review2'));
+ assert.match(second.sequenceReason,/Submit Review 1/);assert.equal(second.notEligible,true,'an earlier assessment not recorded is a condition not met');
+ f.today(20000);gated(f,()=>MET);f.c.submitReviewEvaluation_({...f.input(),assessmentId:'review1'});
+ gated(f,()=>UNMET);assert.equal(f.progress().notEligible,false,'a submitted review is not re-judged');
+});
+
+test('a student\'s team is not eligible for an open, unentered review when an earlier one is unrecorded or a requirement is definitely unmet',()=>{
+ const f=fixture(),run=(key='review1')=>f.c.reviewTeamNotEligible_(key,'T1','Odd');
+ gated(f,()=>MET);assert.equal(run(),false);
+ gated(f,()=>UNMET);assert.equal(run(),true);
+ gated(f,()=>({allowed:false,requirements:[{label:'Docs',met:false,reason:'Could not verify: Docs.'}],reason:'Docs: Could not verify: Docs.'}));
+ assert.equal(run(),false,'a source that could not be read is not a failure');
+ gated(f,()=>({allowed:false,requirements:[],reason:'Submission requirements are misconfigured. Contact the coordinator.'}));
+ assert.equal(run(),false,'a misconfigured sheet says nothing');
+ f.today(19990);gated(f,()=>UNMET);assert.equal(run(),false,'not open yet');
+ f.today(20030);gated(f,()=>MET);assert.equal(run('review2'),true,'Review 1 is not recorded');
+ f.today(20000);f.c.submitReviewEvaluation_({...f.input(),assessmentId:'review1'});
+ f.today(20030);assert.equal(run('review2'),false,'Review 1 is recorded');
+ gated(f,()=>UNMET);assert.equal(run('review1'),false,'a submitted review is not re-judged');
+ assert.equal(run('nothing'),false,'an unknown review says nothing');
+});
+
+test('the eligibility label for a student asks the engine for a hint, with a fresh context each time and no row evaluated twice',()=>{
+ const f=fixture(),asked=gated(f,()=>UNMET);
+ assert.equal(f.c.reviewTeamNotEligible_('review1','T1','Odd'),true);
+ assert.equal(asked.length,1);assert.equal(asked[0].ctx.hint,true,'a hint, never a gate');
+ assert.equal(f.c.reviewTeamNotEligible_('review1','T1','Odd'),true);
+ assert.notEqual(asked[1].ctx,asked[0].ctx,'nothing is kept between requests');
+ gated(f,()=>MET);f.c.submitReviewEvaluation_({...f.input(),assessmentId:'review1'});
+ const locked=gated(f,()=>UNMET);assert.equal(f.c.reviewTeamNotEligible_('review1','T1','Odd'),false);
+ assert.equal(locked.length,0,'a submitted review never reaches the rows');
+});
+
+test('every review of a team is judged from one set of reads: one hint context, only reviews that are open and not yet entered',()=>{
+ const f=fixture(),asked=gated(f,()=>UNMET);let made=0;const make=f.c.activityContext_;f.c.activityContext_=()=>{made++;return make();};
+ f.today(20030);
+ assert.deepEqual(Array.from(f.c.reviewsTeamNotEligible_('T1','Odd')).sort(),['review1','review2'],'both are open and not met');
+ assert.equal(made,1,'one context for every review');
+ assert.equal(asked.length,1,'Review 2 is judged on its sequence alone: Review 1 is not recorded, so its rows are never read');
+ assert.equal(asked[0].ctx.hint,true);
+ gated(f,()=>MET);f.c.submitReviewEvaluation_({...f.input(),assessmentId:'review1'});
+ const second=gated(f,()=>UNMET);
+ assert.deepEqual(Array.from(f.c.reviewsTeamNotEligible_('T1','Odd')),['review2'],'a submitted review is not re-judged');
+ assert.deepEqual(second.map(a=>a.id),['review2']);
+ f.today(19990);assert.deepEqual(Array.from(f.c.reviewsTeamNotEligible_('T1','Odd')),[],'nothing is open yet');
+ f.c.getAssessmentDefinitions_=()=>{throw new Error('Definitions unreadable.');};
+ assert.deepEqual(Array.from(f.c.reviewsTeamNotEligible_('T1','Odd')),[],'what cannot be told says nothing');
+});

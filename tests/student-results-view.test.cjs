@@ -55,6 +55,8 @@ test('an unpublished result says so, using the configured label', () => {
   const p = panel(REVIEW + GUIDE);
   p.api.all(); assert.deepEqual(p.calls.map(c => c.method), ['API_student_getReviewResult', 'API_student_getGuideResult']);
   p.calls.forEach(c => c.ok(null));
+  assert.equal(p.calls[2].method, 'API_student_getEligibility', 'an unpublished review asks whether the team is eligible');
+  p.calls[2].ok({ notEligible: [] });
   assert.match(p.document.getElementById('studentAssessment-review1').textContent, /Review 1.*Not published/);
   assert.match(p.document.getElementById('studentGuideEvaluation').textContent, /Guide Evaluation.*Not published/);
 });
@@ -90,4 +92,36 @@ test('failures name the panel and the markup uses only compiled Tailwind utiliti
   const src = fs.readFileSync('student-results-view.js', 'utf8');
   assert.deepEqual(missingClasses([...src.matchAll(/(?:BUTTON) = '([^']+)'/g)].flatMap(m => m[1].split(/\s+/))), []);
   assert.equal(p.calls[0].options.timeoutMs, 60000);
+});
+
+
+test('an unpublished review says Not Eligible in danger when the team is not eligible, and Not published otherwise', () => {
+  const p = panel(REVIEW), host = p.document.querySelector('section');
+  p.api.review('review1'); p.calls[0].ok(null); p.calls[1].ok({ notEligible: [] });
+  assert.match(host.textContent, /Not published/); assert.equal(host.querySelector('[data-not-eligible]'), null);
+  p.api.review('review1'); p.calls[2].ok(null); p.calls[3].ok({ notEligible: ['review1'] });
+  const mark = host.querySelector('[data-not-eligible]');
+  assert.equal(mark.textContent, 'Not Eligible'); assert.match(mark.className, /\btext-danger\b/);
+  assert.doesNotMatch(host.textContent, /Not published/); assert.equal(host.querySelector('details'), null, 'no marks panel for an unpublished review');
+  assert.equal(p.counts()[0], p.counts()[1], 'loading settles on every path');
+});
+
+test('every review panel of a load shares one eligibility read, and a published or failed read never blocks the panel', () => {
+  const two = REVIEW + '<section id="studentAssessment-review2" data-review-result="review2" data-assessment-label="Review 2"></section>';
+  const p = panel(two);
+  p.api.all();
+  assert.deepEqual(p.calls.map(c => c.method), ['API_student_getReviewResult', 'API_student_getReviewResult']);
+  p.calls[0].ok(null); p.calls[1].ok(null);
+  assert.equal(p.calls.filter(c => c.method === 'API_student_getEligibility').length, 1, 'one read for both panels');
+  p.calls[2].ok({ notEligible: ['review2'] });
+  assert.doesNotMatch(p.document.getElementById('studentAssessment-review1').textContent, /Not Eligible/);
+  assert.match(p.document.getElementById('studentAssessment-review2').textContent, /Review 2.*Not Eligible/);
+  assert.equal(p.counts()[0], p.counts()[1]);
+  const failed = panel(REVIEW);
+  failed.api.all(); failed.calls[0].ok(null); failed.calls[1].fail({ message: 'Offline' });
+  assert.match(failed.document.getElementById('studentAssessment-review1').textContent, /Not published/, 'a failed eligibility read says nothing alarming');
+  assert.equal(failed.counts()[0], failed.counts()[1]);
+  const published = panel(REVIEW);
+  published.api.all(); published.calls[0].ok({ config: { label: 'Review 1', criteria: [], maximum: 100, weight: .2 }, scores: {}, total: 0, weighted: 0, assessment: {} });
+  assert.equal(published.calls.length, 1, 'a published review asks nothing more');
 });

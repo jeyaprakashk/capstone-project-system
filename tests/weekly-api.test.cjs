@@ -111,3 +111,16 @@ test('the weekly read takes the team row and repository URL from the one TeamSta
   assert.deepEqual(again, baseline);
   assert.deepEqual(counts, { repoLookups: 0, teamReads: 0 });
 });
+
+
+test('the eligibility endpoint asks once for the student\'s own team and returns only the review keys', () => {
+  const f = setup(); f.user('one@example.com');
+  const asked = [];
+  f.c.reviewsTeamNotEligible_ = (teamId, semester) => { asked.push([teamId, semester]); return ['review2']; };
+  assert.deepEqual(JSON.parse(JSON.stringify(JSON.parse(f.c.API_student_getEligibility()).data)), { notEligible: ['review2'] });
+  assert.equal(asked.length, 1);
+  assert.ok(asked[0][0], 'the student\'s own team');
+  f.user('outsider@example.com');
+  assert.equal(JSON.parse(f.c.API_student_getEligibility()).error.code, 'NOT_FOUND');
+  assert.equal(asked.length, 1, 'an outsider is refused before anything is read');
+});

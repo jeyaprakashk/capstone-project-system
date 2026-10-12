@@ -17,7 +17,8 @@ function reviewerReviewCellDto_(row, TS, review, progress) {
   const state = (progress.teams[normalizeReviewKey_(row[TS.TEAM_ID])] || {})[review.key];
   const available = !!(state && state.available);
   const enabled = available && !!state.readable && !state.sequenceReason;
-  const hint = !available ? ((state && state.error) || 'Marks unavailable.') : (state.reason || state.status);
+  // A condition that is not met (a requirement row, an earlier assessment) is only said to be unmet: the details are on the coordinator's report.
+  const hint = !available ? ((state && state.error) || 'Marks unavailable.') : state.notEligible ? 'Not Eligible' : (state.reason || state.status);
   const completed = !!(state && state.completed);
   return {
     key:review.key,

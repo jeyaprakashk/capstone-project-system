@@ -79,7 +79,7 @@ function studentAccessOrThrow_() {
   const row = getSheetRows_(SHEET_NAMES.TEAM_STATUS).find(r => r[TS.TEAM_ID] &&
     [r[TS.S1_EMAIL], r[TS.S2_EMAIL], r[TS.S3_EMAIL], r[TS.S4_EMAIL]].some(e => emailsMatch_(e, email)));
   if (!row) throw apiFail_('NOT_FOUND', 'Student team was not found.');
-  return {email, teamId:row[TS.TEAM_ID], row};
+  return {email, teamId:row[TS.TEAM_ID], semester:row[TS.SEMESTER], row};
 }
 
 /** Fast first load: sheet data only. Weeks and Assessments render from this without waiting for GitHub checks. */
@@ -112,6 +112,17 @@ function API_student_submitWeekly(input) {
 /** Published results shown on the Student dashboard; the server decides what the student may see. */
 function API_student_getReviewResult(key) {
   return apiHandle_(() => loadPublishedReviewEvaluation_(String(key || '')));
+}
+
+/**
+ * The reviews the student's team is not eligible for (open, not yet entered, and a condition is not met), in one read for every review so the
+ * Drive folder, the documents and the rules are read once. It is a label for an unpublished review and says nothing more than that.
+ */
+function API_student_getEligibility() {
+  return apiHandle_(() => {
+    const student = studentAccessOrThrow_();
+    return {notEligible: reviewsTeamNotEligible_(student.teamId, student.semester)};
+  });
 }
 
 function API_student_getGuideResult() {
