@@ -34,6 +34,11 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_coordinator_validateTitleLog()` | Coordinator | none | `{ok, live, rows, rosterTeams, errors:[{kind, teamId, message}], information:[{kind, teamId, message}], truncated}`; `kind` is `NO_ROW`, `NOT_ON_ROSTER`, `INVALID_HISTORY` or `APPROVED_WITHOUT_DATE`; a roster team with no row is an error until `TITLE_CUTOVER` is `LIVE`, then information; each list holds at most 200 items and `truncated` says more existed. Read-only. Rejected with `UNAVAILABLE` when the TitleLog sheet is missing or its headers are wrong | new (title revision, Phase 1) |
 | `API_coordinator_getRequirements(teamId?)` | Coordinator | optional `teamId` | `{rules:{<activity>:[{kind,item,label}]}, errors:[string], teamId, activities}`; `activities` is `null` without a team, otherwise `{<activity>:{allowed, reason, requirements:[{label, met, reason, diagnostic?}]}}` for `title.submit` and `title.resubmit` (there is no document upload activity: documents are placed in the team folder outside the system). `diagnostic` appears here only (`GITHUB_ERROR`, `GITHUB_MEMBER_UNVERIFIED`, `GITHUB_REPOSITORY_UNVERIFIED`, `TEAM_DOCUMENTS_UNRESOLVED`, `FOLDER_AMBIGUOUS`); student DTOs go through `studentRequirements_`, which removes it. A team not on the roster is `NOT_FOUND`. Read-only | new (activity engine) |
 | `API_title_get(teamId?)` | Student (own team), Guide, Reviewer, Coordinator | optional `teamId`; a student always gets its own team | `TitleDto` (below). `UNAUTHORIZED` for a person with no role on the team (also for a team that does not exist, except to a coordinator, who gets `NOT_FOUND`); `UNAVAILABLE` when that team's history fails validation | new (title revision) |
+| `API_documents_get(teamId?)` | Student (own team), Guide, Reviewer, Coordinator | optional `teamId`; a student always gets its own team | `DocumentsDto` (below). `UNAUTHORIZED` for a person with no role on the team; `UNAVAILABLE` when the document sheets cannot be read | none |
+| `API_student_previewDocument(input)` | Student | `{documentId}` | `{documentId, fileName, commit:{sha, shortSha, date, author}, lastTeamChange}`; `author` is `{name\|null, login, outsideMember}`. Read live from GitHub; `REJECTED` when no team member has changed the file, `UNAVAILABLE` ("Could not verify") when GitHub cannot be read | none |
+| `API_student_submitDocument(input)` | Student | `{requestId, expectedRevision, documentId, expectedCommit}`; the team comes from the session | `{ok, revision, status, message}` | none |
+| `API_guide_decideDocument(input)` | Guide | `{requestId, expectedRevision, teamId, documentId, decision:'approve'\|'return', notes}`; `notes` are required for `return` | `{ok, revision, status, message}` | none |
+| `API_coordinator_reopenDocument(input)` | Coordinator | `{requestId, expectedRevision, teamId, documentId, reason}` | `{ok, revision, status, message}` | none |
 | `API_student_submitTitle(input)` | Student | `{requestId, expectedRevision, title, problem}`; the team comes from the session | `{ok, revision, status, message}` | the Team Intake Form |
 | `API_guide_decideTitle(input)` | Guide | `{requestId, expectedRevision, teamId, decision:'approve'|'return', notes, editedTitle?}`; `editedTitle` only with `approve`; `notes` required for `return` | `{ok, revision, status, message}` | the old guide decision endpoint (removed) |
 | `API_reviewer_decideTitle(input)` | Reviewer | `{requestId, expectedRevision, teamId, decision:'approve'|'return', notes}` | `{ok, revision, status, message}` | the old reviewer decision endpoint (removed) |
@@ -169,6 +174,24 @@ Capability = { allowed, reason, activity ('title.submit'|'title.resubmit'|null),
 ```
 
 `requirements` is filled only for a student on its own team, and only when the built-in rules would allow the action; it never carries a `diagnostic`. `documents` lists `{key, label, present, uploadedBy, uploadedAt}` for `work` and `need` (read from the team folder; there is no upload in this system, the files are placed there outside it); a student's own card does not carry `documents`.
+
+### DocumentsDto
+
+Returned by `API_documents_get`. One entry per listed template document (active, in the team template, no name conflict; TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md). Dates are ISO strings. The statuses and error codes are the project's own: a document is `NOT_SUBMITTED`, `NEEDS_REVIEW`, `APPROVED`, `RETURNED`, `REOPENED` or `UNAVAILABLE` (its journal failed validation: `can` is null and only that document is affected). `REJECTED` is an error code, never a status.
+
+```
+{ teamId, scannedAt /* the latest team scan time, '' if none */,
+  documents:[{ documentId, fileName, folder, extension,
+    status, state /* active|waiting|done, as for titles */, statusText, revision, existing /* a hand-placed file counts as APPROVED */,
+    teamChanged /* Yes|No|Unknown|'' (from the daily team scan) */, checkedAt, returnedNotes /* the guide's notes when RETURNED */,
+    link /* the Drive file, per the rules below; '' otherwise */,
+    submittedBy:{name, at, email?} | null,                 // email: guide and coordinator only
+    commit:{sha, shortSha, committedBy:{name|null, login, outsideMember}, lastTeamChange:{...}|null} | null,
+    history:[{revision, action, actor, at, notes}],         // guide and coordinator only
+    can:{ submit, approve, return, reopen } | null }] }     // each a Capability {allowed, reason, activity:null, requirements:[]}
+```
+
+Links: a student and the guide see the Drive file's link in every status; a reviewer and the coordinator only while the content is approved (`APPROVED`, `REOPENED` or existing). A student never receives a folder link, and sees names, never e-mail addresses. `submittedBy`, `commit` and the lines are shown to the student, guide and coordinator, and to a reviewer only for approved content. Contract tests: `tests/document-api.test.cjs`, `tests/document-service.test.cjs`.
 
 ### StudentCore and StudentProject
 

@@ -10,7 +10,8 @@ function setupDocumentStorage() {
   requireTriggerOrOperator_();
   return {
     templateFiles: ensureSheet_({...sheetSpec_('templateFiles'), mode: 'setup', onCreate: formatDocumentSheet_}),
-    teamFileStatus: ensureSheet_({...sheetSpec_('teamFileStatus'), mode: 'setup', onCreate: formatDocumentSheet_})
+    teamFileStatus: ensureSheet_({...sheetSpec_('teamFileStatus'), mode: 'setup', onCreate: formatDocumentSheet_}),
+    documentSubmissions: ensureSheet_({...sheetSpec_('documentSubmissions'), mode: 'setup', onCreate: formatDocumentSheet_})
   };
 }
 

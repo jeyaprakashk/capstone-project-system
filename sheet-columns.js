@@ -77,6 +77,7 @@ function sheetCatalog_() {
           {file: 'progress-eligibility.js', role: 'read', functions: ['reconcileProgressEligibility']},
           {file: 'weekly-activity.js', role: 'read', functions: ['weeklyStoredGithubMapping_']},
           {file: 'team-files.js', role: 'read', functions: ['teamLinkedGithubIds_']},
+          {file: 'document-github.js', role: 'read', functions: ['documentTeamPeople_']},
           {file: 'weekly-progress-phase2.js', role: 'read', functions: ['weeklyAIIdentifiers_']}
         ]
       },
@@ -267,6 +268,20 @@ function sheetCatalog_() {
           {file: 'document-setup.js', role: 'setup', functions: ['setupDocumentStorage']},
           {file: 'team-files.js', role: 'read', functions: ['readTeamFileStatus_']},
           {file: 'team-files.js', role: 'write', functions: ['writeTeamFileStatus_']}
+        ]
+      },
+      documentSubmissions: {
+        name: 'DocumentSubmissions',
+        access: 'view',
+        headers: ['Timestamp', 'Team ID', 'Document ID', 'File Name', 'Revision', 'Action', 'Actor', 'Request ID', 'Fingerprint', 'Commit SHA', 'Commit Author',
+          'Commit Author ID', 'Team Commit SHA', 'Team Commit Author', 'Team Commit Author ID', 'Blob SHA', 'Drive File ID', 'Notes'],
+        status: 'new',
+        purpose: 'Append-only history of document submissions and decisions (SUBMIT, APPROVE, RETURN, REOPEN); the latest row of a team and document is its status.',
+        createAtRuntime: false,
+        code: [
+          {file: 'document-setup.js', role: 'setup', functions: ['setupDocumentStorage']},
+          {file: 'document-journal.js', role: 'read', functions: ['readDocumentJournal_']},
+          {file: 'document-journal.js', role: 'write', functions: ['appendDocumentRow_']}
         ]
       }
     });

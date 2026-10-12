@@ -75,9 +75,8 @@ history (one row per change, the latest row of a team is its state). Specified i
 - **Students and Drive.** The team folders live in a shared drive that students are **not members of**. Each team's students are given
   viewer access to **their own team's folder only** (`createTeamFolders_` adds them; nothing else does). Nothing in a team folder may be
   hidden from them: what the app chooses to link cannot limit what a folder viewer sees in Drive. The app never shows a student a folder
-  link: no student DTO or student view carries `folderUrl`. Until the template-document submission ships (Phase 3 of
-  TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md) no student DTO carries any Drive link; after it, a student DTO may carry the link of an approved
-  document of the student's own team, and nothing else. Guides, reviewers and the coordinator get `folderUrl`.
+  link: no student DTO or student view carries `folderUrl`. The template-document submission (TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md) has shipped: the Documents DTO (`API_documents_get`) may carry the
+  link of a file of the student's own team, and nothing else; every other student DTO carries no Drive link. Guides, reviewers and the coordinator get `folderUrl`.
   `tests/student-title.test.cjs` and `tests/student-migration.test.cjs` fail if a student receives a link they may not have.
 - The browser sends title writes with a request ID from `TitleRequests` (`title-requests.js`) and the `revision` its DTO carried.
 - `TITLE_CUTOVER` is changed only by `setTitleCutover` and `clearTitleCutover`. The one-time import of the old title columns into

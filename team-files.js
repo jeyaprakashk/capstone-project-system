@@ -55,21 +55,32 @@ function teamRepositoryTree_(slug) {
 
 /**
  * Reads the commits that touched one path, newest first, page by page, and stops at the first of: a commit by a linked team member
- * (Yes); the end of the history (No); the page limit or a GitHub failure (Unknown). Returns {teamChanged, latestCommit, lastTeamCommit}.
+ * (Yes); the end of the history (No); the page limit or a GitHub failure (Unknown). Returns {teamChanged, latestCommit, lastTeamCommit,
+ * latestAuthor, teamAuthor, latestDate}; an author is {login, id} (blank when GitHub gives no user for the commit).
  */
+function teamFileAuthor_(commit) {
+  return {login: commit.author && commit.author.login ? String(commit.author.login) : '', id: commit.author ? githubId_(commit.author.id) : ''};
+}
+
+function teamFileDate_(commit) {
+  const date = commit.commit && commit.commit.author && commit.commit.author.date;
+  return date ? String(date) : '';
+}
+
 function teamFileHistory_(slug, branch, path, linkedIds) {
-  let latest = '';
+  let latest = '', latestAuthor = {login: '', id: ''}, latestDate = '';
+  const none = {login: '', id: ''};
   for (let page = 1; page <= TEAM_FILE_HISTORY_PAGES_; page++) {
     const response = makeGithubRequest_('GET', '/repos/' + slug + '/commits?sha=' + encodeURIComponent(branch) + '&path=' + encodeURIComponent(path) +
       '&per_page=' + TEAM_FILE_HISTORY_PAGE_SIZE_ + '&page=' + page);
-    if (response.status !== 200 || !Array.isArray(response.body)) return {teamChanged: 'Unknown', latestCommit: latest, lastTeamCommit: ''};
-    if (page === 1 && response.body.length) latest = String(response.body[0].sha);
+    if (response.status !== 200 || !Array.isArray(response.body)) return {teamChanged: 'Unknown', latestCommit: latest, lastTeamCommit: '', latestAuthor, teamAuthor: none, latestDate};
+    if (page === 1 && response.body.length) { latest = String(response.body[0].sha); latestAuthor = teamFileAuthor_(response.body[0]); latestDate = teamFileDate_(response.body[0]); }
     for (const commit of response.body) {
-      if (commit.author && linkedIds.has(githubId_(commit.author.id))) return {teamChanged: 'Yes', latestCommit: latest, lastTeamCommit: String(commit.sha)};
+      if (commit.author && linkedIds.has(githubId_(commit.author.id))) return {teamChanged: 'Yes', latestCommit: latest, lastTeamCommit: String(commit.sha), latestAuthor, teamAuthor: teamFileAuthor_(commit), latestDate};
     }
-    if (response.body.length < TEAM_FILE_HISTORY_PAGE_SIZE_) return {teamChanged: 'No', latestCommit: latest, lastTeamCommit: ''};
+    if (response.body.length < TEAM_FILE_HISTORY_PAGE_SIZE_) return {teamChanged: 'No', latestCommit: latest, lastTeamCommit: '', latestAuthor, teamAuthor: none, latestDate};
   }
-  return {teamChanged: 'Unknown', latestCommit: latest, lastTeamCommit: ''};
+  return {teamChanged: 'Unknown', latestCommit: latest, lastTeamCommit: '', latestAuthor, teamAuthor: none, latestDate};
 }
 
 /** The TeamFileStatus records of one team for every listed document. `tree` comes from teamRepositoryTree_. */
@@ -79,7 +90,8 @@ function teamFileRecords_(teamId, slug, documents, tree, baselines, linkedIds, n
     const sha = tree.blobs.get(document.path);
     if (!sha) return Object.assign(base, {repoBlobSha: '', teamChanged: 'No', lastTeamCommit: '', latestCommit: ''});
     if (sha === baselines.get(document.path) || !linkedIds.size) return Object.assign(base, {repoBlobSha: sha, teamChanged: 'No', lastTeamCommit: '', latestCommit: ''});
-    return Object.assign(base, {repoBlobSha: sha}, teamFileHistory_(slug, tree.branch, document.path, linkedIds));
+    const history = teamFileHistory_(slug, tree.branch, document.path, linkedIds);
+    return Object.assign(base, {repoBlobSha: sha, teamChanged: history.teamChanged, lastTeamCommit: history.lastTeamCommit, latestCommit: history.latestCommit});
   });
 }
 

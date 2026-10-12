@@ -50,6 +50,8 @@ const IDENTITY = /coordinatorRead_\(|guideActor_\(|getDashboardRoleViews_\(|auth
 const DELEGATED = {
   API_coordinator_getTeamDrawer: 'loadCoordinatorDrawerSection_',
   API_shared_getTimeline: 'loadSharedProjectTimeline_', API_shared_getRubrics: 'loadSharedRubrics_',
+  API_guide_decideDocument: ['titleTeamRowFor_', 'titleAuthorizer_'],
+  API_coordinator_reopenDocument: ['titleTeamRowFor_', 'titleAuthorizer_'],
   API_guide_decideTitle: ['titleTeamRowFor_', 'titleAuthorizer_'], API_reviewer_decideTitle: ['titleTeamRowFor_', 'titleAuthorizer_'],
   API_coordinator_reopenTitle: ['titleTeamRowFor_', 'titleAuthorizer_'], API_coordinator_cancelReopen: ['titleTeamRowFor_', 'titleAuthorizer_'],
   API_publishing_get: 'loadInternalAssessmentPublishing_', API_publishing_run: ['publishInternalAssessment_', 'reopenInternalAssessment_'],
