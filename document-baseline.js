@@ -9,16 +9,19 @@
  *   applyDocumentBaseline    appends the rows under the script lock; running it again adds nothing
  *
  * A document with no file, with several files of its name, or in a team without a folder gets no row. Both start with requireTriggerOrOperator_().
+ * apply stops between two documents once it has run for DOCUMENT_BASELINE_BUDGET_MS_ (an Apps Script run is cut off after six minutes) and says how many
+ * remain; run it again. A run that was cut off between the two rows of one document leaves only the baseline SUBMIT: the next run adds its APPROVE.
  */
 const DOCUMENT_BASELINE_IDS_ = Object.freeze(['doc-0004', 'doc-0005']);
 const DOCUMENT_BASELINE_ACTOR_ = 'baseline';
+const DOCUMENT_BASELINE_BUDGET_MS_ = 4 * 60 * 1000;
 const DOCUMENT_BASELINE_NOTE_ = 'Baseline: the file was already in the team folder before document submission started.';
 
 /**
  * Pure apart from the callbacks. input = {teams: [{teamId, semester}], documents: [{documentId, fileName}], inScope: [documentId],
  * rowsFor(teamId, documentId) -> journal rows, folderFor(team) -> folder or null, filesFor(folder, fileName) -> files, fileId(file) -> ID}.
- * Returns [{teamId, documentId, fileName, outcome, fileId?}]. outcome (for an in-scope document): baseline, skip-has-rows, skip-no-file,
- * skip-ambiguous, skip-no-folder. An out-of-scope document is listed only as unbaselined-file: one file, no row.
+ * Returns [{teamId, documentId, fileName, outcome, fileId?, row?}]. outcome (for an in-scope document): baseline, finish (only the baseline SUBMIT is
+ * there: its APPROVE is still to be written, `row` is that SUBMIT), skip-has-rows, skip-no-file, skip-ambiguous, skip-no-folder. An out-of-scope document is listed only as unbaselined-file: one file, no row.
  * A Drive read that throws is not caught for a file lookup: nothing is decided on a guess.
  */
 function documentBaselinePlan_(input) {
@@ -35,8 +38,12 @@ function documentBaselinePlan_(input) {
     input.documents.forEach(document => {
       const entry = {teamId: team.teamId, documentId: document.documentId, fileName: document.fileName};
       const inScope = scope.has(document.documentId);
-      if (input.rowsFor(team.teamId, document.documentId).length) {
-        if (inScope) plan.push({...entry, outcome: 'skip-has-rows'});
+      const recorded = input.rowsFor(team.teamId, document.documentId);
+      if (recorded.length) {
+        if (!inScope) return;
+        const only = recorded[0];
+        const halfDone = recorded.length === 1 && only.action === 'SUBMIT' && only.actor === DOCUMENT_BASELINE_ACTOR_ && Number(only.revision) === 1;
+        plan.push(halfDone ? {...entry, outcome: 'finish', fileId: only.driveFileId, row: only} : {...entry, outcome: 'skip-has-rows'});
         return;
       }
       const found = folderOf();
@@ -62,6 +69,18 @@ function documentBaselineRows_(entry, nowMs) {
   if (documentStateFromRows_([submit, approve]).status !== 'APPROVED') throw new Error('The baseline rows for ' + entry.teamId + ' ' + entry.documentId + ' do not read as approved. Nothing was written for it.');
   return [submit, approve];
 }
+
+/** The APPROVE row that completes a baseline whose SUBMIT is already written. */
+function documentBaselineFinishRow_(entry, nowMs) {
+  const facts = {teamId: entry.teamId, documentId: entry.documentId, fileName: entry.fileName, now: nowMs, actor: DOCUMENT_BASELINE_ACTOR_, fingerprint: '',
+    requestId: 'baseline-' + documentTeamKey_(entry.teamId) + '-' + entry.documentId + '-approve'};
+  const approve = documentNextRow_(documentStateFromRows_([entry.row]), 'approve', {}, facts);
+  if (documentStateFromRows_([entry.row, approve]).status !== 'APPROVED') throw new Error('The baseline rows for ' + entry.teamId + ' ' + entry.documentId + ' do not read as approved. Nothing was written for it.');
+  return [approve];
+}
+
+/** The clock of the time budget; a function so a test can move it. */
+function documentBaselineClock_() { return Date.now(); }
 
 function documentBaselineCounts_(plan) {
   const counts = {};
@@ -92,7 +111,7 @@ function documentBaselineRun_(sources) {
 function previewDocumentBaseline() {
   requireTriggerOrOperator_();
   const plan = documentBaselineRun_(documentBaselineSources_());
-  const result = {counts: documentBaselineCounts_(plan), wouldBaseline: plan.filter(e => e.outcome === 'baseline').map(e => e.teamId + ' ' + e.documentId),
+  const result = {counts: documentBaselineCounts_(plan), wouldBaseline: plan.filter(e => ['baseline', 'finish'].includes(e.outcome)).map(e => e.teamId + ' ' + e.documentId),
     needAttention: plan.filter(e => ['skip-ambiguous', 'skip-no-folder'].includes(e.outcome)).map(e => e.teamId + ' ' + e.documentId + ' (' + e.outcome + ')'),
     unbaselinedFiles: plan.filter(e => e.outcome === 'unbaselined-file').map(e => e.teamId + ' ' + e.documentId + ' ' + e.fileName)};
   console.log(JSON.stringify(result));
@@ -101,15 +120,22 @@ function previewDocumentBaseline() {
 
 function applyDocumentBaseline() {
   requireTriggerOrOperator_();
+  const started = documentBaselineClock_();
   const lock = LockService.getScriptLock();
   try { lock.waitLock(DOCUMENT_LOCK_WAIT_MS_); } catch (error) { throw new Error('Busy. Try again in a moment.'); }
   try {
     const sources = documentBaselineSources_();
-    const plan = documentBaselineRun_(sources), todo = plan.filter(entry => entry.outcome === 'baseline');
-    // Every pair is built and checked before the first row is written, so a problem stops the run with nothing appended.
-    const now = Date.now(), rows = todo.map(entry => documentBaselineRows_(entry, now));
-    rows.forEach(pair => pair.forEach(row => appendDocumentRow_(sources.journal, row)));
-    const result = {written: todo.length, counts: documentBaselineCounts_(plan), baselined: todo.map(e => e.teamId + ' ' + e.documentId)};
+    const plan = documentBaselineRun_(sources), todo = plan.filter(entry => ['baseline', 'finish'].includes(entry.outcome));
+    // Every document's rows are built and checked before the first row is written, so a problem stops the run with nothing appended.
+    const now = Date.now(), built = todo.map(entry => entry.outcome === 'finish' ? documentBaselineFinishRow_(entry, now) : documentBaselineRows_(entry, now));
+    let done = 0;
+    // The budget is checked between documents, never between the two rows of one.
+    while (done < built.length && documentBaselineClock_() - started < DOCUMENT_BASELINE_BUDGET_MS_) {
+      built[done].forEach(row => appendDocumentRow_(sources.journal, row));
+      done++;
+    }
+    const result = {written: done, remaining: built.length - done, counts: documentBaselineCounts_(plan), baselined: todo.slice(0, done).map(e => e.teamId + ' ' + e.documentId)};
+    if (result.remaining) result.message = 'Stopped to stay inside the time limit. Run applyDocumentBaseline again.';
     console.log(JSON.stringify(result));
     return result;
   } finally {

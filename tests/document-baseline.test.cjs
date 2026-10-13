@@ -96,3 +96,35 @@ test('an unreadable file lookup is not guessed: the run stops', () => {
   assert.throws(() => context.applyDocumentBaseline(), /Drive down/);
   assert.equal(appended.length, 0);
 });
+
+test('a run that stops on its time budget leaves whole documents only, and the next run continues', () => {
+  const {context, appended} = world({teams: {T1: {files: {'Step4.docx': 1, 'Step5.docx': 1}}, T2: {files: {'Step4.docx': 1, 'Step5.docx': 1}}}});
+  let calls = 0;
+  context.documentBaselineClock_ = () => (calls++ < 3 ? 0 : 10 * 60 * 1000);
+  const first = plain(context.applyDocumentBaseline());
+  assert.deepEqual([first.written, first.remaining], [2, 2]);
+  assert.deepEqual(appended.map(row => row.action), ['SUBMIT', 'APPROVE', 'SUBMIT', 'APPROVE'], 'no document is left half written');
+  context.documentBaselineClock_ = () => 0;
+  const second = plain(context.applyDocumentBaseline());
+  assert.deepEqual([second.written, second.remaining], [2, 0]);
+  assert.equal(appended.length, 8);
+  assert.equal(plain(context.applyDocumentBaseline()).written, 0);
+});
+
+test('a document cut off after its baseline SUBMIT gets only the APPROVE on the next run', () => {
+  const {context, appended, rows} = world({teams: {T1: {files: {'Step4.docx': 1}}}});
+  const pair = plain(context.documentBaselineRows_({teamId: 'T1', documentId: 'doc-0004', fileName: 'Step4.docx', fileId: 'F1'}, 1));
+  rows['T1|doc-0004'] = [pair[0]];
+  const preview = plain(context.previewDocumentBaseline());
+  assert.deepEqual(preview.wouldBaseline, ['T1 doc-0004']);
+  assert.equal(plain(context.applyDocumentBaseline()).written, 1);
+  assert.deepEqual(appended.map(row => [row.revision, row.action]), [[2, 'APPROVE']]);
+  assert.equal(plain(context.documentStateFromRows_(rows['T1|doc-0004'])).status, 'APPROVED');
+  assert.equal(plain(context.applyDocumentBaseline()).written, 0);
+});
+
+test('a document whose only row is not the baseline SUBMIT is left alone', () => {
+  const {context, appended} = world({teams: {T1: {files: {'Step4.docx': 1}}}, rows: {'T1|doc-0004': [{revision: 1, action: 'SUBMIT', actor: 'student@x'}]}});
+  assert.equal(plain(context.applyDocumentBaseline()).written, 0);
+  assert.equal(appended.length, 0);
+});
