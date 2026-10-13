@@ -203,23 +203,18 @@ test('the guide approves or returns (with notes); a return can be submitted agai
   assert.equal(decide({expectedRevision: 4, decision: 'approve'}).error.code, 'REJECTED');
 });
 
-test('a hand-placed file counts as approved; the coordinator reopens it before a new version can be submitted', () => {
+test('a file with no row is not submitted; a submit overwrites it in place and keeps the earlier content', () => {
   const env = setup();
-  const placed = env.makeFile('Step1_Work_Breakdown.docx', signed(Buffer.from('hand placed')), '');
+  const placed = env.makeFile('Step1_Work_Breakdown.docx', signed(Buffer.from('placed earlier')), '');
   const before = doc(documents(env, STUDENT), 'doc-0001');
-  assert.deepEqual([before.status, before.existing, before.link, before.revision], ['APPROVED', true, 'https://drive.example/' + placed.id, 0]);
-  const refused = submit(env);
-  assert.deepEqual([refused.error.code, /Ask the coordinator to reopen/.test(refused.error.message)], ['REJECTED', true]);
-  const reopen = (extra = {}, user = COORD) => env.call(user, 'API_coordinator_reopenDocument', Object.assign({requestId: env.id(), teamId: 'T1', documentId: 'doc-0001', expectedRevision: 0, reason: 'New version needed'}, extra));
-  assert.equal(reopen({}, GUIDE).error.code, 'UNAUTHORIZED');
-  assert.equal(reopen({reason: ' '}).error.code, 'INVALID_INPUT');
-  assert.equal(reopen({}).data.status, 'REOPENED');
-  assert.equal(String(env.rows()[0].Revision), '1');
-  assert.equal(doc(documents(env, STUDENT), 'doc-0001').status, 'REOPENED');
-  const next = submit(env, {expectedRevision: 1});
-  assert.deepEqual([next.data.revision, next.data.status], [2, 'NEEDS_REVIEW']);
+  assert.deepEqual([before.status, 'existing' in before, before.link, before.revision], ['NOT_SUBMITTED', false, 'https://drive.example/' + placed.id, 0]);
+  assert.equal(doc(documents(env, COORD, 'T1'), 'doc-0001').link, '', 'the coordinator sees no link until the content is approved');
+  const reopen = env.call(COORD, 'API_coordinator_reopenDocument', {requestId: env.id(), teamId: 'T1', documentId: 'doc-0001', expectedRevision: 0, reason: 'New version needed'});
+  assert.equal(reopen.error.code, 'REJECTED', 'only an approved document can be reopened');
+  const next = submit(env);
+  assert.deepEqual([next.data.revision, next.data.status], [1, 'NEEDS_REVIEW']);
   assert.equal(env.drive.files.length, 1);
-  assert.equal(env.drive.files[0].id, placed.id, 'the hand-placed file is updated in place');
+  assert.equal(env.drive.files[0].id, placed.id, 'the file is updated in place');
   assert.equal(env.drive.files[0].revisions[0].keep, true);
 });
 
@@ -282,21 +277,19 @@ test('a description that is empty, hand-edited or belongs to another document se
     const env = setup();
     env.makeFile('Step1_Work_Breakdown.docx', [1], description);
     const dto = doc(documents(env, STUDENT), 'doc-0001');
-    assert.equal(dto.existing, true, description);
-    env.call(COORD, 'API_coordinator_reopenDocument', {requestId: env.id(), teamId: 'T1', documentId: 'doc-0001', expectedRevision: 0, reason: 'again'});
-    assert.deepEqual(env.rows().map(row => row.Action), ['REOPEN'], description);
+    assert.equal(dto.status, 'NOT_SUBMITTED', description);
+    assert.deepEqual(env.rows(), [], description);
   }
 });
 
 test('a failing keep-forever step stops before the file is written', () => {
   const env = setup();
   const placed = env.makeFile('Step1_Work_Breakdown.docx', [7], '');
-  env.call(COORD, 'API_coordinator_reopenDocument', {requestId: env.id(), teamId: 'T1', documentId: 'doc-0001', expectedRevision: 0, reason: 'again'});
   env.f.c.Drive.Revisions.update = () => { throw new Error('Drive down'); };
-  const refused = submit(env, {expectedRevision: 1});
+  const refused = submit(env);
   assert.equal(refused.ok, false);
   assert.deepEqual(placed.content, [7]);
-  assert.deepEqual(env.rows().map(row => row.Action), ['REOPEN']);
+  assert.deepEqual(env.rows(), []);
 });
 
 // ---- reading -----------------------------------------------------------------------------------------------------------------

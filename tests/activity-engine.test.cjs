@@ -395,10 +395,12 @@ test('document: the item must be a Document ID, and an unlisted ID is a misconfi
   }
 });
 
-test('document: approved and reopened content with one live file is met; a hand-placed file with no row is met', () => {
+test('document: approved and reopened content with one live file is met; a file with no row is not', () => {
   assert.equal(documentDecide({journal: [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE')]}).allowed, true);
   assert.equal(documentDecide({journal: [journalRow(1, 'SUBMIT'), journalRow(2, 'APPROVE'), journalRow(3, 'REOPEN')]}).allowed, true);
-  assert.equal(documentDecide({journal: []}).allowed, true, 'an existing file counts as approved');
+  const placed = documentDecide({journal: []});
+  assert.equal(placed.allowed, false, 'a file with no journal row is not submitted');
+  assert.equal(reasonOf(placed), 'Not approved yet.');
 });
 
 test('document: not submitted, waiting for the guide and returned are unmet with their own sentence', () => {
@@ -636,10 +638,11 @@ test('hint: a document with a journal row is answered from the journal, with no 
   assert.deepEqual(returned.drive, {folders: 0, files: 0});
 });
 
-test('hint: a document with no row still asks Drive, so a hand-placed file counts; an invalid journal falls through to the strict answer', () => {
+test('hint: a document with no row is unmet with no Drive read; an invalid journal falls through to the strict answer', () => {
   const placed = hintRun({journal: []});
-  assert.equal(placed.result.allowed, true, 'a hand-placed file with no row is approved');
-  assert(placed.drive.folders > 0 && placed.drive.files > 0, 'Drive was asked');
+  assert.equal(placed.result.allowed, false, 'a file with no row is not submitted');
+  assert.equal(placed.result.requirements[0].reason, 'Not approved yet.');
+  assert.deepEqual(placed.drive, {folders: 0, files: 0}, 'Drive was not asked');
   const none = hintRun({journal: [], drive: {teams: {T1: {files: []}}}});
   assert.equal(none.result.requirements[0].reason, 'Not approved yet.');
   assert.equal(none.result.allowed, false);

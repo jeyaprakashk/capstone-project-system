@@ -103,7 +103,7 @@ function documentWrite_(request, deps) {
     }
 
     // 6. The revision and the rules.
-    const state = documentStateFor_(journal.rowsFor(ctx.team.teamId, documentId), files.length);
+    const state = documentStateFromRows_(journal.rowsFor(ctx.team.teamId, documentId));
     if (state.status === 'UNAVAILABLE') throw apiFail_('UNAVAILABLE', 'This document cannot be used right now. Contact the coordinator.');
     if (state.revision !== expected) throw apiFail_('CONFLICT', 'This document changed since you opened it. Reload and try again.');
     const decision = documentCanDo_(state, action, user, {teamChanged: prepared ? prepared.live.teamChanged : '', label: ctx.document.fileName});

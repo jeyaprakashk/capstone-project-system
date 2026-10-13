@@ -145,11 +145,11 @@ function buildDocumentsDto_(teamId, viewer) {
     const rows = journal.rowsFor(team.teamId, document.documentId);
     let files = null, url = '';
     if (folder) { try { files = documentDriveFiles_(folder, document.fileName); if (files.length === 1) url = String(files[0].getUrl()); } catch (error) { files = null; } }
-    const state = documentStateFor_(rows, files ? files.length : null);
+    const state = documentStateFromRows_(rows);
     const tracked = teamFiles ? teamFiles.index.get(documentJournalKey_(team.teamId, document.documentId)) : null;
     const teamChanged = tracked ? tracked.record.teamChanged : '';
     if (tracked && tracked.record.checkedAt > scannedAt) scannedAt = tracked.record.checkedAt;
-    const approvedContent = ['APPROVED', 'REOPENED'].includes(state.status) || state.existing;
+    const approvedContent = ['APPROVED', 'REOPENED'].includes(state.status);
     const link = state.status === 'UNAVAILABLE' ? '' : ((roles.student || roles.guide || approvedContent) ? url : '');
     const lastSubmit = [...rows].reverse().find(item => item.action === 'SUBMIT') || null;
     const showLines = lastSubmit && (roles.student || roles.guide || roles.coordinator || approvedContent);
@@ -160,7 +160,7 @@ function buildDocumentsDto_(teamId, viewer) {
     const dto = {
       documentId: document.documentId, fileName: document.fileName, folder: document.folder, extension: document.extension,
       status: state.status, state: DOCUMENT_TONE_[state.status], statusText: DOCUMENT_STATUS_TEXT_[state.status],
-      revision: state.revision, existing: state.existing, teamChanged, checkedAt: tracked ? tracked.record.checkedAt : '', link,
+      revision: state.revision, teamChanged, checkedAt: tracked ? tracked.record.checkedAt : '', link,
       returnedNotes: state.status === 'RETURNED' && state.last ? state.last.notes : '',
       submittedBy: showLines ? submitter : null,
       commit: showLines ? documentCommitLines_(lastSubmit, people) : null,

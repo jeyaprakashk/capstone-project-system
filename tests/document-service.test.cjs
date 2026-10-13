@@ -26,7 +26,7 @@ test('the status of a document follows its rows, with the project vocabulary', (
   assert.equal(status([row(1, 'SUBMIT'), row(2, 'RETURN')]), 'RETURNED');
   assert.equal(status([row(1, 'SUBMIT'), row(2, 'APPROVE'), row(3, 'REOPEN')]), 'REOPENED');
   assert.equal(status([row(1, 'SUBMIT'), row(2, 'APPROVE'), row(3, 'REOPEN'), row(4, 'SUBMIT'), row(5, 'RETURN'), row(6, 'SUBMIT')]), 'NEEDS_REVIEW');
-  assert.equal(status([row(1, 'REOPEN')]), 'REOPENED', 'a hand-placed file can be reopened first');
+  assert.equal(status([row(1, 'REOPEN')]), 'REOPENED', 'a history that starts with a REOPEN (from before hand-placed files were retired) stays readable');
   assert.ok(!Object.values(plain(vm.runInContext('DOCUMENT_STATUS_AFTER_', c))).includes('REJECTED'), 'REJECTED is an error code, never a status');
 });
 
@@ -39,12 +39,11 @@ test('a history that breaks the rules makes only that document UNAVAILABLE', () 
   }
 });
 
-test('a hand-placed file with no row counts as approved, once', () => {
-  assert.deepEqual(plain(c.documentStateFor_([], 1)), {status: 'APPROVED', revision: 0, last: null, errors: [], existing: true});
-  assert.equal(c.documentStateFor_([], 0).status, 'NOT_SUBMITTED');
-  assert.equal(c.documentStateFor_([], null).status, 'NOT_SUBMITTED');
-  assert.equal(c.documentStateFor_([], 2).status, 'NOT_SUBMITTED', 'several files are never "existing"');
-  assert.equal(c.documentStateFor_([row(1, 'SUBMIT')], 1).existing, false);
+test('a document with no row is not submitted, whatever stands in the team folder', () => {
+  assert.deepEqual(plain(c.documentStateFromRows_([])), {status: 'NOT_SUBMITTED', revision: 0, last: null, errors: []});
+  assert.equal(vm.runInContext('typeof documentStateFor_', c), 'undefined', 'the file count no longer decides a status');
+  assert.equal('existing' in plain(c.documentStateFromRows_([row(1, 'SUBMIT')])), false);
+  assert.equal(c.documentCanDo_({status: 'NOT_SUBMITTED'}, 'reopen', roles('coordinator')).allowed, false, 'a reopen needs an approved document, so no new first-row REOPEN can be written');
 });
 
 test('who may do what in which status, with the project error codes', () => {

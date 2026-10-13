@@ -1,5 +1,10 @@
 # Template document submission: plan
 
+> **Update 2026-10-13 (owner-approved rule change).** Decision 8 ("a file already in a team folder counts as approved") is retired. A file with a
+> template name and no journal row is `NOT_SUBMITTED`, and the DTO has no `existing` field. The files that stood in the folders at go-live were
+> recorded once by `previewDocumentBaseline` / `applyDocumentBaseline` (`document-baseline.js`) as an ordinary SUBMIT and APPROVE pair with actor
+> `baseline`. A history whose first row is `REOPEN` stays readable, but no action writes one any more. The text below is the original plan.
+
 Status: **planned, not implemented. Rewritten 2026-10-12**, aligned the same day with the project's status, error, styling and helper policies (section 9), then revised the same day after two reviews (all review findings resolved, section 15), with the owner's rule for when Submit is available (decision 4) and the owner's decision to use the Document ID in ActivityDependencies (decision 9). This version has no pending-review location: a submitted file goes
 straight into the team's Drive folder. The owner's answers of 2026-10-12 are built in (section 14). Nothing described here exists in the code yet.
 

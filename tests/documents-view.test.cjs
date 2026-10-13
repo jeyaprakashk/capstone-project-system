@@ -10,7 +10,7 @@ const cap = (allowed, reason = '') => ({ allowed, reason, activity: null, requir
 const author = { name: 'Ann', login: 'ann', outsideMember: false };
 const doc = (extra = {}) => ({
   documentId: 'doc-0001', fileName: 'Step1.docx', folder: '1_Documents', extension: 'docx', status: 'NOT_SUBMITTED', state: 'active', statusText: 'Not submitted yet', revision: 0,
-  existing: false, teamChanged: 'Yes', checkedAt: '2030-01-01T00:00:00.000Z', returnedNotes: '', link: 'https://drive.google.com/file/d/f1/view', submittedBy: null,
+  teamChanged: 'Yes', checkedAt: '2030-01-01T00:00:00.000Z', returnedNotes: '', link: 'https://drive.google.com/file/d/f1/view', submittedBy: null,
   commit: null, history: [], can: { submit: cap(true), approve: cap(false), return: cap(false), reopen: cap(false) }, ...extra
 });
 const dto = (documents, roles = { student: true }) => ({ teamId: 'T1', scannedAt: '2030-01-01T00:00:00.000Z', roles, documents });

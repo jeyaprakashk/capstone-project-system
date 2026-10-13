@@ -9,7 +9,7 @@
  */
 const DOCUMENT_ACTION_ = Object.freeze({submit: 'SUBMIT', approve: 'APPROVE', return: 'RETURN', reopen: 'REOPEN'});
 const DOCUMENT_STATUS_AFTER_ = Object.freeze({SUBMIT: 'NEEDS_REVIEW', APPROVE: 'APPROVED', RETURN: 'RETURNED', REOPEN: 'REOPENED'});
-/** Which statuses each action may start from. A document with no row is NOT_SUBMITTED, or APPROVED when a hand-placed file stands in the folder. */
+/** Which statuses each action may start from. A document with no row is NOT_SUBMITTED, whatever stands in the team folder. */
 const DOCUMENT_FROM_ = Object.freeze({
   SUBMIT: ['NOT_SUBMITTED', 'RETURNED', 'REOPENED'], APPROVE: ['NEEDS_REVIEW'], RETURN: ['NEEDS_REVIEW'], REOPEN: ['APPROVED']
 });
@@ -63,7 +63,8 @@ function documentFingerprint_(action, teamId, documentId, input) {
 
 /**
  * The status of one document from its journal rows (sorted by revision). Returns {status, revision, last, errors}. A history that breaks
- * the rules is UNAVAILABLE with the reasons in errors. A first row may be a REOPEN: a hand-placed file counts as approved.
+ * the rules is UNAVAILABLE with the reasons in errors. A first row may be a REOPEN: history from before hand-placed files were retired (they are
+ * now recorded by document-baseline.js); no action can write such a row any more, because a reopen needs an approved document.
  */
 function documentStateFromRows_(rows) {
   const errors = [];
@@ -79,17 +80,6 @@ function documentStateFromRows_(rows) {
   });
   if (errors.length) return {status: 'UNAVAILABLE', revision: previousRevision, last, errors};
   return {status, revision: previousRevision, last, errors: []};
-}
-
-/**
- * A document's state for decisions and the DTO. rows are its journal rows; fileCount is how many live files with its name stand in the
- * team folder (null when Drive could not be read). With no row, one hand-placed file counts as approved ("existing").
- */
-function documentStateFor_(rows, fileCount) {
-  const state = documentStateFromRows_(rows);
-  state.existing = false;
-  if (state.status === 'NOT_SUBMITTED' && !rows.length && fileCount === 1) { state.status = 'APPROVED'; state.existing = true; }
-  return state;
 }
 
 function documentDenied_(code, reason) { return {allowed: false, reason, code}; }

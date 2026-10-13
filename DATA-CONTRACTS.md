@@ -187,7 +187,7 @@ Returned by `API_documents_get`. One entry per listed template document (active,
 { teamId, scannedAt /* the latest team scan time, '' if none */,
   roles:{student, guide, reviewer, coordinator} /* the caller's roles on this team, booleans */,
   documents:[{ documentId, fileName, folder, extension,
-    status, state /* active|waiting|done, as for titles */, statusText, revision, existing /* a hand-placed file counts as APPROVED */,
+    status, state /* active|waiting|done, as for titles */, statusText, revision,
     teamChanged /* Yes|No|Unknown|'' (from the team scan, every 2 hours; '' = not checked yet) */, checkedAt, returnedNotes /* the guide's notes when RETURNED */,
     link /* the Drive file, per the rules below; '' otherwise */,
     submittedBy:{name, at, email?} | null,                 // email: guide and coordinator only
@@ -200,7 +200,7 @@ Returned by `API_documents_get`. One entry per listed template document (active,
 `teamChanged` is not `Yes`: the screen offers "Check GitHub now", which runs the live preview (`API_student_previewDocument`) and, when
 a team member's change is found, the usual Submit confirmation. Nothing is written by the check.
 
-Links: a student and the guide see the Drive file's link in every status; a reviewer and the coordinator only while the content is approved (`APPROVED`, `REOPENED` or existing). A student never receives a folder link, and sees names, never e-mail addresses. `submittedBy`, `commit` and the lines are shown to the student, guide and coordinator, and to a reviewer only for approved content. Contract tests: `tests/document-api.test.cjs`, `tests/document-service.test.cjs`.
+Links: a student and the guide see the Drive file's link in every status; a reviewer and the coordinator only while the content is approved (`APPROVED` or `REOPENED`). A student never receives a folder link, and sees names, never e-mail addresses. `submittedBy`, `commit` and the lines are shown to the student, guide and coordinator, and to a reviewer only for approved content. Contract tests: `tests/document-api.test.cjs`, `tests/document-service.test.cjs`.
 
 ### StudentCore and StudentProject
 

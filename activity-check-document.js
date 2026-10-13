@@ -1,11 +1,11 @@
 /**
  * ACTIVITY CHECK: document (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, decision 9 and Phase 5). The item is a Document ID of the scanned template
- * list. It is met when the team's document is approved (APPROVED, REOPENED, or a hand-placed file with no journal row) and exactly one live
+ * list. It is met when the team's document is approved (APPROVED or REOPENED; a file with no journal row is not submitted) and exactly one live
  * file of that name stands in the team folder. It fails closed: a TemplateFiles sheet, a journal or a Drive folder that cannot be read is
  * "Could not verify", an outstanding Drive write that is not yet in the journal is unmet until it is settled, and an item that is not a
  * listed document is a misconfiguration. No ActivityDependencies row uses this kind until the coordinator enters one. The existing `drive`
  * kind is unchanged. In a `hint` context (a yes-or-no label, never a gate) a document with a journal row is answered from the journal alone, with no
- * Drive read: approved is met, anything else is unmet. Only a document with no row needs Drive, to tell a hand-placed file from nothing.
+ * Drive read: approved is met, anything else is unmet. A document with no row is unmet without a Drive read in every context.
  */
 const ACTIVITY_DOCUMENT_MET_ = Object.freeze(['APPROVED', 'REOPENED']);
 
@@ -36,11 +36,13 @@ function activityCheckDocument_() {
       }
       const document = sources.listed.find(candidate => candidate.documentId === item);
       if (!document) return {met: false, reason: ACTIVITY_MISCONFIGURED_, diagnostic: 'DOCUMENT_NOT_LISTED'};
+      const rows = sources.journal.rowsFor(team.teamId, document.documentId);
+      // A document with no row is not submitted, whatever stands in the team folder: no Drive read.
+      if (!rows.length) return {met: false, reason: activityDocumentReason_('NOT_SUBMITTED')};
       if (ctx.hint) {
-        const recorded = sources.journal.rowsFor(team.teamId, document.documentId);
-        const status = recorded.length ? documentStateFromRows_(recorded).status : '';
+        const status = documentStateFromRows_(rows).status;
         if (ACTIVITY_DOCUMENT_MET_.includes(status)) return {met: true, reason: ''};
-        if (status && status !== 'UNAVAILABLE') return {met: false, reason: activityDocumentReason_(status)};
+        if (status !== 'UNAVAILABLE') return {met: false, reason: activityDocumentReason_(status)};
       }
       const located = activityDriveFolder_(team, ctx);
       if (located.unresolved) return {met: false, unverifiable: true, diagnostic: located.unresolved};
@@ -51,8 +53,7 @@ function activityCheckDocument_() {
         console.error('Drive file lookup failed for team ' + team.teamId + ': ' + (error && error.message || error));
         return {met: false, unverifiable: true, diagnostic: 'TEAM_DOCUMENTS_UNRESOLVED'};
       }
-      const rows = sources.journal.rowsFor(team.teamId, document.documentId);
-      const state = documentStateFor_(rows, files.length);
+      const state = documentStateFromRows_(rows);
       if (state.status === 'UNAVAILABLE') return {met: false, unverifiable: true, diagnostic: 'DOCUMENT_JOURNAL_INVALID'};
       const pending = files.some(file => {
         const record = documentDriveRecord_(file);

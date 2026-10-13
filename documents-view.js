@@ -93,7 +93,6 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     return '<article class="' + CARD + '" data-document-card="' + escape(doc.documentId) + '" data-document-status="' + escape(doc.status) + '">' +
       '<div class="flex flex-wrap items-center justify-between gap-2"><h4 class="m-0 text-base font-semibold text-ink break-all">' + escape(doc.fileName) + '</h4>' +
       '<span class="' + tone + '">' + escape(doc.statusText) + '</span></div>' +
-      (doc.existing ? p('Already in the team folder.', 'text-muted') : '') +
       (doc.status === 'RETURNED' && doc.returnedNotes ? p('<strong>Guide\'s notes:</strong> ' + escape(doc.returnedNotes), 'text-warning') : '') +
       (doc.link ? '<div class="mt-2"><a class="' + LINK + '" href="' + escape(safeUrl(doc.link)) + '" target="_blank" rel="noopener">Open the file</a></div>' : '') +
       linesMarkup(doc) + controlsMarkup(doc, dto) +
