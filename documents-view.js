@@ -17,7 +17,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   const safeUrl = url => /^https?:\/\//i.test(String(url)) ? String(url) : '#';
   const p = (html, extra) => '<p class="mt-1 text-sm ' + (extra || 'text-ink-2') + '">' + html + '</p>';
 
-  const CARD = 'rounded-card border border-edge bg-paper p-4 shadow-card';
+  const CARD = 'rounded-card border border-edge bg-paper shadow-card';
   const BADGE = 'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ';
   const TONE = {
     done: BADGE + 'bg-success-tint text-success ring-success/20', waiting: BADGE + 'bg-info-tint text-info ring-info/20',
@@ -25,7 +25,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   };
   const FIELD = 'mt-1 block w-full rounded-md border border-control bg-paper px-3 py-2 text-sm text-ink disabled:opacity-60';
   const LABEL = 'mt-3 block text-sm font-semibold text-ink-2';
-  const PRIMARY = 'border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
+  const PRIMARY = 'border-0 rounded-btn bg-primary px-4 py-2.5 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
   const BUTTON = 'border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const LINK = 'inline-flex items-center rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink no-underline ring-1 ring-inset ring-line hover:bg-tint';
   const NOTICE = 'mb-3 rounded-md border border-warning/20 bg-warning-tint px-3 py-2 text-sm text-warning';
@@ -79,7 +79,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     const needs = (evidence.requirements || []).map(item => '<li class="' + (item.met ? 'text-success' : 'text-warning') + '" data-evidence-requirement="' + (item.met ? 'met' : 'unmet') + '">' +
       escape(item.label) + ' needs at least ' + escape(item.minimum) + (item.minimum === 1 ? ' file' : ' files') + ' in ' + escape(item.folder) + ': ' + escape(item.copied) + ' copied' + (item.met ? ' (done)' : '') + '</li>').join('');
     const requirements = needs ? '<ul class="m-0 mt-2 list-none p-0 text-sm" data-evidence-requirements>' + needs + '</ul>' : '';
-    return requirements + '<details class="mt-2 text-sm" data-doc-evidence><summary class="cursor-pointer font-semibold text-ink-2">' + escape(summary) + '</summary>' + body + '</details>' + reason;
+    return requirements + '<details class="mt-3 rounded-card border border-line bg-tint p-4 text-sm" data-doc-evidence><summary class="cursor-pointer font-semibold text-ink-2">' + escape(summary) + '</summary>' + body + '</details>' + reason;
   }
 
   function controlsMarkup(doc, dto) {
@@ -114,23 +114,121 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     return html;
   }
 
+  // Layout: the Reviews that need the documents are selectable cards (a row to scroll on a phone, a column from xl up); the open Review shows
+  // its documents as compact cards. Each card keeps what the person must act on in view and puts the commit details behind a chevron.
+  const TILE = 'inline-flex size-12 shrink-0 items-center justify-center rounded-xl ';
+  const TILE_TONE = {done: 'bg-success-tint text-success', waiting: 'bg-info-tint text-info', active: 'bg-warning-tint text-warning'};
+  const STATUS_ICON = {APPROVED: 'check', NEEDS_REVIEW: 'clock', RETURNED: 'circle-alert', REOPENED: 'file-text', NOT_SUBMITTED: 'file-text', UNAVAILABLE: 'circle-alert'};
+  const ROW = 'flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent px-4 py-3 text-left text-ink hover:bg-tint aria-[current=true]:bg-tint';
+  const CIRCLE = 'inline-flex shrink-0 items-center justify-center rounded-full ';
+  const CIRCLE_TONE = {done: 'bg-success-tint text-success', waiting: 'bg-paper text-info ring-1 ring-inset ring-info/30', active: 'bg-warning-tint text-warning'};
+  const GROUP_ICON = {done: 'check', waiting: 'clock', active: 'pencil'};
+  const WIDE_LINK = 'inline-flex flex-1 items-center justify-center gap-2 rounded-btn bg-paper px-3 py-2 text-sm font-semibold text-primary no-underline ring-1 ring-inset ring-line hover:bg-tint';
+  const TOGGLE = 'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-btn border-0 bg-paper text-ink-2 ring-1 ring-inset ring-line hover:bg-tint';
+  const CODE = 'inline-block rounded-md bg-tint px-1.5 py-0.5 font-mono text-xs text-ink-2';
+  const APPROVED = ['APPROVED', 'REOPENED'];
+  const TEAM_TO_ACT = ['NOT_SUBMITTED', 'RETURNED', 'REOPENED'];
+  const ALL_GROUP = 'all', OTHER_GROUP = 'other';
+  const icon = (name, className) => getUi().renderIcon(name, null, className);
+
   function documentMarkup(doc, dto) {
-    const tone = TONE[doc.state] || TONE.waiting;
-    return '<article class="' + CARD + '" data-document-card="' + escape(doc.documentId) + '" data-document-status="' + escape(doc.status) + '">' +
-      '<div class="flex flex-wrap items-center justify-between gap-2"><h4 class="m-0 text-base font-semibold text-ink break-all">' + escape(doc.fileName) + '</h4>' +
-      '<span class="' + tone + '">' + escape(doc.statusText) + '</span></div>' +
-      (doc.status === 'RETURNED' && doc.returnedNotes ? p('<strong>Guide\'s notes:</strong> ' + escape(doc.returnedNotes), 'text-warning') : '') +
-      (doc.link ? '<div class="mt-2"><a class="' + LINK + '" href="' + escape(safeUrl(doc.link)) + '" target="_blank" rel="noopener">Open the file</a></div>' : '') +
-      linesMarkup(doc) + evidenceMarkup(doc, dto) + controlsMarkup(doc, dto) +
-      '<p class="mt-2 text-sm text-ink-2 empty:hidden" role="status" aria-live="polite" data-doc-status></p>' + historyMarkup(doc) + '</article>';
+    const tone = TONE[doc.state] ? doc.state : 'waiting', dot = doc.fileName.lastIndexOf('.');
+    const base = dot > 0 ? doc.fileName.slice(0, dot) : doc.fileName, extension = dot > 0 ? doc.fileName.slice(dot) : '';
+    const by = doc.submittedBy ? 'Submitted ' + (doc.submittedBy.at ? when(doc.submittedBy.at) : '') + ' by ' + (doc.submittedBy.name || 'a team member') : '';
+    const more = linesMarkup(doc) + historyMarkup(doc);
+    return '<article class="flex min-w-0 flex-col gap-3 ' + CARD + ' p-4" data-document-card="' + escape(doc.documentId) + '" data-document-status="' + escape(doc.status) + '">' +
+      '<div class="flex items-start gap-3"><span class="' + TILE + TILE_TONE[tone] + '">' + icon(STATUS_ICON[doc.status] || 'file-text', 'size-6') + '</span>' +
+      '<div class="min-w-0 flex-1"><h4 class="m-0 break-all text-base text-ink"><span class="font-semibold">' + escape(base) + '</span><span class="text-muted">' + escape(extension) + '</span></h4>' +
+      '<div class="mt-1"><span class="' + TONE[tone] + '">' + escape(doc.statusText) + '</span></div>' +
+      (by ? '<p class="m-0 mt-2 text-sm text-ink-2" data-doc-by>' + escape(by) + '</p>' : '') +
+      (doc.commit ? '<p class="m-0 mt-1.5"><span class="' + CODE + '">' + escape(doc.commit.shortSha) + '</span></p>' : '') + '</div></div>' +
+      (doc.status === 'RETURNED' && doc.returnedNotes ? p('<strong>Guide\'s notes:</strong> ' + escape(doc.returnedNotes), 'text-warning m-0') : '') +
+      evidenceMarkup(doc, dto) + controlsMarkup(doc, dto) +
+      '<p class="m-0 text-sm text-ink-2 empty:hidden" role="status" aria-live="polite" data-doc-status></p>' +
+      (doc.link || more ? '<div class="flex gap-2">' + (doc.link ? '<a class="' + WIDE_LINK + '" href="' + escape(safeUrl(doc.link)) + '" target="_blank" rel="noopener">Open the file' + icon('external-link') + '</a>' : '') +
+        (more ? '<button type="button" class="' + TOGGLE + '" data-doc-action="toggle" aria-expanded="false" aria-label="Show details"><span class="inline-flex" data-doc-chevron>' + icon('chevron-down') + '</span></button>' : '') + '</div>' : '') +
+      (more ? '<div class="rounded-md bg-soft px-3 py-2" data-doc-more hidden>' + more + '</div>' : '') + '</article>';
   }
 
-  function listMarkup(dto, notice) {
-    const stamp = dto.scannedAt ? p('Team files last checked ' + escape(when(dto.scannedAt)) + '.', 'text-muted') : '';
-    const list = dto.documents.length
-      ? '<div class="mt-3 grid gap-3">' + dto.documents.map(doc => documentMarkup(doc, dto)).join('') + '</div>'
-      : p('No documents are listed yet.', 'text-muted');
-    return (notice ? '<p class="' + NOTICE + '" role="status" data-doc-notice>' + escape(notice) + '</p>' : '') + stamp + list;
+  /**
+   * The Reviews, from the DTO's `neededFor` (a document is listed under every Review that needs it), in Review order. Documents no Review needs
+   * come last as "Other documents"; when no document names a Review there is one group, "All documents".
+   */
+  function groupDocuments(documents) {
+    const groups = [], byId = new Map();
+    const add = (id, label, doc) => {
+      if (!byId.has(id)) { const group = {id, label, documents: []}; byId.set(id, group); groups.push(group); }
+      byId.get(id).documents.push(doc);
+    };
+    documents.forEach(doc => {
+      const needed = doc.neededFor || [];
+      if (!needed.length) add(OTHER_GROUP, 'Other documents', doc);
+      needed.forEach(entry => add(entry.id, entry.label, doc));
+    });
+    if (groups.length === 1 && groups[0].id === OTHER_GROUP) { groups[0].id = ALL_GROUP; groups[0].label = 'All documents'; }
+    const rank = group => group.id === OTHER_GROUP ? 1 : 0;
+    return groups.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id, 'en', {numeric: true}));
+  }
+
+  const approvedCount = group => group.documents.filter(doc => APPROVED.indexOf(doc.status) >= 0).length;
+  const countOf = (group, statuses) => group.documents.filter(doc => statuses.indexOf(doc.status) >= 0).length;
+  /** The one thing worth saying about a Review: what the team still has to do, else what the guide has, else done. */
+  function groupChip(group) {
+    const toDo = countOf(group, TEAM_TO_ACT), awaiting = countOf(group, ['NEEDS_REVIEW']);
+    if (toDo) return {tone: 'active', text: toDo + ' to submit'};
+    if (awaiting) return {tone: 'waiting', text: awaiting + ' awaiting guide'};
+    return {tone: 'done', text: 'All approved'};
+  }
+
+  function rowMarkup(group, selected) {
+    const chip = groupChip(group), count = group.documents.length;
+    const awaiting = countOf(group, ['NEEDS_REVIEW']);
+    const sub = approvedCount(group) + ' of ' + count + ' approved' + (awaiting ? ' \u00b7 ' + awaiting + ' awaiting the guide' : '');
+    return '<li><button type="button" class="' + ROW + '" data-doc-action="select" data-doc-group="' + escape(group.id) + '"' + (selected ? ' aria-current="true"' : '') + '>' +
+      '<span class="' + CIRCLE + 'size-9 ' + CIRCLE_TONE[chip.tone] + '">' + icon(GROUP_ICON[chip.tone]) + '</span>' +
+      '<span class="min-w-0 flex-1"><span class="block font-semibold text-ink">' + escape(group.label) + '</span>' +
+      '<span class="block text-sm text-muted">' + escape(sub) + '</span></span>' +
+      '<span class="text-muted">' + icon('chevron-right') + '</span></button></li>';
+  }
+
+  /** The status card on top of the list: how many documents are approved, and when the team files were last checked. */
+  function summaryMarkup(dto) {
+    const total = dto.documents.length, approved = dto.documents.filter(doc => APPROVED.indexOf(doc.status) >= 0).length, done = approved === total;
+    const awaiting = dto.documents.filter(doc => doc.status === 'NEEDS_REVIEW').length;
+    const sub = [awaiting ? awaiting + ' awaiting the guide' : '', dto.scannedAt ? 'Team files last checked ' + when(dto.scannedAt) : ''].filter(Boolean).join(' \u00b7 ');
+    return '<section class="p-5 ' + CARD + '" data-doc-summary aria-label="Documents status"><div class="flex items-center gap-3">' +
+      '<span class="' + CIRCLE + 'size-12 ' + (done ? CIRCLE_TONE.done : CIRCLE_TONE.active) + '">' + icon(done ? 'check' : 'circle-alert', 'size-6') + '</span>' +
+      '<div class="min-w-0"><h2 class="m-0 text-hero font-semibold text-ink">' + approved + ' of ' + total + ' approved</h2>' + (sub ? '<p class="m-0 text-sm text-muted">' + escape(sub) + '</p>' : '') + '</div></div></section>';
+  }
+
+  function detailMarkup(group, dto) {
+    const heading = group.id === OTHER_GROUP ? group.label : group.id === ALL_GROUP ? 'Documents' : 'Needed for ' + group.label;
+    return '<section aria-label="' + escape(group.label) + '">' +
+      '<div class="mb-3 xl:hidden"><button type="button" class="inline-flex items-center gap-1 ' + BUTTON + '" data-doc-action="back">' + icon('chevron-left') + 'All activities</button></div>' +
+      '<div class="flex flex-wrap items-center justify-between gap-2"><h3 class="m-0 text-h1 font-semibold text-ink">' + escape(heading) + '</h3>' +
+      '<span class="' + TONE[groupChip(group).tone === 'done' ? 'done' : 'waiting'] + '">' + approvedCount(group) + ' of ' + group.documents.length + ' approved</span></div>' +
+      '<div class="mt-3 grid gap-3 sm:grid-cols-2">' + group.documents.map(doc => documentMarkup(doc, dto)).join('') + '</div></section>';
+  }
+
+  /** The first Review that still needs the team, else the first. */
+  function defaultSelection(groups) {
+    return (groups.find(group => groupChip(group).tone === 'active') || groups[0]).id;
+  }
+
+  /** `view` = {selected: a group id, mode: 'list'|'detail'} (the mode only matters below xl). */
+  function listMarkup(dto, notice, view) {
+    const banner = notice ? '<p class="' + NOTICE + '" role="status" data-doc-notice>' + escape(notice) + '</p>' : '';
+    if (!dto.documents.length) return banner + p('No documents are listed yet.', 'text-muted');
+    const groups = groupDocuments(dto.documents);
+    const selectedId = view && groups.some(group => group.id === view.selected) ? view.selected : defaultSelection(groups);
+    const mode = view && view.mode === 'detail' ? 'detail' : 'list';
+    const selected = groups.find(group => group.id === selectedId);
+    return banner + '<div class="group/docs" data-doc-shell data-doc-view="' + mode + '">' +
+      '<div class="grid gap-4 xl:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] xl:items-start">' +
+      '<div class="flex min-w-0 flex-col gap-4 group-data-[doc-view=detail]/docs:max-xl:hidden" data-doc-list>' + summaryMarkup(dto) +
+      '<section aria-labelledby="docListHeading"><h3 id="docListHeading" class="m-0 mb-2 px-1 text-sm font-semibold text-ink-2">Activities</h3>' +
+      '<ul class="m-0 list-none divide-y divide-edge overflow-hidden p-0 ' + CARD + '">' + groups.map(group => rowMarkup(group, group.id === selectedId)).join('') + '</ul></section></div>' +
+      '<div class="min-w-0 group-data-[doc-view=list]/docs:max-xl:hidden" data-doc-detail>' + detailMarkup(selected, dto) + '</div></div></div>';
   }
 
   function errorMessage(error) {
@@ -148,7 +246,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
       if (!host.isConnected || hosts.get(host) !== state) return;
       state.dto = dto;
       const notice = state.notice; state.notice = '';
-      host.innerHTML = listMarkup(dto, notice);
+      host.innerHTML = listMarkup(dto, notice, state);
     }, error => {
       finish(); state.busy = false;
       if (error && error.superseded) return;
@@ -162,7 +260,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
 
   /** Starts showing a team's documents in a host. teamId is blank for a student (the server uses the signed-in student's team). */
   function mount(host, teamId) {
-    hosts.set(host, {teamId: teamId || '', dto: null, busy: false, notice: ''});
+    hosts.set(host, {teamId: teamId || '', dto: null, busy: false, notice: '', selected: '', mode: 'list'});
     host.innerHTML = getUi().renderSkeleton('panel', 'Loading documents');
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); }
     return load(host);
@@ -236,7 +334,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
       if (!host.isConnected || hosts.get(host) !== state || !item) return;
       item.evidence = result.evidence;
       if (item.can) item.can.copyEvidence = result.can.copyEvidence;
-      host.innerHTML = listMarkup(state.dto, result.message || '');
+      host.innerHTML = listMarkup(state.dto, result.message || '', state);
     }, error => {
       if (error && error.superseded) return;
       done(errorMessage(error));
@@ -259,11 +357,33 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
       requestId => ({requestId, expectedRevision: revision, teamId: state.dto.teamId, documentId, reason}), 'Reopening…');
   }
 
+  /** Opens a Review's documents (select) or goes back to the list (id null) below xl. Only the open Review is drawn, so a half-typed note lasts only while it stays open. */
+  function show(host, id) {
+    const state = hosts.get(host);
+    if (!state || !state.dto) return;
+    if (id) { state.selected = id; state.mode = 'detail'; } else state.mode = 'list';
+    host.innerHTML = listMarkup(state.dto, '', state);
+  }
+
+  /** The chevron of a document card: shows or hides its commit details and history. */
+  function toggle(button) {
+    const card = button.closest('[data-document-card]'), panel = card && card.querySelector('[data-doc-more]');
+    if (!panel) return;
+    const open = panel.hidden;
+    panel.hidden = !open;
+    button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    button.setAttribute('aria-label', open ? 'Hide details' : 'Show details');
+    const chevron = button.querySelector('[data-doc-chevron]');
+    if (chevron) chevron.classList.toggle('rotate-180', open);
+  }
+
   function onClick(event) {
     const button = event.target.closest ? event.target.closest('[data-doc-action]') : null;
     if (!button || button.disabled) return;
     const host = event.currentTarget, action = button.getAttribute('data-doc-action'), card = button.closest('[data-document-card]');
     if (action === 'retry') { load(host); return; }
+    if (action === 'select' || action === 'back') { show(host, action === 'select' ? button.getAttribute('data-doc-group') : null); return; }
+    if (action === 'toggle') { toggle(button); return; }
     if (!card || !hosts.get(host) || !hosts.get(host).dto) return;
     if (action === 'submit' || action === 'check') submit(host, card, button);
     else if (action === 'approve' || action === 'return') decide(host, card, button, action);
@@ -272,5 +392,5 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     else if (action === 'check-evidence') checkEvidence(host, card, button);
   }
 
-  return {mount, load, markup: listMarkup};
+  return {mount, load, markup: (dto, notice) => listMarkup(dto, notice, null)};
 }

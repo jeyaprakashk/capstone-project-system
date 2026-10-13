@@ -643,3 +643,10 @@ test('evidence: each document lists the Review requirements that use its folders
   env.f.c.invalidateSheetCaches_('ActivityEvidences');
   assert.deepEqual(needs(STUDENT), []);
 });
+
+test('every document carries the Reviews that need it (none when ActivityDependencies names no document)', () => {
+  const env = setup();
+  const dto = documents(env, STUDENT);
+  assert.equal(dto.ok, true);
+  assert.deepEqual(plain(doc(dto, 'doc-0001').neededFor), []);
+});

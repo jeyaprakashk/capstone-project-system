@@ -174,6 +174,25 @@ function documentCommitLines_(row, people) {
 }
 
 /**
+ * Which Review needs which document, for grouping only: Map documentId -> [{id, label}] in Sequence order, from the active `document` rows of
+ * ActivityDependencies. It decides nothing (the gate is the engine); a sheet that cannot be read gives an empty map and the screen shows one list.
+ */
+function documentNeededFor_() {
+  const needed = new Map();
+  try {
+    const rules = loadActivityRules_(activityContext_()).rules;
+    getAssessmentDefinitions_().filter(definition => definition.type === 'REVIEW').forEach(definition => {
+      (rules[definition.key] || []).filter(rule => rule.kind === 'document').forEach(rule => {
+        const list = needed.get(rule.item) || [];
+        if (!list.some(entry => entry.id === definition.key)) list.push({id: definition.key, label: definition.label});
+        needed.set(rule.item, list);
+      });
+    });
+  } catch (error) { console.error('Review documents could not be listed: ' + (error && error.message || error)); }
+  return needed;
+}
+
+/**
  * The Documents DTO of one team for one viewer = {email, roles}. A student and the guide see every status with the file's link; a reviewer
  * and the coordinator see a link only while the content is approved (decision 7). A student sees names, never e-mail addresses.
  * Nothing is written. The journal rows break the rules for one document -> that document is UNAVAILABLE and the others still work.
@@ -188,6 +207,7 @@ function buildDocumentsDto_(teamId, viewer) {
   try { folder = findTeamFolder_(team.teamId, team.semester); } catch (error) { folder = null; }
   const people = documentTeamPeople_(team.teamId, row, TS);
   const evidenceSource = evidenceDtoSource_();
+  const neededFor = documentNeededFor_();
   const names = new Map([1, 2, 3, 4].map(n => [normalizeEmail_(row[TS['S' + n + '_EMAIL']]), String(row[TS['S' + n + '_NAME']] || '').trim()]).filter(pair => pair[0]));
   const seesStaffDetail = roles.guide || roles.coordinator;
   let scannedAt = '';
@@ -210,6 +230,7 @@ function buildDocumentsDto_(teamId, viewer) {
     const evidence = evidenceDtoFor_(evidenceSource, team, document);
     const dto = {
       documentId: document.documentId, fileName: document.fileName, folder: document.folder, extension: document.extension,
+      neededFor: neededFor.get(document.documentId) || [],
       status: state.status, state: DOCUMENT_TONE_[state.status], statusText: DOCUMENT_STATUS_TEXT_[state.status],
       revision: state.revision, teamChanged, checkedAt: tracked ? tracked.record.checkedAt : '', link,
       returnedNotes: state.status === 'RETURNED' && state.last ? state.last.notes : '',

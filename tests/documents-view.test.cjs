@@ -28,7 +28,7 @@ function setup(options = {}) {
     return control.error ? JSON.stringify({ ok: false, error: { code: control.code, message: control.error } }) : JSON.stringify({ ok: true, data: { ok: true, revision: 1, status: 'NEEDS_REVIEW', message: 'Done.' } });
   });
   const ui = {
-    busy: require('./busy-fixture.cjs')(), renderSkeleton: (variant, label) => '<span data-skeleton>' + label + '</span>', beginContentLoading: () => () => {},
+    busy: require('./busy-fixture.cjs')(), renderSkeleton: (variant, label) => '<span data-skeleton>' + label + '</span>', beginContentLoading: () => () => {}, renderIcon: name => '<svg data-icon="' + name + '" aria-hidden="true"></svg>',
     confirmDialog: options => { control.dialogs.push(options); return Promise.resolve(control.confirm); }
   };
   vm.runInContext('globalThis.__make = ' + c.documentsViewBrowser_.toString(), c);
@@ -294,4 +294,46 @@ test('the requirement lines say what each Review needs from the document\'s fold
   const none = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], 0), cap(false), { student: true }) });
   await none.view.mount(none.host, '');
   assert.equal(none.host.querySelector('[data-evidence-requirements]'), null);
+});
+
+test('the left list shows the Reviews with their progress; a row opens that Review\'s documents, and a document\'s chevron shows its commit details', async () => {
+  const r1 = { id: 'review1', label: 'Review 1' }, r2 = { id: 'review2', label: 'Review 2' };
+  const approved = { status: 'APPROVED', state: 'done', statusText: 'Approved' };
+  const commit = { sha: 'abcdef1234', shortSha: 'abcdef1', committedBy: author, lastTeamChange: author };
+  const f = setup({ dto: dto([
+    doc({ documentId: 'doc-0001', fileName: 'A.docx', neededFor: [r1, r2], ...approved }),
+    doc({ documentId: 'doc-0002', fileName: 'B.docx', neededFor: [r1], status: 'NEEDS_REVIEW', state: 'waiting', statusText: 'Submitted \u2014 awaiting the guide', submittedBy: { name: 'Ann', at: '2030-01-01T10:00:00.000Z' }, commit }),
+    doc({ documentId: 'doc-0003', fileName: 'C.docx', neededFor: [r2] }),
+    doc({ documentId: 'doc-0004', fileName: 'D.docx', neededFor: [] })
+  ]) });
+  await f.view.mount(f.host, '');
+  const picks = Array.from(f.host.querySelectorAll('[data-doc-action="select"]'));
+  assert.deepEqual(picks.map(r => r.getAttribute('data-doc-group')), ['review1', 'review2', 'other']);
+  assert(text(picks[0]).includes('Review 1') && text(picks[0]).includes('1 of 2 approved') && text(picks[0]).includes('1 awaiting the guide'));
+  assert(text(picks[1]).includes('Review 2') && text(picks[1]).includes('1 of 2 approved'));
+  assert(text(f.host.querySelector('[data-doc-summary]')).includes('1 of 4 approved'));
+  assert.equal(f.host.querySelector('[data-doc-shell]').getAttribute('data-doc-view'), 'list');
+  assert.deepEqual(Array.from(f.host.querySelectorAll('[data-document-card]')).map(c => c.getAttribute('data-document-card')), ['doc-0001', 'doc-0003'], 'the first Review that still needs the team is open, and a shared document is listed under each Review');
+  await f.click('[data-doc-action="select"][data-doc-group="review1"]');
+  assert.equal(f.host.querySelector('[aria-current="true"]').getAttribute('data-doc-group'), 'review1');
+  assert.equal(f.host.querySelector('[data-doc-shell]').getAttribute('data-doc-view'), 'detail');
+  const card = f.host.querySelector('[data-document-card="doc-0002"]');
+  assert(text(card.querySelector('[data-doc-by]')).includes('Submitted') && text(card).includes('abcdef1') && text(card).includes('by Ann'));
+  const more = card.querySelector('[data-doc-more]');
+  assert.equal(more.hidden, true);
+  await f.click('[data-document-card="doc-0002"] [data-doc-action="toggle"]');
+  assert.equal(more.hidden, false);
+  assert(text(more).includes('Committed by'));
+  assert.equal(card.querySelector('[data-doc-action="toggle"]').getAttribute('aria-expanded'), 'true');
+  await f.click('[data-doc-action="back"]');
+  assert.equal(f.host.querySelector('[data-doc-shell]').getAttribute('data-doc-view'), 'list');
+  assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
+});
+
+test('with no Review naming a document there is one card, Documents', async () => {
+  const f = setup();
+  await f.view.mount(f.host, '');
+  assert.equal(f.host.querySelectorAll('[data-doc-action="select"]').length, 1);
+  assert(text(f.host.querySelector('[data-doc-list]')).includes('All documents'));
+  assert(f.host.querySelector('[data-document-card]'));
 });
