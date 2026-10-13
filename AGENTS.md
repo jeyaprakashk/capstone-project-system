@@ -36,7 +36,7 @@ Whether a team's marks can be entered for a Review is decided by two things, bot
   APPROVED or REOPENED. A file in a team folder with no `DocumentSubmissions` row is `NOT_SUBMITTED`, whatever Drive holds, and a submit may
   overwrite it. The files that stood in the folders at go-live were recorded once (October 2026, 111 documents) as an ordinary SUBMIT
   and APPROVE pair with actor `baseline`; that one-time code has been run and deleted (Versions 202 and 203 hold it). A journal that begins with a `REOPEN`
-  row stays readable.
+  row is `UNAVAILABLE` like any other broken history (the owner checked the sheet: none exists).
 
 Changing these rows or the Sequence values is a configuration change by the coordinator. Changing how they are evaluated is a rule
 change and follows the paragraph above.

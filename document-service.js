@@ -63,17 +63,16 @@ function documentFingerprint_(action, teamId, documentId, input) {
 
 /**
  * The status of one document from its journal rows (sorted by revision). Returns {status, revision, last, errors}. A history that breaks
- * the rules is UNAVAILABLE with the reasons in errors. A first row may be a REOPEN: history from before hand-placed files were retired (they were
- * recorded once as a baseline and that code is deleted); no action can write such a row any more, because a reopen needs an approved document.
+ * the rules is UNAVAILABLE with the reasons in errors.
  */
 function documentStateFromRows_(rows) {
   const errors = [];
   let status = 'NOT_SUBMITTED', previousRevision = 0, last = null;
-  rows.forEach((row, index) => {
+  rows.forEach(row => {
     if (row.revision !== previousRevision + 1) errors.push('revision ' + row.revision + ' follows ' + previousRevision);
     const allowed = DOCUMENT_FROM_[row.action];
     if (!allowed) errors.push('unknown action ' + row.action);
-    else if (!(allowed.includes(status) || (index === 0 && row.action === 'REOPEN'))) errors.push(row.action + ' is not allowed after ' + status);
+    else if (!allowed.includes(status)) errors.push(row.action + ' is not allowed after ' + status);
     if (DOCUMENT_STATUS_AFTER_[row.action]) status = DOCUMENT_STATUS_AFTER_[row.action];
     previousRevision = row.revision;
     last = row;

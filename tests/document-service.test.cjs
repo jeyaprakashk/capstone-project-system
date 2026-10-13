@@ -26,13 +26,12 @@ test('the status of a document follows its rows, with the project vocabulary', (
   assert.equal(status([row(1, 'SUBMIT'), row(2, 'RETURN')]), 'RETURNED');
   assert.equal(status([row(1, 'SUBMIT'), row(2, 'APPROVE'), row(3, 'REOPEN')]), 'REOPENED');
   assert.equal(status([row(1, 'SUBMIT'), row(2, 'APPROVE'), row(3, 'REOPEN'), row(4, 'SUBMIT'), row(5, 'RETURN'), row(6, 'SUBMIT')]), 'NEEDS_REVIEW');
-  assert.equal(status([row(1, 'REOPEN')]), 'REOPENED', 'a history that starts with a REOPEN (from before hand-placed files were retired) stays readable');
   assert.ok(!Object.values(plain(vm.runInContext('DOCUMENT_STATUS_AFTER_', c))).includes('REJECTED'), 'REJECTED is an error code, never a status');
 });
 
 test('a history that breaks the rules makes only that document UNAVAILABLE', () => {
   for (const rows of [[row(2, 'SUBMIT')], [row(1, 'SUBMIT'), row(1, 'APPROVE')], [row(1, 'SUBMIT'), row(3, 'APPROVE')], [row(1, 'APPROVE')], [row(1, 'SUBMIT'), row(2, 'SUBMIT')],
-    [row(1, 'SUBMIT'), row(2, 'REOPEN')], [row(1, 'SUBMIT'), row(2, 'LOOK')]]) {
+    [row(1, 'SUBMIT'), row(2, 'REOPEN')], [row(1, 'SUBMIT'), row(2, 'LOOK')], [row(1, 'REOPEN')]]) {
     const state = plain(c.documentStateFromRows_(rows));
     assert.equal(state.status, 'UNAVAILABLE', JSON.stringify(rows));
     assert.ok(state.errors.length);
