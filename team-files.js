@@ -42,16 +42,20 @@ function teamLinkedGithubIds_() {
   return byTeam;
 }
 
-/** The default branch and the blob SHA of every file of a team repository. Throws when GitHub cannot give a complete answer. */
+/** The default branch, the blob SHA and the size in bytes of every file of a team repository. Throws when GitHub cannot give a complete answer. */
 function teamRepositoryTree_(slug) {
   const repo = makeGithubRequest_('GET', '/repos/' + slug);
   if (repo.status !== 200 || !repo.body || !repo.body.default_branch) throw new Error('The repository could not be read (HTTP ' + repo.status + ').');
   const branch = String(repo.body.default_branch);
   const tree = makeGithubRequest_('GET', '/repos/' + slug + '/git/trees/' + encodeURIComponent(branch) + '?recursive=1');
   if (tree.status !== 200 || !tree.body || !Array.isArray(tree.body.tree) || tree.body.truncated) throw new Error('The repository files could not be listed completely (HTTP ' + tree.status + ').');
-  const blobs = new Map();
-  tree.body.tree.forEach(entry => { if (entry.type === 'blob') blobs.set(entry.path, String(entry.sha)); });
-  return {branch, blobs};
+  const blobs = new Map(), sizes = new Map();
+  tree.body.tree.forEach(entry => {
+    if (entry.type !== 'blob') return;
+    blobs.set(entry.path, String(entry.sha));
+    sizes.set(entry.path, Number(entry.size) || 0);
+  });
+  return {branch, blobs, sizes};
 }
 
 /**
@@ -228,23 +232,29 @@ function scanTeamFiles() {
     const cursor = properties.getProperty(TEAM_FILE_SCAN_CURSOR_KEY_) || '';
     const pending = teams.filter(team => team.slug && (!cursor || team.key > cursor));
     const deadline = Date.now() + TEAM_FILE_SCAN_BUDGET_MS_, nowIso = new Date().toISOString();
+    const evidenceScan = evidenceScanContext_();
     let last = cursor, scanned = 0, failed = 0, busy = false;
     for (const team of pending) {
       if (Date.now() >= deadline) break;
-      let records;
+      let records, evidenceRecords;
       try {
         const stored = new Map(documents.map(document => {
           const kept = status.index.get(team.key + '|' + document.documentId);
           return [document.documentId, kept ? String(kept.record.baselineSha || '') : ''];
         }));
-        records = teamFileRecords_(team.teamId, team.slug, documents, teamRepositoryTree_(team.slug), stored, accounts.get(team.key) || new Set(), nowIso);
+        const tree = teamRepositoryTree_(team.slug);
+        records = teamFileRecords_(team.teamId, team.slug, documents, tree, stored, accounts.get(team.key) || new Set(), nowIso);
+        // The evidence counts come from the same tree: no extra GitHub call (evidence.js).
+        evidenceRecords = evidenceScanRecords_(evidenceScan, team, tree, nowIso);
       } catch (error) {
         // GitHub could not be read for this team: its rows say Unknown, never a left-over Yes.
         failed += 1;
         console.error('Team file scan: ' + team.teamId + ': ' + (error && error.message || error));
         records = documents.map(document => ({teamId: team.teamId, documentId: document.documentId, teamChanged: 'Unknown', checkedAt: nowIso}));
+        evidenceRecords = evidenceUnknownRecords_(evidenceScan, team, nowIso);
       }
       if (!teamFileWriteTeam_(status, records)) { busy = true; break; }
+      evidenceSaveStatus_(evidenceRecords);
       last = team.key;
       scanned += 1;
     }

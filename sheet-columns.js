@@ -283,6 +283,56 @@ function sheetCatalog_() {
           {file: 'document-journal.js', role: 'read', functions: ['readDocumentJournal_']},
           {file: 'document-journal.js', role: 'write', functions: ['appendDocumentRow_']}
         ]
+      },
+      evidenceFolders: {
+        name: 'EvidenceFolders',
+        access: 'edit',
+        headers: ['Evidence Folder', 'Document ID'],
+        status: 'new',
+        purpose: 'Which template document each evidence folder (a folder below 2_Evidence in the team repository) belongs to. A folder belongs to one document; a document may have many folders. Submitting the document copies its folders to Drive. The coordinator fills the rows.',
+        createAtRuntime: false,
+        code: [
+          {file: 'document-setup.js', role: 'setup', functions: ['setupDocumentStorage']},
+          {file: 'evidence.js', role: 'read', functions: ['readEvidenceFolders_']}
+        ]
+      },
+      activityEvidences: {
+        name: 'ActivityEvidences',
+        access: 'edit',
+        headers: ['Activity ID', 'Evidence Folder', 'Minimum Files'],
+        status: 'new',
+        purpose: 'The evidence a Review needs: each row says a team must have copied at least Minimum Files files from one evidence folder before the Review (Activity ID, such as review1) opens. A Review with no row has no evidence requirement. The coordinator fills the rows.',
+        createAtRuntime: false,
+        code: [
+          {file: 'document-setup.js', role: 'setup', functions: ['setupDocumentStorage']},
+          {file: 'evidence.js', role: 'read', functions: ['readActivityEvidences_']}
+        ]
+      },
+      evidenceCopies: {
+        name: 'EvidenceCopies',
+        access: 'view',
+        headers: ['Team ID', 'Document ID', 'Evidence Folder', 'Path', 'Blob SHA', 'Size', 'Drive File ID', 'Committed At', 'First Committed At', 'Copied At'],
+        status: 'new',
+        purpose: 'One row per team and evidence file copied from the team repository to the team folder in Drive. Committed At is the date of the last commit that touched the file; First Committed At is set once and never changed. The Review gate counts these rows.',
+        createAtRuntime: false,
+        code: [
+          {file: 'document-setup.js', role: 'setup', functions: ['setupDocumentStorage']},
+          {file: 'evidence.js', role: 'read', functions: ['readEvidenceCopies_']},
+          {file: 'evidence.js', role: 'write', functions: ['evidenceWriteCopy_']}
+        ]
+      },
+      evidenceStatus: {
+        name: 'EvidenceStatus',
+        access: 'view',
+        headers: ['Team ID', 'Document ID', 'Evidence Pending', 'Evidence Too Large', 'Checked At'],
+        status: 'new',
+        purpose: 'For each team and document with evidence folders: how many evidence files are waiting to be copied and how many are too large, written by the team-file scan, by Copy evidence and by Check for new evidence. A blank Evidence Pending means the repository could not be read. The Documents screen reads this instead of GitHub.',
+        createAtRuntime: false,
+        code: [
+          {file: 'document-setup.js', role: 'setup', functions: ['setupDocumentStorage']},
+          {file: 'evidence.js', role: 'read', functions: ['readEvidenceStatus_']},
+          {file: 'evidence.js', role: 'write', functions: ['evidenceWriteStatus_']}
+        ]
       }
     });
   }

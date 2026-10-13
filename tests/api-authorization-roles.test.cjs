@@ -63,6 +63,8 @@ const ENDPOINTS = {
   API_documents_get: [[TEAM], OUTSIDER],
   API_student_previewDocument: [[{ documentId: 'doc-0001' }], [...OUTSIDER, 'guide@example.com']],
   API_student_submitDocument: [[{ requestId: 'request_123456789', expectedRevision: 0, documentId: 'doc-0001', expectedCommit: 'abcdef1' }], [...OUTSIDER, 'guide@example.com']],
+  API_student_copyEvidence: [[{ documentId: 'doc-0001' }], [...OUTSIDER, 'guide@example.com']],
+  API_student_checkEvidence: [[{ documentId: 'doc-0001' }], [...OUTSIDER, 'guide@example.com']],
   API_guide_decideDocument: [[{ requestId: 'request_123456789', expectedRevision: 0, teamId: TEAM, documentId: 'doc-0001', decision: 'approve' }], [...OUTSIDER, 'one@example.com']],
   API_shared_getTimeline: [[], OUTSIDER],
   API_shared_getRubrics: [[], OUTSIDER]

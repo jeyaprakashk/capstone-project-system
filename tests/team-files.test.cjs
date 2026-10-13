@@ -16,7 +16,7 @@ const ADMIN = 900, ANN = 101, BOB = 102;
 
 function setup() {
   const f = weeklyFixture();
-  ['github-provisioning.js', 'document-sheets.js', 'template-files.js', 'team-files.js', 'document-setup.js']
+  ['github-provisioning.js', 'document-sheets.js', 'template-files.js', 'team-files.js', 'evidence.js', 'document-setup.js']
     .forEach(name => vm.runInContext(fs.readFileSync(name, 'utf8'), f.c, {filename: name}));
   f.c.requireTriggerOrOperator_ = () => {};
   f.c.setupDocumentStorage();

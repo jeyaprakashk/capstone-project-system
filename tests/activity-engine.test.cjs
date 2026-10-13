@@ -9,7 +9,7 @@ const { githubSetupStub, makeDriveContext } = require('./title-baseline/stubs.cj
 const plain = value => JSON.parse(JSON.stringify(value));
 const HEADERS = ['Activity', 'Kind', 'Item', 'Label', 'Active'];
 const WORK = 'Step1_Work_Breakdown.docx', NEED = 'Step2_Need_Analysis.docx';
-const FILES = ['common-constants.js', 'common-helpers.js', 'api-envelope.js', 'sheet-columns.js', 'activity-engine.js', 'activity-check-github.js',
+const FILES = ['common-constants.js', 'common-helpers.js', 'api-envelope.js', 'sheet-columns.js', 'activity-engine.js', 'evidence.js', 'activity-check-github.js',
   'activity-check-drive.js', 'activity-check-document.js', 'activity-check-title.js', 'activity-requirements-api.js', 'document-service.js', 'document-drive.js', 'team-files.js', 'github-identity.js', 'weekly-activity.js'];
 
 /**
@@ -28,7 +28,7 @@ function setup(spec = {}) {
   const reads = {sheet: 0, github: 0};
   c.getAcademicYear_ = () => '2026-27';
   c.getSpreadsheetId_ = () => 'sheet-1';
-  c.getSheet_ = () => spec.present === false ? null : {};
+  c.getSheet_ = name => name === 'ActivityEvidences' || spec.present === false ? null : {};
   c.readSheetRows_ = () => { reads.sheet++; return [spec.headers || HEADERS, ...(spec.rows || [])]; };
   const github = spec.github === undefined ? 'ready' : spec.github;
   const stub = githubSetupStub(typeof github === 'string' ? github : github.preset, typeof github === 'string' ? {} : github.overrides);

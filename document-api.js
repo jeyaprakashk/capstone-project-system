@@ -67,10 +67,59 @@ function documentRun_(as, action, teamId, input) {
   return documentWrite_({action, teamId: resolved, documentId: input.documentId, requestId: input.requestId, expectedRevision: input.expectedRevision, input}, documentDeps_(as));
 }
 
+/**
+ * The evidence of a document is copied right after its submission (archive/plans/EVIDENCE-PLAN.md, decision 5). A failure never undoes or blocks the
+ * submission: the message says what is left, and the student's Copy evidence button finishes it.
+ */
+function documentWithEvidence_(result, teamId, input) {
+  try {
+    const ctx = documentContext_(teamId, String(input && input.documentId || '').trim());
+    const copy = evidenceCopy_(ctx.team, ctx.document), note = evidenceMessage_(copy);
+    return note ? Object.assign({}, result, {message: result.message + ' ' + note, evidence: copy}) : result;
+  } catch (error) {
+    console.error('Evidence copy after a submission failed for ' + teamId + ': ' + (error && error.message || error));
+    return Object.assign({}, result, {message: result.message + ' Evidence could not be copied now: use Copy evidence in a few minutes.'});
+  }
+}
+
 function API_student_submitDocument(input) {
   return apiHandle_(() => {
     const student = studentAccessOrThrow_();
-    return documentRun_('student', 'submit', student.teamId, input);
+    return documentWithEvidence_(documentRun_('student', 'submit', student.teamId, input), student.teamId, input);
+  });
+}
+
+/**
+ * The Check for new evidence button: reads the team repository now (the Documents screen reads none) and returns the document's evidence with its
+ * waiting and too-large files, and whether Copy evidence is now allowed. The counts are saved, so the next screen load shows them too.
+ */
+function API_student_checkEvidence(input) {
+  return apiHandle_(() => {
+    const student = studentAccessOrThrow_();
+    const documentId = String(input && input.documentId || '').trim();
+    const ctx = documentContext_(student.teamId, documentId);
+    if (!readEvidenceFolders_().byDocument.has(documentId)) throw apiFail_('REJECTED', 'This document has no evidence folder.');
+    const status = documentStateFromRows_(documentReadJournal_().rowsFor(ctx.team.teamId, documentId)).status;
+    if (status === 'UNAVAILABLE') throw apiFail_('UNAVAILABLE', 'This document cannot be used right now. Contact the coordinator.');
+    if (status === 'NOT_SUBMITTED') throw apiFail_('REJECTED', 'Submit the document first: its evidence is copied with it.');
+    const evidence = evidenceCheck_(ctx.team, ctx.document);
+    const message = evidence.pending ? evidence.pending + ' evidence file' + (evidence.pending === 1 ? ' is' : 's are') + ' waiting to be copied.' : 'No new evidence files.';
+    return {ok: true, message, evidence, can: {copyEvidence: evidenceCanCopy_(status, {student: true}, evidence)}};
+  });
+}
+
+/** The Copy evidence button: copies the new and changed evidence files of a document that has been submitted. Idempotent, so it needs no request ID. */
+function API_student_copyEvidence(input) {
+  return apiHandle_(() => {
+    const student = studentAccessOrThrow_();
+    const documentId = String(input && input.documentId || '').trim();
+    const ctx = documentContext_(student.teamId, documentId);
+    if (!readEvidenceFolders_().byDocument.has(documentId)) throw apiFail_('REJECTED', 'This document has no evidence folder.');
+    const status = documentStateFromRows_(documentReadJournal_().rowsFor(ctx.team.teamId, documentId)).status;
+    if (status === 'UNAVAILABLE') throw apiFail_('UNAVAILABLE', 'This document cannot be used right now. Contact the coordinator.');
+    if (status === 'NOT_SUBMITTED') throw apiFail_('REJECTED', 'Submit the document first: its evidence is copied with it.');
+    const result = evidenceCopy_(ctx.team, ctx.document);
+    return Object.assign({ok: true, message: evidenceMessage_(result)}, result);
   });
 }
 
@@ -138,6 +187,7 @@ function buildDocumentsDto_(teamId, viewer) {
   let folder = null;
   try { folder = findTeamFolder_(team.teamId, team.semester); } catch (error) { folder = null; }
   const people = documentTeamPeople_(team.teamId, row, TS);
+  const evidenceSource = evidenceDtoSource_();
   const names = new Map([1, 2, 3, 4].map(n => [normalizeEmail_(row[TS['S' + n + '_EMAIL']]), String(row[TS['S' + n + '_NAME']] || '').trim()]).filter(pair => pair[0]));
   const seesStaffDetail = roles.guide || roles.coordinator;
   let scannedAt = '';
@@ -157,6 +207,7 @@ function buildDocumentsDto_(teamId, viewer) {
     if (submitter && seesStaffDetail) submitter.email = lastSubmit.actor;
     const user = {roles};
     const extra = {teamChanged, label: document.fileName};
+    const evidence = evidenceDtoFor_(evidenceSource, team, document);
     const dto = {
       documentId: document.documentId, fileName: document.fileName, folder: document.folder, extension: document.extension,
       status: state.status, state: DOCUMENT_TONE_[state.status], statusText: DOCUMENT_STATUS_TEXT_[state.status],
@@ -164,13 +215,16 @@ function buildDocumentsDto_(teamId, viewer) {
       returnedNotes: state.status === 'RETURNED' && state.last ? state.last.notes : '',
       submittedBy: showLines ? submitter : null,
       commit: showLines ? documentCommitLines_(lastSubmit, people) : null,
+      evidence,
       history: seesStaffDetail ? rows.map(item => ({revision: item.revision, action: item.action, actor: item.actor, at: item.timestamp, notes: item.notes})) : [],
       can: state.status === 'UNAVAILABLE' ? null : {
         submit: documentCapability_(documentCanDo_(state, 'submit', user, extra)),
         approve: documentCapability_(documentCanDo_(state, 'approve', user, extra)),
         return: documentCapability_(documentCanDo_(state, 'return', user, extra)),
         reopen: documentCapability_(documentCanDo_(state, 'reopen', user, extra)),
-        check: documentCapability_(documentCanDo_(state, 'check', user, extra))
+        check: documentCapability_(documentCanDo_(state, 'check', user, extra)),
+        copyEvidence: evidenceCanCopy_(state.status, roles, evidence),
+        checkEvidence: evidenceCanCheck_(state.status, roles, evidence)
       }
     };
     return dto;

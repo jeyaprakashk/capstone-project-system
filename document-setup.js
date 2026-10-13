@@ -1,6 +1,7 @@
 /**
  * DOCUMENT SETUP - the editor-run entry points of the template-document work (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md, sections 9 and 11).
- *   setupDocumentStorage  creates the document sheets built so far (each phase adds its own). It installs no trigger.
+ *   setupDocumentStorage  creates the document sheets built so far (each phase adds its own) and the four evidence sheets
+ *                         (archive/plans/EVIDENCE-PLAN.md). It installs no trigger.
  *   setupDocumentTriggers installs the scan triggers built so far, once each: the daily template scan and the team-file scan every
  *                         TEAM_FILE_SCAN_EVERY_HOURS_ hours. A team-file trigger from an older schedule is replaced.
  * Both start with requireTriggerOrOperator_(); neither changes or deletes data.
@@ -13,7 +14,11 @@ function setupDocumentStorage() {
   return {
     templateFiles: ensureSheet_({...sheetSpec_('templateFiles'), mode: 'setup', onCreate: formatDocumentSheet_}),
     teamFileStatus: ensureSheet_({...sheetSpec_('teamFileStatus'), mode: 'setup', onCreate: formatDocumentSheet_}),
-    documentSubmissions: ensureSheet_({...sheetSpec_('documentSubmissions'), mode: 'setup', onCreate: formatDocumentSheet_})
+    documentSubmissions: ensureSheet_({...sheetSpec_('documentSubmissions'), mode: 'setup', onCreate: formatDocumentSheet_}),
+    evidenceFolders: ensureSheet_({...sheetSpec_('evidenceFolders'), mode: 'setup', onCreate: formatDocumentSheet_}),
+    activityEvidences: ensureSheet_({...sheetSpec_('activityEvidences'), mode: 'setup', onCreate: formatDocumentSheet_}),
+    evidenceCopies: ensureSheet_({...sheetSpec_('evidenceCopies'), mode: 'setup', onCreate: formatDocumentSheet_}),
+    evidenceStatus: ensureSheet_({...sheetSpec_('evidenceStatus'), mode: 'setup', onCreate: formatDocumentSheet_})
   };
 }
 

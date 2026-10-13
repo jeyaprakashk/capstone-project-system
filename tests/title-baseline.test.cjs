@@ -67,7 +67,7 @@ test('baseline: review marking (eligibility, the reviewer status, who can decide
   for (const combo of combos()) {
     const f = fixtureFor(combo);
     const c = f.c;
-    load(c, ['reviewer-api.js', 'reviewer-dashboard.js', 'review-evaluation.js', 'activity-engine.js', 'activity-check-title.js']);
+    load(c, ['reviewer-api.js', 'reviewer-dashboard.js', 'review-evaluation.js', 'activity-engine.js', 'evidence.js', 'activity-check-title.js']);
     f.set('Review Committee Number', 'C1');
     c.getCommitteeNumbersForReviewer_ = () => ['C1'];
     const TS = c.getColumnMap_('TeamStatus', inside(c, 'FIELD_DEFINITIONS.TEAM_STATUS'));

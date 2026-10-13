@@ -104,10 +104,10 @@ function activityPreconditions_(activityId, team, ctx) {
   const loaded = loadActivityRules_(ctx);
   if (loaded.errors.length) return {allowed: false, requirements: [], reason: ACTIVITY_MISCONFIGURED_};
   const rows = (loaded.rules[activityId] || []).filter(rule => !ctx.kinds || ctx.kinds.includes(rule.kind));
-  if (!rows.length) return {allowed: true, requirements: [], reason: ''};
   const checks = activityChecks_();
   const ordered = ctx.hint ? rows.map((rule, at) => ({rule, at})).sort((a, b) => (ACTIVITY_KIND_COST_[a.rule.kind] - ACTIVITY_KIND_COST_[b.rule.kind]) || (a.at - b.at)).map(entry => entry.rule) : rows;
   const requirements = [];
+  let stopped = false;
   for (const rule of ordered) {
     let answer;
     try { answer = checks[rule.kind].isMet(team, rule.item, ctx); }
@@ -116,8 +116,19 @@ function activityPreconditions_(activityId, team, ctx) {
     if (!item.met) item.reason = answer.unverifiable ? 'Could not verify: ' + rule.label + '.' : String(answer.reason || 'Not met.');
     if (answer.diagnostic) item.diagnostic = answer.diagnostic;
     requirements.push(item);
-    if (ctx.hint && !item.met && !answer.unverifiable) break;
+    if (ctx.hint && !item.met && !answer.unverifiable) { stopped = true; break; }
   }
+  // The evidence a Review needs (ActivityEvidences, evidence.js): sheet reads only, so it runs after the dearer checks and, in a hint context, only
+  // when none of them is definitely unmet.
+  if (!stopped && (!ctx.kinds || ctx.kinds.includes('evidence'))) {
+    evidenceGateItems_(activityId, team, ctx).forEach(answer => {
+      const item = {label: answer.label, met: answer.met === true, reason: ''};
+      if (!item.met) item.reason = answer.unverifiable ? 'Could not verify: ' + answer.label + '.' : String(answer.reason || 'Not met.');
+      if (answer.diagnostic) item.diagnostic = answer.diagnostic;
+      requirements.push(item);
+    });
+  }
+  if (!requirements.length) return {allowed: true, requirements: [], reason: ''};
   const unmet = requirements.filter(item => !item.met);
   return {allowed: unmet.length === 0, requirements, reason: unmet.length ? unmet.map(item => item.label + ': ' + item.reason).join(' ') : ''};
 }

@@ -3,7 +3,7 @@
  * Renders the Documents DTO of one team (DATA-CONTRACTS.md, DocumentsDto) into a host element and sends the document writes through the
  * bridge: Submit (API_student_submitDocument, after a live preview the student confirms; "Check GitHub now" runs the same preview when the
  * team scan has not yet seen a team member's change), Approve and Return
- * (API_guide_decideDocument) and Reopen (API_coordinator_reopenDocument). Everything a person may do comes from the DTO's `can`; this
+ * (API_guide_decideDocument), Reopen (API_coordinator_reopenDocument), Copy evidence (API_student_copyEvidence) and Check for new evidence (API_student_checkEvidence; archive/plans/EVIDENCE-PLAN.md). Everything a person may do comes from the DTO's `can`; this
  * module decides nothing and reads no spreadsheet column. The request ID of a write comes from TitleRequests, so a retry of the same
  * content after a failure that may have committed is recognised by the server. It never calls google.script.run.
  * Hosts: the student's Documents screen, the guide's Documents tab and the coordinator's team drawer. Each host gets one delegated listener
@@ -59,11 +59,34 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
         (item.notes ? ' · ' + escape(item.notes) : '') + '</li>').join('') + '</ul></details>';
   }
 
+  const bytes = size => size >= 1048576 ? (size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(size / 1024)) + ' KB';
+  const EVIDENCE_STATE = {COPIED: '', PENDING: 'waiting to be copied', TOO_LARGE: 'too large, not copied'};
+
+  /** The evidence of a document (the team's copied files, and for a student what is still waiting), with a link to each copied file. */
+  function evidenceMarkup(doc, dto) {
+    const evidence = doc.evidence;
+    if (!evidence) return '';
+    const checked = evidence.checkedAt && when(evidence.checkedAt) ? ' (checked ' + when(evidence.checkedAt) + ')' : '';
+    const summary = 'Evidence: ' + evidence.copied + ' copied' + (evidence.pending ? ', ' + evidence.pending + ' waiting to be copied' : '') +
+      (evidence.tooLarge ? ', ' + evidence.tooLarge + ' too large' : '') + checked;
+    const items = evidence.files.map(file => '<li class="break-all" data-evidence-file="' + escape(file.state) + '">' + escape(file.path) + ' · ' + escape(bytes(file.size)) +
+      (EVIDENCE_STATE[file.state] ? ' · ' + escape(EVIDENCE_STATE[file.state]) : '') +
+      (file.link ? ' · <a class="text-primary" href="' + escape(safeUrl(file.link)) + '" target="_blank" rel="noopener">' + (file.state === 'PENDING' ? 'Open the earlier copy' : 'Open') + '</a>' : '') + '</li>').join('');
+    const body = items ? '<ul class="m-0 mt-1 list-none p-0 text-xs text-muted" data-evidence-list>' + items + '</ul>'
+      : p('No evidence files yet in ' + escape(evidence.folders.join(', ')) + '.', 'text-muted');
+    const reason = dto.roles && dto.roles.student && evidence.pending === null && evidence.checkedAt === '' && doc.status !== 'NOT_SUBMITTED'
+      ? p('Evidence has not been checked yet. Use Check for new evidence.', 'text-muted') : '';
+    return '<details class="mt-2 text-sm" data-doc-evidence><summary class="cursor-pointer font-semibold text-ink-2">' + escape(summary) + '</summary>' + body + '</details>' + reason;
+  }
+
   function controlsMarkup(doc, dto) {
     const can = doc.can;
     if (!can) return '';
     const id = escape(doc.documentId), revision = escape(doc.revision), hooks = ' data-document="' + id + '" data-revision="' + revision + '"';
     let html = '';
+    const evidenceButtons = (can.copyEvidence && can.copyEvidence.allowed ? '<button type="button" class="' + BUTTON + '" data-doc-action="copy-evidence"' + hooks + '>Copy evidence</button>' : '') +
+      (can.checkEvidence && can.checkEvidence.allowed ? '<button type="button" class="' + BUTTON + '" data-doc-action="check-evidence"' + hooks + '>Check for new evidence</button>' : '');
+    if (evidenceButtons) html += '<div class="mt-3 flex flex-wrap gap-2">' + evidenceButtons + '</div>';
     if (can.submit.allowed) {
       html += '<div class="mt-3"><button type="button" class="' + PRIMARY + '" data-doc-action="submit"' + hooks + '>Submit the latest version</button></div>';
     } else if (dto.roles && dto.roles.student && ['NOT_SUBMITTED', 'RETURNED', 'REOPENED'].indexOf(doc.status) >= 0 && can.submit.reason) {
@@ -95,7 +118,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
       '<span class="' + tone + '">' + escape(doc.statusText) + '</span></div>' +
       (doc.status === 'RETURNED' && doc.returnedNotes ? p('<strong>Guide\'s notes:</strong> ' + escape(doc.returnedNotes), 'text-warning') : '') +
       (doc.link ? '<div class="mt-2"><a class="' + LINK + '" href="' + escape(safeUrl(doc.link)) + '" target="_blank" rel="noopener">Open the file</a></div>' : '') +
-      linesMarkup(doc) + controlsMarkup(doc, dto) +
+      linesMarkup(doc) + evidenceMarkup(doc, dto) + controlsMarkup(doc, dto) +
       '<p class="mt-2 text-sm text-ink-2 empty:hidden" role="status" aria-live="polite" data-doc-status></p>' + historyMarkup(doc) + '</article>';
   }
 
@@ -180,6 +203,43 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     });
   }
 
+  /** Copy evidence: idempotent on the server, so it needs no request ID. The server's message (what was copied, what is left) is shown after the reload. */
+  function copyEvidence(host, card, button) {
+    const state = hosts.get(host), documentId = button.getAttribute('data-document');
+    const status = card.querySelector('[data-doc-status]');
+    const done = getUi().busy.write(status, 'Copying evidence…', Array.from(card.querySelectorAll('button, textarea')));
+    return bridge.write('API_student_copyEvidence', [{documentId}]).then(result => {
+      done();
+      state.notice = result && result.message ? result.message : '';
+      state.dto = null;
+      return load(host);
+    }, error => {
+      done(errorMessage(error));
+      if (error && (error.code === 'REJECTED' || error.code === 'UNAVAILABLE')) { state.notice = errorMessage(error); return load(host); }
+    });
+  }
+
+  /**
+   * Check for new evidence: the server reads the repository now (the screen load reads none) and returns this document's evidence with its waiting
+   * and too-large files. The result is put into the DTO already on screen and the list is drawn again; the next load shows the saved counts.
+   */
+  function checkEvidence(host, card, button) {
+    const state = hosts.get(host), documentId = button.getAttribute('data-document');
+    const status = card.querySelector('[data-doc-status]');
+    const done = getUi().busy.write(status, 'Checking the repository…', Array.from(card.querySelectorAll('button, textarea')));
+    return bridge.read('evidence-check:' + documentId, 'API_student_checkEvidence', [{documentId}], {timeoutMs: 120000}).then(result => {
+      done();
+      const item = state.dto && state.dto.documents.find(candidate => candidate.documentId === documentId);
+      if (!host.isConnected || hosts.get(host) !== state || !item) return;
+      item.evidence = result.evidence;
+      if (item.can) item.can.copyEvidence = result.can.copyEvidence;
+      host.innerHTML = listMarkup(state.dto, result.message || '');
+    }, error => {
+      if (error && error.superseded) return;
+      done(errorMessage(error));
+    });
+  }
+
   function decide(host, card, button, decision) {
     const state = hosts.get(host), documentId = button.getAttribute('data-document'), revision = Number(button.getAttribute('data-revision'));
     const field = card.querySelector('[data-doc-notes]'), notes = field ? field.value.trim() : '';
@@ -205,6 +265,8 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     if (action === 'submit' || action === 'check') submit(host, card, button);
     else if (action === 'approve' || action === 'return') decide(host, card, button, action);
     else if (action === 'reopen') reopen(host, card, button);
+    else if (action === 'copy-evidence') copyEvidence(host, card, button);
+    else if (action === 'check-evidence') checkEvidence(host, card, button);
   }
 
   return {mount, load, markup: listMarkup};

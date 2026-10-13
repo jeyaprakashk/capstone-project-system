@@ -23,7 +23,7 @@ function setup({registryFails = false, activity = null} = {}) {
   const session = {email: 'ann@x.edu'};
   const properties = {};
   const env = makeTitleEnv([HEADERS], {
-    files: ['activity-engine.js', 'title-service.js', 'title-write.js', 'team-folders.js', 'team-documents.js', 'title-api.js'],
+    files: ['activity-engine.js', 'evidence.js', 'title-service.js', 'title-write.js', 'team-folders.js', 'team-documents.js', 'title-api.js'],
     globals: {
       Utilities, Session: {getActiveUser: () => ({getEmail: () => session.email})},
       MailApp: {sendEmail: (to, subject, body) => mails.push({to, subject, body})},

@@ -22,7 +22,7 @@ only for a deliberate, reviewed rule or schema change made outside a migration.
 
 ## Review entry
 
-Whether a team's marks can be entered for a Review is decided by two things, both reviewed and approved as a deliberate rule change
+Whether a team's marks can be entered for a Review is decided by three things, all reviewed and approved as deliberate rule changes
 (October 2026), not by prerequisite JSON or a title check in code:
 
 - **Order: `Sequence`.** A Review opens for a team only after every other non-SEE assessment with a lower `Sequence` in
@@ -37,6 +37,13 @@ Whether a team's marks can be entered for a Review is decided by two things, bot
   overwrite it. The files that stood in the folders at go-live were recorded once (October 2026, 111 documents) as an ordinary SUBMIT
   and APPROVE pair with actor `baseline`; that one-time code has been run and deleted (Versions 202 and 203 hold it). A journal that begins with a `REOPEN`
   row is `UNAVAILABLE` like any other broken history (the owner checked the sheet: none exists).
+
+- **Evidence: `ActivityEvidences` rows (October 2026, owner-approved rule change; archive/plans/EVIDENCE-PLAN.md).** A Review also needs, for each row
+  `Activity ID` / `Evidence Folder` / `Minimum Files` that names it, at least that many evidence files of the team copied to Drive in that folder (the
+  `EvidenceCopies` rows with a Drive file; the whole semester, no date window). It is evaluated by the activity engine beside the other requirements, so it
+  applies to reading and to every save like them (`reviewEligibility_`). A Review with no row, and a workbook without the sheet, has no evidence
+  requirement; a row that is not valid for its Review, or a sheet that cannot be read, denies; the title activities are never affected. Evidence never
+  gates a document's approval or Submit.
 
 Changing these rows or the Sequence values is a configuration change by the coordinator. Changing how they are evaluated is a rule
 change and follows the paragraph above.
@@ -96,7 +103,11 @@ history (one row per change, the latest row of a team is its state). Specified i
   `github`, `drive`, `document` and `title` checks; `document` takes a Document ID from the scanned template list as its item). Misconfiguration denies; nothing is cached between requests; a student never sees a check's `diagnostic`.
 - **Students and Drive.** The team folders live in a shared drive that students are **not members of**. Each team's students are given
   viewer access to **their own team's folder only** (`createTeamFolders_` adds them; nothing else does). Nothing in a team folder may be
-  hidden from them: what the app chooses to link cannot limit what a folder viewer sees in Drive. The app never shows a student a folder
+  hidden from them: what the app chooses to link cannot limit what a folder viewer sees in Drive. **Evidence** (October 2026): the files of `2_Evidence/<folder>` of the team repository (never dot files or README files, at most 25 MB each) are
+  copied by Submit, or by the student's *Copy evidence* button, into `evidences/<path>` in the team's Drive folder (`evidence.js`); a file is copied only when
+  new or changed, a copy is never deleted, and the Documents DTO links each copied file individually. Which folder belongs to which document is the
+  `EvidenceFolders` sheet. The Documents screen reads no GitHub for evidence: its counts come from `EvidenceStatus`, kept by the team-file scan, Copy
+  evidence and Check for new evidence. The app never shows a student a folder
   link: no student DTO or student view carries `folderUrl`. The template-document submission (archive/plans/TEMPLATE-DOCUMENT-SUBMISSION-PLAN.md) has shipped: the Documents DTO (`API_documents_get`) may carry the
   link of a file of the student's own team, and nothing else; every other student DTO carries no Drive link. Guides, reviewers and the coordinator get `folderUrl`.
   `tests/student-title.test.cjs` and `tests/student-migration.test.cjs` fail if a student receives a link they may not have.
