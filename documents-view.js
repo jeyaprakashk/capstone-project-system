@@ -76,7 +76,10 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
       : p('No evidence files yet in ' + escape(evidence.folders.join(', ')) + '.', 'text-muted');
     const reason = dto.roles && dto.roles.student && evidence.pending === null && evidence.checkedAt === '' && doc.status !== 'NOT_SUBMITTED'
       ? p('Evidence has not been checked yet. Use Check for new evidence.', 'text-muted') : '';
-    return '<details class="mt-2 text-sm" data-doc-evidence><summary class="cursor-pointer font-semibold text-ink-2">' + escape(summary) + '</summary>' + body + '</details>' + reason;
+    const needs = (evidence.requirements || []).map(item => '<li class="' + (item.met ? 'text-success' : 'text-warning') + '" data-evidence-requirement="' + (item.met ? 'met' : 'unmet') + '">' +
+      escape(item.label) + ' needs at least ' + escape(item.minimum) + (item.minimum === 1 ? ' file' : ' files') + ' in ' + escape(item.folder) + ': ' + escape(item.copied) + ' copied' + (item.met ? ' (done)' : '') + '</li>').join('');
+    const requirements = needs ? '<ul class="m-0 mt-2 list-none p-0 text-sm" data-evidence-requirements>' + needs + '</ul>' : '';
+    return requirements + '<details class="mt-2 text-sm" data-doc-evidence><summary class="cursor-pointer font-semibold text-ink-2">' + escape(summary) + '</summary>' + body + '</details>' + reason;
   }
 
   function controlsMarkup(doc, dto) {

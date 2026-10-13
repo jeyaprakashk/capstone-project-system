@@ -280,3 +280,18 @@ test('a failed check keeps the screen and says why; a guide is never offered it'
   await guide.view.mount(guide.host, 'T1');
   assert.equal(guide.host.querySelector('[data-doc-action="check-evidence"]'), null);
 });
+
+test('the requirement lines say what each Review needs from the document\'s folders and how many files are copied; they escape every value', async () => {
+  const needs = [{ activity: 'review1', label: 'Review 1', folder: 'Requirements', minimum: 3, copied: 1, met: false }, { activity: 'review2', label: 'Review <2>', folder: 'Testing', minimum: 1, copied: 2, met: true }];
+  const f = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], 0, { requirements: needs }), cap(false), { student: true }) });
+  await f.view.mount(f.host, '');
+  const lines = [...f.host.querySelectorAll('[data-evidence-requirement]')];
+  assert.deepEqual(lines.map(line => line.getAttribute('data-evidence-requirement')), ['unmet', 'met']);
+  assert.equal(text(lines[0]), 'Review 1 needs at least 3 files in Requirements: 1 copied');
+  assert.equal(text(lines[1]), 'Review <2> needs at least 1 file in Testing: 2 copied (done)');
+  assert.equal(f.host.querySelector('[data-evidence-requirements] b, [data-evidence-requirements] 2'), null);
+  assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
+  const none = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], 0), cap(false), { student: true }) });
+  await none.view.mount(none.host, '');
+  assert.equal(none.host.querySelector('[data-evidence-requirements]'), null);
+});

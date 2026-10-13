@@ -13,7 +13,7 @@ const STEP1 = '1_Documents/Step1_Work_Breakdown.docx', STEP2 = '1_Documents/Step
 const BASE1 = '68fa810f28c67de66c97a0d0140e2b70c0dcf54f';
 const ANN = 101, BOB = 102, ADMIN = 900;
 const TEMPLATE_HEADERS = ['Document ID', 'Folder', 'File Name', 'Extension', 'First Seen', 'Last Seen', 'Active', 'In Team Template', 'Name Conflict'];
-const FILES = ['document-sheets.js', 'template-files.js', 'team-files.js', 'evidence.js', 'document-service.js', 'document-journal.js', 'document-files.js', 'document-github.js', 'document-drive.js',
+const FILES = ['document-sheets.js', 'template-files.js', 'team-files.js', 'evidence.js', 'activity-engine.js', 'document-service.js', 'document-journal.js', 'document-files.js', 'document-github.js', 'document-drive.js',
   'document-write.js', 'document-api.js', 'document-setup.js', 'github-provisioning.js', 'api-envelope.js', 'student-api.js', 'title-api.js'];
 const commit = (sha, id, login, date) => ({sha, author: id === null ? null : {id, login: login || 'user' + id}, commit: {author: {date: date || '2030-01-02T03:04:05Z'}}});
 
@@ -622,4 +622,24 @@ test('evidence: a workbook without the evidence sheets submits and shows documen
   assert.equal(result.data.message, 'Document submitted for guide review.');
   assert.equal(documents(env, STUDENT).data.documents.every(item => item.evidence === null), true);
   assert.equal(env.f.c.scanTeamFiles().ok, true);
+});
+
+test('evidence: each document lists the Review requirements that use its folders with the copied count, for every role; invalid and title rows are left out', () => {
+  const env = evidenceEnv();
+  env.f.c.getAssessmentDefinitions_ = () => [{key: 'review1', type: 'REVIEW', label: 'Review 1'}, {key: 'review2', type: 'REVIEW', label: 'Review 2'}];
+  env.f.sheets.get('ActivityEvidences').rows.push(['review2', 'requirements', '5'], ['review1', 'Requirements', '1'], ['review1', 'Testing', '2'], ['review2', 'Requirements', 'many'], ['title.submit', 'Requirements', '1']);
+  const needs = (user, id = 'doc-0001') => plain(evidenceOf(env, user, id).evidence.requirements);
+  assert.deepEqual(needs(STUDENT), [
+    {activity: 'review1', label: 'Review 1', folder: 'Requirements', minimum: 1, copied: 0, met: false},
+    {activity: 'review2', label: 'Review 2', folder: 'requirements', minimum: 5, copied: 0, met: false}]);
+  assert.deepEqual(needs(STUDENT, 'doc-0002'), [{activity: 'review1', label: 'Review 1', folder: 'Testing', minimum: 2, copied: 0, met: false}]);
+  submit(env);
+  const after = needs(STUDENT);
+  assert.deepEqual(after.map(item => [item.activity, item.copied, item.met]), [['review1', 2, true], ['review2', 2, false]]);
+  assert.deepEqual(needs(GUIDE), after);
+  assert.deepEqual(needs(COORD), after);
+  assert.deepEqual(plain(checkEvidence(env).data.evidence.requirements), after, 'Check for new evidence keeps the requirement lines');
+  env.f.sheets.delete('ActivityEvidences');
+  env.f.c.invalidateSheetCaches_('ActivityEvidences');
+  assert.deepEqual(needs(STUDENT), []);
 });

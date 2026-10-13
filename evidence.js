@@ -323,7 +323,10 @@ function evidenceCheck_(team, document) {
   const copies = readEvidenceCopies_(), live = evidenceLiveFiles_(team, folders, copies);
   const pending = live.files.filter(file => file.state === 'PENDING').length, tooLarge = live.files.filter(file => file.state === 'TOO_LARGE').length;
   evidenceSaveStatus_([evidenceStatusRecord_(team, document, pending, tooLarge)]);
-  return evidenceBuildView_(team, document, folders, copies, live.files, {pending, tooLarge, checkedAt: new Date().toISOString()});
+  let rules = null;
+  try { rules = readActivityEvidences_(); } catch (error) { console.error('ActivityEvidences could not be read for the check: ' + (error && error.message || error)); }
+  const requirements = evidenceRequirements_(rules, rules && rules.rows.length ? evidenceReviewLabels_() : new Map(), team, folders, copies);
+  return evidenceBuildView_(team, document, folders, copies, live.files, {pending, tooLarge, checkedAt: new Date().toISOString()}, requirements);
 }
 
 /** One sentence about a copy for the person who started it. */
@@ -376,17 +379,21 @@ function evidenceUnknownRecords_(scan, team, nowIso) {
 
 /**
  * What the Documents DTO needs, read once per request from sheets only (no GitHub): {folders, copies, status} or null when the evidence sheets
- * cannot be read. `status` (EvidenceStatus) is null when that sheet cannot be read: the counts are then unknown, not zero.
+ * cannot be read. `status` (EvidenceStatus) is null when that sheet cannot be read: the counts are then unknown, not zero. `rules` (ActivityEvidences) is
+ * null when it cannot be read, and `labels` maps a Review key to its label.
  */
 function evidenceDtoSource_() {
   try {
     const folders = readEvidenceFolders_();
-    if (!folders.byDocument.size) return {folders, copies: null, status: null};
+    if (!folders.byDocument.size) return {folders, copies: null, status: null, rules: null, labels: new Map()};
     const copies = readEvidenceCopies_();
     let status = null;
     try { status = readEvidenceStatus_(); }
     catch (error) { console.error('EvidenceStatus could not be read: ' + (error && error.message || error)); }
-    return {folders, copies, status};
+    let rules = null;
+    try { rules = readActivityEvidences_(); }
+    catch (error) { console.error('ActivityEvidences could not be read for the screen: ' + (error && error.message || error)); }
+    return {folders, copies, status, rules, labels: rules && rules.rows.length ? evidenceReviewLabels_() : new Map()};
   } catch (error) {
     console.error('Evidence sheets could not be read: ' + (error && error.message || error));
     return null;
@@ -396,9 +403,9 @@ function evidenceDtoSource_() {
 /**
  * The evidence of one document, as the DTO carries it: {folders, files, copied, pending, tooLarge, checkedAt}. Files are {path (below 2_Evidence),
  * name, folder, size, state (COPIED|PENDING|TOO_LARGE), link ('' unless copied), committedAt}: the copied files, and when `liveFiles` (a repository
- * read) is given, the files that are waiting or too large too. `status` = {pending (a number, or null when unknown), tooLarge, checkedAt}.
+ * read) is given, the files that are waiting or too large too. `requirements` is evidenceRequirements_'s answer. `status` = {pending (a number, or null when unknown), tooLarge, checkedAt}.
  */
-function evidenceBuildView_(team, document, folders, copies, liveFiles, status) {
+function evidenceBuildView_(team, document, folders, copies, liveFiles, status, requirements) {
   const byPath = new Map();
   copies.records.forEach(item => {
     const record = item.record;
@@ -413,7 +420,26 @@ function evidenceBuildView_(team, document, folders, copies, liveFiles, status) 
     byPath.set(file.path, {path: file.relative, name: file.name, folder: file.folder, size: file.size, state: file.state, link: file.state === 'PENDING' && old ? old.link : '', committedAt: old ? old.committedAt : ''});
   });
   const files = Array.from(byPath.values()).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
-  return {folders, files, copied: files.filter(file => file.state === 'COPIED').length, pending: status.pending, tooLarge: status.tooLarge, checkedAt: status.checkedAt};
+  return {folders, files, copied: files.filter(file => file.state === 'COPIED').length, pending: status.pending, tooLarge: status.tooLarge, checkedAt: status.checkedAt, requirements: requirements || []};
+}
+
+/** Review key -> label, for the requirement lines. A definitions sheet that cannot be read leaves the keys as they are. */
+function evidenceReviewLabels_() {
+  try { return new Map(getAssessmentDefinitions_().map(definition => [definition.key, String(definition.label || definition.key)])); }
+  catch (error) { console.error('Review labels could not be read: ' + (error && error.message || error)); return new Map(); }
+}
+
+/**
+ * The Review requirements that use this document's evidence folders, with how many files the team has copied: [{activity, label, folder, minimum, copied, met}].
+ * It tells a student what a Review will ask for; the gate itself is evidenceGateItems_. `rules` is readActivityEvidences_'s answer, or null when it
+ * could not be read (nothing is listed). Rows that are not valid for the gate (no folder, a minimum that is not a whole number above 0) are left out.
+ */
+function evidenceRequirements_(rules, labels, team, folders, copies) {
+  if (!rules) return [];
+  return rules.rows.filter(row => row.folder && row.minimum && !ACTIVITY_IDS_.includes(row.activityId) && folders.some(name => textEquals_(name, row.folder))).map(row => {
+    const copied = copies.records.filter(item => textEquals_(item.record.teamId, team.teamId) && textEquals_(item.record.folder, row.folder) && item.record.driveFileId).length;
+    return {activity: row.activityId, label: labels.get(row.activityId) || row.activityId, folder: row.folder, minimum: row.minimum, copied, met: copied >= row.minimum};
+  }).sort((a, b) => a.activity < b.activity ? -1 : a.activity > b.activity ? 1 : a.folder < b.folder ? -1 : a.folder > b.folder ? 1 : 0);
 }
 
 /** The evidence of one document for the DTO, or null when the document has no evidence folder. Counts come from EvidenceStatus; blank means unknown (null). */
@@ -422,7 +448,8 @@ function evidenceDtoFor_(source, team, document) {
   const kept = source.status ? source.status.index.get(evidenceStatusKey_(team.teamId, document.documentId)) : null;
   const whole = value => /^\d+$/.test(value) ? Number(value) : null;
   const status = kept ? {pending: whole(kept.record.pending), tooLarge: whole(kept.record.tooLarge) || 0, checkedAt: kept.record.checkedAt} : {pending: null, tooLarge: 0, checkedAt: ''};
-  return evidenceBuildView_(team, document, source.folders.byDocument.get(document.documentId), source.copies, null, status);
+  const folders = source.folders.byDocument.get(document.documentId);
+  return evidenceBuildView_(team, document, folders, source.copies, null, status, evidenceRequirements_(source.rules, source.labels, team, folders, source.copies));
 }
 
 /** Who may press Copy evidence, and when. `evidence` is the view; `status` the document's status. Unknown counts (null) allow it: the copy finds out. */
