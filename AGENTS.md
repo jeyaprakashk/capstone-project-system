@@ -34,8 +34,9 @@ Whether a team's marks can be entered for a Review is decided by two things, bot
   to reading and to every save (`reviewEligibility_`); a Submitted or Published evaluation stays readable.
 - **Documents: no hand-placed files (October 2026, owner-approved rule change).** A `document` requirement is met only by a journal status of
   APPROVED or REOPENED. A file in a team folder with no `DocumentSubmissions` row is `NOT_SUBMITTED`, whatever Drive holds, and a submit may
-  overwrite it. The files that stood in the folders at go-live were recorded once by `applyDocumentBaseline` (`document-baseline.js`: an
-  ordinary SUBMIT and APPROVE pair, actor `baseline`), run before this rule shipped. A journal that begins with a `REOPEN` row stays readable.
+  overwrite it. The files that stood in the folders at go-live were recorded once (October 2026, 111 documents) as an ordinary SUBMIT
+  and APPROVE pair with actor `baseline`; that one-time code has been run and deleted (Versions 202 and 203 hold it). A journal that begins with a `REOPEN`
+  row stays readable.
 
 Changing these rows or the Sequence values is a configuration change by the coordinator. Changing how they are evaluated is a rule
 change and follows the paragraph above.

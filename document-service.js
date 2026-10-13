@@ -63,8 +63,8 @@ function documentFingerprint_(action, teamId, documentId, input) {
 
 /**
  * The status of one document from its journal rows (sorted by revision). Returns {status, revision, last, errors}. A history that breaks
- * the rules is UNAVAILABLE with the reasons in errors. A first row may be a REOPEN: history from before hand-placed files were retired (they are
- * now recorded by document-baseline.js); no action can write such a row any more, because a reopen needs an approved document.
+ * the rules is UNAVAILABLE with the reasons in errors. A first row may be a REOPEN: history from before hand-placed files were retired (they were
+ * recorded once as a baseline and that code is deleted); no action can write such a row any more, because a reopen needs an approved document.
  */
 function documentStateFromRows_(rows) {
   const errors = [];

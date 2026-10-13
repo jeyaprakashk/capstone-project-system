@@ -8,7 +8,7 @@ const vm = require('node:vm');
 
 const GUARDED = ['processWeeklySubmissionSchedule', 'fetchAllCommits', 'auditCommitHistory',
   'processWeeklyProgressAI', 'provisionAllTeamRepos', 'backfillExistingRepos', 'backfillMissingStudentCollaborators', 'setupTitleStorage', 'validateTitleLog',
-  'setupDocumentStorage', 'setupDocumentTriggers', 'scanTemplateFiles', 'scanTeamFiles', 'previewDocumentBaseline', 'applyDocumentBaseline'];
+  'setupDocumentStorage', 'setupDocumentTriggers', 'scanTemplateFiles', 'scanTeamFiles'];
 // These check the coordinator themselves (coordinator-only setup and the daily reconciliation).
 const SELF_CHECKED = ['setupTeamStatusColumns', 'setupWeeklySubmissionStorage', 'setupProgressEligibilityStorage', 'setupWeeklyProgressPhase2Storage', 'setupWeeklyProgressPhase2Triggers', 'reconcileProgressEligibility'];
 const files = fs.readdirSync('.').filter(name => name.endsWith('.js') && !name.startsWith('tailwind'));
