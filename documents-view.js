@@ -41,15 +41,19 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     return (author.name ? author.name : 'Outside member') + login;
   };
 
+  const label = text => '<span class="text-muted">' + text + '</span> ';
+
+  /** The commit details behind "Details". A team member who is also the committer is named once. */
   function linesMarkup(doc) {
     const out = [];
-    if (doc.submittedBy) out.push('<li><strong>Submitted by:</strong> ' + escape(doc.submittedBy.name || 'a team member') + (doc.submittedBy.email ? ' (' + escape(doc.submittedBy.email) + ')' : '') +
+    if (doc.submittedBy) out.push('<li>' + label('Submitted by:') + escape(doc.submittedBy.name || 'a team member') + (doc.submittedBy.email ? ' (' + escape(doc.submittedBy.email) + ')' : '') +
       (doc.submittedBy.at ? ' · ' + escape(when(doc.submittedBy.at)) : '') + '</li>');
     if (doc.commit) {
-      out.push('<li><strong>Committed by:</strong> ' + escape(person(doc.commit.committedBy)) + ' · version ' + escape(doc.commit.shortSha) + '</li>');
-      if (doc.commit.lastTeamChange) out.push('<li><strong>Last changed by a team member:</strong> ' + escape(person(doc.commit.lastTeamChange)) + '</li>');
+      const committer = person(doc.commit.committedBy), last = doc.commit.lastTeamChange ? person(doc.commit.lastTeamChange) : '';
+      out.push('<li>' + label('Committed by:') + escape(committer) + ' · version <span class="' + CODE + '">' + escape(doc.commit.shortSha) + '</span></li>');
+      if (last && last !== committer) out.push('<li>' + label('Last changed by a team member:') + escape(last) + '</li>');
     }
-    return out.length ? '<ul class="m-0 mt-2 list-none p-0 text-sm text-ink-2" data-doc-lines>' + out.join('') + '</ul>' : '';
+    return out.length ? '<ul class="m-0 list-none p-0 text-sm text-ink" data-doc-lines>' + out.join('') + '</ul>' : '';
   }
 
   function historyMarkup(doc) {
@@ -62,6 +66,55 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   const bytes = size => size >= 1048576 ? (size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(size / 1024)) + ' KB';
   const EVIDENCE_STATE = {COPIED: '', PENDING: 'waiting to be copied', TOO_LARGE: 'too large, not copied'};
 
+  const plural = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
+  const WIDE = ' flex w-full items-center justify-center gap-2';
+  const unmetFor = (doc, activity) => doc.status !== 'APPROVED' && ((doc.evidence && doc.evidence.requirements) || []).some(item => !item.met && (!activity || item.activity === activity));
+
+  /** The evidence buttons sit with the evidence they act on: Copy evidence is the next step, so it is the primary one. */
+  function evidenceButtons(doc, dto) {
+    const can = doc.can;
+    if (!can) return '';
+    const hooks = ' data-document="' + escape(doc.documentId) + '" data-revision="' + escape(doc.revision) + '"';
+    // A student always sees Copy evidence once the document is submitted, but it works only when files are known to be waiting: an unknown count
+    // (not checked yet) or none leaves it disabled, so it never invites a click that copies nothing. Check for new evidence is what finds out.
+    const pending = doc.evidence ? doc.evidence.pending : null, student = !!(dto && dto.roles && dto.roles.student);
+    const copyShown = can.copyEvidence && (can.copyEvidence.allowed || (student && doc.status !== 'NOT_SUBMITTED'));
+    const copyReady = !!(can.copyEvidence && can.copyEvidence.allowed && typeof pending === 'number' && pending > 0);
+    const html = (copyShown ? '<button type="button" class="' + PRIMARY + WIDE + '" data-doc-action="copy-evidence"' + hooks + (copyReady ? '' : ' disabled') + '>' + icon('copy') +
+        'Copy evidence' + (copyReady ? ' (' + pending + ')' : '') + '</button>' : '') +
+      (can.checkEvidence && can.checkEvidence.allowed ? '<button type="button" class="' + BUTTON + WIDE + '" data-doc-action="check-evidence"' + hooks + '>' + icon('refresh-cw') + 'Check for new evidence</button>' : '');
+    return html ? '<div class="mt-4 flex flex-col gap-2">' + html + '</div>' : '';
+  }
+
+  /**
+   * What each Review needs from the document's evidence folders, one block per folder: the folder's copied count is said once (it is one set of
+   * files) and each Review keeps its own minimum, because two Reviews may ask a different number of the same folder. A block that still owes files
+   * is amber and says how many are owed; the evidence buttons close it.
+   */
+  function requirementsMarkup(doc, dto) {
+    const folders = [];
+    ((doc.evidence && doc.evidence.requirements) || []).forEach(item => {
+      let block = folders.find(entry => entry.folder === item.folder);
+      if (!block) { block = {folder: item.folder, copied: item.copied, items: []}; folders.push(block); }
+      block.items.push(item);
+    });
+    if (!folders.length) return '';
+    const last = folders.length - 1;
+    return '<div class="flex flex-col gap-3" data-evidence-requirements>' + folders.map((block, index) => {
+      const items = block.items.slice().sort((a, b) => a.minimum - b.minimum || String(a.label).localeCompare(String(b.label)));
+      const owes = items.some(item => !item.met);
+      const left = item => Math.max(item.minimum - item.copied, 0);
+      const rows = items.map(item => '<li class="flex items-center justify-between gap-3 py-2" data-evidence-requirement="' + (item.met ? 'met' : 'unmet') + '">' +
+        '<span class="flex min-w-0 items-center gap-2.5"><span class="' + (item.met ? 'inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-success-tint text-success' : 'size-5 shrink-0 rounded-full border-2 border-control') + '">' + (item.met ? icon('check') : '') + '</span>' +
+        '<span class="min-w-0 text-ink-2">' + escape(item.label) + ' <span class="text-muted">needs ' + escape(item.minimum) + '</span></span></span>' +
+        '<span class="shrink-0 ' + TONE[item.met ? 'done' : 'active'] + '">' + (item.met ? 'done' : escape(left(item)) + ' more') + '</span></li>').join('');
+      return '<section class="rounded-card border border-edge bg-paper p-4 text-sm" data-evidence-folder="' + escape(block.folder) + '"' + (owes ? ' data-evidence-owes' : '') + '>' +
+        '<div class="flex items-baseline justify-between gap-2 border-b border-edge pb-3"><span class="min-w-0 break-all font-semibold text-ink">Evidence \u00b7 ' + escape(block.folder) + '</span>' +
+        '<span class="shrink-0 text-muted">' + escape(plural(block.copied, 'file')) + ' copied</span></div><ul class="m-0 list-none p-0">' + rows + '</ul>' +
+        (index === last ? evidenceButtons(doc, dto) : '') + '</section>';
+    }).join('') + '</div>';
+  }
+
   /** The evidence of a document (the team's copied files, and for a student what is still waiting), with a link to each copied file. */
   function evidenceMarkup(doc, dto) {
     const evidence = doc.evidence;
@@ -72,14 +125,17 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     const items = evidence.files.map(file => '<li class="break-all" data-evidence-file="' + escape(file.state) + '">' + escape(file.path) + ' · ' + escape(bytes(file.size)) +
       (EVIDENCE_STATE[file.state] ? ' · ' + escape(EVIDENCE_STATE[file.state]) : '') +
       (file.link ? ' · <a class="text-primary" href="' + escape(safeUrl(file.link)) + '" target="_blank" rel="noopener">' + (file.state === 'PENDING' ? 'Open the earlier copy' : 'Open') + '</a>' : '') + '</li>').join('');
+    // `files` lists the copied files only; files still waiting are a count until the next check, so an empty list is not "no evidence".
+    const waiting = [evidence.pending ? plural(evidence.pending, 'file') + ' waiting to be copied from ' + evidence.folders.join(', ') : '',
+      evidence.tooLarge ? plural(evidence.tooLarge, 'file') + ' too large to copy' : ''].filter(Boolean);
     const body = items ? '<ul class="m-0 mt-1 list-none p-0 text-xs text-muted" data-evidence-list>' + items + '</ul>'
-      : p('No evidence files yet in ' + escape(evidence.folders.join(', ')) + '.', 'text-muted');
-    const reason = dto.roles && dto.roles.student && evidence.pending === null && evidence.checkedAt === '' && doc.status !== 'NOT_SUBMITTED'
-      ? p('Evidence has not been checked yet. Use Check for new evidence.', 'text-muted') : '';
-    const needs = (evidence.requirements || []).map(item => '<li class="' + (item.met ? 'text-success' : 'text-warning') + '" data-evidence-requirement="' + (item.met ? 'met' : 'unmet') + '">' +
-      escape(item.label) + ' needs at least ' + escape(item.minimum) + (item.minimum === 1 ? ' file' : ' files') + ' in ' + escape(item.folder) + ': ' + escape(item.copied) + ' copied' + (item.met ? ' (done)' : '') + '</li>').join('');
-    const requirements = needs ? '<ul class="m-0 mt-2 list-none p-0 text-sm" data-evidence-requirements>' + needs + '</ul>' : '';
-    return requirements + '<details class="mt-3 rounded-card border border-line bg-tint p-4 text-sm" data-doc-evidence><summary class="cursor-pointer font-semibold text-ink-2">' + escape(summary) + '</summary>' + body + '</details>' + reason;
+      : p(escape(waiting.join('; ') || 'No evidence files yet in ' + evidence.folders.join(', ')) + '.', 'text-muted');
+    const requirements = requirementsMarkup(doc, dto);
+    // Without a Review requirement the buttons stand alone; with one they close its block.
+    const buttons = requirements ? '' : evidenceButtons(doc, dto);
+    const hasFiles = items || evidence.pending || evidence.tooLarge;
+    if (!hasFiles) return requirements + buttons;
+    return requirements + buttons + '<details class="rounded-card border border-line bg-tint p-4 text-sm" data-doc-evidence><summary class="cursor-pointer font-semibold text-ink-2">' + escape(summary) + '</summary>' + body + '</details>';
   }
 
   function controlsMarkup(doc, dto) {
@@ -87,9 +143,6 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     if (!can) return '';
     const id = escape(doc.documentId), revision = escape(doc.revision), hooks = ' data-document="' + id + '" data-revision="' + revision + '"';
     let html = '';
-    const evidenceButtons = (can.copyEvidence && can.copyEvidence.allowed ? '<button type="button" class="' + BUTTON + '" data-doc-action="copy-evidence"' + hooks + '>Copy evidence</button>' : '') +
-      (can.checkEvidence && can.checkEvidence.allowed ? '<button type="button" class="' + BUTTON + '" data-doc-action="check-evidence"' + hooks + '>Check for new evidence</button>' : '');
-    if (evidenceButtons) html += '<div class="mt-3 flex flex-wrap gap-2">' + evidenceButtons + '</div>';
     if (can.submit.allowed) {
       html += '<div class="mt-3"><button type="button" class="' + PRIMARY + '" data-doc-action="submit"' + hooks + '>Submit the latest version</button></div>';
     } else if (dto.roles && dto.roles.student && ['NOT_SUBMITTED', 'RETURNED', 'REOPENED'].indexOf(doc.status) >= 0 && can.submit.reason) {
@@ -123,8 +176,8 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   const CIRCLE = 'inline-flex shrink-0 items-center justify-center rounded-full ';
   const CIRCLE_TONE = {done: 'bg-success-tint text-success', waiting: 'bg-paper text-info ring-1 ring-inset ring-info/30', active: 'bg-warning-tint text-warning'};
   const GROUP_ICON = {done: 'check', waiting: 'clock', active: 'pencil'};
-  const WIDE_LINK = 'inline-flex flex-1 items-center justify-center gap-2 rounded-btn bg-paper px-3 py-2 text-sm font-semibold text-primary no-underline ring-1 ring-inset ring-line hover:bg-tint';
-  const TOGGLE = 'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-btn border-0 bg-paper text-ink-2 ring-1 ring-inset ring-line hover:bg-tint';
+  const OPEN_LINK = LINK + ' flex-1 justify-center gap-2';
+  const DETAILS = BUTTON + ' inline-flex cursor-pointer items-center gap-1';
   const CODE = 'inline-block rounded-md bg-tint px-1.5 py-0.5 font-mono text-xs text-ink-2';
   const APPROVED = ['APPROVED', 'REOPENED'];
   const TEAM_TO_ACT = ['NOT_SUBMITTED', 'RETURNED', 'REOPENED'];
@@ -132,22 +185,26 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   const icon = (name, className) => getUi().renderIcon(name, null, className);
 
   function documentMarkup(doc, dto) {
-    const tone = TONE[doc.state] ? doc.state : 'waiting', dot = doc.fileName.lastIndexOf('.');
+    const short = unmetFor(doc), dot = doc.fileName.lastIndexOf('.');
+    // Evidence still owed on a document the guide is waiting for must not look settled.
+    const tone = short && doc.status === 'NEEDS_REVIEW' ? 'active' : TONE[doc.state] ? doc.state : 'waiting';
     const base = dot > 0 ? doc.fileName.slice(0, dot) : doc.fileName, extension = dot > 0 ? doc.fileName.slice(dot) : '';
-    const by = doc.submittedBy ? 'Submitted ' + (doc.submittedBy.at ? when(doc.submittedBy.at) : '') + ' by ' + (doc.submittedBy.name || 'a team member') : '';
+    const by = doc.submittedBy ? '<span class="block">Submitted by ' + escape(doc.submittedBy.name || 'a team member') + '</span>' +
+      (doc.submittedBy.at ? '<span class="block text-muted">' + escape(when(doc.submittedBy.at)) + '</span>' : '') : '';
     const more = linesMarkup(doc) + historyMarkup(doc);
+    const icon_ = short && doc.status === 'NEEDS_REVIEW' ? 'circle-alert' : STATUS_ICON[doc.status] || 'file-text';
     return '<article class="flex min-w-0 flex-col gap-3 ' + CARD + ' p-4" data-document-card="' + escape(doc.documentId) + '" data-document-status="' + escape(doc.status) + '">' +
-      '<div class="flex items-start gap-3"><span class="' + TILE + TILE_TONE[tone] + '">' + icon(STATUS_ICON[doc.status] || 'file-text', 'size-6') + '</span>' +
-      '<div class="min-w-0 flex-1"><h4 class="m-0 break-all text-base text-ink"><span class="font-semibold">' + escape(base) + '</span><span class="text-muted">' + escape(extension) + '</span></h4>' +
-      '<div class="mt-1"><span class="' + TONE[tone] + '">' + escape(doc.statusText) + '</span></div>' +
-      (by ? '<p class="m-0 mt-2 text-sm text-ink-2" data-doc-by>' + escape(by) + '</p>' : '') +
-      (doc.commit ? '<p class="m-0 mt-1.5"><span class="' + CODE + '">' + escape(doc.commit.shortSha) + '</span></p>' : '') + '</div></div>' +
+      '<div class="flex items-start gap-3"><span class="' + TILE + TILE_TONE[tone] + '">' + icon(icon_, 'size-6') + '</span>' +
+      '<div class="min-w-0 flex-1"><h4 class="m-0 break-words text-base text-ink"><span class="font-semibold">' + escape(base) + '</span><span class="text-muted">' + escape(extension) + '</span></h4>' +
+      '<div class="mt-1.5 flex flex-wrap gap-1.5"><span class="' + TONE[TONE[doc.state] ? doc.state : 'waiting'] + '">' + escape(doc.statusText) + '</span>' +
+      (short ? '<span class="' + TONE.active + '" data-evidence-incomplete>Evidence incomplete</span>' : '') + '</div>' +
+      (by ? '<p class="m-0 mt-2 text-sm text-ink-2" data-doc-by>' + by + '</p>' : '') + '</div></div>' +
       (doc.status === 'RETURNED' && doc.returnedNotes ? p('<strong>Guide\'s notes:</strong> ' + escape(doc.returnedNotes), 'text-warning m-0') : '') +
       evidenceMarkup(doc, dto) + controlsMarkup(doc, dto) +
       '<p class="m-0 text-sm text-ink-2 empty:hidden" role="status" aria-live="polite" data-doc-status></p>' +
-      (doc.link || more ? '<div class="flex gap-2">' + (doc.link ? '<a class="' + WIDE_LINK + '" href="' + escape(safeUrl(doc.link)) + '" target="_blank" rel="noopener">Open the file' + icon('external-link') + '</a>' : '') +
-        (more ? '<button type="button" class="' + TOGGLE + '" data-doc-action="toggle" aria-expanded="false" aria-label="Show details"><span class="inline-flex" data-doc-chevron>' + icon('chevron-down') + '</span></button>' : '') + '</div>' : '') +
-      (more ? '<div class="rounded-md bg-soft px-3 py-2" data-doc-more hidden>' + more + '</div>' : '') + '</article>';
+      (doc.link || more ? '<div class="flex gap-2">' + (doc.link ? '<a class="' + OPEN_LINK + '" href="' + escape(safeUrl(doc.link)) + '" target="_blank" rel="noopener">Open the file' + icon('external-link') + '</a>' : '') +
+        (more ? '<button type="button" class="' + DETAILS + '" data-doc-action="toggle" aria-expanded="false">Details<span class="inline-flex transition-transform" data-doc-chevron>' + icon('chevron-down') + '</span></button>' : '') + '</div>' : '') +
+      (more ? '<div class="flex flex-col gap-1 rounded-md bg-soft px-3 py-2" data-doc-more hidden>' + more + '</div>' : '') + '</article>';
   }
 
   /**
@@ -172,18 +229,22 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
 
   const approvedCount = group => group.documents.filter(doc => APPROVED.indexOf(doc.status) >= 0).length;
   const countOf = (group, statuses) => group.documents.filter(doc => statuses.indexOf(doc.status) >= 0).length;
+  /** How many documents of a Review still owe evidence for it. */
+  const evidenceShort = group => group.documents.filter(doc => unmetFor(doc, group.id === OTHER_GROUP || group.id === ALL_GROUP ? '' : group.id)).length;
   /** The one thing worth saying about a Review: what the team still has to do, else what the guide has, else done. */
   function groupChip(group) {
     const toDo = countOf(group, TEAM_TO_ACT), awaiting = countOf(group, ['NEEDS_REVIEW']);
+    const short = evidenceShort(group);
     if (toDo) return {tone: 'active', text: toDo + ' to submit'};
+    if (short) return {tone: 'active', text: short + ' need evidence'};
     if (awaiting) return {tone: 'waiting', text: awaiting + ' awaiting guide'};
     return {tone: 'done', text: 'All approved'};
   }
 
   function rowMarkup(group, selected) {
     const chip = groupChip(group), count = group.documents.length;
-    const awaiting = countOf(group, ['NEEDS_REVIEW']);
-    const sub = approvedCount(group) + ' of ' + count + ' approved' + (awaiting ? ' \u00b7 ' + awaiting + ' awaiting the guide' : '');
+    const awaiting = countOf(group, ['NEEDS_REVIEW']), short = evidenceShort(group);
+    const sub = approvedCount(group) + ' of ' + count + ' approved' + (short ? ' \u00b7 ' + short + ' need evidence' : '') + (awaiting ? ' \u00b7 ' + awaiting + ' awaiting the guide' : '');
     return '<li><button type="button" class="' + ROW + '" data-doc-action="select" data-doc-group="' + escape(group.id) + '"' + (selected ? ' aria-current="true"' : '') + '>' +
       '<span class="' + CIRCLE + 'size-9 ' + CIRCLE_TONE[chip.tone] + '">' + icon(GROUP_ICON[chip.tone]) + '</span>' +
       '<span class="min-w-0 flex-1"><span class="block font-semibold text-ink">' + escape(group.label) + '</span>' +
@@ -372,7 +433,6 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     const open = panel.hidden;
     panel.hidden = !open;
     button.setAttribute('aria-expanded', open ? 'true' : 'false');
-    button.setAttribute('aria-label', open ? 'Hide details' : 'Show details');
     const chevron = button.querySelector('[data-doc-chevron]');
     if (chevron) chevron.classList.toggle('rotate-180', open);
   }

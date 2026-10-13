@@ -201,11 +201,14 @@ test('a document with evidence shows the counts and a link to each copied file; 
   assert.equal(none.host.querySelector('[data-doc-evidence]'), null);
 });
 
-test('with no evidence file yet the folders are named, and the screen escapes every value', async () => {
-  const f = setup({ dto: withEvidence(evidence([], 0, { folders: ['Req<b>'] }), cap(false, 'All evidence files are copied.'), { guide: true }) });
+test('with files waiting but none copied the folders are named, an empty evidence list shows no panel, and the screen escapes every value', async () => {
+  const f = setup({ dto: withEvidence(evidence([], 1, { folders: ['Req<b>'] }), cap(false, 'All evidence files are copied.'), { guide: true }) });
   await f.view.mount(f.host, '');
-  assert(text(f.host).includes('No evidence files yet in Req<b>.'));
+  assert(text(f.host).includes('1 file waiting to be copied from Req<b>.') && !text(f.host).includes('No evidence files yet'), 'a waiting file is never reported as no evidence');
   assert.equal(f.host.querySelector('b'), null);
+  const empty = setup({ dto: withEvidence(evidence([], 0, { folders: ['Req'] }), cap(false), { guide: true }) });
+  await empty.view.mount(empty.host, '');
+  assert.equal(empty.host.querySelector('[data-doc-evidence]'), null, 'nothing to open, so no panel');
   const hostile = setup({ dto: withEvidence(evidence([file('<img src=x>.png', 'COPIED', { link: 'javascript:alert(1)' })], 0), cap(false), { guide: true }) });
   await hostile.view.mount(hostile.host, '');
   assert.equal(hostile.host.querySelector('[data-evidence-file] img'), null);
@@ -216,13 +219,15 @@ test('Copy evidence appears only when the DTO allows it, sends the document, and
   const f = setup({ dto: withEvidence(evidence([file('a.png', 'PENDING')], 1), cap(true), { student: true }) });
   await f.view.mount(f.host, '');
   assert.equal(f.host.querySelectorAll('[data-doc-action="copy-evidence"]').length, 1);
+  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]').disabled, false, 'a file is waiting, so Copy evidence is enabled');
+  assert(text(f.host.querySelector('[data-doc-action="copy-evidence"]')).includes('(1)'), 'it says how many');
   assert.equal(f.host.querySelector('[data-doc-action="submit"]'), null);
   f.control.dto = withEvidence(evidence([file('a.png', 'COPIED')], 0), cap(false, 'All evidence files are copied.'), { student: true });
   await f.click('[data-doc-action="copy-evidence"]');
   await f.settle();
   assert.deepEqual(JSON.parse(JSON.stringify(f.calls[1])), ['API_student_copyEvidence', [{ documentId: 'doc-0001' }]]);
   assert.equal(JSON.parse(JSON.stringify(f.calls[2]))[0], 'API_documents_get', 'the screen reloads');
-  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]'), null);
+  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]').disabled, true, 'nothing is left to copy, so the button stays but is disabled');
   assert.equal(text(f.host.querySelector('[data-doc-notice]')), 'Done.');
   const hidden = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], 0), cap(false, 'Only a member of this team can copy its evidence.'), { guide: true }) });
   await hidden.view.mount(hidden.host, 'T1');
@@ -230,10 +235,10 @@ test('Copy evidence appears only when the DTO allows it, sends the document, and
   assert(!text(hidden.host).includes('Only a member of this team'), 'a guide is not told why a student button is missing');
 });
 
-test('a student with no saved count is told nothing has checked yet, and a refused copy keeps the screen and shows the reason', async () => {
+test('a student with no saved count sees no "not checked yet" sentence, and a refused copy keeps the screen and shows the reason', async () => {
   const f = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], null, { checkedAt: '' }), cap(true), { student: true }, cap(true)) });
   await f.view.mount(f.host, '');
-  assert(text(f.host).includes('Evidence has not been checked yet. Use Check for new evidence.'));
+  assert(!text(f.host).includes('has not been checked yet'));
   assert(!text(f.host.querySelector('[data-doc-evidence] summary')).includes('checked'), 'no time is shown when nothing has checked');
   const failing = setup({ dto: withEvidence(evidence([file('a.png', 'PENDING')], 1), cap(true), { student: true }) });
   await failing.view.mount(failing.host, '');
@@ -254,7 +259,7 @@ test('the summary says when the counts were last checked', async () => {
 test('Check for new evidence is offered when the DTO allows it, reads through the bridge, and redraws the card with the waiting files without reloading the screen', async () => {
   const f = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], 0), cap(false, 'All evidence files are copied.'), { student: true }, cap(true)) });
   await f.view.mount(f.host, '');
-  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]'), null);
+  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]').disabled, true);
   const live = evidence([file('a.png', 'COPIED'), file('b.png', 'PENDING', { link: '' }), file('c.mp4', 'TOO_LARGE')], 1, { checkedAt: '2030-01-03T10:00:00.000Z' });
   f.control.checked = { ok: true, message: '1 evidence file is waiting to be copied.', evidence: live, can: { copyEvidence: cap(true) } };
   await f.click('[data-doc-action="check-evidence"]');
@@ -263,7 +268,7 @@ test('Check for new evidence is offered when the DTO allows it, reads through th
   assert.equal(f.calls.length, 2, 'the screen is not reloaded');
   assert(text(f.host.querySelector('[data-doc-evidence] summary')).startsWith('Evidence: 1 copied, 1 waiting to be copied, 1 too large'));
   assert.deepEqual([...f.host.querySelectorAll('[data-evidence-file]')].map(item => item.getAttribute('data-evidence-file')), ['COPIED', 'PENDING', 'TOO_LARGE']);
-  assert(f.host.querySelector('[data-doc-action="copy-evidence"]'), 'Copy evidence is now offered');
+  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]').disabled, false, 'Copy evidence is now enabled');
   assert.equal(text(f.host.querySelector('[data-doc-notice]')), '1 evidence file is waiting to be copied.');
   assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
 });
@@ -281,19 +286,32 @@ test('a failed check keeps the screen and says why; a guide is never offered it'
   assert.equal(guide.host.querySelector('[data-doc-action="check-evidence"]'), null);
 });
 
-test('the requirement lines say what each Review needs from the document\'s folders and how many files are copied; they escape every value', async () => {
+test('the requirements are one block per folder: the copied count once, and each Review with its own minimum; they escape every value', async () => {
   const needs = [{ activity: 'review1', label: 'Review 1', folder: 'Requirements', minimum: 3, copied: 1, met: false }, { activity: 'review2', label: 'Review <2>', folder: 'Testing', minimum: 1, copied: 2, met: true }];
   const f = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], 0, { requirements: needs }), cap(false), { student: true }) });
   await f.view.mount(f.host, '');
-  const lines = [...f.host.querySelectorAll('[data-evidence-requirement]')];
-  assert.deepEqual(lines.map(line => line.getAttribute('data-evidence-requirement')), ['unmet', 'met']);
-  assert.equal(text(lines[0]), 'Review 1 needs at least 3 files in Requirements: 1 copied');
-  assert.equal(text(lines[1]), 'Review <2> needs at least 1 file in Testing: 2 copied (done)');
-  assert.equal(f.host.querySelector('[data-evidence-requirements] b, [data-evidence-requirements] 2'), null);
+  assert.deepEqual([...f.host.querySelectorAll('[data-evidence-folder]')].map(block => block.getAttribute('data-evidence-folder')), ['Requirements', 'Testing']);
+  const rows = [...f.host.querySelectorAll('[data-evidence-requirement]')];
+  assert.deepEqual(rows.map(row => row.getAttribute('data-evidence-requirement')), ['unmet', 'met']);
+  assert.equal(text(rows[0]), 'Review 1 needs 32 more');
+  assert.equal(text(rows[1]), 'Review <2> needs 1done');
+  assert(text(f.host.querySelector('[data-evidence-folder="Testing"]')).includes('2 files copied'));
+  assert.equal(f.host.querySelector('[data-evidence-requirements] b'), null);
   assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
   const none = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], 0), cap(false), { student: true }) });
   await none.view.mount(none.host, '');
   assert.equal(none.host.querySelector('[data-evidence-requirements]'), null);
+});
+
+test('two Reviews on one folder with different minimums share one block and one copied count, each keeping its own minimum and state', async () => {
+  const needs = [{ activity: 'review2', label: 'Review 2', folder: 'Existing_Solutions', minimum: 9, copied: 5, met: false }, { activity: 'review1', label: 'Review 1', folder: 'Existing_Solutions', minimum: 3, copied: 5, met: true }];
+  const f = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], 0, { requirements: needs }), cap(false), { student: true }) });
+  await f.view.mount(f.host, '');
+  assert.equal(f.host.querySelectorAll('[data-evidence-folder]').length, 1);
+  const block = f.host.querySelector('[data-evidence-folder]');
+  assert(text(block).includes('5 files copied'));
+  assert.deepEqual([...block.querySelectorAll('[data-evidence-requirement]')].map(row => text(row)), ['Review 1 needs 3done', 'Review 2 needs 94 more']);
+  assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
 });
 
 test('the left list shows the Reviews with their progress; a row opens that Review\'s documents, and a document\'s chevron shows its commit details', async () => {
@@ -336,4 +354,35 @@ test('with no Review naming a document there is one card, Documents', async () =
   assert.equal(f.host.querySelectorAll('[data-doc-action="select"]').length, 1);
   assert(text(f.host.querySelector('[data-doc-list]')).includes('All documents'));
   assert(f.host.querySelector('[data-document-card]'));
+});
+
+test('evidence still owed shows on the card and its Review, the evidence buttons sit in the block they act on, and the details name a person once', async () => {
+  const needs = [{ activity: 'review1', label: 'Review 1', folder: 'Budget', minimum: 2, copied: 0, met: false }];
+  const same = { name: 'Ann', login: 'ann', outsideMember: false };
+  const commit = { sha: 'abcdef1234', shortSha: 'abcdef1', committedBy: same, lastTeamChange: same };
+  const d = dto([doc({ status: 'NEEDS_REVIEW', state: 'waiting', statusText: 'Awaiting guide', neededFor: [{ id: 'review1', label: 'Review 1' }], commit, submittedBy: { name: 'Ann', at: '2030-01-01T10:00:00.000Z' },
+    evidence: evidence([], 0, { requirements: needs }), can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(false), copyEvidence: cap(true), checkEvidence: cap(true) } })]);
+  const f = setup({ dto: d });
+  await f.view.mount(f.host, '');
+  const card = f.host.querySelector('[data-document-card]');
+  assert(card.querySelector('[data-evidence-incomplete]'), 'an Awaiting guide document with evidence owed is not shown as settled');
+  assert(text(f.host.querySelector('[data-doc-list]')).includes('1 need evidence'));
+  const block = card.querySelector('[data-evidence-folder][data-evidence-owes]');
+  assert(block && text(block).includes('2 more') && text(block).includes('Evidence · Budget'));
+  assert(block.querySelector('[data-doc-action="copy-evidence"]') && block.querySelector('[data-doc-action="check-evidence"]'), 'the evidence buttons are inside the evidence block');
+  assert(/bg-primary/.test(block.querySelector('[data-doc-action="copy-evidence"]').className) && !/bg-primary/.test(block.querySelector('[data-doc-action="check-evidence"]').className), 'Copy evidence is the primary action');
+  const lines = text(card.querySelector('[data-doc-lines]'));
+  assert(lines.includes('Committed by: Ann (@ann)') && !lines.includes('Last changed by'), 'the committer who is also the last team member is named once');
+  assert.equal(card.querySelector('[data-doc-action="toggle"]').textContent.includes('Details'), true);
+  assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
+});
+
+test('Copy evidence is disabled while the count is unknown, never shown to a guide, and not shown before the document is submitted', async () => {
+  const unknown = setup({ dto: withEvidence(evidence([], null, { checkedAt: '' }), cap(true), { student: true }, cap(true)) });
+  await unknown.view.mount(unknown.host, '');
+  assert.equal(unknown.host.querySelector('[data-doc-action="copy-evidence"]').disabled, true, 'not checked yet: nothing is known to copy');
+  assert.equal(unknown.host.querySelector('[data-doc-action="check-evidence"]').disabled, false);
+  const before = setup({ dto: dto([doc({ status: 'NOT_SUBMITTED', evidence: evidence([], 0), can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(false), copyEvidence: cap(false), checkEvidence: cap(false) } })], { student: true }) });
+  await before.view.mount(before.host, '');
+  assert.equal(before.host.querySelector('[data-doc-action="copy-evidence"]'), null);
 });
