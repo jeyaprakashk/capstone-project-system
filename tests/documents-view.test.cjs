@@ -219,7 +219,7 @@ test('Copy evidence appears only when the DTO allows it, sends the document, and
   const f = setup({ dto: withEvidence(evidence([file('a.png', 'PENDING')], 1), cap(true), { student: true }) });
   await f.view.mount(f.host, '');
   assert.equal(f.host.querySelectorAll('[data-doc-action="copy-evidence"]').length, 1);
-  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]').disabled, false, 'a file is waiting, so Copy evidence is enabled');
+  assert(f.host.querySelector('[data-doc-action="copy-evidence"]'), 'a file is waiting, so Copy evidence is shown');
   assert(text(f.host.querySelector('[data-doc-action="copy-evidence"]')).includes('(1)'), 'it says how many');
   assert.equal(f.host.querySelector('[data-doc-action="submit"]'), null);
   f.control.dto = withEvidence(evidence([file('a.png', 'COPIED')], 0), cap(false, 'All evidence files are copied.'), { student: true });
@@ -227,7 +227,7 @@ test('Copy evidence appears only when the DTO allows it, sends the document, and
   await f.settle();
   assert.deepEqual(JSON.parse(JSON.stringify(f.calls[1])), ['API_student_copyEvidence', [{ documentId: 'doc-0001' }]]);
   assert.equal(JSON.parse(JSON.stringify(f.calls[2]))[0], 'API_documents_get', 'the screen reloads');
-  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]').disabled, true, 'nothing is left to copy, so the button stays but is disabled');
+  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]'), null, 'nothing is left to copy, so the button is hidden');
   assert.equal(text(f.host.querySelector('[data-doc-notice]')), 'Done.');
   const hidden = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], 0), cap(false, 'Only a member of this team can copy its evidence.'), { guide: true }) });
   await hidden.view.mount(hidden.host, 'T1');
@@ -259,7 +259,7 @@ test('the summary says when the counts were last checked', async () => {
 test('Check for new evidence is offered when the DTO allows it, reads through the bridge, and redraws the card with the waiting files without reloading the screen', async () => {
   const f = setup({ dto: withEvidence(evidence([file('a.png', 'COPIED')], 0), cap(false, 'All evidence files are copied.'), { student: true }, cap(true)) });
   await f.view.mount(f.host, '');
-  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]').disabled, true);
+  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]'), null);
   const live = evidence([file('a.png', 'COPIED'), file('b.png', 'PENDING', { link: '' }), file('c.mp4', 'TOO_LARGE')], 1, { checkedAt: '2030-01-03T10:00:00.000Z' });
   f.control.checked = { ok: true, message: '1 evidence file is waiting to be copied.', evidence: live, can: { copyEvidence: cap(true) } };
   await f.click('[data-doc-action="check-evidence"]');
@@ -268,7 +268,7 @@ test('Check for new evidence is offered when the DTO allows it, reads through th
   assert.equal(f.calls.length, 2, 'the screen is not reloaded');
   assert(text(f.host.querySelector('[data-doc-evidence] [data-evidence-summary]')).startsWith('Evidence: 1 copied, 1 waiting to be copied, 1 too large'));
   assert.deepEqual([...f.host.querySelectorAll('[data-evidence-file]')].map(item => item.getAttribute('data-evidence-file')), ['COPIED', 'PENDING', 'TOO_LARGE']);
-  assert.equal(f.host.querySelector('[data-doc-action="copy-evidence"]').disabled, false, 'Copy evidence is now enabled');
+  assert(f.host.querySelector('[data-doc-action="copy-evidence"]'), 'Copy evidence is now offered');
   assert.equal(text(f.host.querySelector('[data-doc-notice]')), '1 evidence file is waiting to be copied.');
   assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
 });
@@ -336,16 +336,16 @@ test('the left list shows the Reviews with their progress; a row opens that Revi
   assert.equal(f.host.querySelector('[aria-current="true"]').getAttribute('data-doc-group'), 'review1');
   assert.equal(f.host.querySelector('[data-doc-shell]').getAttribute('data-doc-view'), 'detail');
   const card = f.host.querySelector('[data-document-card="doc-0002"]');
-  assert(text(card.querySelector('[data-doc-by]')).includes('Submitted') && text(card).includes('abcdef1') && text(card).includes('by Ann'));
-  assert.equal(text(card.querySelector('[data-doc-by] [data-doc-version]')), 'abcdef1', 'the version sits on the submitted line, to the right');
+  assert.equal(card.querySelector('[data-doc-by]'), null, 'the card header has no submitter line');
+  assert.equal(card.querySelector('h4').parentNode.querySelector('[data-doc-version]'), null, 'nor a version');
   const more = card.querySelector('[data-doc-more]');
   assert.equal(more.hidden, true);
   await f.click('[data-document-card="doc-0002"] [data-doc-action="toggle"][data-doc-target="details"]');
   assert.equal(more.hidden, false);
   assert(text(more).includes('Committed by'));
   assert.equal(card.querySelector('[data-doc-target="details"]').getAttribute('aria-expanded'), 'true');
-  assert.equal(card.querySelector('[data-doc-more] [data-doc-lines]').textContent.includes('Submitted by'), false, 'the details do not repeat the submitter shown on the card');
-  assert.equal(card.querySelector('[data-doc-more]').textContent.includes('abcdef1'), false, 'nor the version shown on the card');
+  assert(text(card.querySelector('[data-doc-more] [data-doc-lines]')).includes('Submitted by: Ann'), 'Details names who submitted and when');
+  assert.equal(text(card.querySelector('[data-doc-more] [data-doc-version]')), 'abcdef1', 'and the version');
   await f.click('[data-doc-action="back"]');
   assert.equal(f.host.querySelector('[data-doc-shell]').getAttribute('data-doc-view'), 'list');
   assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
@@ -364,7 +364,7 @@ test('evidence still owed shows on the card and its Review, the evidence buttons
   const same = { name: 'Ann', login: 'ann', outsideMember: false };
   const commit = { sha: 'abcdef1234', shortSha: 'abcdef1', committedBy: same, lastTeamChange: same };
   const d = dto([doc({ status: 'NEEDS_REVIEW', state: 'waiting', statusText: 'Awaiting guide', neededFor: [{ id: 'review1', label: 'Review 1' }], commit, submittedBy: { name: 'Ann', at: '2030-01-01T10:00:00.000Z' },
-    evidence: evidence([], 0, { requirements: needs }), can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(false), copyEvidence: cap(true), checkEvidence: cap(true) } })]);
+    evidence: evidence([], 2, { requirements: needs }), can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(false), copyEvidence: cap(true), checkEvidence: cap(true) } })]);
   const f = setup({ dto: d });
   await f.view.mount(f.host, '');
   const card = f.host.querySelector('[data-document-card]');
@@ -380,14 +380,14 @@ test('evidence still owed shows on the card and its Review, the evidence buttons
   assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
 });
 
-test('Copy evidence is disabled while the count is unknown, never shown to a guide, and not shown before the document is submitted', async () => {
+test('Copy evidence is hidden while the count is unknown, never shown to a guide, and not shown before the document is submitted', async () => {
   const unknown = setup({ dto: withEvidence(evidence([], null, { checkedAt: '' }), cap(true), { student: true }, cap(true)) });
   await unknown.view.mount(unknown.host, '');
-  assert.equal(unknown.host.querySelector('[data-doc-action="copy-evidence"]').disabled, true, 'not checked yet: nothing is known to copy');
-  assert.equal(unknown.host.querySelector('[data-doc-action="check-evidence"]').disabled, false);
-  const before = setup({ dto: dto([doc({ status: 'NOT_SUBMITTED', evidence: evidence([], 0), can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(false), copyEvidence: cap(false), checkEvidence: cap(false) } })], { student: true }) });
-  await before.view.mount(before.host, '');
-  assert.equal(before.host.querySelector('[data-doc-action="copy-evidence"]'), null);
+  assert.equal(unknown.host.querySelector('[data-doc-action="copy-evidence"]'), null, 'not checked yet: nothing is known to copy');
+  assert(unknown.host.querySelector('[data-doc-action="check-evidence"]'), 'Check for new evidence is what finds out');
+  const guide = setup({ dto: withEvidence(evidence([file('a.png', 'PENDING')], 1), cap(true), { guide: true }) });
+  await guide.view.mount(guide.host, 'T1');
+  assert(guide.host.querySelector('[data-doc-action="copy-evidence"]'), 'shown whenever the DTO allows it and files are waiting');
 });
 
 test('completion is approved AND evidence met: an approved document that still owes evidence is not counted, and one with both is', async () => {
@@ -424,5 +424,37 @@ test('the evidence files and the details are the same kind of expandable: a labe
     assert.equal(panel.hidden, false);
     assert.equal(button.getAttribute('aria-expanded'), 'true');
   }
+  assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
+});
+
+test('the Evidence toggle has a row of its own; Open the file and Details share the next row', async () => {
+  const same = { name: 'Ann', login: 'ann', outsideMember: false };
+  const d = dto([doc({ status: 'NEEDS_REVIEW', evidence: evidence([file('a.png', 'COPIED')], 0), commit: { sha: 'abcdef1234', shortSha: 'abcdef1', committedBy: same, lastTeamChange: same }, submittedBy: { name: 'Ann', at: '2030-01-01T10:00:00.000Z' } })]);
+  const f = setup({ dto: d });
+  await f.view.mount(f.host, '');
+  const card = f.host.querySelector('[data-document-card]');
+  const evidenceRow = card.querySelector('[data-doc-target="evidence"]').parentNode, openRow = card.querySelector('[data-doc-target="details"]').parentNode;
+  assert.notEqual(evidenceRow, openRow);
+  assert.equal(evidenceRow.querySelectorAll('button, a').length, 1, 'Evidence is alone in its row');
+  assert(openRow.querySelector('a[href]') && openRow.querySelector('[data-doc-target="details"]'), 'Open the file and Details are together');
+});
+
+test('with a requirement block the Evidence expandable sits inside the evidence box, under one shared row of Copy and Check', async () => {
+  const needs = [{ activity: 'review1', label: 'Review 1', folder: 'Budget', minimum: 2, copied: 0, met: false }];
+  const both = { copyEvidence: cap(true), checkEvidence: cap(true) };
+  const make = can => dto([doc({ status: 'NEEDS_REVIEW', evidence: evidence([file('a.png', 'COPIED')], 3, { requirements: needs }), can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(false), ...can } })]);
+  const f = setup({ dto: make(both) });
+  await f.view.mount(f.host, '');
+  const block = f.host.querySelector('[data-evidence-folder]');
+  assert(block.querySelector('[data-doc-target="evidence"]') && block.querySelector('[data-doc-panel="evidence"]'), 'the expandable is inside the evidence box');
+  const copy = block.querySelector('[data-doc-action="copy-evidence"]'), check = block.querySelector('[data-doc-action="check-evidence"]');
+  assert.equal(copy.parentNode, check.parentNode, 'Copy and Check share one row');
+  assert.equal(text(copy), 'Copy (3)');
+  assert.equal(text(check), 'Check new');
+  assert.equal(copy.getAttribute('aria-label').includes('Copy evidence'), true);
+  const alone = setup({ dto: make({ copyEvidence: cap(false), checkEvidence: cap(true) }) });
+  await alone.view.mount(alone.host, '');
+  assert.equal(alone.host.querySelector('[data-doc-action="copy-evidence"]'), null);
+  assert(/flex-1/.test(alone.host.querySelector('[data-doc-action="check-evidence"]').className), 'a lone Check takes the whole row');
   assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
 });
