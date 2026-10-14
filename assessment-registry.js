@@ -47,6 +47,8 @@ function parseAssessmentDefinitions_(rows,timezone) {
 }
 // Set only inside withAssessmentDefinitions_, so a request parses the definitions tab once.
 let assessmentDefinitionsMemo_=null;
+// Same scope: the Rubrics rows, read on first use, so a request reads that tab once however many assessments it configures.
+let assessmentRubricRowsMemo_=null;
 function getAssessmentDefinitions_() {
   if(assessmentDefinitionsMemo_)return assessmentDefinitionsMemo_;
   const sheet=getSheet_('AssessmentDefinitions');
@@ -57,7 +59,8 @@ function getAssessmentDefinitions_() {
 function withAssessmentDefinitions_(read) {
   if(assessmentDefinitionsMemo_)return read();
   assessmentDefinitionsMemo_=getAssessmentDefinitions_();
-  try {return read();} finally {assessmentDefinitionsMemo_=null;}
+  assessmentRubricRowsMemo_={rows:null};
+  try {return read();} finally {assessmentDefinitionsMemo_=null;assessmentRubricRowsMemo_=null;}
 }
 /** Required consumers distinguish unfinished setup from a configured registry. */
 function requireAssessmentDefinitions_() {
@@ -72,8 +75,14 @@ function assessmentDefinition_(id) {
   return definition;
 }
 function assessmentRubric_(definition) {
-  const sheet=getSheet_('Rubrics');if(!sheet)throw new Error('Rubrics tab is required.');
-  const rows=sheet.getDataRange().getValues(),col=(rows[0]||[]).map(normalizeText_).indexOf('assessment id');
+  const memo=assessmentRubricRowsMemo_;
+  let rows=memo&&memo.rows;
+  if(!rows){
+    const sheet=getSheet_('Rubrics');if(!sheet)throw new Error('Rubrics tab is required.');
+    rows=sheet.getDataRange().getValues();
+    if(memo)memo.rows=rows;
+  }
+  const col=(rows[0]||[]).map(normalizeText_).indexOf('assessment id');
   if(col<0)throw new Error('Rubrics requires Assessment ID column.');
   const key=definition.key;
   return parseRubricRows_([rows[0],...rows.slice(1).filter(r=>normalizeText_(r[col])===key)],[{key}])[key];
@@ -94,8 +103,10 @@ function assessmentSequenceBlock_(definition,team,loaded) {
   return '';
 }
 /** Resolve configured storage, recognizing existing journals by assessment identity,
- * never by Review number. Reads do not create, rename, clear or migrate sheets. */
-function assessmentJournal_(definition) {
+ * never by Review number. Reads do not create, rename, clear or migrate sheets. `options.discover === false` (reading for a dashboard or a marking
+ * screen only) does not search the other sheets when the journal sheet exists: an empty journal there means nothing is marked yet. Setup and
+ * saves keep the search. */
+function assessmentJournal_(definition,options) {
   if(definition.type==='SEE')throw new Error('SEE is evaluated outside this app and has no assessment journal.');
   const configured=getSheet_(definition.journal);
   const inspect=(sheet,name)=>{
@@ -113,7 +124,7 @@ function assessmentJournal_(definition) {
     return Object.defineProperty({sheet,name,state:'READY',hasRecords:!!entries.length},'rows',{value:rows});
   };
   const direct=inspect(configured,definition.journal);
-  if(direct.hasRecords||direct.state==='READY'&&definition.journalConfigured!==false)return direct;
+  if(direct.hasRecords||direct.state==='READY'&&definition.journalConfigured!==false||direct.sheet&&options&&options.discover===false)return direct;
   const candidates=getSpreadsheet_().getSheets().filter(sheet=>sheet!==configured).flatMap(sheet=>{
     const rows=sheet.getDataRange().getValues();
     const columns=assessmentJournalColumns_(rows[0]);

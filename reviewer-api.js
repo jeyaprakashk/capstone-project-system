@@ -59,11 +59,12 @@ function reviewerTeamDto_(row, TS, progress, title, folderUrl) {
 }
 
 /** Pure DTO builder over getReviewerDashboardData_(); no sheet or layout knowledge leaves it. */
-function buildReviewerDto_(data) {
-  const TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
+function buildReviewerDto_(data, timings) {
+  const time = (phase, run) => { if (!timings) return run(); const at = Date.now(); try { return run(); } finally { timings.push({phase, durationMs:Date.now() - at}); } };
+  const TS = time('build:column_map', () => getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS));
   // Only the cheap rows (the title) gate a cell on first paint; the documents and GitHub are read per team by API_reviewer_getTeamRequirements.
-  const progress = getReviewerReviewProgress_(data.assigned, undefined, ['title']);
-  const folders = teamFolderUrls_(data.assigned.map(row => ({teamId:row[TS.TEAM_ID], semester:row[TS.SEMESTER]})));
+  const progress = time('build:progress', () => getReviewerReviewProgress_(data.assigned, undefined, ['title'], undefined, timings));
+  const folders = time('build:folder_links', () => teamFolderUrls_(data.assigned.map(row => ({teamId:row[TS.TEAM_ID], semester:row[TS.SEMESTER]}))));
   return {
     summary:{pending:data.pending.length, approved:data.approved.length, awaitingGuide:data.notYetGuideApproved.length, total:data.total},
     reviews:progress.reviews.map(review => ({key:review.key, label:String(review.label)})),
@@ -80,29 +81,40 @@ function reviewerEmailOrThrow_() {
 }
 
 function API_reviewer_getDashboard() {
-  return apiHandle_(() => withDashboardRead_(() => buildReviewerDto_(getReviewerDashboardData_(reviewerEmailOrThrow_()))));
+  const started = Date.now(), timings = [];
+  try {
+    return apiHandle_(() => withDashboardRead_(() => {
+      const email = timedPhase_(timings, 'auth', () => reviewerEmailOrThrow_());
+      const data = timedPhase_(timings, 'dashboard_data', () => getReviewerDashboardData_(email));
+      return timedPhase_(timings, 'build_dto', () => buildReviewerDto_(data, timings));
+    }));
+  } finally { logPhases_('reviewer_request', 'getDashboard', timings, started); }
 }
 
 /**
- * One assigned team's review cells with every ActivityDependencies requirement evaluated (documents, GitHub, ...). That reads Drive, so the
- * dashboard asks for it per team after first paint and replaces the cells it showed. The same rules refuse the entry itself on the server.
+ * One assigned team's review cells with the ActivityDependencies requirements evaluated as a label (`hint`): a document is answered from the
+ * DocumentSubmissions journal with no Drive read. The dashboard asks per team after first paint and replaces the cells it showed. The entry
+ * itself is read the same way (loadReviewEvaluation_); every save still runs the full gate, Drive included, and refuses what the label allowed.
  */
 function API_reviewer_getTeamRequirements(teamId) {
-  return apiHandle_(() => withDashboardRead_(() => {
+  const started = Date.now(), timings = [];
+  try { return apiHandle_(() => withDashboardRead_(() => {
     const email = reviewerEmailOrThrow_(), TS = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
     const wanted = normalizeText_(teamId), mine = new Set(getCommitteeNumbersForReviewer_(email).map(normalizeText_));
     const row = wanted && getSheetRows_(SHEET_NAMES.TEAM_STATUS).find(r => normalizeText_(r[TS.TEAM_ID]) === wanted && mine.has(normalizeText_(r[TS.COMMITTEE_NUMBER])));
     if (!row) throw apiFail_('NOT_FOUND', 'Team not found.');
-    const progress = getReviewerReviewProgress_([row], undefined, true);
+    const progress = timedPhase_(timings, 'progress_and_rows', () => getReviewerReviewProgress_([row], undefined, true, true, timings));
     return {teamId:String(row[TS.TEAM_ID]), reviews:progress.error ? [] : progress.reviews.map(review => reviewerReviewCellDto_(row, TS, review, progress))};
-  }));
+  })); } finally { logPhases_('reviewer_request', 'getTeamRequirements', timings, started); }
 }
 
 /** Review marking: the rules code authorizes (assigned reviewer, or staff) and keeps its messages; the drawer reads and saves through the bridge. */
 const REVIEW_SAVE_KINDS_ = {draft:'saveReviewEvaluationDraft_', submit:'submitReviewEvaluation_', absence:'recordReviewAbsence_', makeupDraft:'saveReviewMakeupDraft_', makeupSubmit:'submitReviewMakeup_'};
 
 function API_review_getEvaluation(teamId, assessmentId) {
-  return apiHandle_(() => withDashboardRead_(() => loadReviewEvaluation_(String(teamId || ''), String(assessmentId || ''))));
+  const started = Date.now(), timings = [];
+  try { return apiHandle_(() => withDashboardRead_(() => timedPhase_(timings, 'load_evaluation', () => loadReviewEvaluation_(String(teamId || ''), String(assessmentId || ''), timings)))); }
+  finally { logPhases_('reviewer_request', 'getEvaluation', timings, started); }
 }
 
 /** kind is one of draft, submit, absence, makeupDraft, makeupSubmit; the rules function validates the input. */

@@ -1445,6 +1445,16 @@ test('Review entry is refused with the engine\'s reason on load and on every sav
  assert.equal(f.progress().reason,'');
 });
 
+test('reading a Review asks the engine for a label (documents from the journal, no Drive); every save asks for the full gate',()=>{
+ const f=fixture(),asked=gated(f,()=>MET);
+ f.load();
+ assert.equal(asked.at(-1).ctx.hint,true,'load is a hint');
+ f.c.saveReviewEvaluationDraft_({...f.input(),assessmentId:'review1'});
+ assert.notEqual(asked.at(-1).ctx.hint,true,'a save is the full gate');
+ f.c.submitReviewEvaluation_({...f.input(),assessmentId:'review1'});
+ assert.notEqual(asked.at(-1).ctx.hint,true,'a submit is the full gate');
+});
+
 test('the title is a requirement row like any other: without a row an unapproved title does not block, with one it does',()=>{
  const f=fixture();f.row[3]='Pending';
  gated(f,()=>MET);

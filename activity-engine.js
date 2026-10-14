@@ -110,8 +110,10 @@ function activityPreconditions_(activityId, team, ctx) {
   let stopped = false;
   for (const rule of ordered) {
     let answer;
+    const rowStarted = ctx.timings ? Date.now() : 0;
     try { answer = checks[rule.kind].isMet(team, rule.item, ctx); }
     catch (error) { console.error('Requirement check failed (' + rule.kind + '/' + rule.item + '): ' + (error && error.message || error)); answer = {met: false, unverifiable: true}; }
+    if (ctx.timings) ctx.timings.push({phase: 'row:' + rule.kind, durationMs: Date.now() - rowStarted, success: answer.met === true});
     const item = {label: rule.label, met: answer.met === true, reason: ''};
     if (!item.met) item.reason = answer.unverifiable ? 'Could not verify: ' + rule.label + '.' : String(answer.reason || 'Not met.');
     if (answer.diagnostic) item.diagnostic = answer.diagnostic;

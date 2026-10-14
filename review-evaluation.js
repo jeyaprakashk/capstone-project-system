@@ -18,7 +18,8 @@ function reviewEligibility_(row, columns, activity) {
   return gate.allowed ? {eligible:true,reason:''} : {eligible:false,reason:gate.reason};
 }
 
-function reviewContext_(teamId, staff, key) {
+/** `hint`: the requirement rows run as a label (a document is answered from its journal, no Drive read). Only reading a Review uses it; every save runs the full gate. */
+function reviewContext_(teamId, staff, key, hint, timings) {
   const actor = guideActor_(staff);
   const columns = getColumnMap_(SHEET_NAMES.TEAM_STATUS, FIELD_DEFINITIONS.TEAM_STATUS);
   const rows = getSheetRows_(SHEET_NAMES.TEAM_STATUS).filter(row=>textEquals_(row[columns.TEAM_ID],teamId));
@@ -31,6 +32,8 @@ function reviewContext_(teamId, staff, key) {
   const roster = {team:normalizeReviewKey_(row[columns.TEAM_ID]),committee,students};
   const committeeInfo=getCommitteeInfo_(committee) || {};
   const titleIndex = readTitleIndex_(), gate = titleGate_(row[columns.TEAM_ID], titleIndex), ctx = activityContext_();
+  if (hint) ctx.hint = true;
+  if (timings) ctx.timings = timings;
   ctx.title = {index:titleIndex};
   return {actor,roster,eligibility:reviewEligibility_(row,columns,{key,ctx}),details:{team:String(row[columns.TEAM_ID]),
     title:gate.title,problem:gate.problem,committee,
@@ -38,8 +41,8 @@ function reviewContext_(teamId, staff, key) {
     guideName:String(row[columns.GUIDE_NAME] || ''),guideEmail:String(row[columns.GUIDE_EMAIL] || '')}};
 }
 
-function reviewRecords_(key) {
-  const storage=assessmentJournal_(assessmentDefinition_(key)),name=storage.name,sheet=storage.sheet;
+function reviewRecords_(key,options) {
+  const storage=assessmentJournal_(assessmentDefinition_(key),options),name=storage.name,sheet=storage.sheet;
   if (!sheet) return {sheet:null,records:[]};
   if(storage.state==='EMPTY')throw new Error(assessmentStorageMissing_(name));
   const rows = storage.rows || sheet.getDataRange().getValues();
@@ -101,10 +104,10 @@ function reviewStudentView_(config,teamScores,student) {
   if(!student.assessment || student.assessment.policyVersion!==config.academicPolicyVersion)throw new Error('Invalid finalized outcome policy.');
   return student;
 }
-function loadReviewEvaluation_(teamId,key) {return withAssessmentDefinitions_(()=>getReviewEvaluation_(teamId,key));}
-function getReviewEvaluation_(teamId,key) {
-  const context = reviewContext_(teamId,false,key), config = reviewConfiguration_(key);
-  const history=reviewRecords_(key);
+function loadReviewEvaluation_(teamId,key,timings) {return withAssessmentDefinitions_(()=>getReviewEvaluation_(teamId,key,timings));}
+function getReviewEvaluation_(teamId,key,timings) {
+  const context = reviewContext_(teamId,false,key,true,timings), config = reviewConfiguration_(key);
+  const history=reviewRecords_(key,{discover:false});
   if(!history.sheet)throw new Error(assessmentStorageMissing_(reviewHistoryName_(key)));
   const latest = reviewLatest_(history.records,context.roster.team);
   const availability = reviewAvailability_(context,config,latest);
@@ -264,7 +267,9 @@ function reviewProgress_(row, columns, records, config, definition, loaded) {
   const markedStudents=submitted?latest.students.filter(isComplete).length:0;
   const recorded=submitted;
   const completed=submitted && markedStudents===totalStudents;
+  const sequenceStarted=loaded&&loaded.timings?Date.now():0;
   const sequenceReason=assessmentSequenceBlock_(definition||assessmentDefinition_(config.key),row[columns.TEAM_ID],loaded);
+  if(sequenceStarted)loaded.timings.push({phase:'sequence:'+config.key,durationMs:Date.now()-sequenceStarted});
   // The ActivityDependencies rows of the review are read only while the entry could still be opened (it is open and not yet submitted): a
   // locked or not yet open review never needs them, and they can cost a Drive lookup per team. A bulk run (`loaded`) evaluates them only when
   // its caller asked for the gate, with one engine context for the whole run; a direct call evaluates them with a context of its own.

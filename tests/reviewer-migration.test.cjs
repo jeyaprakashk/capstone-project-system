@@ -32,7 +32,7 @@ function serverFixture(email = 'reviewer@example.com') {
   };
   Object.assign(c, {
     getColumnMap_: () => index, getSheetRows_: () => rows, getCommitteeNumbersForReviewer_: () => ['C1'],
-    normalizeReviewKey_: s => String(s || '').trim().toLowerCase(), getReviewerReviewProgress_: () => progress,
+    normalizeReviewKey_: s => String(s || '').trim().toLowerCase(), withAssessmentDefinitions_: read => read(), getReviewerReviewProgress_: () => progress,
     teamFolderUrls_: () => ({ t1: 'https://drive.example.com/T1' })
   });
   // The titles are read from TitleLog; the rows above keep the old-style data the fixture was written with, translated to TitleLog rows.
@@ -137,7 +137,7 @@ test('the dashboard asks only for the cheap rows; the per-team endpoint asks for
   const { c, progress } = serverFixture();
   const asked = [];
   const stub = c.getReviewerReviewProgress_;
-  c.getReviewerReviewProgress_ = (rows, onlyKey, gate) => { asked.push({teams: rows.map(r => String(r[0])), gate}); return stub(rows, onlyKey, gate); };
+  c.getReviewerReviewProgress_ = (rows, onlyKey, gate, hint) => { asked.push({teams: rows.map(r => String(r[0])), gate, hint}); return stub(rows, onlyKey, gate, hint); };
   JSON.parse(c.API_reviewer_getDashboard());
   assert.deepEqual(Array.from(asked[0].gate), ['title'], 'the dashboard evaluates the title rows only');
   progress.teams.t2.review1 = { available: true, readable: false, status: 'Not started', reason: 'Step3: Waiting for the guide to approve it.', markedStudents: 0, totalStudents: 1 };
@@ -145,6 +145,8 @@ test('the dashboard asks only for the cheap rows; the per-team endpoint asks for
   assert.equal(frame.ok, true);
   assert.equal(frame.data.teamId, 'T2');
   assert.equal(asked[1].gate, true, 'every kind');
+  assert.equal(asked[1].hint, true, 'as a label: documents come from the journal, not Drive');
+  assert.equal(asked[0].hint, undefined, 'the first paint is not a hint');
   assert.deepEqual(Array.from(asked[1].teams), ['T2'], 'one team');
   assert.deepEqual(frame.data.reviews.map(cell => cell.key), ['review1', 'review2']);
   assert.deepEqual({enabled: frame.data.reviews[0].enabled, note: frame.data.reviews[0].note}, {enabled: false, note: 'Step3: Waiting for the guide to approve it.'});

@@ -103,6 +103,26 @@ test('default journal discovers existing assessment history by identity without 
  f.actor('coord@x');const result=c.prepareReviewAssessmentStorage_([]);assert.equal(result.journals[0].journal,'ArchivedAssessment');assert.equal(result.journals[0].created,false);assert.equal(f.extra.Assessment_review1,undefined);assert.equal(JSON.stringify(data),before);
 });
 
+test('a read of an existing journal with no records does not search the other sheets; the default lookup still does',()=>{
+ const f=coordinatorStorageSetup(),c=f.c;f.actor('coord@x');c.prepareReviewAssessmentStorage_([]);
+ const headers=Array.from(vm.runInContext('Object.values(ASSESSMENT_JOURNAL_FIELDS_)',c));
+ const decoy=f.sheet([headers],'Decoy');let reads=0;const original=decoy.getDataRange;decoy.getDataRange=(...a)=>{reads++;return original.apply(decoy,a);};
+ f.extra.Decoy=decoy;
+ const definition={...c.assessmentDefinition_('review1'),journalConfigured:false};
+ assert.equal(c.assessmentJournal_(definition,{discover:false}).state,'READY');assert.equal(reads,0,'a read does not open the other sheets');
+ c.assessmentJournal_(definition);assert(reads>0,'the default lookup still searches');
+});
+
+test('the Rubrics tab is read once inside withAssessmentDefinitions_ and again on the next call',()=>{
+ const f=coordinatorStorageSetup(),c=f.c,getSheet_=c.getSheet_;let reads=0;
+ c.getSheet_=name=>{const sheet=getSheet_(name);if(name!=='Rubrics'||!sheet)return sheet;return new Proxy(sheet,{get:(t,k)=>k==='getDataRange'?()=>{reads++;return t.getDataRange();}:typeof t[k]==='function'?t[k].bind(t):t[k]});};
+ const keys=['review1','review2'];
+ c.withAssessmentDefinitions_(()=>keys.forEach(k=>{c.assessmentRubric_(c.assessmentDefinition_(k));c.assessmentRubric_(c.assessmentDefinition_(k));}));
+ assert.equal(reads,1,'one read for the whole scope');
+ c.assessmentRubric_(c.assessmentDefinition_('review1'));c.assessmentRubric_(c.assessmentDefinition_('review1'));
+ assert.equal(reads,3,'outside the scope every call reads');
+});
+
 test('conflicting bindings, foreign data and ambiguous history fail before creating any journal',()=>{
  for(const kind of ['binding','foreign','ambiguous','headers']){
   const f=coordinatorStorageSetup(),c=f.c,headers=Array.from(vm.runInContext('Object.values(ASSESSMENT_JOURNAL_FIELDS_)',c));

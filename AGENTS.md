@@ -38,6 +38,10 @@ Whether a team's marks can be entered for a Review is decided by three things, a
   and APPROVE pair with actor `baseline`; that one-time code has been run and deleted (Versions 202 and 203 hold it). A journal that begins with a `REOPEN`
   row is `UNAVAILABLE` like any other broken history (the owner checked the sheet: none exists).
 
+- **Reading a Review answers documents from the journal (October 2026, owner-approved).** Loading a Review for marking, and the reviewer dashboard's
+  per-team button, run the requirements as a `hint`: a `document` with a journal row is met by APPROVED or REOPENED with no Drive read (a file that
+  was deleted or duplicated after approval is not seen on read). Every save (draft, submit, makeup, absence) still runs the full gate, Drive included.
+
 - **Evidence: `ActivityEvidences` rows (October 2026, owner-approved rule change; archive/plans/EVIDENCE-PLAN.md).** A Review also needs, for each row
   `Activity ID` / `Evidence Folder` / `Minimum Files` that names it, at least that many evidence files of the team copied to Drive in that folder (the
   `EvidenceCopies` rows with a Drive file; the whole semester, no date window). It is evaluated by the activity engine beside the other requirements, so it
