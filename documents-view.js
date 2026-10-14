@@ -71,7 +71,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   const unmetFor = (doc, activity) => ((doc.evidence && doc.evidence.requirements) || []).some(item => !item.met && (!activity || item.activity === activity));
 
   /** The evidence buttons sit with the evidence they act on: Copy evidence is the next step, so it is the primary one. */
-  function evidenceButtons(doc, dto) {
+  function evidenceButtons(doc, dto, list) {
     const can = doc.can;
     if (!can) return '';
     const hooks = ' data-document="' + escape(doc.documentId) + '" data-revision="' + escape(doc.revision) + '"';
@@ -81,7 +81,8 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     const html = (copyReady ? '<button type="button" class="' + PRIMARY + SHARE + '" data-doc-action="copy-evidence"' + hooks + ' aria-label="Copy evidence (' + pending + ' waiting)" title="Copy evidence">' + icon('copy') +
         'Copy (' + pending + ')</button>' : '') +
       (can.checkEvidence && can.checkEvidence.allowed ? '<button type="button" class="' + BUTTON + SHARE + '" data-doc-action="check-evidence"' + hooks + ' aria-label="Check for new evidence" title="Check for new evidence">' + icon('refresh-cw') + 'Check new</button>' : '');
-    return html ? '<div class="mt-4 flex gap-2">' + html + '</div>' : '';
+    // `list` is the toggle of the evidence list: the third button of the same row. Check takes the width the others leave.
+    return html || list ? '<div class="mt-4 flex gap-2">' + html + (list || '') + '</div>' : '';
   }
 
   /**
@@ -109,12 +110,12 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
       return '<section class="rounded-card border border-edge bg-paper p-4 text-sm" data-evidence-folder="' + escape(block.folder) + '"' + (owes ? ' data-evidence-owes' : '') + '>' +
         '<div class="flex items-baseline justify-between gap-2 border-b border-edge pb-3"><span class="min-w-0 break-all font-semibold text-ink">Evidence \u00b7 ' + escape(block.folder) + '</span>' +
         '<span class="shrink-0 text-muted">' + escape(plural(block.copied, 'file')) + ' copied</span></div><ul class="m-0 list-none p-0">' + rows + '</ul>' +
-        (index === last ? evidenceButtons(doc, dto) + (tail ? '<div class="mt-2 flex flex-col gap-2">' + tail + '</div>' : '') : '') + '</section>';
+        (index === last ? evidenceButtons(doc, dto, tail && tail.toggle) + (tail && tail.panel ? '<div class="mt-2">' + tail.panel + '</div>' : '') : '') + '</section>';
     }).join('') + '</div>';
   }
 
   const PANEL = 'flex flex-col gap-1 rounded-md bg-soft px-3 py-2 text-sm';
-  const toggleButton = (target, glyph, text) => '<button type="button" class="' + DETAILS + (target === 'evidence' ? ' w-full justify-center' : '') + '" data-doc-action="toggle" data-doc-target="' + target + '" aria-expanded="false">' + icon(glyph) + text +
+  const toggleButton = (target, glyph, text, name) => '<button type="button" class="' + DETAILS + '" data-doc-action="toggle" data-doc-target="' + target + '"' + (name ? ' aria-label="' + name + '" title="' + name + '"' : '') + ' aria-expanded="false">' + icon(glyph) + text +
     '<span class="inline-flex transition-transform" data-doc-chevron>' + icon('chevron-down') + '</span></button>';
 
   /**
@@ -128,7 +129,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     const items = evidence.files.map(file => '<li class="break-all" data-evidence-file="' + escape(file.state) + '">' + escape(file.path) + ' · ' + escape(bytes(file.size)) +
       (EVIDENCE_STATE[file.state] ? ' · ' + escape(EVIDENCE_STATE[file.state]) : '') +
       (file.link ? ' · <a class="text-primary" href="' + escape(safeUrl(file.link)) + '" target="_blank" rel="noopener">' + (file.state === 'PENDING' ? 'Open the earlier copy' : 'Open') + '</a>' : '') + '</li>').join('');
-    const standalone = () => ({main: hasBlocks ? requirementsMarkup(doc, dto, '') : evidenceButtons(doc, dto), toggle: '', panel: ''});
+    const standalone = () => ({main: hasBlocks ? requirementsMarkup(doc, dto, null) : evidenceButtons(doc, dto), toggle: '', panel: ''});
     if (!(items || evidence.pending || evidence.tooLarge)) return standalone();
     // The requirement block already says how many files are copied, so the summary repeats the count only when there is no block.
     const parts = [hasBlocks ? '' : evidence.copied + ' copied', evidence.pending ? evidence.pending + ' waiting to be copied' : '', evidence.tooLarge ? evidence.tooLarge + ' too large' : ''].filter(Boolean);
@@ -138,10 +139,10 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     const waiting = [evidence.pending ? plural(evidence.pending, 'file') + ' waiting to be copied from ' + evidence.folders.join(', ') : '',
       evidence.tooLarge ? plural(evidence.tooLarge, 'file') + ' too large to copy' : ''].filter(Boolean);
     const body = items ? '<ul class="m-0 list-none p-0 text-xs text-muted" data-evidence-list>' + items + '</ul>' : '<p class="m-0 text-muted">' + escape(waiting.join('; ')) + '.</p>';
-    const toggle = toggleButton('evidence', 'paperclip', 'Evidence');
+    const toggle = toggleButton('evidence', 'paperclip', 'List', 'Evidence list');
     const panel = '<div class="' + PANEL + '" data-doc-panel="evidence" data-doc-evidence hidden><p class="m-0 font-semibold text-ink-2" data-evidence-summary>' + escape(summary) + '</p>' + body + '</div>';
-    // With a Review requirement the files expand inside its evidence box; without one they stand on their own row under the buttons.
-    return hasBlocks ? {main: requirementsMarkup(doc, dto, toggle + panel), toggle: '', panel: ''} : {main: evidenceButtons(doc, dto), toggle, panel};
+    // The list toggle joins the evidence buttons in one row, and its panel opens under that row: inside the evidence box when there is one.
+    return hasBlocks ? {main: requirementsMarkup(doc, dto, {toggle, panel}), toggle: '', panel: ''} : {main: evidenceButtons(doc, dto, toggle) + '<div class="mt-2 empty:hidden">' + panel + '</div>', toggle: '', panel: ''};
   }
 
   function controlsMarkup(doc, dto) {

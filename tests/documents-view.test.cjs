@@ -458,3 +458,20 @@ test('with a requirement block the Evidence expandable sits inside the evidence 
   assert(/flex-1/.test(alone.host.querySelector('[data-doc-action="check-evidence"]').className), 'a lone Check takes the whole row');
   assert.deepEqual(missingClasses(renderedClasses(f.host)), []);
 });
+
+test('Copy, Check and the List toggle are one row of the evidence box; Check keeps the free width, and the toggle is named for screen readers', async () => {
+  const needs = [{ activity: 'review1', label: 'Review 1', folder: 'Budget', minimum: 2, copied: 0, met: false }];
+  const make = can => dto([doc({ status: 'NEEDS_REVIEW', evidence: evidence([file('a.png', 'COPIED')], 3, { requirements: needs }), can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(false), ...can } })]);
+  const f = setup({ dto: make({ copyEvidence: cap(true), checkEvidence: cap(true) }) });
+  await f.view.mount(f.host, '');
+  const block = f.host.querySelector('[data-evidence-folder]');
+  const copy = block.querySelector('[data-doc-action="copy-evidence"]'), check = block.querySelector('[data-doc-action="check-evidence"]'), list = block.querySelector('[data-doc-target="evidence"]');
+  assert(copy.parentNode === check.parentNode && check.parentNode === list.parentNode, 'one row');
+  assert.equal(text(list), 'List');
+  assert.equal(list.getAttribute('aria-label'), 'Evidence list');
+  assert(/flex-1/.test(check.className) && !/flex-1/.test(list.className), 'Check takes the width the others leave');
+  const alone = setup({ dto: dto([doc({ status: 'NEEDS_REVIEW', evidence: evidence([], 0, { requirements: needs }), can: { submit: cap(false), approve: cap(false), return: cap(false), reopen: cap(false), copyEvidence: cap(false), checkEvidence: cap(true) } })]) });
+  await alone.view.mount(alone.host, '');
+  assert.equal(alone.host.querySelector('[data-doc-target="evidence"]'), null, 'no files to list, so no List button');
+  assert(/flex-1/.test(alone.host.querySelector('[data-doc-action="check-evidence"]').className), 'Check alone takes the whole row');
+});
