@@ -450,7 +450,7 @@ test('with a requirement block the Evidence expandable sits inside the evidence 
   const copy = block.querySelector('[data-doc-action="copy-evidence"]'), check = block.querySelector('[data-doc-action="check-evidence"]');
   assert.equal(copy.parentNode, check.parentNode, 'Copy and Check share one row');
   assert.equal(text(copy), 'Copy (3)');
-  assert.equal(text(check), 'Check new');
+  assert.equal(text(check), 'Check');
   assert.equal(copy.getAttribute('aria-label').includes('Copy evidence'), true);
   const alone = setup({ dto: make({ copyEvidence: cap(false), checkEvidence: cap(true) }) });
   await alone.view.mount(alone.host, '');

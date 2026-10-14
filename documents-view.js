@@ -67,7 +67,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   const EVIDENCE_STATE = {COPIED: '', PENDING: 'waiting to be copied', TOO_LARGE: 'too large, not copied'};
 
   const plural = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
-  const SHARE = ' flex min-w-0 flex-1 items-center justify-center gap-2';
+  const SHARE = ' flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap px-2';
   const unmetFor = (doc, activity) => ((doc.evidence && doc.evidence.requirements) || []).some(item => !item.met && (!activity || item.activity === activity));
 
   /** The evidence buttons sit with the evidence they act on: Copy evidence is the next step, so it is the primary one. */
@@ -80,7 +80,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     const copyReady = !!(can.copyEvidence && can.copyEvidence.allowed && typeof pending === 'number' && pending > 0);
     const html = (copyReady ? '<button type="button" class="' + PRIMARY + SHARE + '" data-doc-action="copy-evidence"' + hooks + ' aria-label="Copy evidence (' + pending + ' waiting)" title="Copy evidence">' + icon('copy') +
         'Copy (' + pending + ')</button>' : '') +
-      (can.checkEvidence && can.checkEvidence.allowed ? '<button type="button" class="' + BUTTON + SHARE + '" data-doc-action="check-evidence"' + hooks + ' aria-label="Check for new evidence" title="Check for new evidence">' + icon('refresh-cw') + 'Check new</button>' : '');
+      (can.checkEvidence && can.checkEvidence.allowed ? '<button type="button" class="' + BUTTON + SHARE + '" data-doc-action="check-evidence"' + hooks + ' aria-label="Check for new evidence" title="Check for new evidence">' + icon('refresh-cw') + 'Check</button>' : '');
     // `list` is the toggle of the evidence list: the third button of the same row. Check takes the width the others leave.
     return html || list ? '<div class="mt-4 flex gap-2">' + html + (list || '') + '</div>' : '';
   }
