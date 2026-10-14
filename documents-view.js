@@ -43,17 +43,19 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
 
   const label = text => '<span class="text-muted">' + text + '</span> ';
 
-  /** The commit details behind "Details". A team member who is also the committer is named once. */
+  /**
+   * The facts behind "Details" that the card does not already show: the submitter's e-mail (guide and coordinator only), who committed the version,
+   * and who last changed it when that is another person. The submitter's name and time and the version are on the card itself.
+   */
   function linesMarkup(doc) {
     const out = [];
-    if (doc.submittedBy) out.push('<li>' + label('Submitted by:') + escape(doc.submittedBy.name || 'a team member') + (doc.submittedBy.email ? ' (' + escape(doc.submittedBy.email) + ')' : '') +
-      (doc.submittedBy.at ? ' · ' + escape(when(doc.submittedBy.at)) : '') + '</li>');
+    if (doc.submittedBy && doc.submittedBy.email) out.push('<li>' + label('Submitted by:') + escape(doc.submittedBy.name || 'a team member') + ' (' + escape(doc.submittedBy.email) + ')</li>');
     if (doc.commit) {
       const committer = person(doc.commit.committedBy), last = doc.commit.lastTeamChange ? person(doc.commit.lastTeamChange) : '';
-      out.push('<li>' + label('Committed by:') + escape(committer) + ' · version <span class="' + CODE + '">' + escape(doc.commit.shortSha) + '</span></li>');
+      out.push('<li>' + label('Committed by:') + escape(committer) + '</li>');
       if (last && last !== committer) out.push('<li>' + label('Last changed by a team member:') + escape(last) + '</li>');
     }
-    return out.length ? '<ul class="m-0 list-none p-0 text-sm text-ink" data-doc-lines>' + out.join('') + '</ul>' : '';
+    return out.length ? '<ul class="m-0 list-none p-0 text-ink" data-doc-lines>' + out.join('') + '</ul>' : '';
   }
 
   function historyMarkup(doc) {
@@ -68,7 +70,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
 
   const plural = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
   const WIDE = ' flex w-full items-center justify-center gap-2';
-  const unmetFor = (doc, activity) => doc.status !== 'APPROVED' && ((doc.evidence && doc.evidence.requirements) || []).some(item => !item.met && (!activity || item.activity === activity));
+  const unmetFor = (doc, activity) => ((doc.evidence && doc.evidence.requirements) || []).some(item => !item.met && (!activity || item.activity === activity));
 
   /** The evidence buttons sit with the evidence they act on: Copy evidence is the next step, so it is the primary one. */
   function evidenceButtons(doc, dto) {
@@ -115,27 +117,34 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     }).join('') + '</div>';
   }
 
-  /** The evidence of a document (the team's copied files, and for a student what is still waiting), with a link to each copied file. */
+  const PANEL = 'flex flex-col gap-1 rounded-md bg-soft px-3 py-2 text-sm';
+  const toggleButton = (target, text) => '<button type="button" class="' + DETAILS + '" data-doc-action="toggle" data-doc-target="' + target + '" aria-expanded="false">' + text +
+    '<span class="inline-flex transition-transform" data-doc-chevron>' + icon('chevron-down') + '</span></button>';
+
+  /**
+   * The evidence of a document, in three parts: `main` (the requirement blocks and the evidence buttons, always visible), and a `toggle` button and
+   * `panel` for the files (the team's copied files with a link to each, and what is still waiting), which share the pattern of the Details panel.
+   */
   function evidenceMarkup(doc, dto) {
-    const evidence = doc.evidence;
-    if (!evidence) return '';
-    const checked = evidence.checkedAt && when(evidence.checkedAt) ? ' (checked ' + when(evidence.checkedAt) + ')' : '';
-    const summary = 'Evidence: ' + evidence.copied + ' copied' + (evidence.pending ? ', ' + evidence.pending + ' waiting to be copied' : '') +
-      (evidence.tooLarge ? ', ' + evidence.tooLarge + ' too large' : '') + checked;
+    const evidence = doc.evidence, none = {main: '', toggle: '', panel: ''};
+    if (!evidence) return none;
+    const requirements = requirementsMarkup(doc, dto);
+    // Without a Review requirement the buttons stand alone; with one they close its block.
+    const main = requirements + (requirements ? '' : evidenceButtons(doc, dto));
     const items = evidence.files.map(file => '<li class="break-all" data-evidence-file="' + escape(file.state) + '">' + escape(file.path) + ' · ' + escape(bytes(file.size)) +
       (EVIDENCE_STATE[file.state] ? ' · ' + escape(EVIDENCE_STATE[file.state]) : '') +
       (file.link ? ' · <a class="text-primary" href="' + escape(safeUrl(file.link)) + '" target="_blank" rel="noopener">' + (file.state === 'PENDING' ? 'Open the earlier copy' : 'Open') + '</a>' : '') + '</li>').join('');
+    if (!(items || evidence.pending || evidence.tooLarge)) return {main, toggle: '', panel: ''};
+    // The requirement block already says how many files are copied, so the summary repeats the count only when there is no block.
+    const parts = [requirements ? '' : evidence.copied + ' copied', evidence.pending ? evidence.pending + ' waiting to be copied' : '', evidence.tooLarge ? evidence.tooLarge + ' too large' : ''].filter(Boolean);
+    const checked = evidence.checkedAt && when(evidence.checkedAt) ? ' (checked ' + when(evidence.checkedAt) + ')' : '';
+    const summary = (parts.length ? 'Evidence: ' + parts.join(', ') : 'Evidence files') + checked;
     // `files` lists the copied files only; files still waiting are a count until the next check, so an empty list is not "no evidence".
     const waiting = [evidence.pending ? plural(evidence.pending, 'file') + ' waiting to be copied from ' + evidence.folders.join(', ') : '',
       evidence.tooLarge ? plural(evidence.tooLarge, 'file') + ' too large to copy' : ''].filter(Boolean);
-    const body = items ? '<ul class="m-0 mt-1 list-none p-0 text-xs text-muted" data-evidence-list>' + items + '</ul>'
-      : p(escape(waiting.join('; ') || 'No evidence files yet in ' + evidence.folders.join(', ')) + '.', 'text-muted');
-    const requirements = requirementsMarkup(doc, dto);
-    // Without a Review requirement the buttons stand alone; with one they close its block.
-    const buttons = requirements ? '' : evidenceButtons(doc, dto);
-    const hasFiles = items || evidence.pending || evidence.tooLarge;
-    if (!hasFiles) return requirements + buttons;
-    return requirements + buttons + '<details class="rounded-card border border-line bg-tint p-4 text-sm" data-doc-evidence><summary class="cursor-pointer font-semibold text-ink-2">' + escape(summary) + '</summary>' + body + '</details>';
+    const body = items ? '<ul class="m-0 list-none p-0 text-xs text-muted" data-evidence-list>' + items + '</ul>' : '<p class="m-0 text-muted">' + escape(waiting.join('; ')) + '.</p>';
+    return {main, toggle: toggleButton('evidence', 'Evidence'),
+      panel: '<div class="' + PANEL + '" data-doc-panel="evidence" data-doc-evidence hidden><p class="m-0 font-semibold text-ink-2" data-evidence-summary>' + escape(summary) + '</p>' + body + '</div>'};
   }
 
   function controlsMarkup(doc, dto) {
@@ -176,7 +185,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   const CIRCLE = 'inline-flex shrink-0 items-center justify-center rounded-full ';
   const CIRCLE_TONE = {done: 'bg-success-tint text-success', waiting: 'bg-paper text-info ring-1 ring-inset ring-info/30', active: 'bg-warning-tint text-warning'};
   const GROUP_ICON = {done: 'check', waiting: 'clock', active: 'pencil'};
-  const OPEN_LINK = LINK + ' flex-1 justify-center gap-2';
+  const OPEN_LINK = LINK + ' min-w-36 flex-1 justify-center gap-2';
   const DETAILS = BUTTON + ' inline-flex cursor-pointer items-center gap-1';
   const CODE = 'inline-block rounded-md bg-tint px-1.5 py-0.5 font-mono text-xs text-ink-2';
   const APPROVED = ['APPROVED', 'REOPENED'];
@@ -187,24 +196,25 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   function documentMarkup(doc, dto) {
     const short = unmetFor(doc), dot = doc.fileName.lastIndexOf('.');
     // Evidence still owed on a document the guide is waiting for must not look settled.
-    const tone = short && doc.status === 'NEEDS_REVIEW' ? 'active' : TONE[doc.state] ? doc.state : 'waiting';
+    const unsettled = short && (doc.status === 'NEEDS_REVIEW' || APPROVED.indexOf(doc.status) >= 0);
+    const tone = unsettled ? 'active' : TONE[doc.state] ? doc.state : 'waiting';
     const base = dot > 0 ? doc.fileName.slice(0, dot) : doc.fileName, extension = dot > 0 ? doc.fileName.slice(dot) : '';
-    const by = doc.submittedBy ? '<span class="block">Submitted by ' + escape(doc.submittedBy.name || 'a team member') + '</span>' +
-      (doc.submittedBy.at ? '<span class="block text-muted">' + escape(when(doc.submittedBy.at)) + '</span>' : '') : '';
-    const more = linesMarkup(doc) + historyMarkup(doc);
-    const icon_ = short && doc.status === 'NEEDS_REVIEW' ? 'circle-alert' : STATUS_ICON[doc.status] || 'file-text';
+    const by = doc.submittedBy ? '<span class="min-w-0">Submitted ' + (doc.submittedBy.at ? escape(when(doc.submittedBy.at)) + ' ' : '') + 'by ' + escape(doc.submittedBy.name || 'a team member') + '</span>' +
+      (doc.commit ? '<span class="' + CODE + ' shrink-0" title="Version of the file" data-doc-version>' + escape(doc.commit.shortSha) + '</span>' : '') : '';
+    const more = linesMarkup(doc) + historyMarkup(doc), proof = evidenceMarkup(doc, dto);
+    const icon_ = unsettled ? 'circle-alert' : STATUS_ICON[doc.status] || 'file-text';
     return '<article class="flex min-w-0 flex-col gap-3 ' + CARD + ' p-4" data-document-card="' + escape(doc.documentId) + '" data-document-status="' + escape(doc.status) + '">' +
       '<div class="flex items-start gap-3"><span class="' + TILE + TILE_TONE[tone] + '">' + icon(icon_, 'size-6') + '</span>' +
       '<div class="min-w-0 flex-1"><h4 class="m-0 break-words text-base text-ink"><span class="font-semibold">' + escape(base) + '</span><span class="text-muted">' + escape(extension) + '</span></h4>' +
       '<div class="mt-1.5 flex flex-wrap gap-1.5"><span class="' + TONE[TONE[doc.state] ? doc.state : 'waiting'] + '">' + escape(doc.statusText) + '</span>' +
       (short ? '<span class="' + TONE.active + '" data-evidence-incomplete>Evidence incomplete</span>' : '') + '</div>' +
-      (by ? '<p class="m-0 mt-2 text-sm text-ink-2" data-doc-by>' + by + '</p>' : '') + '</div></div>' +
+      (by ? '<p class="m-0 mt-2 flex items-start justify-between gap-2 text-sm text-ink-2" data-doc-by>' + by + '</p>' : '') + '</div></div>' +
       (doc.status === 'RETURNED' && doc.returnedNotes ? p('<strong>Guide\'s notes:</strong> ' + escape(doc.returnedNotes), 'text-warning m-0') : '') +
-      evidenceMarkup(doc, dto) + controlsMarkup(doc, dto) +
+      proof.main + controlsMarkup(doc, dto) +
       '<p class="m-0 text-sm text-ink-2 empty:hidden" role="status" aria-live="polite" data-doc-status></p>' +
-      (doc.link || more ? '<div class="flex gap-2">' + (doc.link ? '<a class="' + OPEN_LINK + '" href="' + escape(safeUrl(doc.link)) + '" target="_blank" rel="noopener">Open the file' + icon('external-link') + '</a>' : '') +
-        (more ? '<button type="button" class="' + DETAILS + '" data-doc-action="toggle" aria-expanded="false">Details<span class="inline-flex transition-transform" data-doc-chevron>' + icon('chevron-down') + '</span></button>' : '') + '</div>' : '') +
-      (more ? '<div class="flex flex-col gap-1 rounded-md bg-soft px-3 py-2" data-doc-more hidden>' + more + '</div>' : '') + '</article>';
+      (doc.link || proof.toggle || more ? '<div class="flex flex-wrap gap-2">' + (doc.link ? '<a class="' + OPEN_LINK + '" href="' + escape(safeUrl(doc.link)) + '" target="_blank" rel="noopener">Open the file' + icon('external-link') + '</a>' : '') +
+        proof.toggle + (more ? toggleButton('details', 'Details') : '') + '</div>' : '') +
+      proof.panel + (more ? '<div class="' + PANEL + '" data-doc-panel="details" data-doc-more hidden>' + more + '</div>' : '') + '</article>';
   }
 
   /**
@@ -227,10 +237,13 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     return groups.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id, 'en', {numeric: true}));
   }
 
-  const approvedCount = group => group.documents.filter(doc => APPROVED.indexOf(doc.status) >= 0).length;
+  const activityOf = group => group.id === OTHER_GROUP || group.id === ALL_GROUP ? '' : group.id;
+  /** A document is complete when the guide has approved it AND the evidence it needs is all there; either one alone is not enough. */
+  const isComplete = (doc, activity) => APPROVED.indexOf(doc.status) >= 0 && !unmetFor(doc, activity);
+  const completeCount = group => group.documents.filter(doc => isComplete(doc, activityOf(group))).length;
   const countOf = (group, statuses) => group.documents.filter(doc => statuses.indexOf(doc.status) >= 0).length;
   /** How many documents of a Review still owe evidence for it. */
-  const evidenceShort = group => group.documents.filter(doc => unmetFor(doc, group.id === OTHER_GROUP || group.id === ALL_GROUP ? '' : group.id)).length;
+  const evidenceShort = group => group.documents.filter(doc => unmetFor(doc, activityOf(group))).length;
   /** The one thing worth saying about a Review: what the team still has to do, else what the guide has, else done. */
   function groupChip(group) {
     const toDo = countOf(group, TEAM_TO_ACT), awaiting = countOf(group, ['NEEDS_REVIEW']);
@@ -238,13 +251,13 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     if (toDo) return {tone: 'active', text: toDo + ' to submit'};
     if (short) return {tone: 'active', text: short + ' need evidence'};
     if (awaiting) return {tone: 'waiting', text: awaiting + ' awaiting guide'};
-    return {tone: 'done', text: 'All approved'};
+    return {tone: 'done', text: 'All complete'};
   }
 
   function rowMarkup(group, selected) {
     const chip = groupChip(group), count = group.documents.length;
     const awaiting = countOf(group, ['NEEDS_REVIEW']), short = evidenceShort(group);
-    const sub = approvedCount(group) + ' of ' + count + ' approved' + (short ? ' \u00b7 ' + short + ' need evidence' : '') + (awaiting ? ' \u00b7 ' + awaiting + ' awaiting the guide' : '');
+    const sub = completeCount(group) + ' of ' + count + ' complete' + (short ? ' \u00b7 ' + short + ' need evidence' : '') + (awaiting ? ' \u00b7 ' + awaiting + ' awaiting the guide' : '');
     return '<li><button type="button" class="' + ROW + '" data-doc-action="select" data-doc-group="' + escape(group.id) + '"' + (selected ? ' aria-current="true"' : '') + '>' +
       '<span class="' + CIRCLE + 'size-9 ' + CIRCLE_TONE[chip.tone] + '">' + icon(GROUP_ICON[chip.tone]) + '</span>' +
       '<span class="min-w-0 flex-1"><span class="block font-semibold text-ink">' + escape(group.label) + '</span>' +
@@ -252,14 +265,15 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
       '<span class="text-muted">' + icon('chevron-right') + '</span></button></li>';
   }
 
-  /** The status card on top of the list: how many documents are approved, and when the team files were last checked. */
+  /** The status card on top of the list: how many documents are complete (approved and with their evidence), and when the team files were last checked. */
   function summaryMarkup(dto) {
-    const total = dto.documents.length, approved = dto.documents.filter(doc => APPROVED.indexOf(doc.status) >= 0).length, done = approved === total;
+    const total = dto.documents.length, complete = dto.documents.filter(doc => isComplete(doc, '')).length, done = complete === total;
     const awaiting = dto.documents.filter(doc => doc.status === 'NEEDS_REVIEW').length;
-    const sub = [awaiting ? awaiting + ' awaiting the guide' : '', dto.scannedAt ? 'Team files last checked ' + when(dto.scannedAt) : ''].filter(Boolean).join(' \u00b7 ');
+    const short = dto.documents.filter(doc => unmetFor(doc, '')).length;
+    const sub = [short ? short + ' need evidence' : '', awaiting ? awaiting + ' awaiting the guide' : '', dto.scannedAt ? 'Team files last checked ' + when(dto.scannedAt) : ''].filter(Boolean).join(' \u00b7 ');
     return '<section class="p-5 ' + CARD + '" data-doc-summary aria-label="Documents status"><div class="flex items-center gap-3">' +
       '<span class="' + CIRCLE + 'size-12 ' + (done ? CIRCLE_TONE.done : CIRCLE_TONE.active) + '">' + icon(done ? 'check' : 'circle-alert', 'size-6') + '</span>' +
-      '<div class="min-w-0"><h2 class="m-0 text-hero font-semibold text-ink">' + approved + ' of ' + total + ' approved</h2>' + (sub ? '<p class="m-0 text-sm text-muted">' + escape(sub) + '</p>' : '') + '</div></div></section>';
+      '<div class="min-w-0"><h2 class="m-0 text-hero font-semibold text-ink">' + complete + ' of ' + total + ' complete</h2>' + (sub ? '<p class="m-0 text-sm text-muted">' + escape(sub) + '</p>' : '') + '</div></div></section>';
   }
 
   function detailMarkup(group, dto) {
@@ -267,7 +281,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     return '<section aria-label="' + escape(group.label) + '">' +
       '<div class="mb-3 xl:hidden"><button type="button" class="inline-flex items-center gap-1 ' + BUTTON + '" data-doc-action="back">' + icon('chevron-left') + 'All activities</button></div>' +
       '<div class="flex flex-wrap items-center justify-between gap-2"><h3 class="m-0 text-h1 font-semibold text-ink">' + escape(heading) + '</h3>' +
-      '<span class="' + TONE[groupChip(group).tone === 'done' ? 'done' : 'waiting'] + '">' + approvedCount(group) + ' of ' + group.documents.length + ' approved</span></div>' +
+      '<span class="' + TONE[groupChip(group).tone === 'done' ? 'done' : 'waiting'] + '">' + completeCount(group) + ' of ' + group.documents.length + ' complete</span></div>' +
       '<div class="mt-3 grid gap-3 sm:grid-cols-2">' + group.documents.map(doc => documentMarkup(doc, dto)).join('') + '</div></section>';
   }
 
@@ -428,7 +442,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
 
   /** The chevron of a document card: shows or hides its commit details and history. */
   function toggle(button) {
-    const card = button.closest('[data-document-card]'), panel = card && card.querySelector('[data-doc-more]');
+    const card = button.closest('[data-document-card]'), panel = card && card.querySelector('[data-doc-panel="' + button.getAttribute('data-doc-target') + '"]');
     if (!panel) return;
     const open = panel.hidden;
     panel.hidden = !open;
