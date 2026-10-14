@@ -76,16 +76,31 @@ function readActivityEvidences_() {
 
 function evidenceCopyKey_(teamId, path) { return normalizeText_(teamId) + '|' + path; }
 
-/** EvidenceCopies as {records, index: Map(team|path -> {rowNumber, row, record})}. Two rows for one file throw: nothing is guessed. */
+/**
+ * EvidenceCopies as {records, index: Map(team|path -> {rowNumber, row, record}), conflicts: Map(team -> message)}. Two rows for one file are never guessed
+ * between, and they must not hide every other team's evidence: the team that has them is left out of `records` and `index` and named in `conflicts`.
+ * Nothing may read, gate or copy for that team until the sheet is fixed by hand (evidenceCopiesConflict_ says so), so no further row is appended for it.
+ */
 function readEvidenceCopies_() {
   const storage = documentSheetStorage_('evidenceCopies', EVIDENCE_COPIES_FIELDS_);
-  const records = documentSheetRecords_(storage), index = new Map();
-  records.forEach(item => {
+  const all = documentSheetRecords_(storage), seen = new Set(), conflicts = new Map();
+  all.forEach(item => {
     const key = evidenceCopyKey_(item.record.teamId, item.record.path);
-    if (index.has(key)) throw new Error('EvidenceCopies has two rows for ' + item.record.teamId + ' and ' + item.record.path + '. Nothing was changed.');
-    index.set(key, item);
+    if (!seen.has(key)) { seen.add(key); return; }
+    const team = normalizeText_(item.record.teamId);
+    if (conflicts.has(team)) return;
+    const message = 'EvidenceCopies has two rows for ' + item.record.teamId + ' and ' + item.record.path + '. Nothing was changed.';
+    conflicts.set(team, message);
+    console.error(message);
   });
-  return Object.assign(storage, {records, index});
+  const records = all.filter(item => !conflicts.has(normalizeText_(item.record.teamId))), index = new Map();
+  records.forEach(item => index.set(evidenceCopyKey_(item.record.teamId, item.record.path), item));
+  return Object.assign(storage, {records, index, conflicts});
+}
+
+/** The conflict message when EvidenceCopies has two rows for one file of this team, else ''. */
+function evidenceCopiesConflict_(copies, teamId) {
+  return copies && copies.conflicts && copies.conflicts.get(normalizeText_(teamId)) || '';
 }
 
 /** Writes one copy record: an existing row gets only the fields that changed; a new row is appended with every field. */
@@ -251,6 +266,7 @@ function evidenceRepositorySlug_(team) {
 
 /** The evidence files of one document in one team repository, each with its state. Throws UNAVAILABLE when GitHub cannot be read. */
 function evidenceLiveFiles_(team, folders, copies) {
+  if (evidenceCopiesConflict_(copies, team.teamId)) throw apiFail_('UNAVAILABLE', 'The evidence records of this team need to be fixed by the coordinator. Try again later.');
   const slug = evidenceRepositorySlug_(team);
   let tree;
   try { tree = teamRepositoryTree_(slug); }
@@ -287,7 +303,9 @@ function evidenceCopy_(team, document) {
       catch (error) { result.busy = true; break; }
     }
     try {
-      const copies = readEvidenceCopies_(), kept = copies.index.get(evidenceCopyKey_(team.teamId, file.path));
+      const copies = readEvidenceCopies_();
+      if (evidenceCopiesConflict_(copies, team.teamId)) throw new Error(evidenceCopiesConflict_(copies, team.teamId));
+      const kept = copies.index.get(evidenceCopyKey_(team.teamId, file.path));
       if (kept && kept.record.driveFileId && kept.record.blobSha === file.sha) { result.pending -= 1; continue; }
       const dates = evidenceCommitDates_(live.slug, live.branch, file.path);
       const driveFileId = evidenceDriveWrite_(teamFolder, file.relative, evidenceBlobBytes_(live.slug, file.sha), 'Evidence ' + file.path + ' @ ' + file.sha);
@@ -363,6 +381,7 @@ function evidenceScanRecords_(scan, team, tree, nowIso) {
   let copies;
   try { copies = readEvidenceCopies_(); }
   catch (error) { console.error('Evidence scan: EvidenceCopies could not be read: ' + (error && error.message || error)); return evidenceUnknownRecords_(scan, team, nowIso); }
+  if (evidenceCopiesConflict_(copies, team.teamId)) return evidenceUnknownRecords_(scan, team, nowIso);
   return Array.from(scan.folders.byDocument.entries()).map(([documentId, folders]) => {
     const states = evidenceListFiles_(tree, folders).map(file => evidenceFileState_(file, copies.index, team.teamId));
     return {teamId: team.teamId, documentId, pending: states.filter(state => state === 'PENDING').length, tooLarge: states.filter(state => state === 'TOO_LARGE').length, checkedAt: nowIso};
@@ -445,6 +464,7 @@ function evidenceRequirements_(rules, labels, team, folders, copies) {
 /** The evidence of one document for the DTO, or null when the document has no evidence folder. Counts come from EvidenceStatus; blank means unknown (null). */
 function evidenceDtoFor_(source, team, document) {
   if (!source || !source.folders.byDocument.has(document.documentId)) return null;
+  if (evidenceCopiesConflict_(source.copies, team.teamId)) return null;
   const kept = source.status ? source.status.index.get(evidenceStatusKey_(team.teamId, document.documentId)) : null;
   const whole = value => /^\d+$/.test(value) ? Number(value) : null;
   const status = kept ? {pending: whole(kept.record.pending), tooLarge: whole(kept.record.tooLarge) || 0, checkedAt: kept.record.checkedAt} : {pending: null, tooLarge: 0, checkedAt: ''};
@@ -505,6 +525,7 @@ function evidenceGateItems_(activityId, team, ctx) {
     if (!row.folder || !row.minimum) return {label: 'Evidence', met: false, reason: ACTIVITY_MISCONFIGURED_, diagnostic: 'EVIDENCE_ROW_INVALID'};
     const label = 'Evidence: at least ' + row.minimum + ' file' + (row.minimum === 1 ? '' : 's') + ' in ' + row.folder;
     if (!ctx.evidence.copies) return {label, met: false, unverifiable: true, diagnostic: 'EVIDENCE_COPIES_UNREADABLE'};
+    if (evidenceCopiesConflict_(ctx.evidence.copies, team.teamId)) return {label, met: false, unverifiable: true, diagnostic: 'EVIDENCE_COPIES_CONFLICT'};
     const count = ctx.evidence.copies.records.filter(item => textEquals_(item.record.teamId, team.teamId) && textEquals_(item.record.folder, row.folder) && item.record.driveFileId).length;
     if (count >= row.minimum) return {label, met: true, reason: ''};
     return {label, met: false, reason: count + ' of ' + row.minimum + ' copied. Add the files under ' + EVIDENCE_ROOT_ + '/' + row.folder + ' in your repository, then copy them from Documents.'};

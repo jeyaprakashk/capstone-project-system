@@ -150,10 +150,25 @@ test('a workbook without the evidence sheets has no folders and no rules: the fe
   assert.deepEqual(plain(f.c.readActivityEvidences_()), {present: false, rows: []});
 });
 
-test('two EvidenceCopies rows for one file stop the read', () => {
+test('two EvidenceCopies rows for one file leave out that team only; the other teams are read as before', () => {
   const env = setup();
-  env.copies([env.copy('T1', 'R', 'a.png'), env.copy('t1', 'R', 'a.png')]);
-  assert.throws(() => env.f.c.readEvidenceCopies_(), /two rows for/);
+  env.copies([env.copy('T1', 'R', 'a.png'), env.copy('t1', 'R', 'a.png'), env.copy('T2', 'R', 'b.png')]);
+  const copies = env.f.c.readEvidenceCopies_();
+  assert.deepEqual([copies.records.length, copies.index.size], [1, 1]);
+  assert.match(env.f.c.evidenceCopiesConflict_(copies, 'T1'), /two rows for t1 and .*a\.png/);
+  assert.equal(env.f.c.evidenceCopiesConflict_(copies, 'T2'), '');
+  assert.ok(env.f.errors.some(line => /two rows for/.test(line)), 'logged');
+});
+
+test('a team with two rows for one file cannot be gated or copied (nothing is appended); a Review of another team is unaffected', () => {
+  const env = setup();
+  env.rules([{'Activity ID': 'review1', 'Evidence Folder': 'R', 'Minimum Files': '1'}]);
+  env.copies([env.copy('T1', 'R', 'a.png'), env.copy('T1', 'R', 'a.png')]);
+  const result = env.gate('review1');
+  assert.deepEqual([result.allowed, result.requirements[0].diagnostic], [false, 'EVIDENCE_COPIES_CONFLICT']);
+  const rows = env.f.sheets.get('EvidenceCopies').rows.length;
+  assert.throws(() => env.f.c.evidenceLiveFiles_({teamId: 'T1'}, [], env.f.c.readEvidenceCopies_()), /fixed by the coordinator/);
+  assert.equal(env.f.sheets.get('EvidenceCopies').rows.length, rows);
 });
 
 test('a copy is written over its mapped columns only: an extra column and its value stay, a changed file updates its row, First Committed At never changes', () => {
