@@ -19,7 +19,7 @@ function setup(dto = DTO) {
     bootstrapAssessmentDefinitions: record('bootstrap'), initializeAssessmentStorage: record('storage'), changeTeamPageSize: record('size') };
   const publishing = { toggle: record('toggle'), refresh: record('refresh') };
   vm.runInContext('globalThis.__make = ' + c.systemStatusViewBrowser_.toString(), c);
-  const view = c.__make(bridge, () => ui, () => publishing, () => actions);
+  const view = c.__make(bridge, () => ui, () => publishing, () => actions, {style:()=>""});
   const host = document.getElementById('systemStatusContent');
   view.render(host, dto);
   return { view, host, calls, window, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })) };

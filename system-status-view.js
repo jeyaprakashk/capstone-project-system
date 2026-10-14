@@ -4,7 +4,7 @@
  * Each card keeps the DOM contract its dashboard module attaches to (#studentInvitationResend, [data-publishing], #committeeConfigurationCard, #reviewConfigurationCard,
  * #assessmentStorageSetup, #weeklyPhase2Setup ...). It never calls google.script.run.
  */
-function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions) {
+function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions, avatars) {
   'use strict';
   const delegated = new WeakSet();
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -15,7 +15,6 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions) {
   const BUTTON = 'border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const PRIMARY = 'border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
   const BADGE = 'inline-flex items-center rounded-md bg-success-tint px-2 py-0.5 text-xs font-semibold text-success ring-1 ring-inset ring-success/20';
-  const AVATAR = ['bg-teal-700', 'bg-purple-700', 'bg-primary'];
   const note = text => '<p class="mt-2 text-sm text-ink-2">' + text + '</p>';
   const link = (id, text) => '<a id="' + id + '" class="text-sm text-primary underline" hidden target="_blank" rel="noopener">' + text + ' ' + icon('external-link') + '</a>';
 
@@ -100,7 +99,7 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions) {
   function committeeDirectory(committees) {
     const items = (committees || []).map(committee => {
       const members = committee.members.length
-        ? committee.members.map((m, i) => '<li class="flex items-center gap-2 py-1"><span class="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold text-paper ' + AVATAR[i % 3] + '" aria-hidden="true">' + escape((m.name || m.email).slice(0, 1).toUpperCase()) + '</span>' +
+        ? committee.members.map(m => '<li class="flex items-center gap-2 py-1"><span class="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold" style="' + escape(avatars.style(m.name || m.email)) + '" aria-hidden="true">' + escape((m.name || m.email).slice(0, 1).toUpperCase()) + '</span>' +
           '<div class="flex flex-col"><strong>' + escape(m.name || 'Name not provided') + '</strong><span class="text-xs text-muted">' + escape(m.email || 'Email not provided') + '</span></div></li>').join('')
         : '<li class="py-1 text-sm text-muted">No reviewers assigned.</li>';
       return '<details class="committee-item group overflow-hidden rounded-tile border border-edge bg-paper px-4 py-3" data-committee-key="' + escape(String(committee.number ?? '').trim().toLowerCase()) + '">' +

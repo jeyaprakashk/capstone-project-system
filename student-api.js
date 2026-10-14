@@ -18,7 +18,10 @@ function studentGithubDto_(d, email) {
       const member = members.find(item => emailsMatch_(item.email, student.email));
       const missing = !member || !member.githubId;
       const joined = !missing && member.status === 'valid' && member.access === 'active';
-      return {regno:String(student.regno || ''), status:missing ? 'missing' : joined ? 'joined' : 'pending', canConnect:missing && !connected && emailsMatch_(student.email, email), isMe:emailsMatch_(student.email, email)};
+      const id = member && githubId_(member.githubId);
+      // The avatar is GitHub's own address for the stored account ID; no avatar is stored in the sheet.
+      const account = id && member.username ? {username:String(member.username), displayName:String(member.displayName || ''), profileUrl:String(member.profileUrl || ''), avatarUrl:'https://avatars.githubusercontent.com/u/' + id} : null;
+      return {regno:String(student.regno || ''), name:String(student.name || ''), initials:initialsOf_(student.name), status:missing ? 'missing' : joined ? 'joined' : 'pending', canConnect:missing && !connected && emailsMatch_(student.email, email), isMe:emailsMatch_(student.email, email), account};
     }),
     repoUrl:String(d.repoUrl || '')
   };

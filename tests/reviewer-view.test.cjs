@@ -17,7 +17,7 @@ const dtoOf = teams => ({ summary: { pending: teams.length, approved: 0, awaitin
 function setup(dto) {
   const { document, window } = parseHTML('<html><body><div id="reviewerContent"></div></body></html>');
   const calls = { marks: [], refresh: 0, loading: 0, finished: 0, writes: [], requirements: [], inflight: 0, peak: 0 };
-  const c = loadSources(['data-bridge-client.js', 'shared-tabs.js', 'title-requests.js', 'reviewer-view.js'], { document, Promise, setTimeout, clearTimeout, Intl, Date });
+  const c = loadSources(['data-bridge-client.js', 'avatar-color.js','shared-tabs.js', 'title-requests.js', 'reviewer-view.js'], { document, Promise, setTimeout, clearTimeout, Intl, Date });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const state = { dto: dto || dtoOf([team(1)]), writeResult: { message: 'Saved' }, writeError: null, readError: null, requirements: null };
   bridge.useTransport(async (method, args) => {

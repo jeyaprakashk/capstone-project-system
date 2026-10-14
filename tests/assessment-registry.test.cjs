@@ -75,7 +75,7 @@ test('Coordinator System Status stays available when registry discovery is missi
   c.getRepoUrlMap_=()=>({});c.getConfig_=()=>'';
   const dto=c.buildSystemStatusDto_();
   const {document}=parseHTML('<div id="status"></div>'),target=document.getElementById('status');
-  c.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null).render(target,JSON.parse(JSON.stringify(dto)));
+  c.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null,()=>null,{style:()=>""}).render(target,JSON.parse(JSON.stringify(dto)));
   assert(target.querySelector('#reviewConfigurationCard'));
   assert(target.querySelector('#createAssessmentDefinitionsButton'));
   assert(target.querySelector('#reviewDefinitionsLink'));

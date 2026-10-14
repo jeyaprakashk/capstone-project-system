@@ -12,7 +12,7 @@ async function setup(dto, options = {}) {
   const { document, window } = parseHTML('<html><body><nav id="studentSideNav"></nav><div id="studentContent"></div></body></html>');
   const ctl = { fail: false };
   const calls = { documents: [], jump: [], refresh: 0, weekly: 0, results: 0, logs: [], preview: [] };
-  const c = loadSources(['data-bridge-client.js', 'title-requests.js', 'student-title.js', 'student-view.js'], { document, Promise, JSON, setTimeout, clearTimeout });
+  const c = loadSources(['data-bridge-client.js', 'title-requests.js', 'student-title.js', 'github-account-card.js', 'student-view.js'], { document, Promise, JSON, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const core = { teamId: dto.teamId, roster: dto.roster, titleApproved: dto.titleApproved, titleStatus: dto.titleStatus, assessments: dto.assessments }, project = { setup: dto.setup, github: dto.github, title: dto.title };
   bridge.useFixtures({ API_student_getCore: () => core, API_student_getProject: () => ctl.fail ? JSON.stringify({ ok: false, error: { code: 'INTERNAL', message: 'Project setup is unavailable.' } }) : project });
@@ -29,7 +29,7 @@ async function setup(dto, options = {}) {
   let view;
   const requests = c.titleRequestsBrowser_();
   actions.title = c.__makeTitle(bridge, () => ui, () => requests, () => view);
-  view = c.__make(bridge, () => ui, actions);
+  view = c.__make(bridge, () => ui, actions, c.githubAccountCardBrowser_(), {style:()=>""});
   const host = document.getElementById('studentContent');
   view.render(host, core);
   const projectLoaded = () => new Promise(resolve => view.reloadProject(resolve));
@@ -125,6 +125,17 @@ test('only the logged-in student own register number is marked (You), on the ros
   assert.deepEqual(Array.from(f.host.querySelectorAll('[data-member-register]')).map(norm), ['R1', 'R2 (You)']);
 });
 
+test('a connected member shows the shared GitHub account card; others show none', async () => {
+  const dto = dtoFor('githubWaiting');
+  dto.github.members = [{ regno: 'R1', status: 'joined', canConnect: false, isMe: true, account: { username: 'alice', displayName: '<A>', profileUrl: 'https://github.com/alice', avatarUrl: 'https://avatars.githubusercontent.com/u/101' } },
+    { regno: 'R2', status: 'missing', canConnect: false, isMe: false, account: null }];
+  const f = await setup(dto), rows = f.host.querySelectorAll('[data-member-status]');
+  const card = rows[0].querySelector('[data-github-account]');
+  assert.match(norm(card), /&lt;A&gt;|<A>/); assert.equal(card.querySelector('a').textContent, '@alice');
+  assert.equal(card.querySelector('a').getAttribute('href'), 'https://github.com/alice');
+  assert.equal(rows[1].querySelector('[data-github-account] a'), null); assert.match(norm(rows[1]), /No GitHub username yet/);
+});
+
 test('an unregistered student sees only account connection', async () => {
   const f = (await setup(dtoFor('githubActive'))), card = f.host.querySelector('[data-student-panel="github"] [data-step-row]');
   assert.match(norm(card), /Waiting for GitHub account connection/);
@@ -197,7 +208,7 @@ test('escapes every interpolated value and rejects unsafe links', async () => {
   dto.title = { ...dto.title, proposal: { title: evil, problem: evil }, notes: evil, folderUrl: 'javascript:alert(1)', documents: [{ key: 'work', label: evil, present: true, uploadedBy: evil, uploadedAt: 'x' }] };
   dto.github.repoUrl = 'javascript:alert(2)'; dto.assessments = { reviews: [{ key: 'r"1', label: evil }], guideEvaluationLabel: evil };
   const f = (await setup(dto));
-  assert.equal(f.host.querySelectorAll('img').length, 0);
+  assert(Array.from(f.host.querySelectorAll('img')).every(img => /^https:\/\/avatars\.githubusercontent\.com\//.test(img.getAttribute('src')) && !img.hasAttribute('onerror')));
   assert(Array.from(f.host.querySelectorAll('a')).every(a => !/^javascript:/i.test(a.getAttribute('href'))));
   assert.equal(f.host.querySelector('[data-review-result]').getAttribute('data-review-result'), 'r"1');
 });

@@ -18,7 +18,7 @@ function setup() {
   const ui = { busy:require('./busy-fixture.cjs')(), renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton>' + l + '</span>' };
   const actions = { recheckTeamFolders: record('recheck'), createTeamFolders: record('create') };
   vm.runInContext('globalThis.__view = ' + c.systemStatusViewBrowser_.toString(), c);
-  const view = c.__view(bridge, () => ui, () => null, () => actions);
+  const view = c.__view(bridge, () => ui, () => null, () => actions, {style:()=>""});
   const host = document.getElementById('systemStatusContent');
   view.render(host, STATUS_DTO);
   c.SystemStatusView = view;

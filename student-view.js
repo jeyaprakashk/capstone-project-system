@@ -9,7 +9,7 @@
  * It never calls google.script.run. Its screens' actions come from the student modules passed in
  * `actions` ({weekly, results, github, title}); getUi() supplies only shared UI services.
  */
-function studentViewBrowser_(bridge, getUi, actions) {
+function studentViewBrowser_(bridge, getUi, actions, accountCard, avatars) {
   'use strict';
   const delegated = new WeakSet();
   const state = {dto:null, host:null, tab:null, loaded:{}, project:null, projectBusy:false};
@@ -26,13 +26,12 @@ function studentViewBrowser_(bridge, getUi, actions) {
   const STEP_TEXT = {done:'Done', waiting:'Waiting', locked:'Locked', active:'Action needed'};
   const BUTTON = 'border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const PRIMARY = 'border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
-  const AVATAR = ['bg-teal-700', 'bg-purple-700', 'bg-primary'];
   const registerLabel = (regno, isMe) => escape(regno) + (isMe ? ' (You)' : '');
   const p = (html, extra) => '<p class="mt-2 text-sm ' + (extra || 'text-ink-2') + '">' + html + '</p>';
 
   function rosterMarkup(roster) {
-    return '<div class="mt-3 flex flex-wrap gap-3">' + roster.map((r, i) =>
-      '<div class="flex items-center gap-2 rounded-card border border-edge bg-paper shadow-card px-3 py-2"><span class="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold text-paper ' + AVATAR[i % 3] + '">' + escape(r.initials) + '</span>' +
+    return '<div class="mt-3 flex flex-wrap gap-3">' + roster.map(r =>
+      '<div class="flex items-center gap-2 rounded-card border border-edge bg-paper shadow-card px-3 py-2"><span class="inline-flex size-9 items-center justify-center rounded-full text-sm font-bold" style="' + escape(avatars.style(r.name || r.regno)) + '">' + escape(r.initials) + '</span>' +
       '<div><div class="text-sm font-semibold text-ink">' + escape(r.name) + '</div><div class="text-xs text-muted">' + registerLabel(r.regno, r.isMe) + '</div></div></div>').join('') + '</div>';
   }
   function stepCard(title, stepState, body, cta) {
@@ -45,8 +44,10 @@ function studentViewBrowser_(bridge, getUi, actions) {
     const label = m.canConnect
       ? '<button type="button" class="' + BUTTON + '" data-github-form-jump>' + escape(status[0]) + '</button>'
       : '<span>' + escape(status[0]) + '</span>';
-    return '<li data-member-status="' + m.status + '" class="flex flex-wrap items-center gap-x-3 gap-y-1 py-1 text-sm"><span data-member-register class="min-w-16 font-semibold">' + registerLabel(m.regno, m.isMe) + '</span>' +
-      '<span data-member-state class="inline-flex items-center gap-1">' + icon(status[1]) + label + '</span></li>';
+    return '<li data-member-status="' + m.status + '" class="flex flex-col gap-3 rounded-tile border border-edge bg-paper p-4 text-sm">' +
+      '<div class="flex flex-wrap items-baseline gap-x-2"><span data-member-register class="font-semibold text-ink">' + registerLabel(m.regno, m.isMe) + '</span>' + (m.name ? '<span class="text-ink-2">' + escape(m.name) + '</span>' : '') + '</div>' +
+      accountCard.markup(m.account, m.initials) +
+      '<div data-member-state class="inline-flex items-center gap-1 border-t border-edge pt-3">' + icon(status[1]) + label + '</div></li>';
   }
   function repoLine(repoUrl) {
     return '<div class="mt-3 flex items-center gap-1 text-sm"><span>' + icon('git-branch', 'Team repository') + '</span>' + (repoUrl
@@ -65,7 +66,7 @@ function studentViewBrowser_(bridge, getUi, actions) {
   function githubCard(dto) {
     const g = dto.github;
     return stepCard('GitHub setup', g.state,
-      p('GitHub setup due ' + escape(g.due) + ' · ' + escape(g.statusText)) + '<ul aria-label="Team GitHub status" class="mt-2 divide-y divide-edge">' + g.members.map(memberRow).join('') + '</ul>' + repoLine(g.repoUrl),
+      p('GitHub setup due ' + escape(g.due) + ' · ' + escape(g.statusText)) + '<ul aria-label="Team GitHub status" class="mt-3 grid list-none gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">' + g.members.map(memberRow).join('') + '</ul>' + repoLine(g.repoUrl),
       g.connected ? '' : githubForm(g));
   }
   function titleCard(dto) {
@@ -75,7 +76,7 @@ function studentViewBrowser_(bridge, getUi, actions) {
   // GitHub status screen: what is still pending for setup, then the GitHub card. The Title screen is the title card alone.
   function githubMarkup(project) {
     const pending = project.setup.complete ? '' : '<div data-setup-pending>' + project.setup.pendingSteps.map(text => p(escape(text))).join('') + '</div>';
-    return pending + '<div class="mt-3">' + githubCard(project) + '</div>';
+    return pending + '<div' + (pending ? ' class="mt-3"' : '') + '>' + githubCard(project) + '</div>';
   }
   function titleMarkup(project) { return '<div>' + titleCard(project) + '</div>'; }
   const TABS = [['weeks', 'Weeks', 'calendar'], ['assessments', 'Assessments', 'clipboard-check'], ['title', 'Title', 'file-text'], ['documents', 'Documents', 'folder'], ['github', 'GitHub', 'git-branch'], ['team', 'Team', 'users']];

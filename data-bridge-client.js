@@ -109,20 +109,22 @@ function getMigratedViewsClientScript_(roles) {
     `const DataBridge = (${dataBridgeBrowser_.toString()})();
 const SharedTabs = (${sharedTabsBrowser_.toString()})(() => DashboardUI);
 const TitleRequests = (${titleRequestsBrowser_.toString()})();
+const AvatarColor = (${avatarColorBrowser_.toString()})();
 const DocumentsView = (${documentsViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TitleRequests);`,
     has('reviewer') ? `const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations, () => SharedTabs, () => TitleRequests);` : '',
-    has('coord') ? `const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => InternalAssessmentPublishing, () => SystemStatusActions);
+    has('coord') ? `const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => InternalAssessmentPublishing, () => SystemStatusActions, AvatarColor);
 const CoordinatorView = (${coordinatorViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TeamDrawerView);
 const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TitleRequests, () => DocumentsView);` : '',
     `const SharedTimelineView = (${sharedTimelineViewBrowser_.toString()})(() => DashboardUI);
 const SharedRubricsView = (${sharedRubricsViewBrowser_.toString()})(() => DashboardUI);`,
     has('coord') ? `const SystemStatusActions = (${systemStatusActionsBrowser_.toString()})(DataBridge, () => DashboardUI);` : '',
-    has('student') ? `const StudentGithub = (${studentGithubBrowser_.toString()})(DataBridge, () => DashboardUI, () => StudentView);
+    has('student') ? `const GithubAccountCard = (${githubAccountCardBrowser_.toString()})();
+const StudentGithub = (${studentGithubBrowser_.toString()})(DataBridge, () => DashboardUI, () => StudentView, () => GithubAccountCard);
 const StudentResults = (${studentResultsViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentWeekly = (${studentWeeklyViewBrowser_.toString()})(DataBridge, () => DashboardUI);
 const StudentTitle = (${studentTitleBrowser_.toString()})(DataBridge, () => DashboardUI, () => TitleRequests, () => StudentView);
-const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI, {weekly: StudentWeekly, results: StudentResults, github: StudentGithub, title: StudentTitle, documents: DocumentsView});` : '',
-    has('guide') ? `const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly, () => SharedTabs, () => TitleRequests, () => DocumentsView);` : ''
+const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI, {weekly: StudentWeekly, results: StudentResults, github: StudentGithub, title: StudentTitle, documents: DocumentsView}, GithubAccountCard, AvatarColor);` : '',
+    has('guide') ? `const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly, () => SharedTabs, () => TitleRequests, () => DocumentsView, AvatarColor);` : ''
   ].filter(Boolean).join('\n');
 }
 

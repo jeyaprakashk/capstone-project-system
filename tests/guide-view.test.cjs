@@ -20,7 +20,7 @@ function firstPaintFromServer(options) {
 function setup(dto = dtoFromServer()) {
   const { document, window } = parseHTML('<html><body><div id="guideContent"></div></body></html>');
   const calls = { reads: [], weekly: [], loads: 0, refresh: 0, writes: [], toggles: [], github: 0 };
-  const c = loadSources(['data-bridge-client.js', 'shared-tabs.js', 'title-requests.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
+  const c = loadSources(['data-bridge-client.js', 'avatar-color.js','shared-tabs.js', 'title-requests.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const s = { dto, writeError: null, readError: null };
   bridge.useTransport(async (method, args) => {
@@ -35,7 +35,7 @@ function setup(dto = dtoFromServer()) {
   vm.runInContext('globalThis.__make = ' + c.guideViewBrowser_.toString(), c);
   const tabs = c.sharedTabsBrowser_(() => ui);
   const requests = c.titleRequestsBrowser_();
-  const view = c.__make(bridge, () => ui, () => weekly, () => tabs, () => requests);
+  const view = c.__make(bridge, () => ui, () => weekly, () => tabs, () => requests, () => null, {style:()=>""});
   const host = document.getElementById('guideContent');
   return { view, host, document, window, calls, s, ui, weekly, tabs, c, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
@@ -166,7 +166,7 @@ test('a normal load starts the weekly and GitHub reads with the dashboard read; 
   const bridge = vm.runInContext('(' + f.c.dataBridgeBrowser_.toString() + ')()', f.c);
   bridge.useTransport(async method => { sent.push(method); return JSON.stringify({ ok: true, data: method === 'API_guide_getGithub' ? github : method === 'API_guide_getDashboard' ? dto : { entries: [], weeks: [] } }); });
   vm.runInContext('globalThis.__make2 = ' + f.c.guideViewBrowser_.toString(), f.c);
-  const view = f.c.__make2(bridge, () => f.ui, () => f.weekly, () => f.tabs, () => f.c.titleRequestsBrowser_());
+  const view = f.c.__make2(bridge, () => f.ui, () => f.weekly, () => f.tabs, () => f.c.titleRequestsBrowser_(), () => null, {style:()=>""});
   const loaded = await view.load();
   assert.deepEqual(sent.slice().sort(), ['API_guide_getDashboard', 'API_guide_getGithub', 'API_guide_getWeekly']);
   view.render(f.host, loaded); await f.settle(); await f.settle();

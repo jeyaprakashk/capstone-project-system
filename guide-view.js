@@ -7,7 +7,7 @@
  * The workspace tab strip, its styles and its keyboard handling come from SharedTabs.
  * Elements that GuideWeekly toggles with `hidden` carry no display utilities.
  */
-function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests, getDocuments) {
+function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests, getDocuments, avatars) {
   'use strict';
   const delegated = new WeakSet();
   const state = {dto:null, host:null, busyTeam:null, commits:{}};
@@ -140,8 +140,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests, getDo
       '<strong data-team-label hidden>' + id + '</strong><span data-team-spinner role="status">' + getUi().renderSkeleton('inline', 'Checking team actions') + '</span></button>';
   }
   const initials = name => String(name || '?').trim().split(/\s+/).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('');
-  const AVATAR = ['bg-info-tint text-primary', 'bg-success-tint text-success', 'bg-warning-tint text-warning', 'bg-danger-tint text-danger'];
-  const memberChip = (m, index) => '<li class="inline-flex items-center gap-2 text-sm"><span aria-hidden="true" class="inline-flex size-8 items-center justify-center rounded-full text-xs font-semibold ' + AVATAR[index % AVATAR.length] + '">' + escape(initials(m.name)) + '</span>' +
+  const memberChip = m => '<li class="inline-flex items-center gap-2 text-sm"><span aria-hidden="true" class="inline-flex size-8 items-center justify-center rounded-full text-xs font-semibold" style="' + escape(avatars.style(m.name || m.regno)) + '">' + escape(initials(m.name)) + '</span>' +
     '<strong class="font-semibold capitalize text-ink">' + escape(String(m.name || '').toLowerCase()) + '</strong>' + (m.regno ? '<span class="font-mono text-xs text-muted">' + escape(m.regno) + '</span>' : '') + '</li>';
   const memberChips = team => '<ul aria-label="Team members" class="m-0 flex list-none flex-wrap items-center gap-x-6 gap-y-2 p-0">' + team.members.map(memberChip).join('') + '</ul>';
   function headingMarkup(team, index) {

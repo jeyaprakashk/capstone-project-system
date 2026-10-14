@@ -225,7 +225,8 @@ The browser loads the student dashboard in two parts: `API_student_getCore` firs
   setup:{complete:boolean, pendingSteps:[string]},            // complete = GitHub ready and title approved
   github:{ state:'done'|'waiting'|'active'|'locked', text, connected:boolean, captureReady:boolean,
            due:string, statusText, repoUrl,
-           members:[{regno, status:'missing'|'joined'|'pending', canConnect:boolean, isMe:boolean}] },  // canConnect: this student, not yet connected; isMe: this student's own row
+           members:[{regno, name, initials, status:'missing'|'joined'|'pending', canConnect:boolean, isMe:boolean,
+                      account:null|{username, displayName, profileUrl, avatarUrl}}] },  // canConnect: this student, not yet connected; isMe: this student's own row; account: the connected GitHub account (avatarUrl from the stored GitHub ID), drawn by the same card as the username form's confirmation
   title: TitleDto fields (see TitleDto) without `history`, `similarityNote`, `documents` and `folderUrl` (students are not members of the shared drive, so they never get a Drive link), with `can` limited to {submit},
          plus { state:'active'|'waiting'|'done', statusText, due:{date,overdue} },   // independent of GitHub setup; `can.submit` carries the checklist
          // a team whose title history failed validation gets {teamId, status:'UNAVAILABLE', state, statusText, due, can:null}

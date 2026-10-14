@@ -4,14 +4,13 @@
  * confirm the account. Server calls go through the bridge (API_student_*); the Project refresh comes from
  * StudentView and the loading overlay from DashboardUI. It never calls google.script.run.
  */
-function studentGithubBrowser_(bridge, getUi, getStudentView) {
+function studentGithubBrowser_(bridge, getUi, getStudentView, getAccountCard) {
   'use strict';
   const byId = id => document.getElementById(id);
   const setText = (id, text) => { const el = byId(id); if (el) el.textContent = text; };
   const setLoading = (id, label) => { const el = byId(id); if (el) el.innerHTML = getUi().renderSkeleton('inline', label); };
   const setButtonsDisabled = (container, disabled) => { if (container) container.querySelectorAll('button').forEach(btn => { btn.disabled = disabled; }); };
   const beginContentLoading = (target, label, options) => getUi().beginContentLoading(target, label, options);
-  const escapeClientHtml = value => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const errorMessage = err => {
     if (typeof err === 'string' && err.trim()) return err.trim();
     if (err && typeof err.message === 'string' && err.message.trim()) return err.message.trim();
@@ -66,9 +65,7 @@ function studentGithubBrowser_(bridge, getUi, getStudentView) {
       settle();
       if (!form.isConnected || form.githubRequest !== request) return;
       form.githubToken = result.token;
-      const account = result.account, esc = escapeClientHtml;
-      panel.innerHTML = '<div class="flex items-center gap-3">' + (account.avatarUrl ? '<img width="48" height="48" alt="" class="size-12 shrink-0 rounded-full border border-edge" src="' + esc(account.avatarUrl) + '">' : '') +
-        '<div class="min-w-0"><p class="m-0 font-semibold text-ink">' + esc(account.displayName || account.username) + '</p><a class="text-sm text-primary" target="_blank" rel="noopener" href="' + esc(account.profileUrl) + '">@' + esc(account.username) + '</a></div></div>' +
+      panel.innerHTML = getAccountCard().markup(result.account) +
         '<p class="m-0 text-sm text-ink-2">Is this your GitHub account?</p><div class="flex flex-wrap gap-2"><button type="button" class="border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50" data-confirm-account>Yes, this is my account</button><button type="button" class="border-0 inline-flex items-center rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50 no-underline" data-change-account>No, change profile link</button></div>';
       input.disabled = true;
       form.querySelector('button[type="submit"]').hidden = true;

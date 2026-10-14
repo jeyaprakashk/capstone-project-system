@@ -16,7 +16,7 @@ const VIEWS=[
 const ROLE_READS={student:'API_student_getCore',guide:'API_guide_getDashboard',reviewer:'API_reviewer_getDashboard',coord:'API_coordinator_getOverview'};
 // Every module a role's views or start-up registration use, by role.
 const ROLE_MODULES={
- student:['StudentView','StudentWeekly','StudentResults','StudentGithub','StudentTitle'],
+ student:['StudentView','StudentWeekly','StudentResults','StudentGithub','GithubAccountCard','StudentTitle'],
  guide:['GuideView','GuideWeekly','GuideEvaluation'],
  reviewer:['ReviewerView','ReviewEvaluations'],
  coord:['CoordinatorView','SystemStatusView','SystemStatusActions','TeamDrawerView','InternalAssessmentPublishing','WeeklyPhase2Setup']

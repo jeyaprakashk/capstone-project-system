@@ -18,7 +18,9 @@ function fixture() {
   // The Project refresh is StudentView's; settling it shows the status message the flow passed along.
   const ui={busy:context.busy,renderSkeleton:context.renderSkeleton,beginContentLoading:context.beginContentLoading};
   const studentView={reloadProject:onLoaded=>{onLoaded();refreshes.push(document.getElementById('githubSubmitStatus').textContent);}};
-  const github=context.studentGithubBrowser_(bridge,()=>ui,()=>studentView);
+  vm.runInContext(fs.readFileSync('github-account-card.js','utf8'),context);
+  const card=context.githubAccountCardBrowser_();
+  const github=context.studentGithubBrowser_(bridge,()=>ui,()=>studentView,()=>card);
   context.focusGithubAccountForm=github.focusGithubAccountForm;
   const preview=()=>github.previewGithubAccount({preventDefault(){}},form);
   const reply=()=>requests.at(-1).success({token:'test-token',account:{githubId:'101',username:'canonical',displayName:'<Student>',profileUrl:'https://github.com/canonical',avatarUrl:'https://avatars.githubusercontent.com/u/101'}});

@@ -4,7 +4,7 @@ const vm = require('node:vm');
 function publishingCardMarkup(c, key) {
   if (!c.systemStatusViewBrowser_) vm.runInContext(fs.readFileSync('system-status-view.js', 'utf8'), c);
   const ui = { renderIcon: (name, label) => c.renderLucideIcon_(name, label), renderSkeleton: (variant, label) => c.getSkeletonMarkup_(variant, label) };
-  const view = c.systemStatusViewBrowser_(null, () => ui, () => null);
+  const view = c.systemStatusViewBrowser_(null, () => ui, () => null, () => null, {style:()=>""});
   return view.publishingCard({ key, title: c.internalPublishingConfig_(key).title });
 }
 module.exports = { publishingCardMarkup };
