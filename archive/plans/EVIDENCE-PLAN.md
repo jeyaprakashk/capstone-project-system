@@ -1,6 +1,46 @@
 # Evidence: plan
 
-Status: **implemented 2026-10-13, not deployed.** The owner approved the plan and the AGENTS.md change (section 9) on 2026-10-13. Where the code differs from the first draft of this plan, the text below now says what the code does: a workbook without the evidence sheets has no evidence requirement (section 5), a copy needs no request ID because it is idempotent (section 4), and the gate runs in the activity engine, for the Review activities only (section 5). Code: `evidence.js`, `team-files.js` (the scan), `activity-engine.js`, `document-api.js`, `documents-view.js`; tests: `tests/evidence.test.cjs`, `tests/document-api.test.cjs`, `tests/documents-view.test.cjs`.
+**Status: built and live.** Implemented 2026-10-13 and deployed by the owner. The owner approved the plan and the AGENTS.md change on 2026-10-13.
+The rules are now in [AGENTS.md](../../AGENTS.md) ("Review entry" and "Students and Drive"), the sheets in [SHEETS.md](../../SHEETS.md) and the endpoints in
+[DATA-CONTRACTS.md](../../DATA-CONTRACTS.md).
+
+## What was planned
+
+Copy the evidence files of a team (the topic folders below `2_Evidence` in its repository) into the team's Drive folder when a document is submitted,
+show them next to the document to everyone with a role on the team, and open a Review only when the team has copied the minimum number of files the
+coordinator set for it. Evidence never gates a document's approval.
+
+## What was implemented
+
+- `evidence.js`: the sheet readers and writers, the file rules (no dot files, no README files, at most 25 MB), the copy to `evidences/<path>` in the team
+  folder, the Documents-screen view, and the Review gate (`evidenceGateItems_`).
+- Four sheets in the catalog, created by `setupDocumentStorage`: `EvidenceFolders` and `ActivityEvidences` (filled in by the coordinator), `EvidenceCopies`
+  and `EvidenceStatus`.
+- Submit copies the evidence after the submission (a failure never blocks it); the student's **Copy evidence** and **Check for new evidence** buttons
+  (`API_student_copyEvidence`, `API_student_checkEvidence`) do the rest.
+- The team-file scan (`team-files.js`) saves the waiting counts from the tree it already reads, so the Documents screen reads no GitHub.
+- The activity engine adds the evidence requirement to the Review activities; the Documents screen lists each Review's requirement beside the folders it uses.
+- Tests: `tests/evidence.test.cjs`, `tests/document-api.test.cjs`, `tests/documents-view.test.cjs`. The invariants snapshots did not change.
+
+## What differs from the plan, and why
+
+| Planned | Built | Why |
+|---|---|---|
+| The gate is checked in `reviewEligibility_` | It is in the activity engine (`evidenceGateItems_`), for the Review activities only | So it appears in every checklist beside the other requirements; the title activities never read the sheets. |
+| A missing `ActivityEvidences` sheet denies | A workbook without the sheet has no evidence requirement | The code can be deployed before setup runs without closing any Review. |
+| Copy evidence carries a request ID | It does not | A copy is idempotent (only new or changed files), so a repeated click is safe. |
+| Three sheets | Four: `EvidenceStatus` was added | Students and faculty found the screen slow. The screen now reads saved counts instead of GitHub (decision 15). |
+| The screen lists the waiting files | It lists the copied files and the counts; the waiting and too-large files appear after Check for new evidence | Same reason (decisions 15 and 16). |
+| Staff are exempt from the evidence gate | They are not: it behaves like the other `ActivityDependencies` rows. Only the Sequence (order) block exempts staff | The plan misdescribed the existing rule. |
+| A student is shown "Add at least N files in <folder>" | The reviewer and student dashboards say only "Not Eligible"; the full checklist is on the coordinator's drawer, and the Documents screen lists each Review's requirement (decision 17) | The dashboards deliberately never show requirement details; the owner asked for the lines on the Documents screen. |
+| Copy evidence only when files are waiting | When the saved count is not 0; an unknown count allows it | The copy itself finds out (decision 16). |
+| (not planned) | The owner redesigned the Documents screen afterwards (Versions 206 to 208, `documents-view.js`) | Layout only: the DTO and the endpoints are unchanged. |
+| Evidence by week | Not built. `Committed At` and `First Committed At` are recorded so it can be added (section 8) | Left as a future option, as planned. |
+
+## The plan as it was written
+
+The text below is the plan as it stood at the end of the work: it was edited during the work to say what the code does (sections 4 to 7 and decisions
+15 to 17), except where the table above says otherwise.
 
 ## 1. What this does, in plain words
 
@@ -25,7 +65,7 @@ Evidence **never gates the approval of a document** (many documents are approved
 | 8 | Drive layout | `<team folder>/evidences/<Topic>/<file>`, the GitHub path below `2_Evidence`. |
 | 9 | Failure | A copy failure never blocks or undoes a document Submit. The evidence shows "not copied yet". |
 | 10 | Batch | One click copies at most a fixed batch (about 20 files and 60 MB, constants) to stay under the 6-minute limit; the next click continues. |
-| 11 | Retry button | **Copy evidence** is shown on a document only when its folders hold new or changed files that are not yet copied. It works for documents submitted before this feature, and appends nothing to the document journal. |
+| 11 | Retry button | **Copy evidence** is shown on a document when the saved count of waiting files is not 0 (see decision 16). It works for documents submitted before this feature, and appends nothing to the document journal. |
 | 12 | Already-approved documents | **No one-time script.** Their students use the button. |
 | 13 | Who sees it | Everyone with a role on the team. Students see a link to each file, never a folder link. |
 | 14 | Template scan unchanged | The template folders `1_Documents` and `5_Presentations` stay the only folders `TemplateFiles` scans. `2_Evidence` is not added to `TEMPLATE_FOLDERS_`. |
@@ -60,7 +100,7 @@ A run that stops part-way leaves valid rows and the next click finishes it (the 
 
 `reviewEligibility_` also checks `ActivityEvidences` for the Review's Assessment ID: for each row, the team's `EvidenceCopies` rows in that folder
 must number at least `Minimum Files`. A short count denies entry. A sheet that cannot be read, or a row that is not valid for its Review (no folder, a minimum that is not a whole number above 0), denies; an unreadable `EvidenceCopies` is "Could not verify". A workbook **without** the `ActivityEvidences` sheet has no evidence requirement (so the code can be deployed before setup is run without closing any Review), and a row naming an activity that does not exist gates nothing. The check lives in the activity engine (`evidenceGateItems_`), appended to the requirements of the Review activities only; the title activities are never read for it. A student sees
-"Add at least N files in <folder>", never a diagnostic. Staff are exempt as for the other Review gates. A Submitted or Published evaluation stays
+"Add at least N files in <folder>", never a diagnostic. Staff are not exempt (only the Sequence block is). A Submitted or Published evaluation stays
 readable.
 
 ## 6. Display
@@ -71,10 +111,10 @@ readable.
 
 ## 7. Tests
 
-- A shuffled-column test, a missing-header test and a duplicate-header test for each of the three sheets.
+- A shuffled-column test, a missing-header test and a duplicate-header test for each of the four sheets.
 - Copy rules: new file, changed file, unchanged file, deleted file kept, dot and README skipped, oversize skipped, batch limit, retry after a failure.
-- Gate: no row (no requirement), short count, enough, unreadable sheet (denied), staff exempt.
-- DTO contract test, a student-link test (no folder link), and a page-assembly entry for any new browser module.
+- Gate: no row (no requirement), short count, enough, unreadable sheet (denied).
+- DTO contract test and a student-link test (no folder link). No new browser module was added, so there is no page-assembly entry.
 - `npm run test:invariants` stays green with no snapshot regenerated; `npm run check:sheets-doc` passes (`SHEETS.md` regenerated).
 
 ## 8. Later option, not built: evidence by week

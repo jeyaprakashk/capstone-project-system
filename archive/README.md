@@ -19,6 +19,7 @@ under "The plan as it was written".
 | [REPO-FROM-TEMPLATE-PLAN.md](plans/REPO-FROM-TEMPLATE-PLAN.md) | Built: new team repositories are generated from the template repository; the bundled template was deleted. |
 | [OWNER-CHECKLIST.md](plans/OWNER-CHECKLIST.md) | Completed: every owner step, A to D, is done (owner confirmed 2026-10-12). Section E (rules to keep) is still how the system is run. |
 | [FORM-SHEET-RETIREMENT-PLAN.md](plans/FORM-SHEET-RETIREMENT-PLAN.md) | Executed: the Form sheets are gone from the code; the owner's backup replaced the archive steps. |
+| [EVIDENCE-PLAN.md](plans/EVIDENCE-PLAN.md) | Built and live: evidence files are copied to the team folder on Submit, shown with the document, and a Review needs a minimum count of them (`ActivityEvidences`). The Documents screen reads saved counts, not GitHub. |
 
 Still open and not archived: [STUDENT-IDENTITY-PLAN.md](../STUDENT-IDENTITY-PLAN.md) (not built), [BUILD-ORDER.md](../BUILD-ORDER.md) (item 14 is
 open).
