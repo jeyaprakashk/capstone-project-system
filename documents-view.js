@@ -162,9 +162,9 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     if (can.approve.allowed || can.return.allowed) {
       html += '<label class="' + LABEL + '" for="docNotes-' + id + '">Notes for the team (required to return)</label>' +
         '<textarea id="docNotes-' + id + '" rows="3" maxlength="2000" class="' + FIELD + '" data-doc-notes' + hooks + '></textarea>' +
-        '<div class="mt-2 flex gap-2">' +
-        (can.approve.allowed ? '<button type="button" class="flex-1 ' + PRIMARY + '" data-doc-action="approve"' + hooks + '>Approve</button>' : '') +
-        (can.return.allowed ? '<button type="button" class="flex-1 ' + BUTTON + '" data-doc-action="return"' + hooks + '>Return</button>' : '') + '</div>';
+        '<div class="mt-2 flex flex-wrap gap-2">' +
+        (can.approve.allowed ? '<button type="button" class="' + PRIMARY + '" data-doc-action="approve"' + hooks + '>Approve</button>' : '') +
+        (can.return.allowed ? '<button type="button" class="' + BUTTON + '" data-doc-action="return"' + hooks + '>Return</button>' : '') + '</div>';
     }
     if (can.reopen.allowed) {
       html += '<label class="' + LABEL + '" for="docReason-' + id + '">Reason for reopening</label>' +
