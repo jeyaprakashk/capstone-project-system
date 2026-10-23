@@ -17,8 +17,7 @@ const SHEET_NAMES = {
   GuideSignoff: 'GuideSignoff',
   AIProgressAnalysis: 'AIProgressAnalysis',
   COMMITS: 'Commits',
-  COMMIT_COLLECTION_STATUS: 'CommitCollectionStatus',
-  FLAGS: 'Flags'
+  COMMIT_COLLECTION_STATUS: 'CommitCollectionStatus'
 };
 
 // ===================================================================

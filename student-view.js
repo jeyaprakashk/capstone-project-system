@@ -44,10 +44,7 @@ function studentViewBrowser_(bridge, getUi, actions, accountCard, avatars) {
     const label = m.canConnect
       ? '<button type="button" class="' + BUTTON + '" data-github-form-jump>' + escape(status[0]) + '</button>'
       : '<span>' + escape(status[0]) + '</span>';
-    return '<li data-member-status="' + m.status + '" class="flex flex-col gap-3 rounded-tile border border-edge bg-paper p-4 text-sm">' +
-      '<div class="flex flex-wrap items-baseline gap-x-2"><span data-member-register class="font-semibold text-ink">' + registerLabel(m.regno, m.isMe) + '</span>' + (m.name ? '<span class="text-ink-2">' + escape(m.name) + '</span>' : '') + '</div>' +
-      accountCard.markup(m.account, m.initials) +
-      '<div data-member-state class="inline-flex items-center gap-1 border-t border-edge pt-3">' + icon(status[1]) + label + '</div></li>';
+    return accountCard.memberCard({attrs:' data-member-status="' + m.status + '"', register:m.regno, isMe:m.isMe, name:m.name, account:m.account, initials:m.initials, state:icon(status[1]) + label});
   }
   function repoLine(repoUrl) {
     return '<div class="mt-3 flex items-center gap-1 text-sm"><span>' + icon('git-branch', 'Team repository') + '</span>' + (repoUrl
@@ -102,7 +99,8 @@ function studentViewBrowser_(bridge, getUi, actions, accountCard, avatars) {
     const a = dto.assessments;
     return '<section class="' + CARD + ' p-5" aria-label="Assessments"><header><h3 class="text-base font-semibold text-ink">Assessments</h3></header><div class="mt-3 flex flex-col gap-3">' +
       a.reviews.map(r => '<section id="studentAssessment-' + escape(r.key) + '" data-review-result="' + escape(r.key) + '" data-assessment-label="' + escape(r.label) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading ' + r.label + ' results') + '</section>').join('') +
-      '<section id="studentGuideEvaluation" data-assessment-label="' + escape(a.guideEvaluationLabel) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading guide evaluation') + '</section></div></section>';
+      '<section id="studentGuideEvaluation" data-assessment-label="' + escape(a.guideEvaluationLabel) + '" class="rounded-card border border-edge p-3" aria-live="polite">' + ui.renderSkeleton('panel', 'Loading guide evaluation') + '</section>' +
+      '<section data-ai-score-card class="rounded-card border border-edge p-3" aria-live="polite"><h4 class="m-0 text-sm font-semibold text-ink">Weekly progress AI score</h4><p data-ai-score-text class="m-0 mt-1 text-sm text-muted">Loading…</p></section></div></section>';
   }
   // The team heading and roster come with the core DTO, so the Team screen needs no fetch.
   function teamMarkup(dto) {
@@ -169,7 +167,7 @@ function studentViewBrowser_(bridge, getUi, actions, accountCard, avatars) {
     if (!state.dto || state.loaded[key]) return;
     state.loaded[key] = true;
     if (key === 'weeks' && state.dto.titleApproved) actions.weekly.load();
-    else if (key === 'assessments') actions.results.all();
+    else if (key === 'assessments') { actions.results.all(); actions.weekly.showAiScore(); }
     else if (key === 'documents') actions.documents.mount(state.host.querySelector('[data-documents-host]'), '');
     else if ((key === 'github' || key === 'title') && !state.loaded.project) loadProject();
   }

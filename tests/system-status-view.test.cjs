@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { parseHTML } = require('linkedom');
 const { loadSources } = require('./invariants/golden.cjs');
 
-const DTO = { publishing: { configured: true, items: [{ key: 'review1', title: 'Review 1' }, { key: 'guide_eval', title: 'Guide Evaluation' }] } };
+const DTO = {};
 
 function setup(dto = DTO) {
   const { document, window } = parseHTML('<html><body><div id="systemStatusContent"></div></body></html>');
@@ -17,9 +17,8 @@ function setup(dto = DTO) {
   const ui = { renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton>' + String(l).replace(/[&<>"']/g, ch => '&#' + ch.charCodeAt(0) + ';') + '</span>' };
   const actions = { runStudentInvitationResend: record('resend'), recheckCommitteeConfiguration: record('committee'), recheckReviewConfiguration: record('review'),
     bootstrapAssessmentDefinitions: record('bootstrap'), initializeAssessmentStorage: record('storage'), changeTeamPageSize: record('size') };
-  const publishing = { toggle: record('toggle'), refresh: record('refresh') };
   vm.runInContext('globalThis.__make = ' + c.systemStatusViewBrowser_.toString(), c);
-  const view = c.__make(bridge, () => ui, () => publishing, () => actions, {style:()=>""});
+  const view = c.__make(bridge, () => ui, () => actions, {style:()=>""});
   const host = document.getElementById('systemStatusContent');
   view.render(host, dto);
   return { view, host, calls, window, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })) };
@@ -39,18 +38,9 @@ test('renders every card with the hooks its dashboard module attaches to', () =>
   assert.equal(f.host.querySelector('[data-resend-log]').hasAttribute('hidden'), true);
 });
 
-test('each configured assessment gets a collapsed publishing card; a missing configuration shows a notice', () => {
+test('System Status no longer carries the publishing cards', () => {
   const f = setup();
-  const cards = Array.from(f.host.querySelectorAll('[data-publishing]'));
-  assert.deepEqual(cards.map(c => c.getAttribute('data-publishing')), ['review1', 'guide_eval']);
-  assert.equal(norm(cards[1].querySelector('h3')), 'Guide Evaluation');
-  assert.equal(cards[0].querySelector('[data-publishing-toggle]').getAttribute('aria-expanded'), 'false');
-  assert.equal(cards[0].querySelector('[data-publishing-body]').hasAttribute('hidden'), true);
-  assert(cards[0].querySelector('[data-publishing-content] [data-skeleton]'));
-  assert.equal(cards[0].querySelector('[data-publishing-toggle]').getAttribute('aria-controls'), 'review1PublishingBody');
-  const none = setup({ ...DTO, publishing: { configured: false, items: [] } });
-  assert.equal(none.host.querySelectorAll('[data-publishing]').length, 0);
-  assert.match(norm(none.host), /Assessment configuration needs attention/);
+  assert.equal(f.host.querySelectorAll('[data-publishing], [data-publish-all]').length, 0);
 });
 
 test('buttons hand off to the dashboard modules without inline handlers', () => {
@@ -58,9 +48,7 @@ test('buttons hand off to the dashboard modules without inline handlers', () => 
   for (const action of ['resend', 'committee-recheck', 'review-recheck']) f.click(pick(action));
   const bootstrap = pick('bootstrap-definitions'); bootstrap.removeAttribute('hidden'); bootstrap.removeAttribute('disabled'); f.click(bootstrap);
   const storage = pick('storage-init'); storage.removeAttribute('disabled'); f.click(storage);
-  f.click(f.host.querySelector('[data-action="publishing-toggle"][data-key="review1"]'));
-  f.click(f.host.querySelector('[data-action="publishing-refresh"][data-key="guide_eval"]'));
-  assert.deepEqual(JSON.parse(JSON.stringify(f.calls)), [['resend'], ['committee'], ['review'], ['bootstrap'], ['storage'], ['toggle', 'review1'], ['refresh', 'guide_eval']]);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.calls)), [['resend'], ['committee'], ['review'], ['bootstrap'], ['storage']]);
   f.click(pick('storage-init').cloneNode(true)); // a detached clone is not a registered action target
   const select = f.host.querySelector('#studentInvitationsPageSize');
   Object.defineProperty(select, 'value', { value: '25', configurable: true }); select.dispatchEvent(new f.window.Event('change', { bubbles: true }));
@@ -95,7 +83,7 @@ test('the committee directory lists reviewers and teams, with empty states and a
 
 test('values are escaped and every class is compiled into the stylesheet', () => {
   const evil = '<img src=x onerror=alert(1)>"\'&';
-  const bad = setup({ publishing: { configured: true, items: [{ key: 'k"1', title: evil }] } });
+  const bad = setup();
   bad.host.querySelector('#committeeDirectoryContent').innerHTML = bad.view.committeeDirectory([{ number: evil, members: [{ name: evil, email: evil }], teams: [evil] }]);
   assert.equal(bad.host.querySelectorAll('img').length, 0);
   const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
@@ -108,5 +96,5 @@ test('load reads once per request and a newer read supersedes an older one', asy
   const f = setup();
   const first = f.view.load(), second = f.view.load();
   await assert.rejects(first, e => e.superseded === true);
-  assert.equal((await second).publishing.items.length, DTO.publishing.items.length);
+  assert.deepEqual(await second, DTO);
 });

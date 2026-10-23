@@ -40,6 +40,7 @@ function reviewerTeamDto_(row, TS, progress, title, folderUrl) {
     teamId:String(row[TS.TEAM_ID]),
     guideName:String(row[TS.GUIDE_NAME] || ''),
     registerNumbers:[1, 2, 3, 4].map(n => String(row[TS['S' + n + '_REGNO']] || '').trim()).filter(Boolean),
+    students:[1, 2, 3, 4].map(n => ({name:String(row[TS['S' + n + '_NAME']] || '').trim(), regNo:String(row[TS['S' + n + '_REGNO']] || '').trim()})).filter(student => student.regNo),
     title:summary ? summary.title : '',
     committee:String(row[TS.COMMITTEE_NUMBER] || ''),
     titleApproval:{

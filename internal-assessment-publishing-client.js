@@ -1,13 +1,12 @@
-function internalAssessmentPublishingBrowser_(bridge) {
+function internalAssessmentPublishingBrowser_(bridge, table, xlsx) {
   const states=new Map();
   const FIELD='rounded-md border border-control px-3 py-1.5 text-sm font-normal';
   const SMALL='border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const ICON='border-0 inline-flex items-center justify-center rounded-md bg-paper p-1.5 text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const ICON_PRIMARY='border-0 inline-flex items-center justify-center rounded-md bg-primary p-1.5 text-paper hover:bg-primary-hover disabled:opacity-50';
-  const WRAP='overflow-x-auto rounded-tile border border-edge bg-paper';
-  const TABLE='w-full border-collapse text-sm [&_th]:border-b [&_td]:border-b [&_th]:border-edge [&_td]:border-edge [&_th]:px-2 [&_td]:px-2 [&_th]:py-1.5 [&_td]:py-1.5 [&_th]:text-left [&_td]:text-left [&_td]:align-top [&_thead_th]:bg-soft [&_thead_th]:text-xs [&_thead_th]:font-semibold [&_thead_th]:text-ink-2 [&_small]:block [&_small]:text-xs [&_small]:text-muted';
   const BADGE='inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ';
   const STATE={AWAITING_EVALUATION:BADGE+'bg-soft text-ink-2 ring-control/20',READY_TO_PUBLISH:BADGE+'bg-info-tint text-info ring-info/20',PARTIAL_OR_EXCEPTION:BADGE+'bg-warning-tint text-warning ring-warning/20',PARTIALLY_PUBLISHED:BADGE+'bg-warning-tint text-warning ring-warning/20',PUBLISHED:BADGE+'bg-success-tint text-success ring-success/20'};
+  const PAGE_BUTTON='inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-md border border-line bg-paper px-3 text-sm text-ink no-underline hover:bg-tint aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:font-semibold aria-[current=page]:text-paper disabled:pointer-events-none disabled:opacity-50';
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const stateLabels={AWAITING_EVALUATION:'Awaiting evaluation',READY_TO_PUBLISH:'Ready to publish',PARTIAL_OR_EXCEPTION:'Needs attention',PARTIALLY_PUBLISHED:'Partial / updates pending',PUBLISHED:'Published'};
   const publicationLabels={NOT_PUBLISHED:'Not published',PUBLISHED:'Published',UPDATE_PENDING:'Published · update pending'};
@@ -15,7 +14,7 @@ function internalAssessmentPublishingBrowser_(bridge) {
   const label=value=>academicLabels[value]||value;
   const mark=value=>value===null || value===undefined?'Pending':String(value);
   function state(key) {
-    if(!states.has(key))states.set(key,{busy:false,generation:0,query:'',filter:'all',open:new Set(),requests:new Map(),outcomes:new Map(),report:null});
+    if(!states.has(key))states.set(key,{busy:false,generation:0,query:'',filter:'all',page:1,size:10,open:new Set(),requests:new Map(),outcomes:new Map(),report:null});
     return states.get(key);
   }
   function rpc(method,args) {
@@ -49,15 +48,15 @@ function internalAssessmentPublishingBrowser_(bridge) {
   }
   function componentSummary(student) {
     if(!student.components)return '';
-    return Object.entries(student.components).map(([name,c])=>'<small>'+escape((name==='team'?'Team':'Individual')+': '+mark(c.score)+' · '+c.state+(c.source==='policy'?' · Policy-assigned zero':c.source==='makeup'?' · Individual Makeup':''))+'</small>').join('');
+    return Object.entries(student.components).map(([name,c])=>table.note(escape((name==='team'?'Team':'Individual')+': '+mark(c.score)+' · '+c.state+(c.source==='policy'?' · Policy-assigned zero':c.source==='makeup'?' · Individual Makeup':'')))).join('');
   }
-  function studentResults(team,resultsOnly=false) {
-    if(!team.students.length)return resultsOnly?'—':'No roster students';
+  function studentResults(team) {
+    if(!team.students.length)return '—';
     return '<ul data-student-results class="m-0 list-none p-0">'+team.students.map(student=>{
       const identity=(student.name||'Name unavailable')+' ('+student.register+')';
       const resolved=student.assessmentComplete && student.total!==null && student.total!==undefined;
       const result=resolved?mark(student.total)+(student.maximum!==null && student.maximum!==undefined?' / '+mark(student.maximum):''):'Pending';
-      return '<li>'+(resultsOnly?'<span data-student-score aria-label="'+escape(identity+': '+result)+'">'+escape(result)+'</span>':'<span data-student-identity>'+escape(identity)+'</span>')+'</li>';
+      return '<li><span data-student-score aria-label="'+escape(identity+': '+result)+'">'+escape(result)+'</span></li>';
     }).join('')+'</ul>';
   }
   function actionButton(icon,text,attributes,classes='') {
@@ -71,19 +70,43 @@ function internalAssessmentPublishingBrowser_(bridge) {
     const text=config.teamPublication==='sequential' && team.students.some(s=>s.publicationPermission!=='ALLOWED')?'Publish eligible students':'Publish Team';
     return actionButton('megaphone',text+' · '+team.displayTeam,'data-publish="'+index+'"');
   }
+
+  function studentRows(team,student,j,index,config) {
+    const permission=student.publicationPermission==='ALLOWED'?'<span>Allowed under current policy</span>':'<span>'+escape(student.publicationStatus==='PUBLISHED'?'No publication needed':student.blockingReason)+'</span>';
+    const actions=(student.publicationPermission==='ALLOWED' && student.needsPublication?actionButton('megaphone','Publish · '+student.register,'data-publish="'+index+'" data-student="'+j+'"'):'')+(config.reopenScope==='student' && student.canReopen?actionButton('refresh-cw','Reopen student · '+student.register,'data-reopen="'+index+'" data-student="'+j+'"','publishing-reopen'):'');
+    const main=table.row([
+      table.rowHeader(escape(student.name||student.register)+table.note(escape(student.register))),
+      table.td(escape(label(student.assessmentStatus))+table.note('Total: '+escape(mark(student.total))+' · Contribution: '+escape(mark(student.weighted)))+componentSummary(student)),
+      table.td(permission),
+      table.td('<span'+publicationTooltip(student.hasPublishedSnapshot && student.needsPublication?'Students still see the previous publication.':'')+'>'+publicationLabels[student.publicationStatus]+(student.underCorrection?' · Under correction':'')+'</span>'),
+      table.td('<div class="flex gap-1">'+actions+'</div>')
+    ]);
+    const history=(student.decisions||[]).length?table.row([table.spanCell('<div class="publishing-history-context">'+escape(student.name||student.register)+' ('+escape(student.register)+')</div>'+renderAssessmentHistory_(student.decisions),5)]):'';
+    return main+history;
+  }
+  function teamBody(team,index,config,s) {
+    const open=s.open.has(team.team),status=effectiveState(team,s),outcomes=s.outcomes.get(team.team);
+    const main=table.row([
+      ...table.teamCells({teamId:team.displayTeam,students:team.students.map(student=>({name:student.name,regNo:student.register})),guide:team.guideName},{studentAttrs:{'data-student-identity':true},studentsCellAttrs:{'data-registers':true}}),
+      table.td(studentResults(team),{'data-results':true}),
+      table.td(escape(summary(team))),
+      table.td('<span data-state="'+status+'" class="'+STATE[status]+'"'+publicationTooltip(team.canPublishTeam?'Publication permitted':'')+'>'+stateLabels[status]+'</span>'),
+      table.td('<div class="flex gap-1">'+teamAction(team,index,config)+actionButton('eye',(status==='PARTIAL_OR_EXCEPTION' || status==='PARTIALLY_PUBLISHED'?'Review':'Details')+' · '+team.displayTeam,'data-details="'+index+'" aria-expanded="'+open+'" aria-controls="'+config.key+'Team'+index+'"')+'</div>')
+    ]);
+    const students=table.table({label:'Students in '+team.displayTeam,wrapAttrs:{'data-publishing-table-wrap':true},head:table.head(['Student','Assessment','Permission','Publication','Action']),body:table.tbody(team.students.map((student,j)=>studentRows(team,student,j,index,config)).join(''))});
+    const detail=table.row([table.spanCell('<div>'+team.issues.map(issue=>'<p class="m-0 text-sm text-danger">'+escape(issue)+'</p>').join('')+(outcomes?'<div role="status" class="mt-2 text-sm text-ink-2">'+outcomeText(outcomes)+(outcomes.some(r=>r.outcome!=='success')?' <button class="'+SMALL+'" type="button" data-retry-operation="'+index+'">Retry unsuccessful requests</button>':'')+'</div>':'')+students+(team.reopenReason&&!team.canReopen?'<p class="m-0 mt-2 text-sm text-muted">'+escape('Reopening unavailable: '+team.reopenReason)+'</p>':'')+(team.canReopen?'<div class="flex items-center gap-2 py-2 text-xs text-muted"><span>'+escape(config.reopenDescription)+'</span>'+actionButton('refresh-cw','Reopen assessment · '+team.displayTeam,'data-reopen="'+index+'"','publishing-reopen')+'</div>':'')+'</div>',7)],{id:config.key+'Team'+index,'data-detail-row':true,hidden:!open});
+    return table.tbody(main+detail,{'data-team':index});
+  }
   function markup(report,s) {
     const teams=report.teams,config=report.config;
     const count=values=>teams.filter(team=>values.includes(effectiveState(team,s))).length;
     const metrics=[['Total teams',teams.length],['Awaiting evaluation',count(['AWAITING_EVALUATION'])],['Ready to publish',count(['READY_TO_PUBLISH'])],['Exceptions / partial',count(['PARTIAL_OR_EXCEPTION','PARTIALLY_PUBLISHED'])],['Published',count(['PUBLISHED'])]];
-    return '<div class="publishing-stats mb-3 grid grid-cols-2 gap-px overflow-hidden rounded-tile border border-edge bg-edge sm:grid-cols-5">'+metrics.map(([title,value])=>'<div class="flex flex-col bg-paper px-3 py-2"><span class="text-xs text-muted">'+title+'</span><strong class="text-lg text-ink">'+value+'</strong></div>').join('')+'</div><div class="mb-3 flex flex-wrap items-end gap-3"><label class="flex flex-col gap-1 text-sm font-semibold">Find a team or student<input class="'+FIELD+'" type="search" data-search placeholder="Team, register number or name" value="'+escape(s.query)+'"></label><label class="flex flex-col gap-1 text-sm font-semibold">Publication status<select class="'+FIELD+'" data-filter>'+[['all','All statuses'],['AWAITING_EVALUATION','Awaiting evaluation'],['READY_TO_PUBLISH','Ready to publish'],['exceptions','Exceptions / partial'],['PUBLISHED','Published']].map(([value,text])=>'<option value="'+value+'"'+(value===s.filter?' selected':'')+'>'+text+'</option>').join('')+'</select></label><span data-count role="status" class="text-sm text-muted"></span></div><div class="publishing-table-wrap '+WRAP+'" data-publishing-table-wrap data-tooltip-boundary><table class="'+TABLE+'"><caption class="sr-only">'+escape(config.title)+' publication teams</caption><thead><tr><th scope="col">Team</th><th scope="col">Students</th><th scope="col">Result</th><th scope="col">Assessment</th><th scope="col">Publication</th><th scope="col">Action</th></tr></thead>'+teams.map((team,index)=>{
-      const open=s.open.has(team.team),status=effectiveState(team,s),outcomes=s.outcomes.get(team.team);
-      return '<tbody data-team="'+index+'"><tr><th scope="row">'+escape(team.displayTeam)+'</th><td data-registers>'+studentResults(team)+'</td><td data-results>'+studentResults(team,true)+'</td><td>'+escape(summary(team))+'</td><td><span data-state="'+status+'" class="'+STATE[status]+'"'+publicationTooltip(team.canPublishTeam?'Publication permitted':'')+'>'+stateLabels[status]+'</span></td><td><div class="flex gap-1">'+teamAction(team,index,config)+''+actionButton('eye',(status==='PARTIAL_OR_EXCEPTION' || status==='PARTIALLY_PUBLISHED'?'Review':'Details')+' · '+team.displayTeam,'data-details="'+index+'" aria-expanded="'+open+'" aria-controls="'+config.key+'Team'+index+'"')+'</div></td></tr><tr id="'+config.key+'Team'+index+'" data-detail-row'+(open?'':' hidden')+'><td colspan="6"><div>'+team.issues.map(issue=>'<p class="m-0 text-sm text-danger">'+escape(issue)+'</p>').join('')+(outcomes?'<div role="status" class="mt-2 text-sm text-ink-2">'+outcomeText(outcomes)+(outcomes.some(r=>r.outcome!=='success')?' <button class="'+SMALL+'" type="button" data-retry-operation="'+index+'">Retry unsuccessful requests</button>':'')+'</div>':'')+'<div class="publishing-table-wrap '+WRAP+'" data-publishing-table-wrap data-tooltip-boundary><table class="'+TABLE+'"><caption class="sr-only">Students in '+escape(team.displayTeam)+'</caption><thead><tr><th scope="col">Student</th><th scope="col">Assessment</th><th scope="col">Permission</th><th scope="col">Publication</th><th scope="col">Action</th></tr></thead><tbody>'+team.students.map((student,j)=>'<tr><th scope="row">'+escape(student.name||student.register)+'<small>'+escape(student.register)+'</small></th><td>'+escape(label(student.assessmentStatus))+'<small>Total: '+escape(mark(student.total))+' · Contribution: '+escape(mark(student.weighted))+'</small>'+componentSummary(student)+'</td><td>'+(student.publicationPermission==='ALLOWED'?'<span>Allowed under current policy</span>':'<span>'+escape(student.publicationStatus==='PUBLISHED'?'No publication needed':student.blockingReason)+'</span>')+'</td><td><span'+publicationTooltip(student.hasPublishedSnapshot && student.needsPublication?'Students still see the previous publication.':'')+'>'+publicationLabels[student.publicationStatus]+(student.underCorrection?' · Under correction':'')+'</span></td><td><div class="flex gap-1">'+(student.publicationPermission==='ALLOWED' && student.needsPublication?actionButton('megaphone','Publish · '+student.register,'data-publish="'+index+'" data-student="'+j+'"'):'')+(config.reopenScope==='student' && student.canReopen?actionButton('refresh-cw','Reopen student · '+student.register,'data-reopen="'+index+'" data-student="'+j+'"','publishing-reopen'):'')+'</div></td></tr>'+((student.decisions||[]).length?'<tr><td colspan="5"><div class="publishing-history-context">'+escape(student.name||student.register)+' ('+escape(student.register)+')</div>'+renderAssessmentHistory_(student.decisions)+'</td></tr>':'')).join('')+'</tbody></table></div>'+(team.reopenReason&&!team.canReopen?'<p class="m-0 mt-2 text-sm text-muted">'+escape('Reopening unavailable: '+team.reopenReason)+'</p>':'')+(team.canReopen?'<div class="flex items-center gap-2 py-2 text-xs text-muted"><span>'+escape(config.reopenDescription)+'</span>'+actionButton('refresh-cw','Reopen assessment · '+team.displayTeam,'data-reopen="'+index+'"','publishing-reopen')+'</div>':'')+'</div></td></tr></tbody>';
-    }).join('')+'</table></div><div data-empty hidden><strong>'+(!teams.length?'No teams in the current roster':'No matching teams')+'</strong><p>'+(!teams.length?'Add roster data before publishing results.':'Try a different search or publication status.')+'</p></div>';
+    return '<div class="publishing-stats mb-3 grid grid-cols-2 gap-px overflow-hidden rounded-tile border border-edge bg-edge sm:grid-cols-5">'+metrics.map(([title,value])=>'<div class="flex flex-col bg-paper px-3 py-2"><span class="text-xs text-muted">'+title+'</span><strong class="text-lg text-ink">'+value+'</strong></div>').join('')+'</div><div class="mb-3 flex flex-wrap items-end gap-3"><label class="flex flex-col gap-1 text-sm font-semibold">Find a team or student<input class="'+FIELD+'" type="search" data-search placeholder="Team, register number or name" value="'+escape(s.query)+'"></label><label class="flex flex-col gap-1 text-sm font-semibold">Publication status<select class="'+FIELD+'" data-filter>'+[['all','All statuses'],['AWAITING_EVALUATION','Awaiting evaluation'],['READY_TO_PUBLISH','Ready to publish'],['exceptions','Exceptions / partial'],['PUBLISHED','Published']].map(([value,text])=>'<option value="'+value+'"'+(value===s.filter?' selected':'')+'>'+text+'</option>').join('')+'</select></label><span data-count role="status" class="text-sm text-muted"></span></div>'+table.table({label:config.title+' publication teams',wrapAttrs:{'data-publishing-table-wrap':true},head:table.head([...table.TEAM_COLUMNS,'Result','Assessment','Publication','Action']),body:teams.map((team,index)=>teamBody(team,index,config,s)).join('')})+'<nav aria-label="Pagination" class="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-muted"><span data-page-info>Showing 0 - 0 of 0 teams</span><label class="flex items-center gap-2">Rows per page <select data-page-size class="rounded-md border border-control px-2 py-1">'+[['10','10'],['25','25'],['50','50'],['all','All']].map(([value,text])=>'<option value="'+value+'"'+(String(s.size)===value?' selected':'')+'>'+text+'</option>').join('')+'</select></label><div data-page-buttons class="flex items-center gap-1" aria-label="Team table pages"></div></nav><div data-empty hidden><strong>'+(!teams.length?'No teams in the current roster':'No matching teams')+'</strong><p>'+(!teams.length?'Add roster data before publishing results.':'Try a different search or publication status.')+'</p></div>';
   }
   function outcomeText(results) {
     const count=kind=>results.filter(r=>r.outcome===kind).length;
     const description=results.every(r=>/reopen/i.test(r.method||''))?' reopening requests confirmed':' publication requests confirmed';
-    return count('success')+'/'+results.length+description+(count('failed')?' · '+count('failed')+' failed':'')+(count('uncertain')?' · '+count('uncertain')+' unconfirmed; refresh or retry to verify':'')+results.filter(r=>r.outcome!=='success').map(r=>'<small>'+escape(r.input.student||r.input.team)+': '+escape(r.error)+'</small>').join('');
+    return count('success')+'/'+results.length+description+(count('failed')?' · '+count('failed')+' failed':'')+(count('uncertain')?' · '+count('uncertain')+' unconfirmed; refresh or retry to verify':'')+results.filter(r=>r.outcome!=='success').map(r=>table.note(escape(r.input.student||r.input.team)+': '+escape(r.error))).join('');
   }
   /** One delegated listener per publication card (content and notices). */
   function attachActions(section) {
@@ -93,14 +116,17 @@ function internalAssessmentPublishingBrowser_(bridge) {
       const button=event.target.closest && event.target.closest('button');
       if(!button || !section.contains(button))return;
       const key=section.dataset.publishing,s=state(key),host=section.querySelector('[data-publishing-content]');
-      if(button.hasAttribute('data-details')){const index=Number(button.dataset.details),team=s.report.teams[index],open=!s.open.has(team.team);if(open)s.open.add(team.team);else s.open.delete(team.team);button.setAttribute('aria-expanded',String(open));host.querySelectorAll('[data-detail-row]')[index].hidden=!open;}
+      if(button.hasAttribute('data-page')){s.page=Number(button.dataset.page);applyFilter(section,s);}
+      else if(button.hasAttribute('data-details')){const index=Number(button.dataset.details),team=s.report.teams[index],open=!s.open.has(team.team);if(open)s.open.add(team.team);else s.open.delete(team.team);button.setAttribute('aria-expanded',String(open));host.querySelectorAll('[data-detail-row]')[index].hidden=!open;}
       else if(button.hasAttribute('data-publish') || button.hasAttribute('data-reopen'))act(key,button);
       else if(button.hasAttribute('data-retry-operation'))retry(key,Number(button.dataset.retryOperation));
       else if(button.hasAttribute('data-retry-refresh'))refresh(key);
     });
     const filter=event=>{
-      if(!event.target.matches || !event.target.matches('[data-search],[data-filter]'))return;
-      const s=state(section.dataset.publishing);if(s.report)applyFilter(section,s);
+      if(!event.target.matches || !event.target.matches('[data-search],[data-filter],[data-page-size]'))return;
+      const s=state(section.dataset.publishing);if(!s.report)return;
+      if(event.target.matches('[data-page-size]'))s.size=event.target.value==='all'?'all':Number(event.target.value);
+      s.page=1;applyFilter(section,s);
     };
     section.addEventListener('input',filter);section.addEventListener('change',filter);
   }
@@ -109,17 +135,31 @@ function internalAssessmentPublishingBrowser_(bridge) {
   function notice(section,text,error=false){const node=section.querySelector('[data-notice]');node.textContent=text;node.className=error?'mt-2 rounded-md bg-danger-tint px-3 py-2 text-sm text-danger':'mt-2 text-sm text-ink-2';}
   function render(section,s) {
     const host=section.querySelector('[data-publishing-content]');host.innerHTML=markup(s.report,s);
-    host.querySelectorAll('[data-publishing-table-wrap]').forEach((wrapper,index)=>{wrapper.tabIndex=0;wrapper.setAttribute('role','region');wrapper.setAttribute('aria-label',index?'Student publication details, scroll horizontally':'Team publication table, scroll horizontally');});
     const hint=document.createElement('p');hint.className='publishing-scroll-hint m-0 hidden text-xs text-muted max-[640px]:block';hint.textContent='Scroll horizontally to see publication status and actions.';host.querySelector('[data-publishing-table-wrap]').before(hint);
     applyFilter(section,s);
   }
   /** Search and status filter over the rendered rows; driven by the section's delegated input/change listener. */
   function applyFilter(section,s) {
     const host=section.querySelector('[data-publishing-content]');
-    s.query=host.querySelector('[data-search]').value;s.filter=host.querySelector('[data-filter]').value;const query=s.query.trim().toLowerCase();let count=0;
-    host.querySelectorAll('[data-team]').forEach(node=>{const team=s.report.teams[Number(node.dataset.team)],status=effectiveState(team,s),match=s.filter==='all' || s.filter===status || s.filter==='exceptions' && ['PARTIAL_OR_EXCEPTION','PARTIALLY_PUBLISHED'].includes(status);
-      node.hidden=!match || ![team.displayTeam,...team.students.flatMap(student=>[student.name,student.register])].some(value=>String(value).toLowerCase().includes(query));if(!node.hidden)count++;
-    });host.querySelector('[data-count]').textContent=count+' of '+s.report.teams.length+' teams';host.querySelector('[data-empty]').hidden=count!==0;
+    s.query=host.querySelector('[data-search]').value;s.filter=host.querySelector('[data-filter]').value;const query=s.query.trim().toLowerCase();
+    const matched=Array.from(host.querySelectorAll('[data-team]')).filter(node=>{const team=s.report.teams[Number(node.dataset.team)],status=effectiveState(team,s),match=s.filter==='all' || s.filter===status || s.filter==='exceptions' && ['PARTIAL_OR_EXCEPTION','PARTIALLY_PUBLISHED'].includes(status);
+      return match && [team.displayTeam,...team.students.flatMap(student=>[student.name,student.register])].some(value=>String(value).toLowerCase().includes(query));
+    });
+    const size=s.size==='all'?Math.max(1,matched.length):s.size,pages=Math.max(1,Math.ceil(matched.length/size));
+    s.page=Math.min(Math.max(1,s.page),pages);
+    const start=(s.page-1)*size,end=Math.min(start+size,matched.length),shown=new Set(matched.slice(start,end));
+    host.querySelectorAll('[data-team]').forEach(node=>{node.hidden=!shown.has(node);});
+    host.querySelector('[data-count]').textContent=matched.length+' of '+s.report.teams.length+' teams';host.querySelector('[data-empty]').hidden=matched.length!==0;
+    host.querySelector('[data-page-info]').textContent='Showing '+(matched.length?start+1:0)+' - '+end+' of '+matched.length+' teams';
+    const page=(label,number,disabled,active)=>'<button type="button" class="'+PAGE_BUTTON+'" data-page="'+number+'"'+(disabled?' disabled':'')+(active?' aria-current="page"':'')+'>'+label+'</button>';
+    const dots='<span class="px-1 text-muted">…</span>';
+    let first=Math.max(1,s.page-2);const last=Math.min(pages,first+4);first=Math.max(1,last-4);
+    let html=page(DashboardUI.renderIcon('chevron-left')+'Previous',s.page-1,s.page===1,false);
+    if(first>1)html+=page('1',1,false,s.page===1)+(first>2?dots:'');
+    for(let number=first;number<=last;number++)html+=page(String(number),number,false,number===s.page);
+    if(last<pages)html+=(last<pages-1?dots:'')+page(String(pages),pages,false,s.page===pages);
+    html+=page('Next'+DashboardUI.renderIcon('chevron-right'),s.page+1,s.page===pages,false);
+    host.querySelector('[data-page-buttons]').innerHTML=html;
   }
   function reconcile(s) {
     s.report.teams.forEach(team=>{
@@ -145,6 +185,61 @@ function internalAssessmentPublishingBrowser_(bridge) {
     if(!s.requests.has(signature))s.requests.set(signature,{method,input:{...input,requestId:window.crypto.randomUUID()}});
     return s.requests.get(signature);
   }
+  function publishJobs(s,key,config,team,selected,student) {
+    return config.teamPublication==='sequential'?selected.map(member=>job(s,config.publishMethod,{assessmentId:key,team:team.team,student:member.register,revision:member.revision})):[job(s,config.publishMethod,{assessmentId:key,team:team.team,revision:team.revision,...(student?{student:student.register}:{})})];
+  }
+  /** Publishes every team of one assessment that the per-team button would publish, one request at a time. `card` holds the status line. */
+  /** The status line and the lock of a bulk card (Publish all, Download results); the card's assessment cards are locked with it. */
+  function cardTools(key,card) {
+    const section=root(key),status=card.querySelector('[data-publish-all-status]');
+    return {
+      section,
+      say:(html,error=false)=>{status.className=error?'mt-2 rounded-md bg-danger-tint px-3 py-2 text-sm text-danger':'mt-2 text-sm text-ink-2';status.innerHTML=html;},
+      lock:value=>{card.querySelectorAll('button,select').forEach(node=>node.disabled=value);if(section)disable(section,value);}
+    };
+  }
+  /** Reads the published results of one assessment and saves them as an Excel sheet: register number, name, a column per PI and the total. */
+  async function downloadResults(key,card) {
+    const s=state(key),{say,lock}=cardTools(key,card);
+    if(s.busy)return;
+    s.busy=true;lock(true);
+    try {
+      say('Preparing the results…');
+      const data=await new Promise((resolve,reject)=>bridge.read('publishing-export:'+key,'API_publishing_export',[key],{timeoutMs:120000}).then(resolve,reject));
+      const header=['Register Number','Name','Team ID',...data.criteria.map(c=>c.pi),'Total','Comments'];
+      const rows=data.rows.map(row=>[row.register,row.name,row.team,...data.criteria.map(c=>row.scores[c.pi]),row.total,row.comments||'']);
+      const safe=String(data.label||key).replace(/[\\/:*?"<>|]/g,' ').trim();
+      const keySheet=[['Code','Meaning'],...(data.legend||[]).map(item=>[item.code,item.meaning])];
+      xlsx.download(safe+' results.xlsx',xlsx.buildBook([{name:data.label||key,rows:[header,...rows],widths:[18,34,10,...data.criteria.map(()=>8),10,80],wrap:[header.length-1]},{name:'Key',rows:keySheet,widths:[10,90]}]));
+      say(escape(rows.length+' students saved to '+safe+' results.xlsx. See the Key sheet for A, NE, NA, NS, NP and ERR.'));
+    } catch(error){say(escape(error.message||String(error)),true);}
+    finally{s.busy=false;lock(false);}
+  }
+  async function publishAll(key,card) {
+    const s=state(key),{section,say,lock}=cardTools(key,card);
+    if(s.busy)return;
+    s.busy=true;lock(true);
+    let done=false;
+    try {
+      say('Reading publication status…');
+      const report=await rpc('loadInternalAssessmentPublishing_',[key]);
+      if(!report.ready)throw new Error(report.error||'Assessment configuration is unavailable.');
+      const config=report.config,teams=report.teams.filter(team=>team.canPublishTeam);
+      if(!teams.length){say('Nothing to publish for '+escape(config.title)+'.');return;}
+      const jobs=teams.flatMap(team=>{
+        const selected=config.teamPublication==='native'?team.students:team.students.filter(member=>member.publicationPermission==='ALLOWED' && member.needsPublication);
+        return publishJobs(s,key,config,team,selected,null);
+      });
+      if(!await DashboardUI.ask('Publish '+config.title+' results for '+teams.length+' '+(teams.length===1?'team':'teams')+'? Students not yet eligible are not included.')){say('');return;}
+      const results=await runSequence(jobs,rpc,settled=>say('Publishing: '+settled.length+'/'+jobs.length+' requests settled.'));
+      say(outcomeText(results),results.some(r=>r.outcome!=='success'));
+      done=true;
+    } catch(error){say(escape(error.message||String(error)),true);}
+    finally{
+      s.busy=false;lock(false);
+      if(done && section && section.isConnected && s.report)refresh(key);
+    }
+  }
   async function execute(key,section,s,team,jobs,verb) {
     const noticeNode=()=>section.querySelector('[data-notice]');
     let stop=DashboardUI.busy.write(noticeNode(),verb+'…');
@@ -168,7 +263,7 @@ function internalAssessmentPublishingBrowser_(bridge) {
         const remaining=team.totalStudents-selected.length;
         const question='Publish '+config.title+' results for '+(student?student.name+' ('+student.register+')':selected.length+' eligible students')+' in '+team.displayTeam+'?'+(remaining?' '+remaining+' students will not be included.':'')+(selected.some(member=>!member.assessmentComplete)?' Pending academic statuses will remain visible.':'')+(!student && config.teamPublication==='native' && selected.some(member=>member.hasPublishedSnapshot)?' This republishes the team’s current results, including previously published students.':'');
         if(!await DashboardUI.ask(question))return;
-        jobs=config.teamPublication==='sequential'?selected.map(member=>job(s,config.publishMethod,{assessmentId:key,team:team.team,student:member.register,revision:member.revision})):[job(s,config.publishMethod,{assessmentId:key,team:team.team,revision:team.revision,...(student?{student:student.register}:{})})];
+        jobs=publishJobs(s,key,config,team,selected,student);
       } else {
         const reason=await DashboardUI.requestText('Reason for reopening '+config.title+' '+(student?student.register:team.displayTeam)+'. '+config.reopenDescription+' Reason:');if(!reason || !reason.trim())return;
         jobs=[job(s,config.reopenMethod,{assessmentId:key,team:team.team,revision:student?student.revision:team.revision,...(student?{student:student.register}:{}),reason:reason.trim()})];
@@ -195,11 +290,12 @@ function internalAssessmentPublishingBrowser_(bridge) {
     const button=section.querySelector('[data-publishing-toggle]'),body=section.querySelector('[data-publishing-body]');
     const expanded=button.getAttribute('aria-expanded')!=='true';
     body.hidden=!expanded;
+    if(expanded && !section.querySelector('[data-search]'))refresh(key);
     button.setAttribute('aria-expanded',String(expanded));
     button.setAttribute('aria-label',(expanded?'Collapse ':'Expand ')+section.querySelector('h3').textContent+' publishing');
   }
-  return {refresh,toggle,runSequence,markup};
+  return {refresh,toggle,publishAll,downloadResults,runSequence,markup};
 }
 function getInternalAssessmentPublishingClientScript_() {
-  return renderAssessmentHistory_.toString()+'\nconst InternalAssessmentPublishing = ('+internalAssessmentPublishingBrowser_.toString()+')(DataBridge);';
+  return renderAssessmentHistory_.toString()+'\nconst InternalAssessmentPublishing = ('+internalAssessmentPublishingBrowser_.toString()+')(DataBridge, SharedTable, XlsxWriter);';
 }

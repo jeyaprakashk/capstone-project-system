@@ -88,7 +88,9 @@ function loadGuideEvaluation_(teamId, register) {
   const overdue = projectDay_(new Date(),config.timezone) > config.due;
   const repository = typeof getRepoUrlForTeam_ === 'function' ? getRepoUrlForTeam_(roster.team) : '';
   return {roster, student, config, overdue, repository, token:guideFingerprint_({roster,config}), revision:latest ? latest.revision : 0,
-    evaluation:latest, statuses:roster.students.map(s => ({register:s.register,status:(guideLatest_(records,roster.team,s.register)||{}).status || 'Not started'}))};
+    evaluation:latest, statuses:roster.students.map(s => ({register:s.register,status:(guideLatest_(records,roster.team,s.register)||{}).status || 'Not started'})),
+    // Every student's own state, so the browser can move between students without another read.
+    entries:roster.students.map(s => {const own=guideLatest_(records,roster.team,s.register);return {register:s.register,revision:own ? own.revision : 0,evaluation:own || null};})};
 }
 function guideWrite_(action, input) {
   const staff = action === 'reopen';

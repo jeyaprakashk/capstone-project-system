@@ -724,7 +724,6 @@ DashboardUI.registerUtility('system-status', {
   render: function(target, dto) { SystemStatusActions.resetChecks(); SystemStatusView.render(target, dto); },
   rendered: function(target) {
     SystemStatusActions.recheckAll();
-    target.querySelectorAll('[data-publishing]').forEach(function(section) { InternalAssessmentPublishing.refresh(section.dataset.publishing); });
   }
 });`
   };

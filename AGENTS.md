@@ -170,6 +170,10 @@ or removing any class. Do not add inline `<style>` blocks or hand-written CSS fi
   modules do not assign per-element `onclick`/`onchange`; each host gets one delegated listener.
   Tests should find elements through `data-*` hooks, not styling classes.
 - Do not put a display utility (`flex`, `grid`, ...) on an element scripts toggle with `hidden`.
+- Data tables come from `SharedTable` (`shared-table.js`): the scroll region, caption, header, rows and cells, as theme-token utilities.
+  Views compose `table.table({label, head, body})` with `head`, `tbody`, `row`, `td`, `rowHeader` and `note`, and pass their own `data-*` hooks
+  as attributes; they write no table tags or table classes (`tests/shared-table.test.cjs` fails when a module does). A new view gets `SharedTable`
+  as a constructor argument. Mobile card lists are not tables and keep their own markup.
 - Workspace tab strips (Guide and Reviewer) come from `SharedTabs` (`shared-tabs.js`): its markup, classes,
   More sheet and WAI-ARIA Tabs keyboard handling. Views pass tab data and their own `data-*` hooks; they
   keep no tab classes or key handling of their own. Selection is `aria-selected`, never a class.

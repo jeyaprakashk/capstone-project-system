@@ -21,6 +21,7 @@ function coordinatorTeamDto_(team, reviews) {
     githubTiming:String(team.githubTiming || ''),
     repoUrl:String(team.repoUrl || ''),
     registerNumbers:(team.registerNumbers || []).map(String),
+    students:(team.students || []).map(student => ({name:String(student.name || ''), regNo:String(student.regNo || '')})),
     emailRecipients:(team.emailRecipients || []).map(String),
     health:String(team.health || ''),
     guideEvaluation:String(team.guideEvaluation || ''),
@@ -50,8 +51,14 @@ function buildCoordinatorDto_(data) {
   };
 }
 
+/** The assessments the dashboard can publish; `configured:false` when assessment definitions are invalid. */
+function coordinatorPublishing_() {
+  try { return {configured:true, items:publicationDefinitions_().map(d => ({key:String(d.key), title:String(internalPublishingConfig_(d.key).title)}))}; }
+  catch (err) { return {configured:false, items:[]}; }
+}
+
 function API_coordinator_getOverview() {
-  return apiHandle_(() => coordinatorRead_('overview', () => { coordinatorAccessOrThrow_(); return buildCoordinatorDto_(getCoordinatorDashboardData_(true)); }));
+  return apiHandle_(() => coordinatorRead_('overview', () => { coordinatorAccessOrThrow_(); return {...buildCoordinatorDto_(getCoordinatorDashboardData_(true)), publishing:coordinatorPublishing_()}; }));
 }
 
 /**
@@ -116,10 +123,7 @@ function API_coordinator_getActivity() {
 
 /** System Status frame data; every card's own readiness checks load separately. */
 function buildSystemStatusDto_() {
-  let publishing = {configured:true, items:[]};
-  try { publishing.items = publicationDefinitions_().map(d => ({key:String(d.key), title:String(internalPublishingConfig_(d.key).title)})); }
-  catch (err) { publishing = {configured:false, items:[]}; }
-  return {publishing};
+  return {};
 }
 
 function API_coordinator_getSystemStatus() {

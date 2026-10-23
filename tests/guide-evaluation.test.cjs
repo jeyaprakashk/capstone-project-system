@@ -142,3 +142,9 @@ test('journal: a missing or repeated required header refuses to read or write an
  data.forEach(row=>row.pop());
  assert.equal(JSON.stringify(data),before);
 });
+test('the evaluation read carries every roster student, and the requested one matches the top level',()=>{
+ const f=fixture(),d=f.load();
+ assert.deepEqual(Array.from(d.entries,e=>e.register),Array.from(d.roster.students,s=>s.register));
+ const own=d.entries.find(e=>e.register===d.student.register);
+ assert.equal(own.revision,d.revision);assert.deepEqual(JSON.parse(JSON.stringify(own.evaluation)),JSON.parse(JSON.stringify(d.evaluation)));
+});

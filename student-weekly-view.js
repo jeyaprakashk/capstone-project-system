@@ -6,7 +6,7 @@
  * API_student_submitWeekly); markup uses Tailwind utilities and delegated events. Panel state lives
  * on the host element so a re-rendered dashboard starts clean.
  */
-function studentWeeklyViewBrowser_(bridge, getUi) {
+function studentWeeklyViewBrowser_(bridge, getUi, logs) {
   'use strict';
   const delegated = new WeakSet();
   const FIELDS = [
@@ -44,11 +44,8 @@ function studentWeeklyViewBrowser_(bridge, getUi) {
   const p = (html, extra) => '<p class="mt-2 text-sm ' + (extra || 'text-ink-2') + '">' + html + '</p>';
 
   // ---- dates ----
-  const FORMAT = {day:'numeric', month:'short', hour:'numeric', minute:'2-digit', hour12:true};
-  const tidy = text => text.replace('Sept', 'Sep').replace(/\b([ap])m\b/, (m, c) => c.toUpperCase() + 'M');
-  function weeklyDate(value, timezone) {
-    return value ? tidy(new Date(value).toLocaleString('en-IN', {timeZone:timezone, ...FORMAT, timeZoneName:'short'})) : 'Not submitted';
-  }
+  // The date format and week label are shared with the guide's copy of the weekly logs drawer.
+  const {weeklyDate, weekLabel, tidy, FORMAT} = logs;
   function shortDate(value, timezone) {
     return value ? tidy(new Date(value).toLocaleString('en-IN', {timeZone:timezone, ...FORMAT})) : '';
   }
@@ -64,10 +61,6 @@ function studentWeeklyViewBrowser_(bridge, getUi) {
     return (hour >= 18 ? 'tonight' : 'today') + ', ' + time;
   }
   const nowOf = data => data.checkedAt ? Date.parse(data.checkedAt) : Date.now();
-  function weekLabel(weekId) {
-    const match = String(weekId).match(/[0-9]+$/);
-    return match ? 'Week ' + match[0].padStart(2, '0') : String(weekId);
-  }
   function statusTone(state, deadline, timezone, now) {
     if (state === 'SUBMITTED ON TIME') return 'success';
     if (state === 'LATE' || state === 'SUBMITTED LATE' || state === 'MISSED' || now > Date.parse(deadline)) return 'danger';
@@ -121,31 +114,13 @@ function studentWeeklyViewBrowser_(bridge, getUi) {
   }
 
   // ---- all logs drawer ----
-  function githubList(evidence, timezone) {
-    if (evidence && evidence.state === 'available') {
-      return evidence.count ? '<ul class="mt-1 list-disc pl-5 text-sm">' + evidence.commits.map(commit => '<li>' + esc(weeklyDate(commit.timestamp, timezone)) + ' | ' + esc(commit.message) + ' | <a class="text-primary underline" href="' + esc(commit.url) + '" target="_blank" rel="noopener noreferrer">' + esc(commit.shortSha) + '</a></li>').join('') + '</ul>'
-        : '<p class="text-sm text-ink-2">No qualifying GitHub activity recorded.</p>';
-    }
-    return '<p class="text-sm text-ink-2">' + esc(evidence && evidence.message || (evidence && evidence.state === 'unmapped' ? 'GitHub username mapping is unavailable.' : 'GitHub activity is unavailable.')) + '</p>';
-  }
   function openActivity(trigger) {
     const host = byId('studentWeeklyProgress'), data = host && host.weeklyData;
-    if (!data) { getUi().openContentDrawer('All weekly logs', '<p>Logs unavailable. Refresh weekly progress and try again.</p>', trigger); return; }
-    const weeks = data.allWeeks || data.weeks, now = Date.parse(data.checkedAt) || Date.now();
-    const content = '<p class="text-sm text-muted">' + weeks.length + ' weeks</p>' + weeks.map(week => {
-      const future = Date.parse(week.opens) > now;
-      const entries = data.history.filter(entry => entry.weekId === week.weekId).slice().reverse();
-      const evidence = (data.evidence || []).find(item => item.weekId === week.weekId);
-      return '<section class="mt-4 border-t border-edge pt-3"' + (future ? ' data-future' : '') + '><h3 class="m-0 text-base font-semibold">' + esc(weekLabel(week.weekId)) + (future ? ' · Upcoming' : '') + '</h3>' +
-        '<p class="mt-1 text-sm text-muted">Opens ' + esc(weeklyDate(week.opens, data.timezone)) + '<br>Deadline ' + esc(weeklyDate(week.deadline, data.timezone)) + '</p>' +
-        (entries.length ? entries.map(entry => entry.entryStatus === 'MISSED' ? '<p class="mt-2 text-sm text-danger">Missed</p>' :
-          '<details class="mt-2"><summary class="cursor-pointer text-sm font-semibold">' + esc(weeklyDate(entry.recordedAt, data.timezone) + SEP + entry.entryStatus + SEP + entry.timeliness) + '</summary>' +
-          '<p class="mt-1 text-sm text-muted">First submitted: ' + esc(weeklyDate(entry.firstSubmittedAt, data.timezone)) + '</p>' +
-          FIELDS.map(field => '<h4 class="m-0 mt-2 text-sm font-semibold">' + esc(field[1]) + '</h4><p class="m-0 whitespace-pre-line break-words text-sm">' + esc(entry[field[0]] || '') + '</p>').join('') +
-          '<h4 class="m-0 mt-2 text-sm font-semibold">Your GitHub activity</h4>' + githubList(evidence, data.timezone) + '</details>').join('')
-          : '<p class="mt-2 text-sm text-muted">' + (future ? 'Not open yet' : 'No submission recorded') + '</p>') + '</section>';
-    }).join('');
-    getUi().openContentDrawer('All weekly logs', content, trigger);
+    if (!data) { logs.openMessage('All weekly logs', 'Logs unavailable. Refresh weekly progress and try again.', trigger); return; }
+    logs.open({title:'All weekly logs', timezone:data.timezone, now:Date.parse(data.checkedAt) || Date.now(), evidenceTitle:'Your GitHub activity',
+      weeks:(data.allWeeks || data.weeks).map(week => ({weekId:week.weekId, opens:week.opens, deadline:week.deadline,
+        entries:data.history.filter(entry => entry.weekId === week.weekId).slice().reverse().map(entry => ({...entry, aiScore:entry.aiScore === null ? undefined : entry.aiScore})),
+        evidence:(data.evidence || []).find(item => item.weekId === week.weekId)}))}, trigger);
   }
 
   // ---- GitHub evidence gate ----
@@ -234,7 +209,8 @@ function studentWeeklyViewBrowser_(bridge, getUi) {
     else parts.push(view.text);
     return '<li><button type="button" class="' + ROW + '" data-weekly-row data-action="choose-week" data-week="' + esc(week.weekId) + '">' +
       '<span class="' + CIRCLE + 'size-9 ' + CIRCLE_TONE[tone] + '">' + icon(view.icon) + '</span>' +
-      '<span class="min-w-0 flex-1"><span class="block font-semibold text-ink">' + esc(weekLabel(week.weekId)) + '</span><span class="block text-sm text-muted">' + esc(parts.filter(Boolean).join(SEP)) + '</span></span>' +
+      '<span class="min-w-0 flex-1"><span class="block font-semibold text-ink">' + esc(weekLabel(week.weekId)) + '</span><span class="block text-sm text-muted">' + esc(parts.filter(Boolean).join(SEP)) + '</span>' +
+      (Number.isFinite(latest && latest.aiScore) ? '<span class="block text-sm text-muted" data-ai-score>AI score: ' + esc(latest.aiScore) + ' / ' + logs.AI_SCORE_MAX + '</span>' : '') + '</span>' +
       '<span class="text-muted">' + icon('chevron-right') + '</span></button></li>';
   }
   function overviewMarkup(host, data) {
@@ -247,6 +223,27 @@ function studentWeeklyViewBrowser_(bridge, getUi) {
   }
   function bind(host) {
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('submit', onSubmit); host.addEventListener('input', onInput); }
+  }
+  /** The AI score averaged over the weeks scored (a week without a score is left out, never counted as zero). */
+  function aiScoreSummary(data) {
+    const latest = new Map();
+    data.history.forEach(entry => { if (entry.entryStatus !== 'MISSED') latest.set(entry.weekId, entry); });
+    const scores = Array.from(latest.values()).map(entry => entry.aiScore).filter(score => Number.isFinite(score));
+    return {weeks:scores.length, average:scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null};
+  }
+  /** Fills the card under Assessments from the weekly data (percentage of the maximum, advisory like the score itself). */
+  function paintAiScore() {
+    const text = document.querySelector('[data-ai-score-text]'), host = byId('studentWeeklyProgress');
+    if (!text) return;
+    if (!host) { text.textContent = 'Available once your project title is approved.'; return; }
+    if (!host.weeklyData) return;
+    const summary = aiScoreSummary(host.weeklyData);
+    text.textContent = summary.average === null ? 'Not scored yet.' : Math.round(summary.average / logs.AI_SCORE_MAX * 100) + '% · average of ' + summary.weeks + (summary.weeks === 1 ? ' scored week' : ' scored weeks');
+  }
+  /** The Assessments screen asks for the card to be filled; the weekly data is read first when this page has not read it yet. */
+  function showAiScore() {
+    const host = byId('studentWeeklyProgress');
+    if (host && !host.weeklyData) load(); else paintAiScore();
   }
   function load() {
     const host = byId('studentWeeklyProgress');
@@ -265,6 +262,7 @@ function studentWeeklyViewBrowser_(bridge, getUi) {
         host.weeklyRefreshError = null;
       }
       host.weeklyData = data;
+      paintAiScore();
       target.innerHTML = overviewMarkup(host, data);
       const formContainer = host.querySelector('[data-weekly-form]');
       const form = host.querySelector('form');
@@ -418,5 +416,5 @@ function studentWeeklyViewBrowser_(bridge, getUi) {
     const marker = form.querySelector('[data-weekly-dirty]'); if (marker) marker.hidden = false;
   }
 
-  return {load, openActivity, statusTone, weekLabel};
+  return {load, openActivity, statusTone, weekLabel, showAiScore};
 }

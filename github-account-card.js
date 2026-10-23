@@ -19,5 +19,16 @@ function githubAccountCardBrowser_() {
       '<div class="min-w-0"><p class="m-0 font-semibold text-ink">' + escape(account.displayName || account.username) + '</p>' +
       '<a class="text-sm text-primary" target="_blank" rel="noopener" href="' + escape(safeUrl(account.profileUrl)) + '">@' + escape(account.username) + '</a></div></div>';
   }
-  return {markup};
+  const MEMBER = 'flex flex-col gap-3 rounded-tile border border-edge bg-paper p-4 text-sm';
+  /**
+   * One team member's card, the same on the student and guide screens: register number and name, the account, a state line
+   * (`state`, markup) and any `after` markup. `attrs` is the view's own data-* hooks as an attribute string.
+   */
+  function memberCard(options) {
+    return '<li' + (options.attrs || '') + ' class="' + MEMBER + '">' +
+      '<div class="flex flex-wrap items-baseline gap-x-2"><span data-member-register class="font-semibold text-ink">' + escape(options.register) + (options.isMe ? ' (You)' : '') + '</span>' + (options.name ? '<span class="text-ink-2">' + escape(options.name) + '</span>' : '') + '</div>' +
+      markup(options.account, options.initials) +
+      '<div data-member-state class="flex flex-wrap items-center gap-1 border-t border-edge pt-3">' + options.state + '</div>' + (options.after || '') + '</li>';
+  }
+  return {markup, memberCard};
 }

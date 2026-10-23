@@ -86,13 +86,13 @@ function browser() {
   // The invitation card comes from the real System Status view.
   const viewContext=vm.createContext({});vm.runInContext(fs.readFileSync('system-status-view.js','utf8'),viewContext);
   const {document}=parseHTML('<html><body><div id="status"></div></body></html>');
-  viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null,()=>null,{style:()=>""}).render(document.getElementById('status'),{publishing:{configured:false,items:[]}});
+  viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null,{style:()=>""}).render(document.getElementById('status'),{publishing:{configured:false,items:[]}});
   const requests=[];const c=vm.createContext({document,Map});
   // linkedom lacks the browser select.value setter used by the shared helper.
   Object.defineProperty(document.getElementById('studentInvitationsPageSize'),'value',{value:'10',writable:true});
-  vm.runInContext(fs.readFileSync('system-status-actions.js','utf8'),c);
+  vm.runInContext(fs.readFileSync('shared-table.js','utf8'),c);vm.runInContext(fs.readFileSync('system-status-actions.js','utf8'),c);
   const bridge={write:(method,args)=>{const p=new Sync(),r={method,cursor:args[0],success:v=>p.resolve(v),failure:e=>p.reject(e)};requests.push(r);return p;}};
-  const actions=c.systemStatusActionsBrowser_(bridge,()=>({busy:require('./busy-fixture.cjs')(),beginContentLoading:()=>()=>{},notify:()=>{},renderIcon:()=>''}));
+  const actions=c.systemStatusActionsBrowser_(bridge,()=>({busy:require('./busy-fixture.cjs')(),beginContentLoading:()=>()=>{},notify:()=>{},renderIcon:()=>''}),c.sharedTableBrowser_());
   return {document,requests,run:()=>actions.runStudentInvitationResend(),resize:value=>actions.changeTeamPageSize('invitations',value),host:document.getElementById('studentInvitationResend')};
 }
 test('browser blocks duplicate clicks, accumulates batches, preserves results on failure and retries cursor',()=>{

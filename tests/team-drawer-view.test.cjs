@@ -24,7 +24,7 @@ const TITLE = {
 
 function setup(data = { basic: BASIC, title: TITLE, progress: PROGRESS, activity: ACTIVITY }) {
   const { document, window } = parseHTML('<html><body><div id="content"></div></body></html>');
-  const c = loadSources(['data-bridge-client.js', 'title-requests.js', 'team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js'], { document, Promise, JSON, setTimeout, clearTimeout });
+  const c = loadSources(['data-bridge-client.js', 'title-requests.js', 'shared-table.js', 'team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js'], { document, Promise, JSON, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const requests = [], fail = {};
   const writes = [];
@@ -37,7 +37,7 @@ function setup(data = { basic: BASIC, title: TITLE, progress: PROGRESS, activity
   const ui = { busy:require('./busy-fixture.cjs')(), renderSkeleton: (v, l) => '<span data-skeleton aria-label="' + l + '">…</span>', renderExpandableText: t => '<details data-expandable>' + String(t).slice(0, 10) + '</details>' };
   vm.runInContext('globalThis.__make = ' + c.teamDrawerViewBrowser_.toString(), c);
   const titleRequests = c.titleRequestsBrowser_();
-  const view = c.__make(bridge, () => ui, () => titleRequests, () => ({ mount() {} }));
+  const view = c.__make(bridge, () => ui, () => titleRequests, () => ({ mount() {} }), c.sharedTableBrowser_());
   const host = document.getElementById('content');
   const flush = () => new Promise(r => setImmediate(r));
   return { view, host, requests, writes, fail, flush, window, open: { value: true } };

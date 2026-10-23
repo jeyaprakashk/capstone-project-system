@@ -47,9 +47,9 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_coordinator_reopenTitle(input)` / `API_coordinator_cancelReopen(input)` | Coordinator | `{requestId, expectedRevision, teamId, reason}` (reason required, at most 500 characters) | `{ok, revision, status, message}` | new |
 | `API_coordinator_getActivity()` | Coordinator | none | `{state (`active`, `between` weeks, `not-started`, `ended`, `unavailable`), week, checkedAt, teams:{<teamId lower-case>:{logs,commits}}, totalTeams, activeTeams}` | `loadAllTeamsWeeklyActivity_` (wrapped) |
 | `API_coordinator_getSystemStatus()` | Coordinator | none | `SystemStatus` (below) | `loadCoordinatorSystemStatus` (removed) |
-| `API_student_getWeekly()` / `API_student_submitWeekly(input)` | Student | input: `{requestId, weekId, workCompleted, guideDiscussion, blockers, nextAction}` | the existing weekly-progress object (`ready, weeks, actions, history, evidence, allWeeks, timezone, checkedAt …`) / `{ok, entryId, weekId, entryStatus, timeliness, firstSubmittedAt, message}` | `loadStudentWeeklyProgress_` / `submitWeeklyProgress_` called directly |
-| `API_guide_getWeekly()` / `API_guide_signWeekly(entryId, status)` | Guide | `status` is `DISCUSSED` or `NOT_DISCUSSED` | `{checkedAt, timezone, weeks, entries, requiredByWeek …}` / `{ok, entryId, status, message}` | `loadGuideWeeklyProgress_` / `submitWeeklyGuideSignoff_` called directly |
-| `API_guide_getEvaluation(teamId, register)` | Guide | register optional | the existing `loadGuideEvaluation_` object (`roster, student, statuses, config, evaluation, repository, revision, token, overdue`) | `loadGuideEvaluation_` called directly |
+| `API_student_getWeekly()` / `API_student_submitWeekly(input)` | Student | input: `{requestId, weekId, workCompleted, guideDiscussion, blockers, nextAction}` | the existing weekly-progress object (`ready, weeks, actions, history, evidence, allWeeks, timezone, checkedAt …`); each `history` entry also carries `aiScore`: the AI score of that entry (0 to 10) once its analysis exists, otherwise `null`. Only the score reaches the student, never the ratings or the comment / `{ok, entryId, weekId, entryStatus, timeliness, firstSubmittedAt, message}` | `loadStudentWeeklyProgress_` / `submitWeeklyProgress_` called directly |
+| `API_guide_getWeekly()` / `API_guide_signWeekly(entryId, status)` | Guide | `status` is `DISCUSSED` or `NOT_DISCUSSED` | `{checkedAt, timezone, weeks, allWeeks, entries, requiredByWeek …}`; `allWeeks` is every week of the semester as `{weekId, opens, deadline}` (ISO times), as in the student's `API_student_getWeekly`, for the weekly logs drawer / `{ok, entryId, status, message}` | `loadGuideWeeklyProgress_` / `submitWeeklyGuideSignoff_` called directly |
+| `API_guide_getEvaluation(teamId, register)` | Guide | register optional | the existing `loadGuideEvaluation_` object (`roster, student, statuses, config, evaluation, repository, revision, token, overdue`, plus `entries`: one `{register, revision, evaluation}` per roster student, so the browser moves between students without another read; `student`, `revision` and `evaluation` still describe the requested student) | `loadGuideEvaluation_` called directly |
 | `API_guide_saveEvaluationDraft(input)` / `API_guide_submitEvaluation(input)` | Guide | `{team, student, revision, token, scores, requestId}`; the request ID makes a retry safe | `{status, …}` as before | `saveGuideEvaluationDraft_` / `submitGuideEvaluation_` called directly |
 | `API_student_getReviewResult(key)` / `API_student_getGuideResult()` | Student | assessment key | the published result (`config, identity, total, weighted, scores, assessment, underCorrection`) or `null` when nothing is published | `loadPublishedReviewEvaluation_` / `loadPublishedGuideEvaluation_` called directly |
 | `API_student_getEligibility()` | Student | none | `{notEligible:[assessmentKey]}`: the assessments the student's team is not eligible for: every assessment the activity dependencies know (`activityIds_`: each `REVIEW` row of `AssessmentDefinitions`) that is not yet entered and where an earlier assessment is not recorded or a requirement row is definitely unmet, whether or not it has opened. One read for every assessment of the team, so the Drive folder, the documents and the rules are read once. It labels an unpublished assessment `Not Eligible` and says nothing more: no requirement, label or reason reaches a student. A requirement that could not be read, or a misconfigured sheet, leaves the assessment out | `assessmentsTeamNotEligible_` called directly |
@@ -66,7 +66,8 @@ One section per migrated endpoint, added with the dashboard that needs it:
 | `API_coordinator_getCommitteeConfiguration()` / `API_coordinator_getReviewConfiguration()` | Coordinator | none | the existing readiness reports (`valid, state, summary, issues, links, checkedAt`, plus `committees` or `storage`) | `getCoordinatorCommitteeConfiguration_` / `getCoordinatorReviewConfiguration_` called directly |
 | `API_coordinator_createDefinitions()` / `API_coordinator_prepareStorage()` | Coordinator | none | `{created}` / `{journals:[{label,journal,created,initialized}]}` | `createAssessmentDefinitions_` / `prepareReviewAssessmentStorage_` called directly |
 | `API_coordinator_resendInvitations(cursor)` | Coordinator | `cursor` is `''` for the first batch, then the returned `nextCursor` | `{results, nextCursor, stopped}` | `resendExpiredStudentInvitations_` called directly |
-| `API_publishing_get(assessmentId)` / `API_publishing_run(method, input)` | Coordinator | `method` is `publishInternalAssessment_` or `reopenInternalAssessment_`; `input` carries `requestId`, so a retry is safe | the existing publication report (`ready, config, teams, error`) / the existing publish or reopen result | `loadInternalAssessmentPublishing_` / `publishInternalAssessment_` / `reopenInternalAssessment_` called directly |
+| `API_publishing_export(assessmentId)` | Coordinator | assessment key such as `review1` | `{key, label, criteria:[{pi,name,maxMarks,type}], rows:[{register, name, team, scores:{<pi>:number\|code}, total:number\|code, comments /* every non-blank PI remark of the published result (team and individual), one `PI: text` line each; for an absent student the absence in words (kind, approved or not, contribution, supporting evidence), after any remarks; '' when none or unpublished */}], legend:[{code, meaning}]}`: the published results only, one row per roster student sorted by register number. `A` = absent without a makeup (the individual part is pending or set by policy), `NE` = the team is not eligible to be assessed yet (the Sequence rule or a requirement row), `NA` = eligible but not assessed, `NS` = assessed, saved as a draft, not submitted, `NP` = submitted, not yet published, `ERR` = unreadable roster or a mark that cannot be calculated. The browser writes it as an .xlsx (`xlsx-writer.js`): the results sheet and a `Key` sheet built from `legend` | `internalPublishingExport_` called directly |
+| `API_publishing_get(assessmentId)` / `API_publishing_run(method, input)` | Coordinator | `method` is `publishInternalAssessment_` or `reopenInternalAssessment_`; `input` carries `requestId`, so a retry is safe | the existing publication report (`ready, config, teams, error`; each team also carries `guideName`) / the existing publish or reopen result | `loadInternalAssessmentPublishing_` / `publishInternalAssessment_` / `reopenInternalAssessment_` called directly |
 | `API_student_previewGithub(profileUrl)` / `API_student_confirmGithub(token)` / `API_student_completeGithubSetup()` | Student | profile URL; the signed `token` returned by the preview | `{token, account:{githubId, username, displayName, profileUrl, avatarUrl}}` / `{ok, message}` / `{message}` | `previewStudentGithubAccount_` / `confirmStudentGithubAccount_` / `completeStudentGithubSetup_` called directly |
 | `API_shared_getTimeline()` / `API_shared_getRubrics()` | Any dashboard role | none | the existing project timeline (`schedule, milestones …`) / shared rubrics (`assessments …`) | `loadSharedProjectTimeline_` / `loadSharedRubrics_` called directly |
 | `API_coordinator_getTeamDrawer(teamId, section)` | Coordinator | `section` is `basic`, `title`, `progress` or `activity` | the existing team detail for that section, rendered by `TeamDrawerView` (`team-drawer-view.js`); the `title` section is `{title: TitleDto (with history), requirements:{errors, activities:{<activity>:{allowed, reason, requirements:[{label, met, reason, diagnostic?}]}}}}` and is where the coordinator reopens a title or cancels a reopening; `basic` and `progress` report `titleStatus` as above and no longer carry the guide and reviewer decisions | `loadCoordinatorDrawerSection_` called directly |
@@ -82,7 +83,7 @@ comparison against the output of the function it replaces.
 { summary:{pending,approved,awaitingGuide,total},
   reviews:[{key,label}],                 // configured REVIEW assessments, in column order
   reviewError:string|null,               // set when marks are unavailable (e.g. missing definitions)
-  teams:[{ teamId, guideName, registerNumbers:[string], title, committee,
+  teams:[{ teamId, guideName, registerNumbers:[string], students:[{name,regNo}], title, committee,
            titleApproval:{ status:{tone:'neutral'|'success'|'warning', label}, canDecide:boolean, canApprove:boolean, approveBlockedReason:string, revision:number,
                            submittedTitle, problem, similarityFlag, folderUrl, notes },
            reviews:[{key, enabled:boolean, actionLabel, note}] }] }
@@ -105,8 +106,9 @@ Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invaria
           guideEvaluation:{available,completed}|null,
           reviews:[{key,label,completed:number|null,unavailable:number,known:boolean}] },
   reviewColumns:[{key,label}], reviewConfigurationError:boolean, partial:boolean,
+  publishing:{ configured:boolean, items:[{key,title}] },   // overview only; configured:false when assessment definitions are invalid
   teams:[{ teamId, guide, title /* the title in effect */, titleStatus /* NOT_SUBMITTED|NEEDS_REVIEW|AWAITING_REVIEWER|RETURNED|APPROVED|REOPENED|UNAVAILABLE */, repoStatus:'ready'|'pending', githubMessage, githubTiming, repoUrl,
-           registerNumbers:[string], emailRecipients:[string], health:'ontrack'|'monitor'|'attention'|'loading',
+           registerNumbers:[string], students:[{name,regNo}], emailRecipients:[string], health:'ontrack'|'monitor'|'attention'|'loading',
            guideEvaluation:string, reviews:{<key>:'Completed'|'Pending'|'Unavailable'|'Loading…'} }] }
 ```
 
@@ -116,6 +118,8 @@ timeout is isolated to that section, with its own message and Retry. Percentages
 The team drawer is rendered by `TeamDrawerView` (three sections read independently; each fails and retries on its own); DashboardUI only opens, closes and focuses it. Contract tests: `tests/coordinator-migration.test.cjs`
 (snapshot `tests/invariants/snapshots/coordinator-legacy-facts.json`, captured from the removed HTML for the overview,
 progress and no-reviews cases, with explicit expectations for the removed deadline alerts).
+
+Between the statistics and the tracker the view renders, in a multi-column grid (an opened card spans the row), the "Publish all results" card (an assessment select and one button; the browser reads `API_publishing_get` for the chosen assessment and sends one `API_publishing_run` publish per publishable team, with no new endpoint) and one collapsed publishing card per `publishing.items` entry; a card reads its publication status the first time it is opened.
 
 The tracker offers All, Attention and On Track filters. Deadline alert pills and
 per-team pending deadline keys have been removed; team-health assessment remains separate.
@@ -127,12 +131,12 @@ from `WeeklyWindows`, independently of the title deadline.
 ### SystemStatus
 
 ```
-{ publishing:{ configured:boolean, items:[{key,title}] } }       // configured:false when assessment definitions are invalid
+{}                                                               // the frame carries no data
 ```
 
-This is only the frame: the invitation-resend card, one collapsed publishing card per assessment, and the
-committee and assessment-readiness cards. Each card's own checks (`getCoordinatorCommitteeConfiguration_`,
-`getCoordinatorReviewConfiguration_`, publishing reads, weekly setup, invitation resend) are separate calls made
+This is only the frame: the invitation-resend card, the team folders card, and the
+committee and assessment-readiness cards (the publishing cards moved to the Coordinator Dashboard). Each card's own checks (`getCoordinatorCommitteeConfiguration_`,
+`getCoordinatorReviewConfiguration_`, weekly setup, invitation resend) are separate calls made
 by their dashboard modules against hooks the view renders. `getCoordinatorCommitteeConfiguration_` returns structured
 `committees:[{number, members:[{name,email}], teams:[string]}]`; the view builds the directory (no server HTML).
 Contract tests: `tests/system-status-view.test.cjs` and the System Status cases in `tests/project-schedule.test.cjs`.
@@ -254,7 +258,8 @@ captured from the removed HTML for eight states, with explicit expectations for 
 
 GuideGithub   // one team's entry in API_guide_getGithub().teams
 { tone, members:[{name,regno,state:'missing'|'joined'|'pending',
-                  timing:{state,explanation,date,daysLate,days:number|null}|null}] }
+                  timing:{state,explanation,date,daysLate,days:number|null}|null,
+                  account:{username,displayName,profileUrl,avatarUrl}|null}] }   // account: as in the student GitHub card; null when no account is stored
 ```
 
 The dashboard has no `github` field. The view treats a team's `github` as `undefined` (placeholder) until

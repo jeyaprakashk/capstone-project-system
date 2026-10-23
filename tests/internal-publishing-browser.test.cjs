@@ -28,11 +28,11 @@ function fixture(key='review1') {
     guideRun:()=>runner(),ask:async text=>{questions.push(text);return approve;},requestText:async text=>{questions.push(text);return approve?'Correction':null;},
     busy:require('./busy-fixture.cjs')(),beginContentLoading:host=>{loading.begun++;host.setAttribute('aria-busy','true');let done=false;return ()=>{if(done)return;done=true;loading.settled++;host.removeAttribute('aria-busy');};}
   }});
-  for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js','internal-assessment-publishing-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);c.DashboardUI.renderIcon=c.renderLucideIcon_;c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;const { Sync } = require('./sync-promise.cjs');
+  for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js','shared-table.js','internal-assessment-publishing-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);c.DashboardUI.renderIcon=c.renderLucideIcon_;c.DashboardUI.renderAssessmentHistory=c.renderAssessmentHistory_;const { Sync } = require('./sync-promise.cjs');
   const record = (method, args) => { const p = new Sync(); calls.push({ method, args, ok: v => p.resolve(v), fail: e => p.reject(e) }); return p; };
   const bridge = { read: (key, endpoint, args, options) => { assert.equal(endpoint, 'API_publishing_get'); assert.equal(options.timeoutMs, 120000); return record('loadInternalAssessmentPublishing_', args); },
     write: (endpoint, args) => { assert.equal(endpoint, 'API_publishing_run'); return record(args[0], [args[1]]); } };
-  const api=c.internalAssessmentPublishingBrowser_(bridge);
+  const api=c.internalAssessmentPublishingBrowser_(bridge,c.sharedTableBrowser_());
   const section=()=>document.querySelector('[data-publishing]'),host=()=>document.querySelector('[data-publishing-content]');
   async function load(){const promise=api.refresh(key);calls.at(-1).ok(server.report());await promise;}
   async function settleMutation(call,fail){if(fail)call.fail({message:fail});else {server.report();call.ok(server.c[call.method](call.args[0]));}await flush();}
@@ -42,8 +42,8 @@ function fixture(key='review1') {
 
 test('refresh lifecycle retains content, deduplicates reads, retries and restores controls',async()=>{
   const f=fixture();await f.load();const before=f.host().innerHTML,search=f.host().querySelector('[data-search]');search.value='Alex';search.dispatchEvent(new f.window.Event('input',{bubbles:true}));
-  const pending=f.api.refresh('review1');await f.api.refresh('review1');assert.equal(f.calls.length,2);assert(f.section().querySelector('[data-refresh]').disabled);
-  f.calls[1].fail({message:'Offline'});await pending;assert.equal(f.host().querySelector('[data-search]'),search);assert.equal(search.value,'Alex');assert.match(f.section().querySelector('[data-notice]').textContent,/Offline/);assert(!f.section().querySelector('[data-refresh]').disabled);assert.equal(f.loading.begun,f.loading.settled);
+  const pending=f.api.refresh('review1');await f.api.refresh('review1');assert.equal(f.calls.length,2);assert(f.section().querySelector('[data-publishing-toggle]').disabled);
+  f.calls[1].fail({message:'Offline'});await pending;assert.equal(f.host().querySelector('[data-search]'),search);assert.equal(search.value,'Alex');assert.match(f.section().querySelector('[data-notice]').textContent,/Offline/);assert(!f.section().querySelector('[data-publishing-toggle]').disabled);assert.equal(f.loading.begun,f.loading.settled);
   f.section().querySelector('[data-notice] button').click();assert.equal(f.calls.length,3);f.calls[2].ok(f.server.report());await flush();assert.equal(f.host().querySelector('[data-search]').value,'Alex');assert.equal(f.loading.begun,f.loading.settled);assert(before.includes('Publish Team'));
 });
 
@@ -69,7 +69,7 @@ test('Review individual UI publishes only selected register and displays partial
 });
 
 test('cancelled confirmation sends nothing and restores controls',async()=>{
-  const f=fixture();await f.load();f.approve(false);f.host().querySelector('[data-publish]').click();await flush();assert.equal(f.calls.length,1);assert(!f.section().querySelector('[data-refresh]').disabled);
+  const f=fixture();await f.load();f.approve(false);f.host().querySelector('[data-publish]').click();await flush();assert.equal(f.calls.length,1);assert(!f.section().querySelector('[data-publishing-toggle]').disabled);
 });
 
 test('Guide team UI serializes calls, reports failure, refreshes actual state and retries original request',async()=>{
@@ -104,7 +104,7 @@ test('re-entered screen does not retain an initial skeleton after a failed read'
 });
 
 test('scrollable team and student tables are keyboard-focusable named regions',async()=>{
-  const f=fixture();await f.load();const wrappers=f.host().querySelectorAll('.publishing-table-wrap');assert(wrappers.length>1);
+  const f=fixture();await f.load();const wrappers=f.host().querySelectorAll('[data-publishing-table-wrap]');assert(wrappers.length>1);
   wrappers.forEach(wrapper=>{assert.equal(wrapper.getAttribute('tabindex'),'0');assert.equal(wrapper.getAttribute('role'),'region');assert.match(wrapper.getAttribute('aria-label'),/scroll horizontally/);});
   assert.match(f.host().querySelector('.publishing-scroll-hint').textContent,/publication status and actions/);
 });
@@ -131,9 +131,9 @@ test('publication details use shared tooltips without adding text below the stat
 
 test('student result lines show name, bracketed register and the assessment-specific maximum',async()=>{
   for(const key of ['review1','review2','guide_eval']){
-    const f=fixture(key);await f.load();const lines=f.host().querySelectorAll('[data-registers] [data-student-results] li');assert.equal(lines.length,3);
+    const f=fixture(key);await f.load();const lines=f.host().querySelectorAll('[data-registers] li');assert.equal(lines.length,3);
     assert.equal(lines[0].querySelector('[data-student-identity]').textContent,'Alex One (s1)');assert.equal(f.host().querySelector('[data-results] [data-student-score]').textContent,key==='guide_eval'?'32 / 40':'80 / 100');
-    assert.equal(f.host().querySelector('[data-team]').firstElementChild.children.length,6);assert.equal(f.host().querySelector('[data-detail-row] td').getAttribute('colspan'),'6');
+    assert.equal(f.host().querySelector('[data-team]').firstElementChild.children.length,7);assert.equal(f.host().querySelector('[data-detail-row] td').getAttribute('colspan'),'7');
     const report=f.server.report();report.teams[0].students[0].total=null;report.teams[0].students[0].assessmentComplete=false;report.teams[0].students[1].total=0;
     const pending=f.api.refresh(key);f.calls.at(-1).ok(report);await pending;const scores=f.host().querySelectorAll('[data-student-score]');assert.equal(scores[0].textContent,'Pending');assert.match(scores[1].textContent,/^0 \/ /);
   }

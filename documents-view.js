@@ -308,6 +308,15 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   }
 
   /** Reads the Documents DTO into the host. Content already shown stays on a failed refresh, with a Retry. */
+  /** The number of documents waiting for the guide, announced to whoever watches (the Guide dashboard's tab badge) each time a team's documents are read. */
+  const watchers = [];
+  const awaitingGuide = dto => dto.documents.filter(doc => doc.status === 'NEEDS_REVIEW').length;
+  const announce = dto => watchers.forEach(watcher => watcher(dto.teamId, awaitingGuide(dto)));
+  const watch = watcher => { watchers.push(watcher); };
+  /** Reads one team's documents on their own key (the screen's own read must never be superseded) and announces the count. It never fails. */
+  function summarize(teamId) {
+    return bridge.read('documents-summary:' + teamId, 'API_documents_get', [teamId], {timeoutMs: 120000}).then(announce, () => {});
+  }
   function load(host) {
     const state = hosts.get(host);
     if (!state || state.busy) return Promise.resolve();
@@ -316,7 +325,7 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     return bridge.read('documents:' + (state.teamId || 'own'), 'API_documents_get', state.teamId ? [state.teamId] : [], {timeoutMs: 120000}).then(dto => {
       finish(); state.busy = false;
       if (!host.isConnected || hosts.get(host) !== state) return;
-      state.dto = dto;
+      state.dto = dto; announce(dto);
       const notice = state.notice; state.notice = '';
       host.innerHTML = listMarkup(dto, notice, state);
     }, error => {
@@ -463,5 +472,5 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     else if (action === 'check-evidence') checkEvidence(host, card, button);
   }
 
-  return {mount, load, markup: (dto, notice) => listMarkup(dto, notice, null)};
+  return {mount, load, watch, summarize, markup: (dto, notice) => listMarkup(dto, notice, null)};
 }

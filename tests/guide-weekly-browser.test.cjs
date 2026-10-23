@@ -15,11 +15,13 @@ function fixture() {
   },guideRun:()=>{const request={};const runner=new Proxy({withSuccessHandler(fn){request.success=fn;return runner;},withFailureHandler(fn){request.failure=fn;return runner;}},{get(target,key){return target[key]||((...args)=>{request.method=key;request.args=args;requests.push(request);});}});return runner;}}});
   vm.runInContext(fs.readFileSync('guide-weekly-client.js','utf8'),c);
   vm.runInContext(fs.readFileSync('shared-tabs.js','utf8'),c);const tabs=c.sharedTabsBrowser_(()=>c.DashboardUI);
-  new vm.Script(c.getGuideWeeklyClientScript_());const api=c.guideWeeklyBrowser_(bridge,()=>tabs);
+  new vm.Script(c.getGuideWeeklyClientScript_());
+  vm.runInContext(fs.readFileSync('weekly-logs-view.js','utf8'),c);const drawers=[];c.DashboardUI.openContentDrawer=(title,html)=>drawers.push({title,html});
+  const api=c.guideWeeklyBrowser_(bridge,()=>tabs,c.weeklyLogsViewBrowser_(()=>c.DashboardUI));
   const data={weeks:['W2','W1'],checkedAt:'2026-01-08T12:00:00Z',timezone:'Asia/Kolkata',entries:[
     {entryId:'e2',weekId:'W2',student:'Student <script>alert(1)</script>',regNo:'001',discussion:'Measured <b>signal</b>',status:'PENDING',score:null},
     {entryId:'e1',weekId:'W1',student:'Student',regNo:'001',discussion:'Decision',status:'DISCUSSED',score:0}]};
-  return {api,c,document,requests,data,flush:()=>{const pending=[...timers.values()];timers.clear();pending.forEach(fn=>fn());},host:document.getElementById('guideWeeklyProgress'),counts:()=>[starts,finishes],reply:()=>requests.at(-1).success(data)};
+  return {api,c,document,requests,data,drawers,flush:()=>{const pending=[...timers.values()];timers.clear();pending.forEach(fn=>fn());},host:document.getElementById('guideWeeklyProgress'),counts:()=>[starts,finishes],reply:()=>requests.at(-1).success(data)};
 }
 
 test('guide list defaults latest week, escapes content, renders absent score and uses shared buttons',()=>{
@@ -350,7 +352,9 @@ test('team attention combines only guide actions, updates after decisions and di
   f.api.load();assert.match(pill('A').textContent,/Skeleton/);assert.equal(pill('B').hidden,false);assert.equal(pill('A').getAttribute('aria-busy'),'true');
   f.reply();assert.equal(pill('A').textContent,'Title review · 1');assert.equal(pill('A').getAttribute('aria-busy'),'false');assert.equal(pill('A').hasAttribute('title'),false);assert.equal(root.querySelector('[data-guide-select="A"]').hasAttribute('title'),false);assert.equal(pill('B').hidden,true);assert.equal(f.requests.length,1);
   const tabBadge=key=>root.querySelector('[data-guide-tab="'+key+'"] [data-tab-badge]');
-  assert.equal(tabBadge('weekly').textContent,'1');assert.ok(tabBadge('documents')===null || tabBadge('documents').hidden,'the Documents tab has no count: the folder is a link, not work to do');
+  assert.equal(tabBadge('weekly').textContent,'1');assert.ok(tabBadge('documents')===null || tabBadge('documents').hidden,'the Documents tab has no count until the Documents screen reports documents waiting for the guide');
+  f.api.setDocumentCount('A',2);assert.equal(tabBadge('documents').textContent,'2');assert.match(tabBadge('documents').title,/awaiting your approval: 2/);
+  f.api.setDocumentCount('A',0);assert.equal(tabBadge('documents').hidden,true);
   assert.equal(root.querySelector('[data-guide-tab="title"]').getAttribute('aria-selected'),'true');
   f.host.querySelector('[data-sign="DISCUSSED"]').click();f.flush();f.requests.at(-1).success({status:'DISCUSSED',message:'Saved'});
   assert.equal(pill('A').textContent,'Title review · 1');assert.equal(tabBadge('weekly').hidden,true);
@@ -408,4 +412,45 @@ test('answers sit in a two-column grid, clamp with a Show more toggle, and the c
   assert.doesNotMatch(text.className,/\bline-clamp-3\b/);assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(toggle.textContent,'Show less');
   toggle.click();
   assert.match(text.className,/\bline-clamp-3\b/);assert.equal(toggle.textContent,'Show more');
+});
+
+test('the weekly logs drawer shows one student submissions for every week, like the student own drawer',()=>{
+  const f=fixture();f.api.load();
+  f.api.openWeeklyLogs('001','Student',null);
+  assert.match(f.drawers.at(-1).html,/still loading|unavailable/);
+  f.data.allWeeks=[{weekId:'W1',opens:'2026-01-01T00:00:00Z',deadline:'2026-01-05T00:00:00Z'},{weekId:'W2',opens:'2026-01-06T00:00:00Z',deadline:'2026-01-09T00:00:00Z'},{weekId:'W3',opens:'2026-02-01T00:00:00Z',deadline:'2026-02-05T00:00:00Z'}];
+  f.data.entries=[
+    {entryId:'e1',weekId:'W1',student:'Student',regNo:'001',workCompleted:'Parser <b>done</b>',guideDiscussion:'OK',blockers:'None',nextAction:'Tests',timeliness:'ON_TIME',firstSubmittedAt:'2026-01-02T00:00:00Z',submittedAt:'2026-01-02T00:00:00Z',status:'PENDING',evidence:{state:'available',commits:[{timestamp:'2026-01-02T00:00:00Z',message:'Add parser',shortSha:'abcdef0',url:'https://github.com/o/t/commit/abcdef0'}]}},
+    {entryId:'e2',weekId:'W2',student:'Student',regNo:'001',workCompleted:'More',guideDiscussion:'OK',blockers:'None',nextAction:'Docs',timeliness:'LATE',firstSubmittedAt:'2026-01-07T00:00:00Z',submittedAt:'2026-01-08T00:00:00Z',status:'PENDING',evidence:{state:'unavailable',message:'GitHub evidence could not be read.',commits:[]}},
+    {entryId:'x',weekId:'W1',student:'Other',regNo:'002',workCompleted:'Not shown',guideDiscussion:'',blockers:'',nextAction:'',timeliness:'ON_TIME',firstSubmittedAt:'2026-01-02T00:00:00Z',submittedAt:'2026-01-02T00:00:00Z',status:'PENDING',evidence:{state:'available',commits:[]}}];
+  f.reply();
+  f.api.openWeeklyLogs('001','Student',null);
+  const {title,html}=f.drawers.at(-1);
+  assert.equal(title,'All weekly logs · Student');
+  const {document}=parseHTML('<html><body>'+html+'</body></html>');
+  assert.equal(document.querySelectorAll('section').length,3);
+  assert.equal(document.querySelectorAll('details').length,2);
+  assert.match(document.body.textContent,/Parser <b>done<\/b>/);assert.doesNotMatch(document.body.textContent,/Not shown/);
+  assert.equal(document.querySelector('b'),null);
+  assert.match(document.querySelectorAll('summary')[0].textContent,/SUBMITTED · ON_TIME/);
+  assert.match(document.querySelectorAll('summary')[1].textContent,/REVISED · LATE/);
+  assert.match(document.querySelector('a[href^="https://github.com/"]').textContent,/abcdef0/);
+  assert.match(document.body.textContent,/GitHub evidence could not be read/);
+  assert.match(document.querySelector('[data-future]').textContent,/Week 03.*Upcoming/);
+  assert.match(document.querySelector('[data-future]').textContent,/Not open yet/);
+});
+
+test('the AI score is averaged over the scored weeks only and shown per week in the drawer',()=>{
+  const f=fixture();
+  assert.equal(f.api.aiScoreFor('001'),null);
+  let waited=0;f.api.whenData(()=>waited++);f.api.load();assert.equal(waited,0);
+  f.data.allWeeks=[{weekId:'W1',opens:'2026-01-01T00:00:00Z',deadline:'2026-01-05T00:00:00Z'},{weekId:'W2',opens:'2026-01-06T00:00:00Z',deadline:'2026-01-09T00:00:00Z'},{weekId:'W3',opens:'2026-01-07T00:00:00Z',deadline:'2026-01-10T00:00:00Z'}];
+  const entry=(weekId,score,regNo='001')=>({entryId:weekId+regNo,weekId,student:'S',regNo,workCompleted:'w',guideDiscussion:'g',blockers:'b',nextAction:'n',timeliness:'ON_TIME',firstSubmittedAt:'2026-01-02T00:00:00Z',submittedAt:'2026-01-02T00:00:00Z',status:'PENDING',score,evidence:{state:'available',commits:[]}});
+  f.data.entries=[entry('W1',8),entry('W2',null),entry('W3',5),entry('W1',2,'002')];
+  f.reply();assert.equal(waited,1);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.api.aiScoreFor('001'))),{weeks:2,average:6.5,max:10});
+  assert.equal(f.api.aiScoreFor('999').average,null);
+  f.api.openWeeklyLogs('001','S',null);
+  const text=parseHTML('<html><body>'+f.drawers.at(-1).html+'</body></html>').document.body.textContent;
+  assert.match(text,/AI score: 8 \/ 10/);assert.match(text,/AI score: —/);assert.match(text,/AI score: 5 \/ 10/);
 });

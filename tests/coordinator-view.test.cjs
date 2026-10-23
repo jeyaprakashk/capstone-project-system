@@ -21,8 +21,8 @@ const ACTIVITY = { state: 'active', week: 'W2', checkedAt: '2026-01-10T12:00:00Z
 
 function setup({ data = sections(), activity = ACTIVITY } = {}) {
   const { document, window } = parseHTML('<html><body><div id="coordinatorContent"></div></body></html>');
-  const calls = { view: [], close: 0, refresh: 0, requests: [] };
-  const c = loadSources(['data-bridge-client.js', 'coordinator-view.js'], { document, Promise, JSON, Intl, Date, setTimeout, clearTimeout });
+  const calls = { view: [], close: 0, refresh: 0, requests: [], publishing: [] };
+  const c = loadSources(['data-bridge-client.js', 'shared-table.js', 'shared-tabs.js', 'coordinator-view.js'], { document, Promise, JSON, Intl, Date, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const s = { ...data, activity, fail: {}, hold: {}, release: {} };
   bridge.useTransport((method, args) => {
@@ -37,7 +37,9 @@ function setup({ data = sections(), activity = ACTIVITY } = {}) {
     closeRubricDrawer: () => {}, openDrawer: () => {}, closeDrawer: () => calls.close++, refreshRoleDashboard: () => calls.refresh++ };
   const teamDrawer = { mount: (content, team) => calls.view.push(team), cancel: () => {} };
   vm.runInContext('globalThis.__make = ' + c.coordinatorViewBrowser_.toString(), c);
-  const view = c.__make(bridge, () => ui, () => teamDrawer);
+  const publishing = { toggle: key => calls.publishing.push(['toggle', key]), refresh: key => calls.publishing.push(['refresh', key]), publishAll: (key, card) => calls.publishing.push(['all', key, card.hasAttribute('data-publish-all')]) };
+  const tabs = c.sharedTabsBrowser_(() => ui);
+  const view = c.__make(bridge, () => ui, () => teamDrawer, () => publishing, c.sharedTableBrowser_(), () => tabs);
   const host = document.getElementById('coordinatorContent');
   const flush = () => new Promise(r => setImmediate(r));
   return { view, host, document, calls, s, flush, fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), click: el => el.dispatchEvent(new window.Event('click', { bubbles: true })),
@@ -50,16 +52,19 @@ const rowIds = f => Array.from(f.host.querySelectorAll('#trackerBody tr[data-tea
 const norm = n => n.textContent.replace(/\s+/g, ' ').trim();
 const card = (f, label) => Array.from(f.host.querySelectorAll('[data-stat-card]')).find(c => norm(c).startsWith(label));
 
-test('tracker filters use top icon tabs with an underline for the selected filter', async () => {
+test('tracker filters use the shared tab strip with the selected filter marked by aria-selected', async () => {
   const f = setup(); await f.start();
   const tracker = f.host.querySelector('[data-team-tracker="coordinator"]');
   const tabs = tracker.querySelector('[data-tracker-filters]');
   assert.equal(tracker.firstElementChild, tabs);
-  assert.deepEqual(Array.from(tabs.querySelectorAll('button')).map(button => button.dataset.filter), ['all', 'attention', 'ontrack']);
-  assert.match(tabs.querySelector('[data-filter="all"]').className, /border-blue-700/);
+  assert.equal(tabs.querySelector('[role=tablist]').getAttribute('aria-label'), 'Team tracker filters');
+  assert.deepEqual(Array.from(tabs.querySelectorAll('[role=tab]')).map(tab => tab.dataset.filter), ['all', 'attention', 'ontrack']);
+  assert.equal(tabs.querySelector('[data-filter="all"]').getAttribute('aria-selected'), 'true');
   assert(tabs.querySelector('[data-filter="attention"] svg.lucide-triangle-alert'));
   f.click(tabs.querySelector('[data-filter="attention"]'));
-  assert.match(f.host.querySelector('[data-filter="attention"]').className, /border-blue-700/);
+  assert.equal(f.host.querySelector('[data-filter="attention"]').getAttribute('aria-selected'), 'true');
+  assert.equal(f.host.querySelector('[data-filter="all"]').getAttribute('aria-selected'), 'false');
+  assert.equal(f.host.querySelector('[data-tracker-panel]').getAttribute('aria-labelledby'), 'coordinatorFilter-tab-attention');
 });
 
 test('the overview renders at once with progress-dependent values still loading', async () => {
@@ -137,7 +142,7 @@ test('a health failure marks only health unavailable and Retry reloads only heal
   assert.equal(card(f, 'Need Attention').querySelector('[data-stat-value]').textContent, 'Unavailable');
   assert.equal(card(f, 'Review 1 Completed').querySelector('[data-stat-value]').textContent, '2', 'reviews are unaffected');
   assert.equal(card(f, 'Guide Evaluation Completed').querySelector('[data-stat-value]').textContent, '1');
-  assert.match(norm(f.host.querySelector('[data-tracker-filters] [data-filter="attention"]')), /Unavailable/);
+  assert.equal(f.host.querySelector('[data-tracker-filters] [data-filter="attention"]').disabled, true);
   assert.equal(f.host.querySelectorAll('#trackerBody [data-col="health"] .lucide-triangle-alert').length, 5);
   assert.equal(rowIds(f).length, 5, 'the overview content stays');
   const before = f.calls.requests.length;
@@ -205,7 +210,7 @@ test('filters, search and reset narrow the tracker; a vanished filter falls back
   for (const [query, expected] of [['dr. c', ['T3']], ['005', ['T4']], ['t5', ['T5']], ['zzz', []]]) { box.value = query; f.fire(box, 'input'); assert.deepEqual(rowIds(f), expected, query); }
   f.click(f.host.querySelector('[data-action="reset"]'));
   assert.equal(box.value, ''); assert.equal(rowIds(f).length, 5);
-  assert.equal(f.host.querySelector('[data-filter="all"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(f.host.querySelector('[data-filter="all"]').getAttribute('aria-selected'), 'true');
 });
 
 test('sorting toggles direction, keeps empty values last and survives a refresh', async () => {
@@ -254,16 +259,16 @@ test('team actions open the drawer, email the team, or explain why they cannot',
 
 test('repository and health badges carry labelled tooltips', async () => {
   const f = setup(); await f.start();
-  const repo = f.host.querySelector('[data-team-id="T1"] td:nth-child(3) span');
+  const repo = f.host.querySelector('[data-team-id="T1"] td:nth-child(4) span');
   assert.equal(norm(repo), 'Ready'); assert.equal(repo.getAttribute('aria-label'), 'Repository URL recorded · Repository available');
-  assert.equal(f.host.querySelector('[data-team-id="T3"] td:nth-child(3) span').getAttribute('title'), 'Pending · Repository URL missing');
+  assert.equal(f.host.querySelector('[data-team-id="T3"] td:nth-child(4) span').getAttribute('title'), 'Pending · Repository URL missing');
 });
 
 test('review configuration problems and missing reviews degrade without hiding the tracker', async () => {
   const f = setup({ data: sections({ reviewsConfigured: false }) }); await f.start();
   assert.match(norm(f.host), /Review configuration unavailable/);
   assert.equal(rowIds(f).length, 5);
-  assert.equal(f.host.querySelectorAll('thead th').length, 8);
+  assert.equal(f.host.querySelectorAll('thead th').length, 9);
   assert.equal(Array.from(f.host.querySelectorAll('[data-stat-card]')).filter(c => /Review \d/.test(norm(c))).length, 0);
 });
 
@@ -277,4 +282,33 @@ test('escapes every interpolated value, emits no inline handlers and uses only c
   const { missingClasses, renderedClasses } = require('./compiled-css.cjs');
   const good = setup(); await good.start();
   assert.deepEqual(missingClasses(renderedClasses(good.host).filter(c => !c.startsWith('lucide'))), []);
+});
+
+test('publish all and one collapsed card per assessment sit between the statistics and the tracker and hand off to the publishing module', async () => {
+  const data = sections();
+  data.overview.publishing = { configured: true, items: [{ key: 'review1', title: 'Review 1' }, { key: 'guide_eval', title: 'Guide Evaluation' }] };
+  const f = setup({ data }); await f.start();
+  const all = f.host.querySelector('[data-publish-all]');
+  const order = Array.from(f.host.querySelectorAll('#coordinatorStats, [data-publishing-cards], #coordinatorTracker')).map(n => n.id || 'cards');
+  assert.deepEqual(order, ['coordinatorStats', 'cards', 'coordinatorTracker'], 'the cards sit between the statistics and the tracker');
+  assert.equal(all.parentElement.querySelectorAll(':scope > section').length, 3, 'one grid holds every card');
+  assert.deepEqual(Array.from(all.querySelectorAll('option')).map(o => o.value), ['review1', 'guide_eval']);
+  const cards = Array.from(f.host.querySelectorAll('[data-publishing]'));
+  assert.deepEqual(cards.map(c => c.getAttribute('data-publishing')), ['review1', 'guide_eval']);
+  assert.equal(cards[0].querySelector('[data-publishing-toggle]').getAttribute('aria-expanded'), 'false');
+  assert.equal(cards[0].querySelector('[data-publishing-body]').hasAttribute('hidden'), true);
+  assert(cards[0].querySelector('[data-publishing-content] [data-skeleton]'));
+  f.click(f.host.querySelector('[data-action="publishing-toggle"][data-key="review1"]'));
+  assert.equal(f.host.querySelector('[data-refresh], [data-action="publishing-refresh"]'), null, 'the dashboard refresh is the only refresh');
+  all.querySelectorAll('option')[1].selected = true;
+  f.click(all.querySelector('[data-action="publish-all"]'));
+  assert.deepEqual(JSON.parse(JSON.stringify(f.calls.publishing)), [['toggle', 'review1'], ['all', 'guide_eval', true]]);
+});
+
+test('a missing assessment configuration shows a notice instead of publishing cards', async () => {
+  const data = sections();
+  data.overview.publishing = { configured: false, items: [] };
+  const f = setup({ data }); await f.start();
+  assert.equal(f.host.querySelectorAll('[data-publishing], [data-publish-all]').length, 0);
+  assert.match(norm(f.host), /Assessment configuration needs attention/);
 });

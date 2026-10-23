@@ -137,7 +137,9 @@ function loadGuideWeeklyProgress_(timings) {
       const record = progressStudentEligibility_({regNo:student.regNo,teamId:team[columns.TEAM_ID]},eligibility,windows);
       return record.eligibleFrom && eligibleWeeklyWindows_(record.enforcedFrom,windows).some(w=>w.weekId === window.weekId);
     }).map(student=>String(student.regNo)))}));
-  return {entries,weeks,requiredByWeek,checkedAt:new Date().toISOString(),timezone:getSpreadsheet_().getSpreadsheetTimeZone()};
+  // Every week with its dates, for the weekly logs drawer (the same shape as the student's allWeeks).
+  const allWeeks = windows.map(w=>({weekId:w.weekId,opens:new Date(w.opens_at).toISOString(),deadline:new Date(w.deadline_at).toISOString()}));
+  return {entries,weeks,allWeeks,requiredByWeek,checkedAt:new Date().toISOString(),timezone:getSpreadsheet_().getSpreadsheetTimeZone()};
 }
 
 function weeklyAIEligible_(entry, windows, signedIds, now) {

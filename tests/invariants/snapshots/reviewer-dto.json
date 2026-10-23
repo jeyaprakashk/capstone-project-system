@@ -24,6 +24,16 @@
         "R1",
         "R2"
       ],
+      "students": [
+        {
+          "name": "",
+          "regNo": "R1"
+        },
+        {
+          "name": "",
+          "regNo": "R2"
+        }
+      ],
       "title": "<SCRIPT>ALERT(1)</SCRIPT> TITLE",
       "committee": "C1",
       "titleApproval": {
@@ -62,6 +72,12 @@
       "registerNumbers": [
         "R3"
       ],
+      "students": [
+        {
+          "name": "",
+          "regNo": "R3"
+        }
+      ],
       "title": "APPROVED TITLE",
       "committee": "C1",
       "titleApproval": {
@@ -98,6 +114,7 @@
       "teamId": "T3",
       "guideName": "",
       "registerNumbers": [],
+      "students": [],
       "title": "REVISION TITLE",
       "committee": "C1",
       "titleApproval": {
@@ -134,6 +151,7 @@
       "teamId": "T4",
       "guideName": "",
       "registerNumbers": [],
+      "students": [],
       "title": "",
       "committee": "C1",
       "titleApproval": {
@@ -170,6 +188,7 @@
       "teamId": "T5",
       "guideName": "Guide 5",
       "registerNumbers": [],
+      "students": [],
       "title": "SUBMITTED TITLE",
       "committee": "C1",
       "titleApproval": {

@@ -5,6 +5,12 @@ function githubId_(value) {
   return /^[1-9][0-9]*$/.test(text) ? text : '';
 }
 
+/** The account a dashboard shows for a team member: {username, displayName, profileUrl, avatarUrl}, or null when no account is stored. The avatar is GitHub's own address for the stored account ID; none is stored in the sheet. */
+function githubAccountDto_(member) {
+  const id = member && githubId_(member.githubId);
+  return id && member.username ? {username:String(member.username), displayName:String(member.displayName || ''), profileUrl:String(member.profileUrl || ''), avatarUrl:'https://avatars.githubusercontent.com/u/' + id} : null;
+}
+
 /** Headers are compared by case and outer whitespace only; the spelling stays as the sheet has it. */
 function githubBaseHeaderEquals_(actual, expected) {
   return typeof actual === 'string' && actual.trim().toLowerCase() === expected.trim().toLowerCase();

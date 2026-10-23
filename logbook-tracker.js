@@ -474,7 +474,11 @@ function loadStudentWeeklyProgress_() {
       deadline:new Date(w.deadline_at).toISOString(),cutoff:new Date(w.late_until).toISOString()};
   });
   const actions = weeks.filter(w=>w.editable);
-  const serial = records.map(r=>({...r, recordedAt:new Date(r.recordedAt).toISOString(),
+  // The AI score of an entry once its analysis exists; only the score reaches the student (no ratings, no comment). A failed read leaves the scores blank.
+  let aiScores = new Map();
+  try { aiScores = new Map(weeklyPhase2Rows_('AIProgressAnalysis').filter(row=>row.score !== '' && Number.isFinite(Number(row.score))).map(row=>[String(row.entryId),Number(row.score)])); }
+  catch(error) { Logger.log('AI scores unavailable: ' + error.message); }
+  const serial = records.map(r=>({...r, aiScore:aiScores.has(String(r.id)) ? aiScores.get(String(r.id)) : null, recordedAt:new Date(r.recordedAt).toISOString(),
     submittedAt:r.submittedAt ? new Date(r.submittedAt).toISOString() : '',
     firstSubmittedAt:r.firstSubmittedAt ? new Date(r.firstSubmittedAt).toISOString() : ''}));
   // The team's repository URL sits on the TeamStatus row already read; no separate lookup is needed.

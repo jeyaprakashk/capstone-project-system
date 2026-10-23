@@ -16,10 +16,10 @@ const VIEWS=[
 const ROLE_READS={student:'API_student_getCore',guide:'API_guide_getDashboard',reviewer:'API_reviewer_getDashboard',coord:'API_coordinator_getOverview'};
 // Every module a role's views or start-up registration use, by role.
 const ROLE_MODULES={
- student:['StudentView','StudentWeekly','StudentResults','StudentGithub','GithubAccountCard','StudentTitle'],
+ student:['StudentView','StudentWeekly','StudentResults','StudentGithub','StudentTitle'],
  guide:['GuideView','GuideWeekly','GuideEvaluation'],
  reviewer:['ReviewerView','ReviewEvaluations'],
- coord:['CoordinatorView','SystemStatusView','SystemStatusActions','TeamDrawerView','InternalAssessmentPublishing','WeeklyPhase2Setup']
+ coord:['XlsxWriter','CoordinatorView','SystemStatusView','SystemStatusActions','TeamDrawerView','InternalAssessmentPublishing','WeeklyPhase2Setup']
 };
 // Each page ships the modules of its own roles only.
 const SHIPPED=views=>views.map(view=>view.key);
@@ -81,6 +81,8 @@ for(const views of COMBINATIONS) {
   for(const [role,modules] of Object.entries(ROLE_MODULES)) for(const module of modules) {
    assert.equal(vm.runInContext('typeof '+module,complete.page),shipped.includes(role)?'object':'undefined',module+' on a '+name+' page');
   }
+  // The weekly logs drawer is shared by the student and guide pages and ships when either is present.
+  assert.equal(vm.runInContext('typeof WeeklyLogsView',complete.page),shipped.includes('student')||shipped.includes('guide')?'object':'undefined','WeeklyLogsView on a '+name+' page');
   const coordinator=views.some(view=>view.key==='coord');
   assert.equal(!!complete.document.querySelector('[data-role-tab="system-status"]'),coordinator);
   if(coordinator) {

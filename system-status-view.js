@@ -1,10 +1,10 @@
 /**
  * SYSTEM STATUS VIEW — browser module serialized into the dashboard shell as `SystemStatusView`.
  * Renders the System Status frame from the coordinator DTO (DATA-CONTRACTS.md) with Tailwind utilities.
- * Each card keeps the DOM contract its dashboard module attaches to (#studentInvitationResend, [data-publishing], #committeeConfigurationCard, #reviewConfigurationCard,
+ * Each card keeps the DOM contract its dashboard module attaches to (#studentInvitationResend, #committeeConfigurationCard, #reviewConfigurationCard,
  * #assessmentStorageSetup, #weeklyPhase2Setup ...). It never calls google.script.run.
  */
-function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions, avatars) {
+function systemStatusViewBrowser_(bridge, getUi, getActions, avatars) {
   'use strict';
   const delegated = new WeakSet();
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -24,18 +24,10 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions, avat
       '<div class="mt-3"><button type="button" class="' + PRIMARY + '" data-action="resend">Resend expired student invitations</button></div>' +
       '<p data-resend-status role="status" aria-live="polite" class="mt-2 text-sm text-ink-2"></p>' +
       '<details data-resend-log hidden class="mt-2"><summary class="cursor-pointer text-sm font-semibold">View student invitation log</summary>' +
-      '<div data-resend-results data-tooltip-boundary class="max-w-full overflow-x-auto overscroll-x-contain mt-2 rounded-tile border border-edge" role="region" aria-label="Student invitation results" tabindex="0"></div>' +
+      '<div data-resend-results class="mt-2"></div>' +
       '<nav aria-label="Pagination" class="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-muted"><span id="studentInvitationsPaginationInfo">Showing 0 - 0 of 0 students</span>' +
       '<label class="flex items-center gap-2">Rows per page <select id="studentInvitationsPageSize" data-action="resend-size" class="rounded-md border border-control px-2 py-1"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="all">All</option></select></label>' +
       '<div id="studentInvitationsPaginationButtons" class="flex items-center gap-1" aria-label="Student table pages"></div></nav></details></section>';
-  }
-  function publishingCard(item) {
-    const key = escape(item.key), title = escape(item.title);
-    return '<section class="' + CARD + '" data-publishing="' + key + '" aria-labelledby="' + key + 'PublishingHeading"><header class="flex items-center justify-between gap-3"><h3 id="' + key + 'PublishingHeading" class="text-base font-semibold text-ink">' + title + '</h3>' +
-      '<button type="button" class="publishing-toggle group ' + BUTTON + '" data-publishing-toggle aria-expanded="false" aria-controls="' + key + 'PublishingBody" aria-label="Expand ' + title + ' publishing" data-action="publishing-toggle" data-key="' + key + '">' + icon('chevron-down', '', 'group-aria-expanded:rotate-180') + '</button></header>' +
-      '<div id="' + key + 'PublishingBody" data-publishing-body hidden><div class="mt-3 flex flex-wrap items-center gap-3"><p class="text-sm text-ink-2">Publish internal assessment results using the assessment\'s existing publication rules.</p>' +
-      '<button class="' + BUTTON + '" type="button" data-refresh data-action="publishing-refresh" data-key="' + key + '">Refresh evaluations</button></div>' +
-      '<div data-notice role="status" aria-live="polite"></div><div data-publishing-content>' + skeleton('panel', 'Reading ' + item.title + ' publication status') + '</div></div></section>';
   }
   function teamFoldersCard() {
     return '<section id="teamFoldersCard" class="' + CARD + '" aria-labelledby="teamFoldersHeading" aria-busy="true"><div class="flex items-center justify-between gap-3"><div class="flex flex-wrap items-center gap-2"><h3 id="teamFoldersHeading" class="text-base font-semibold text-ink">Team folders</h3>' +
@@ -137,8 +129,7 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions, avat
   }
 
   function render(target, dto) {
-    const items = dto.publishing.configured ? dto.publishing.items.map(publishingCard).join('') : '<p role="status" class="text-sm text-warning">Assessment configuration needs attention. Use Assessment readiness below.</p>';
-    target.innerHTML = '<div data-status-cards class="flex flex-col gap-4"><div data-status-primary class="grid gap-4 lg:grid-cols-2">' + invitationsCard() + '</div>' + items + teamFoldersCard() + committeeCard() + reviewCard() + '</div>';
+    target.innerHTML = '<div data-status-cards class="flex flex-col gap-4"><div data-status-primary class="flex flex-col gap-4">' + invitationsCard() + '</div>' + teamFoldersCard() + committeeCard() + reviewCard() + '</div>';
     if (!delegated.has(target)) { delegated.add(target); target.addEventListener('click', onClick); target.addEventListener('change', onChange); }
   }
 
@@ -149,10 +140,8 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions, avat
   function onClick(event) {
     const el = event.target.closest ? event.target.closest('[data-action]') : null;
     if (!el || el.disabled) return;
-    const actions = getActions(), action = el.getAttribute('data-action'), key = el.getAttribute('data-key');
+    const actions = getActions(), action = el.getAttribute('data-action');
     if (action === 'resend') actions.runStudentInvitationResend();
-    else if (action === 'publishing-toggle') getPublishing().toggle(key);
-    else if (action === 'publishing-refresh') getPublishing().refresh(key);
     else if (action === 'team-folders-recheck') actions.recheckTeamFolders();
     else if (action === 'team-folders-create') actions.createTeamFolders();
     else if (action === 'committee-recheck') actions.recheckCommitteeConfiguration();
@@ -163,5 +152,5 @@ function systemStatusViewBrowser_(bridge, getUi, getPublishing, getActions, avat
 
   function load() { return bridge.read('system-status', 'API_coordinator_getSystemStatus', [], {timeoutMs:120000}); }
 
-  return {load, render, renderTeamFolders, committeeDirectory, publishingCard, renderIssues, renderReadiness, renderJournalResults};
+  return {load, render, renderTeamFolders, committeeDirectory, renderIssues, renderReadiness, renderJournalResults};
 }

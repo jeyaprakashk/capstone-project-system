@@ -105,6 +105,8 @@ test('guide reads show only assigned effective submissions with their own eviden
   assert.equal(data.entries[0].status,'PENDING');assert.equal(data.entries[0].score,null);
   assert.equal(data.entries[0].guideDiscussion,'Measured noise');assert.equal(data.entries[0].evidence.commits.length,1);
   assert.equal(data.entries[0].workCompleted,'Work');
+  assert(data.allWeeks.length>0);assert(data.allWeeks.every(w=>w.weekId&&!Number.isNaN(Date.parse(w.opens))&&!Number.isNaN(Date.parse(w.deadline))));
+  assert(data.allWeeks.some(w=>w.weekId===data.entries[0].weekId));
   f.user('outsider@example.com');assert.equal(f.c.loadGuideWeeklyProgress_().entries.length,0);
 });
 
@@ -284,4 +286,15 @@ test('readiness does not infer missing triggers owned by another execution accou
   assert.throws(()=>f.c.setupWeeklyProgressPhase2Triggers(),/execution owner/);
   f.c.Session.getEffectiveUser=()=>({getEmail:()=> 'coord@example.com'});f.properties.set('WEEKLY_AI_TRIGGER_OWNER','previous@example.com');
   assert.equal(f.c.getWeeklyProgressPhase2Readiness_().triggerReady,null);
+});
+
+test('the student weekly read carries the AI score of an entry once its analysis exists, and nothing else of the analysis',()=>{
+  const f=fixture(),entry=f.c.submitWeeklyProgress_(f.input());
+  let record=f.c.loadStudentWeeklyProgress_().history.find(item=>item.id===entry.entryId);
+  assert.equal(record.aiScore,null);
+  f.c.appendWeeklyPhase2_('AIProgressAnalysis',{...ratings,score:6,id:'analysis',entryId:entry.entryId,comment:'Private comment',analyzedAt:new Date('2026-01-06T00:00:00Z')});
+  const data=f.c.loadStudentWeeklyProgress_();
+  record=data.history.find(item=>item.id===entry.entryId);
+  assert.equal(record.aiScore,6);
+  assert(!JSON.stringify(data).includes('Private comment'));assert(!('analysis' in record));
 });

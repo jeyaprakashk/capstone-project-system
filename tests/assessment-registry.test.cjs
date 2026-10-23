@@ -73,14 +73,14 @@ test('Coordinator System Status stays available when registry discovery is missi
   for(const file of ['coordinator-dashboard.js','coordinator-api.js','system-status-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
   c.coordinatorRead_=(_,read)=>read();c.getColumnMap_=()=>({});c.getSheetRows_=()=>[];
   c.getRepoUrlMap_=()=>({});c.getConfig_=()=>'';
-  const dto=c.buildSystemStatusDto_();
+  const dto=c.buildSystemStatusDto_(),publishing=c.coordinatorPublishing_();
   const {document}=parseHTML('<div id="status"></div>'),target=document.getElementById('status');
-  c.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null,()=>null,{style:()=>""}).render(target,JSON.parse(JSON.stringify(dto)));
+  c.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>''}),()=>null,{style:()=>""}).render(target,JSON.parse(JSON.stringify(dto)));
   assert(target.querySelector('#reviewConfigurationCard'));
   assert(target.querySelector('#createAssessmentDefinitionsButton'));
   assert(target.querySelector('#reviewDefinitionsLink'));
   assert.equal(target.querySelector('#initializeAssessmentStorageButton').hasAttribute('disabled'),true);
-  if(state==='invalid'){assert.equal(dto.publishing.configured,false);assert.match(target.textContent,/Assessment configuration needs attention/);}
+  assert.equal(publishing.configured,state!=='invalid');
  }
 });
 

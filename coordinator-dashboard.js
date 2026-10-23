@@ -98,6 +98,7 @@ function getCoordinatorDashboardData_(deferAssessments, timings) {
       emailRecipients:[...new Set(['GUIDE_EMAIL','S1_EMAIL','S2_EMAIL','S3_EMAIL','S4_EMAIL'].map(key => String((rosterRow && rosterRow[TR[key]]) || r[TS[key]] || '').trim().toLowerCase()).filter(email => /^[^\s@,;:?&#]+@[^\s@,;:?&#]+\.[^\s@,;:?&#]+$/.test(email)))],
       title: (() => { const title = titleOf(r[TS.TEAM_ID]); return title.state ? titleSummaryFromState_(title.state).title : ''; })(),
       registerNumbers: [1,2,3,4].map(number => String(r[TS['S' + number + '_REGNO']] || '').trim()).filter(Boolean),
+      students: [1,2,3,4].map(number => ({name:String(r[TS['S' + number + '_NAME']] || '').trim(), regNo:String(r[TS['S' + number + '_REGNO']] || '').trim()})).filter(student => student.regNo),
       titleStatus: (() => { const title = titleOf(r[TS.TEAM_ID]); return title.state ? title.state.status : 'UNAVAILABLE'; })(),
       repoStatus: githubByTeam[teamId].ready ? 'ready' : 'pending',
       githubMessage: githubByTeam[teamId].message,

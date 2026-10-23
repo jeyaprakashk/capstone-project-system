@@ -313,11 +313,12 @@ function browserFixture(extended=false,key='review1') {
   c.DashboardUI.renderExpandableText=c.renderExpandableText_;
   vm.runInContext(fs.readFileSync('review-academic-policy.js','utf8'),c);vm.runInContext(fs.readFileSync('review-evaluation-client.js','utf8'),c);const LEGACY={draft:'saveReviewEvaluationDraft_',submit:'submitReviewEvaluation_',absence:'recordReviewAbsence_',makeupDraft:'saveReviewMakeupDraft_',makeupSubmit:'submitReviewMakeup_'};
   const settle=(name,args)=>{const p=new Sync();requests.push({name,args,success:v=>p.resolve(v),failure:e=>p.reject(e)});return p;};
-  const bridge={read:(readKey,method,args)=>settle('loadReviewEvaluation_',args),write:(method,args)=>settle(LEGACY[args[0]],[args[1]])};
+  const documentReads=[];let documents=[];const fixtureDocuments=()=>documents;
+  const bridge={read:(readKey,method,args)=>{if(method==='API_documents_get'){documentReads.push(args[0]);return Promise.resolve({documents:fixtureDocuments(args[0])});}return settle('loadReviewEvaluation_',args);},write:(method,args)=>settle(LEGACY[args[0]],[args[1]])};
   const api=c.reviewEvaluationBrowser_(key,bridge);
   const click=attr=>events.click({target:buttons.find(b=>b.hasAttribute(attr))});
   const data=JSON.parse(JSON.stringify(fixture().load()));
-   return {api,drawer,rail,media,teamSelect,teamSteps,listHost,tableScroll,scrolls,requests,status,footerProgress,unsaved,data,trigger,click,events,fields:()=>fields,discard:v=>discard=v,focus:()=>focusCount,absenceNodes:()=>absenceNodes,loading,context:c};
+   return {documentReads,setDocuments:v=>{documents=v;},api,drawer,rail,media,teamSelect,teamSteps,listHost,tableScroll,scrolls,requests,status,footerProgress,unsaved,data,trigger,click,events,fields:()=>fields,discard:v=>discard=v,focus:()=>focusCount,absenceNodes:()=>absenceNodes,loading,context:c};
 }
 
 // Both configured reviews must obey the same policy without sharing records or rubric content.
@@ -500,6 +501,16 @@ for(const key of ['review1','review2']) {
     marks.value='48';f.events.input();
     step(1);assert.equal(panels.team.hidden,true);assert.equal(panels.individual.hidden,false);assert.equal(first.hidden,false);
     step(-1);assert.equal(panels.team.hidden,false);assert.equal(panels.individual.hidden,true);assert.equal(marks.value,'48');assert.equal(f.requests.length,1);
+  });
+  test(key+': Next after the last team PI opens the individual criteria even before attendance is recorded',async()=>{
+    const f=browserFixture(true,key);f.api.open('T1',f.trigger);f.requests[0].success(f.data);
+    const panels=Object.fromEntries(['team','individual'].map(name=>[name,{querySelectorAll:()=>[]}])),query=f.drawer.querySelector.bind(f.drawer);
+    f.drawer.querySelector=s=>s.startsWith('[data-criteria-group="')?panels[s.match(/"([^"]+)"/)[1]]:query(s);
+    const [team]=f.fields(),next={dataset:{piStep:'1'},disabled:false,hasAttribute:a=>a==='data-pi-step',closest:s=>s==='button'?next:null};
+    team.controls['[data-level]'].value='3';team.controls['[data-marks]'].value='48';f.events.input();
+    f.events.click({target:next});await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(panels.team.hidden,true);assert.equal(panels.individual.hidden,false);
+    assert.equal(f.requests.length,1);
   });
   test(key+': rail progress counts all applicable criteria using existing grading rules',()=>{
     const f=browserFixture(true,key),label={},segments={},query=f.drawer.querySelector.bind(f.drawer);
@@ -1562,4 +1573,30 @@ test('every assessment the activity dependencies know is judged from one set of 
  assert.deepEqual(Array.from(f.c.assessmentsTeamNotEligible_('T1','Odd')),[],'an assessment the engine does not know is not judged: the list comes from the engine');
  f.c.getAssessmentDefinitions_=()=>{throw new Error('Definitions unreadable.');};
  assert.deepEqual(Array.from(f.c.assessmentsTeamNotEligible_('T1','Odd')),[],'what cannot be told says nothing');
+});
+
+test('the marking header links the team documents this Review needs, with no link for what is not approved',async()=>{
+  const f=fixture(),browser=browserFixture(true,'review1');
+  browser.setDocuments([
+    {documentId:'doc-0001',fileName:'Project Report',neededFor:[{id:'review1',label:'Review 1'}],link:'https://drive.google.com/file/d/1/view',statusText:'Approved',status:'APPROVED'},
+    {documentId:'doc-0002',fileName:'Design Document',neededFor:[{id:'review1',label:'Review 1'}],link:'',statusText:'Not submitted',status:'NOT_SUBMITTED'},
+    {documentId:'doc-0003',fileName:'Final Report',neededFor:[{id:'review2',label:'Review 2'}],link:'https://drive.google.com/file/d/3/view',statusText:'Approved',status:'APPROVED'},
+    {documentId:'doc-0004',fileName:'Unsafe',neededFor:[{id:'review1',label:'Review 1'}],link:'javascript:alert(1)',statusText:'Approved',status:'APPROVED'}]);
+  const slot={innerHTML:''},find=browser.drawer.querySelector.bind(browser.drawer);browser.drawer.querySelector=s=>s==='[data-review-documents]'?slot:find(s);
+  browser.api.open('T1',browser.trigger);browser.requests[0].success(JSON.parse(JSON.stringify(f.load())));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(browser.documentReads,['T1']);
+  assert.match(browser.drawer.innerHTML,/data-review-documents/);
+  const html=slot.innerHTML;
+  assert.match(html,/<a [^>]*href="https:\/\/drive\.google\.com\/file\/d\/1\/view"[^>]*target="_blank"[^>]*rel="noopener">Project Report<\/a>/);
+  assert.match(html,/Design Document · Not submitted/);
+  assert.doesNotMatch(html,/Final Report/,'a document for another Review is not listed');
+  assert.doesNotMatch(html,/javascript:/);
+});
+
+test('moving to another team reads that team\'s documents too, so the card is there after Next as well as from the dashboard',async()=>{
+  const f=teamNavigationFixture();
+  assert.deepEqual(f.documentReads,['T1']);
+  await f.step(1);
+  assert.deepEqual(f.documentReads,['T1','T2']);
 });

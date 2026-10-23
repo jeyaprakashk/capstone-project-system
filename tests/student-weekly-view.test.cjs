@@ -18,8 +18,8 @@ function fixture() {
  const ui={busy:require('./busy-fixture.cjs')(),ask:async()=>true,openContentDrawer(){},renderIcon:name=>'<svg data-icon="'+name+'" aria-hidden="true"></svg>',
   beginContentLoading:(target,label,options)=>{assert.equal(target,host);assert.equal(options.compact,true);starts++;target.setAttribute('aria-busy','true');let done=false;return()=>{if(!done){finishes++;done=true;target.setAttribute('aria-busy','false');}};}};
  const context=vm.createContext({document,Date,Intl,crypto:{randomUUID}});
- vm.runInContext(fs.readFileSync('student-weekly-view.js','utf8'),context);
- const api=context.studentWeeklyViewBrowser_(bridge,()=>ui);
+vm.runInContext(fs.readFileSync('weekly-logs-view.js','utf8'),context);vm.runInContext(fs.readFileSync('student-weekly-view.js','utf8'),context);
+const api=context.studentWeeklyViewBrowser_(bridge,()=>ui,context.weeklyLogsViewBrowser_(()=>ui));
  const data={ready:true,eligibleFrom:'W1',timezone:'Asia/Kolkata',summary:{expectedWeeks:1,missing:0},history:[],message:'',
   evidence:['W1','W0'].map(weekId=>({weekId,state:'available',count:1,commits:[{timestamp:'2026-01-02T12:00:00Z',message:'Project work',shortSha:'abcdef0',url:'https://github.com/org/team/commit/'+'a'.repeat(40)}]})),
   actions:[{weekId:'W1',state:'OPEN',editable:true,deadline:'2026-01-05T18:00:00Z',cutoff:'2026-01-14T23:59:59Z'}]};
@@ -369,10 +369,10 @@ test('reads and saves use the bridge endpoints with the request identity the ser
  const {document}=parseHTML('<html><body><section id="studentWeeklyProgress"><div data-weekly-read></div><p data-weekly-status></p><div data-weekly-form></div></section></body></html>');
  const calls=[];
  const context=vm.createContext({document,Date,Intl,crypto:{randomUUID}});
- vm.runInContext(fs.readFileSync('student-weekly-view.js','utf8'),context);
+ vm.runInContext(fs.readFileSync('weekly-logs-view.js','utf8'),context);vm.runInContext(fs.readFileSync('student-weekly-view.js','utf8'),context);
  const bridge={read:(key,method,args,options)=>{calls.push(['read',key,method,options]);return Promise.resolve({ready:false,weeks:[],actions:[],history:[],evidence:[],timezone:'Asia/Kolkata',message:'Not ready'});},
   write:(method,args)=>{calls.push(['write',method,args[0]]);return Promise.resolve({});}};
- const api=context.studentWeeklyViewBrowser_(bridge,()=>({busy:require('./busy-fixture.cjs')(),beginContentLoading:()=>()=>{},renderIcon:()=>'',ask:async()=>true,openContentDrawer(){}}));
+ const api=context.studentWeeklyViewBrowser_(bridge,()=>({busy:require('./busy-fixture.cjs')(),beginContentLoading:()=>()=>{},renderIcon:()=>'',ask:async()=>true,openContentDrawer(){}}),context.weeklyLogsViewBrowser_(()=>({openContentDrawer(){}})));
  api.load();await new Promise(r=>setImmediate(r));
  assert.deepEqual(calls[0].slice(0,3),['read','student-weekly','API_student_getWeekly']);
  assert.equal(calls[0][3].timeoutMs,60000);
@@ -417,4 +417,21 @@ test('an edited form shows an honest unsaved-changes marker and never claims a d
  form.dispatchEvent(new f.window.Event('input',{bubbles:true}));
  assert.equal(marker.hidden,false);assert.equal(form.weeklyDirty,true);
  assert.match(marker.textContent,/Unsaved changes/);assert(!f.host.textContent.includes('Draft saved'));
+});
+
+test('the AI score shows under a week once it is filled, and the Assessments card averages the scored weeks as a percentage',()=>{
+ const f=fixture();
+ f.document.body.insertAdjacentHTML('beforeend','<section data-ai-score-card><p data-ai-score-text>Loading…</p></section>');
+ f.data.weeks=[{weekId:'W1',state:'SUBMITTED ON TIME',editable:false,opens:'2026-01-01T00:00:00Z',deadline:'2026-01-05T00:00:00Z',cutoff:'2026-01-14T00:00:00Z'},{weekId:'W2',state:'SUBMITTED ON TIME',editable:false,opens:'2026-01-06T00:00:00Z',deadline:'2026-01-09T00:00:00Z',cutoff:'2026-01-14T00:00:00Z'},{weekId:'W3',state:'SUBMITTED ON TIME',editable:false,opens:'2026-01-10T00:00:00Z',deadline:'2026-01-12T00:00:00Z',cutoff:'2026-01-14T00:00:00Z'}];
+ f.data.actions=[];
+ const entry=(weekId,id,aiScore,entryStatus='SUBMITTED')=>({id,weekId,entryStatus,timeliness:'ON_TIME',recordedAt:'2026-01-02T00:00:00Z',firstSubmittedAt:'2026-01-02T00:00:00Z',workCompleted:'w',guideDiscussion:'g',blockers:'b',nextAction:'n',aiScore});
+ f.data.history=[entry('W1','a',3),entry('W1','b',8,'REVISED'),entry('W2','c',null),entry('W3','d',7)];
+ f.load();f.reply();
+ const rows=f.host.querySelectorAll('[data-weekly-row]');
+ const scores=Array.from(rows).map(row=>row.querySelector('[data-ai-score]')?.textContent||'');
+ assert.deepEqual(scores,['AI score: 7 / 10','','AI score: 8 / 10']);
+ assert.equal(f.document.querySelector('[data-ai-score-text]').textContent,'75% · average of 2 scored weeks');
+ f.data.history=[entry('W1','a',null)];f.load();f.reply();
+ assert.equal(f.document.querySelector('[data-ai-score-text]').textContent,'Not scored yet.');
+ assert.equal(f.host.querySelector('[data-ai-score]'),null);
 });

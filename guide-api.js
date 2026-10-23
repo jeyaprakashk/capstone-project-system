@@ -57,7 +57,7 @@ function guideGithubDto_(github, roster, repoUrl, data) {
       const member = github.members.find(item => emailsMatch_(item.email, student.email));
       const missing = !member || !member.githubId;
       const joined = !missing && member.status === 'valid' && member.access === 'active';
-      return {name:String(student.name || ''), regno:String(student.regno || ''), state:missing ? 'missing' : joined ? 'joined' : 'pending', timing:guideGithubTimingDto_(member, data.schedule, data.clock)};
+      return {name:String(student.name || ''), regno:String(student.regno || ''), state:missing ? 'missing' : joined ? 'joined' : 'pending', timing:guideGithubTimingDto_(member, data.schedule, data.clock), account:githubAccountDto_(member)};
     })
   };
 }

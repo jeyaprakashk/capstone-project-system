@@ -1,12 +1,12 @@
 /**
  * COORDINATOR VIEW — browser module serialized into the dashboard shell as `CoordinatorView`.
  * Renders the coordinator DTOs (DATA-CONTRACTS.md) with Tailwind utilities: summary cards and the
- * team tracker (search, filters, sorting, pagination). The overview renders first; then one read per
+ * team tracker (search, filters, sorting, pagination) and the publishing cards (Publish all results, one collapsed card per assessment, driven by InternalAssessmentPublishing). The overview renders first; then one read per
  * Review, the Guide Evaluation, health and weekly activity run in parallel, each settling (or failing,
  * with its own Retry) on its own.
  * It never calls google.script.run; the team drawer is rendered by TeamDrawerView.
  */
-function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
+function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer, getPublishing, table, getTabs) {
   'use strict';
   const PAGE_SIZES = [10, 25, 50, 'all'];
   const READ = {timeoutMs:120000};
@@ -21,6 +21,10 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
   const isLoading = value => /^loading/i.test(String(value || ''));
 
   const BUTTON = 'border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
+  const CARD = 'rounded-card border border-edge bg-paper p-4 shadow-card';
+  /** An opened publishing card needs the room for its team table, so it takes the whole row. */
+  const PUBLISHING_CARD = CARD + ' min-w-0 has-[[data-publishing-toggle][aria-expanded=true]]:col-span-full';
+  const PRIMARY = 'border-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
   const SMALL = 'border-0 inline-flex items-center rounded-md bg-paper px-2 py-1 text-xs font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const BADGE = 'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ';
   const TONE = {
@@ -105,7 +109,7 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
   function filteredTeams() {
     const query = state.query.trim().toLowerCase(), filter = state.filter;
     return effective().teams.filter(t => {
-      const search = [t.teamId, t.guide, ...t.registerNumbers].join(' ').toLowerCase();
+      const search = [t.teamId, t.guide, ...t.registerNumbers, ...t.students.map(student => student.name)].join(' ').toLowerCase();
       if (!search.includes(query)) return false;
       if (filter === 'attention') return t.health === 'attention';
       if (filter === 'ontrack') return t.health === 'ontrack';
@@ -163,36 +167,40 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
     const titleBadge = t.titleStatus === 'APPROVED' ? TONE.success + '">Approved' : t.titleStatus === 'NEEDS_REVIEW' ? TONE.warning + '">Review' : t.titleStatus === 'RETURNED' ? TONE.danger + '">Returned' : t.titleStatus === 'REOPENED' ? TONE.warning + '">Reopened' : t.titleStatus === 'UNAVAILABLE' ? TONE.danger + '">Unavailable' : TONE.info + '">Pending';
     const repoLabel = escape([t.repoStatus === 'ready' ? 'Repository URL recorded' : 'Pending', t.githubMessage, t.githubTiming, t.repoUrl ? 'Repository available' : ''].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' · '));
     const health = t.health === 'ontrack' ? [TONE.success, 'On track'] : t.health === 'monitor' ? [TONE.warning, 'Monitor'] : [TONE.danger, 'Needs attention'];
-    const activity = activityOf(t), cell = 'px-3 py-2 align-top text-sm';
-    return '<tr class="border-b border-edge hover:bg-canvas" data-team-id="' + escape(t.teamId) + '" data-health="' + escape(t.health) + '">' +
-      '<td class="' + cell + '"><strong>' + escape(t.teamId) + '</strong><div class="text-xs text-muted">' + (t.registerNumbers.length ? t.registerNumbers.map(escape).join(', ') : '—') + '</div></td>' +
-      '<td class="' + cell + '">' + escape(t.guide) + '</td>' +
-      '<td class="' + cell + '"><span class="' + (t.repoStatus === 'ready' ? TONE.success : TONE.danger) + '" tabindex="0" aria-label="' + repoLabel + '" title="' + repoLabel + '">' + (t.repoStatus === 'ready' ? 'Ready' : 'Pending') + '</span></td>' +
-      '<td class="' + cell + '"><span class="' + titleBadge + '</span></td>' +
-      '<td class="' + cell + '" data-col="activity"' + (activity === null ? '' : ' title="' + escape(activityLabel(state.activity)) + '"') + '>' + (activity === null ? skeleton('Loading weekly activity') : escape(activity)) + '</td>' +
-      reviewColumns.map(r => '<td class="' + cell + '" data-col="review">' + (reviewStatus(r.key) === 'failed' ? unavailableCell() : completion(t.reviews[r.key])) + '</td>').join('') +
-      '<td class="' + cell + '" data-col="guide-evaluation">' + (guideStatus() === 'failed' ? unavailableCell() : completion(t.guideEvaluation)) + '</td>' +
-      '<td class="' + cell + '" data-col="health">' + (unavailableHealth ? unavailableCell() : loadingRow ? skeleton('Loading health') : '<span class="' + health[0] + '" tabindex="0" aria-label="' + health[1] + '" title="' + health[1] + '">' + health[1] + '</span>') + '</td>' +
-      '<td class="' + cell + '">' + teamActions(t) + '</td></tr>';
+    const activity = activityOf(t);
+    return table.row([
+      ...table.teamCells({teamId:t.teamId, students:t.students, guide:t.guide}),
+      table.td('<span class="' + (t.repoStatus === 'ready' ? TONE.success : TONE.danger) + '" tabindex="0" aria-label="' + repoLabel + '" title="' + repoLabel + '">' + (t.repoStatus === 'ready' ? 'Ready' : 'Pending') + '</span>'),
+      table.td('<span class="' + titleBadge + '</span>'),
+      table.td(activity === null ? skeleton('Loading weekly activity') : escape(activity), {'data-col':'activity', title:activity === null ? null : activityLabel(state.activity)}),
+      ...reviewColumns.map(r => table.td(reviewStatus(r.key) === 'failed' ? unavailableCell() : completion(t.reviews[r.key]), {'data-col':'review'})),
+      table.td(guideStatus() === 'failed' ? unavailableCell() : completion(t.guideEvaluation), {'data-col':'guide-evaluation'}),
+      table.td(unavailableHealth ? unavailableCell() : loadingRow ? skeleton('Loading health') : '<span class="' + health[0] + '" tabindex="0" aria-label="' + health[1] + '" title="' + health[1] + '">' + health[1] + '</span>', {'data-col':'health'}),
+      table.td(teamActions(t))
+    ], {'data-team-id':t.teamId, 'data-health':t.health});
   }
+  /** The All / Attention / On Track filters as the shared tab strip; a count shows once health has arrived. */
   function filterButtons() {
-    const dto = effective(), teams = dto.teams, anyLoading = dto.healthStatus !== 'ready', failed = dto.healthStatus === 'failed';
-    const count = (predicate, label) => anyLoading ? (failed ? 'Unavailable' : skeleton('Loading ' + label)) : teams.filter(predicate).length;
-    const tab = (filter, label, value, symbol, disabled) => '<button type="button" class="inline-flex min-h-11 shrink-0 items-center gap-3 border-b-2 px-5 text-sm font-semibold ' + (state.filter === filter ? 'border-blue-700 text-blue-700' : 'border-transparent text-gray-900 hover:text-blue-700') + ' disabled:opacity-50" data-action="filter" data-filter="' + filter + '" aria-pressed="' + (state.filter === filter) + '"' + (disabled ? ' disabled' : '') + '>' + icon(symbol) + '<span>' + label + '</span><span class="rounded-md border border-orange-200 bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">' + value + '</span></button>';
-    return tab('all', 'All', teams.length, 'users', false) + tab('attention', 'Attention', count(t => t.health === 'attention', 'attention count'), 'triangle-alert', anyLoading) + tab('ontrack', 'On Track', count(t => t.health === 'ontrack', 'on-track count'), 'check', anyLoading);
+    const dto = effective(), teams = dto.teams, anyLoading = dto.healthStatus !== 'ready';
+    const tab = (filter, label, count, symbol, disabled) => ({key:filter, icon:symbol, label, count, countLabel:label + ' teams', selected:state.filter === filter,
+      attrs:{'data-action':'filter', 'data-filter':filter, ...(disabled ? {disabled:'disabled'} : {})}});
+    return getTabs().markup({id:'coordinatorFilter', label:'Team tracker filters', activation:'auto', tabs:[
+      tab('all', 'All', teams.length, 'users', false),
+      tab('attention', 'Attention', anyLoading ? 0 : teams.filter(t => t.health === 'attention').length, 'triangle-alert', anyLoading),
+      tab('ontrack', 'On Track', anyLoading ? 0 : teams.filter(t => t.health === 'ontrack').length, 'check', anyLoading)]});
   }
   function headMarkup(reviewColumns) {
     const sort = persistent.sort;
     const th = (label, type, column, title) => {
       const selected = sort.column === column, direction = selected ? sort.direction : 'none';
-      const attr = (type ? ' data-sort-type="' + type + '" aria-sort="' + direction + '"' : '') + (title ? ' title="' + escape(title) + '"' : '');
-      return '<th class="px-3 py-2 text-left text-xs font-semibold text-muted" scope="col"' + attr + '>' + (type
+      const attrs = {...(type ? {'data-sort-type':type, 'aria-sort':direction} : {}), title:title || null};
+      return table.th(type
         ? '<button type="button" class="' + SMALL + '" data-action="sort" data-column="' + column + '" data-type="' + type + '" data-sort-direction="' + direction + '" aria-label="Sort by ' + escape(label) + (selected && sort.direction === 'ascending' ? ' descending' : ' ascending') + '">' + escape(label) + '</button>'
-        : escape(label)) + '</th>';
+        : escape(label), attrs);
     };
     let i = 0;
-    return '<tr>' + th('Team', 'text', i++) + th('Guide', 'text', i++) + th('Repo', 'text', i++) + th('Title', 'text', i++) + th('Weekly Activity', 'pair', i++, 'Sort by logs, then commit records') +
-      reviewColumns.map(r => th(r.label.replace(/^Review\s+(\d+)$/i, 'R$1'), 'text', i++, r.label)).join('') + th('Guide Eval', 'text', i++) + th('Health', 'text', i++) + th('Actions', null, i++) + '</tr>';
+    return table.headRow([th('Team', 'text', i++), th('Students'), th('Guide', 'text', i++), th('Repo', 'text', i++), th('Title', 'text', i++), th('Weekly Activity', 'pair', i++, 'Sort by logs, then commit records'),
+      ...reviewColumns.map(r => th(r.label.replace(/^Review\s+(\d+)$/i, 'R$1'), 'text', i++, r.label)), th('Guide Eval', 'text', i++), th('Health', 'text', i++), th('Actions', null, i++)]);
   }
   function paginationMarkup(total, bounds) {
     const start = total ? bounds.start + 1 : 0;
@@ -213,16 +221,40 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
     const bounds = {pages, start:(state.page - 1) * size, end:Math.min(state.page * size, found.length)};
     q('[data-tracker-heading]').textContent = 'Team Tracker (' + dto.teams.length + ' teams)';
     q('[data-tracker-filters]').innerHTML = filterButtons();
+    q('[data-tracker-panel]').setAttribute('aria-labelledby', 'coordinatorFilter-tab-' + state.filter);
     q('#trackerBody').parentElement.querySelector('thead').innerHTML = headMarkup(dto.reviewColumns);
     q('#trackerBody').innerHTML = found.slice(bounds.start, bounds.end).map(t => rowMarkup(t, dto.reviewColumns)).join('') +
-      (found.length ? '' : '<tr><td class="px-3 py-6 text-sm text-muted" colspan="' + (8 + dto.reviewColumns.length) + '">' + (dto.teams.length ? 'No teams match your search.' : 'No teams are registered.') + '</td></tr>');
+      (found.length ? '' : table.emptyRow(9 + dto.reviewColumns.length, dto.teams.length ? 'No teams match your search.' : 'No teams are registered.'));
     q('[data-tracker-pagination]').innerHTML = paginationMarkup(found.length, bounds);
   }
   function trackerMarkup() {
-    return '<div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" data-team-tracker="coordinator"><div class="flex overflow-x-auto border-b border-gray-200" data-tracker-filters aria-label="Team tracker filters"></div><div class="p-4"><h3 class="text-base font-semibold text-gray-900" data-tracker-heading></h3>' +
+    return '<div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" data-team-tracker="coordinator"><div data-tracker-filters></div><div class="p-4" data-tracker-panel ' + getTabs().panelAttributes('coordinatorFilter', state.filter) + '><h3 class="text-base font-semibold text-gray-900" data-tracker-heading></h3>' +
       '<div class="mt-2"><button class="' + BUTTON + '" type="button" id="weeklyActivityRetry" data-action="activity-retry" hidden>Retry activity</button><p id="weeklyActivityStatus" class="text-xs text-muted" role="status" aria-live="polite"></p></div>' +
       '<div class="mt-3 flex flex-wrap gap-2"><input type="text" id="trackerSearch" class="w-full max-w-md rounded-md border border-control px-3 py-2 text-sm" aria-label="Search teams by team ID, register number, or guide" placeholder="Search team, register number, or guide…" data-action="search"><button class="' + BUTTON + '" type="button" data-action="reset">Reset</button></div>' +
-      '<div class="max-w-full overflow-x-auto overscroll-x-contain mt-3 rounded-card border border-edge" data-tooltip-boundary role="region" aria-label="Team tracker table, scroll horizontally for more columns" tabindex="0"><table class="w-full border-collapse text-sm"><thead class="bg-soft"></thead><tbody id="trackerBody"></tbody></table></div><div data-tracker-pagination></div></div></div>';
+      '<div class="mt-3">' + table.table({label:'Team tracker table', body:table.tbody('', {id:'trackerBody'})}) + '</div><div data-tracker-pagination></div></div></div>';
+  }
+
+  // ---- publishing cards ----
+  function publishingCard(item) {
+    const key = escape(item.key), title = escape(item.title);
+    return '<section class="' + PUBLISHING_CARD + '" data-publishing="' + key + '" aria-labelledby="' + key + 'PublishingHeading"><header class="flex items-center justify-between gap-3"><h3 id="' + key + 'PublishingHeading" class="text-base font-semibold text-ink">' + title + '</h3>' +
+      '<button type="button" class="publishing-toggle group ' + BUTTON + '" data-publishing-toggle aria-expanded="false" aria-controls="' + key + 'PublishingBody" aria-label="Expand ' + title + ' publishing" data-action="publishing-toggle" data-key="' + key + '">' + getUi().renderIcon('chevron-down', '', 'group-aria-expanded:rotate-180') + '</button></header>' +
+      '<div id="' + key + 'PublishingBody" data-publishing-body hidden><p class="mt-3 text-sm text-ink-2">Publish internal assessment results using the assessment\'s existing publication rules.</p>' +
+      '<div data-notice role="status" aria-live="polite"></div><div data-publishing-content>' + getUi().renderSkeleton('panel', 'Reading ' + item.title + ' publication status') + '</div></div></section>';
+  }
+  /** One select and one button: publishes every publishable team of the chosen assessment. */
+  function publishAllCard(items) {
+    return '<section class="' + CARD + ' min-w-0" data-publish-all aria-labelledby="publishAllHeading"><h3 id="publishAllHeading" class="text-base font-semibold text-ink">Publish all results</h3>' +
+      '<p class="mt-2 text-sm text-ink-2">Publish the results of every team that is ready for the selected assessment, using its existing publication rules, or download its published results as an Excel sheet.</p>' +
+      '<div class="mt-3 flex flex-wrap items-end gap-3"><label class="flex flex-col gap-1 text-sm font-semibold">Assessment<select class="rounded-md border border-control px-3 py-1.5 text-sm font-normal" data-publish-all-select>' +
+      items.map(item => '<option value="' + escape(item.key) + '">' + escape(item.title) + '</option>').join('') + '</select></label>' +
+      '<button type="button" class="' + PRIMARY + '" data-action="publish-all">Publish all</button>' +
+      '<button type="button" class="' + BUTTON + '" data-action="download-results">Download results</button></div>' +
+      '<div data-publish-all-status role="status" aria-live="polite"></div></section>';
+  }
+  function publishingMarkup(publishing) {
+    if (!publishing.configured) return '<p role="status" class="text-sm text-warning">Assessment configuration needs attention. Use Assessment readiness in System Status.</p>';
+    return publishing.items.length ? '<div data-publishing-cards class="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">' + publishAllCard(publishing.items) + publishing.items.map(publishingCard).join('') + '</div>' : '';
   }
 
   // ---- frame ----
@@ -283,9 +315,10 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
     host = target;
     const wasPending = pending && pending.gen === generation ? pending : null;
     Object.assign(state, {overview, reviews:{}, reviewErrors:{}, guide:null, guideError:null, health:null, healthError:null, activity:null, filter:'all', query:'', page:1});
-    host.innerHTML = headerMarkup() + '<div id="coordinatorAsyncRoot" class="mt-4 flex flex-col gap-4"><div id="coordinatorOverviewStatus" role="status"></div>' +
+    host.innerHTML = headerMarkup() + '<div id="coordinatorAsyncRoot" class="mt-4 flex flex-col gap-4 max-md:pb-16"><div id="coordinatorOverviewStatus" role="status"></div>' +
       (overview.reviewConfigurationError ? '<p role="status" class="text-sm text-warning">Review configuration unavailable. Check System Status.</p>' : '') +
-      '<div id="coordinatorStats"></div><div id="coordinatorProgressStatus" role="status"></div><div id="coordinatorTracker">' + trackerMarkup() + '</div></div>' + drawerMarkup();
+      '<div id="coordinatorStats"></div>' + publishingMarkup(overview.publishing) + '<div id="coordinatorProgressStatus" role="status"></div><div id="coordinatorTracker">' + trackerMarkup() + '</div></div>' + drawerMarkup();
+    getTabs().bind(host);
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('input', onInput); host.addEventListener('change', onChange); }
     renderStats(); updateTracker();
     const gen = generation;
@@ -366,6 +399,11 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
     else if (action === 'close-drawer') ui.closeDrawer('teamDrawer');
     else if (action === 'progress-retry') retryProgress();
     else if (action === 'activity-retry') retryActivity();
+    else if (action === 'publishing-toggle') getPublishing().toggle(target.getAttribute('data-key'));
+    else if (action === 'publish-all' || action === 'download-results') {
+      const card = target.closest('[data-publish-all]'), key = card.querySelector('[data-publish-all-select]').value;
+      if (action === 'publish-all') getPublishing().publishAll(key, card); else getPublishing().downloadResults(key, card);
+    }
   }
 
   // Team drawer: DashboardUI owns the drawer frame (focus, Escape, scrim); TeamDrawerView fills its sections.
@@ -383,5 +421,5 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer) {
     getTeamDrawer().mount(content, teamId, () => drawer.dataset.open === 'true');
   }
 
-  return {load, render, openTeam, state, persistent};
+  return {load, render, openTeam, publishingCard, state, persistent};
 }

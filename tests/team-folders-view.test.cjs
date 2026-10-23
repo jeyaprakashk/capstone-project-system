@@ -7,7 +7,7 @@ const { loadSources } = require('./invariants/golden.cjs');
 
 const FOLDERS = { configured: true, baseFolder: { name: 'Capstone <Files>', url: 'https://drive.example/base' }, teamDocuments: { exists: true, url: 'https://drive.example/docs' },
   total: 4, existing: 1, missing: ['T2', 'T3'], duplicates: ['T1'], collisions: ['A-1', 'A/1'], issues: ['Check this'], canCreate: true };
-const STATUS_DTO = { publishing: { configured: true, items: [] } };
+const STATUS_DTO = {};
 
 function setup() {
   const { document, window } = parseHTML('<html><body><div id="systemStatusContent"></div></body></html>');
@@ -18,7 +18,7 @@ function setup() {
   const ui = { busy:require('./busy-fixture.cjs')(), renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton>' + l + '</span>' };
   const actions = { recheckTeamFolders: record('recheck'), createTeamFolders: record('create') };
   vm.runInContext('globalThis.__view = ' + c.systemStatusViewBrowser_.toString(), c);
-  const view = c.__view(bridge, () => ui, () => null, () => actions, {style:()=>""});
+  const view = c.__view(bridge, () => ui, () => actions, {style:()=>""});
   const host = document.getElementById('systemStatusContent');
   view.render(host, STATUS_DTO);
   c.SystemStatusView = view;

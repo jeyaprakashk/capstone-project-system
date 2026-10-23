@@ -129,7 +129,7 @@ function fixture(system=false,shipped=false) {
  for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js']) vm.runInContext(fs.readFileSync(file,'utf8'),c);
  vm.runInContext(fs.readFileSync('common-styles.js','utf8'),c); vm.runInContext(fs.readFileSync('busy-state.js','utf8'),c);
  vm.runInContext(fs.readFileSync('dashboard-client-scripts.js','utf8'),c);
- for(const file of ['data-bridge-client.js','title-requests.js','documents-view.js','reviewer-view.js','guide-view.js','student-view.js','student-title.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','avatar-color.js','shared-tabs.js','system-status-actions.js','student-github-actions.js','github-account-card.js','system-status-view.js','student-weekly-view.js','student-results-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','avatar-color.js','shared-tabs.js','system-status-actions.js','student-github-actions.js','github-account-card.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=SystemStatusView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript_(),c);vm.runInContext(c.getDashboardStartScript_(),c);
+ for(const file of ['data-bridge-client.js','weekly-logs-view.js','title-requests.js','documents-view.js','reviewer-view.js','guide-view.js','student-view.js','student-title.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','avatar-color.js','shared-tabs.js','shared-table.js','xlsx-writer.js','system-status-actions.js','student-github-actions.js','github-account-card.js','system-status-view.js','student-weekly-view.js','student-results-view.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','avatar-color.js','shared-tabs.js','shared-table.js','xlsx-writer.js','system-status-actions.js','student-github-actions.js','github-account-card.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);vm.runInContext(c.getMigratedViewsClientScript_(),c);vm.runInContext('ReviewerView.render=GuideView.render=StudentView.render=CoordinatorView.render=SystemStatusView.render=(host,dto)=>{host.innerHTML=dto.html;}',c);vm.runInContext(c.getDashboardClientScript_(),c);vm.runInContext(c.getDashboardStartScript_(),c);
  // Preloading ships disabled; the queue tests opt in so the machinery stays covered.
  if(!shipped)c.window.DashboardPerformance.preloading=true;
  return {c,requests,early,systemContent,systemMessage,fire:(name,event)=>listeners[name].forEach(fn=>fn(event)),click:key=>vm.runInContext('DashboardUI',c).showRoleTab(key),tick:()=>{ /* bridge read timeouts (30s+) are not part of idle/preload timing */ const entries=[...timers.entries()].filter(([,fn])=>!(fn.delay>=10000));entries.forEach(([key])=>timers.delete(key));entries.forEach(([,fn])=>fn());},done:(key,html='ok')=>{const req=requests.find(r=>r.key===key&&!r.done);assert(req,key);req.done=true;req.success(html);},settle:()=>new Promise(r=>setImmediate(r))};
@@ -436,10 +436,9 @@ test('utilities and role queue resume after visibility and preload setting chang
 
 test('System Status follow-up reads do not block roles or reset their idle timer',async()=>{
  const f=fixture(true);const ui=vm.runInContext('DashboardUI',f.c);
- f.systemContent.querySelectorAll=selector=>selector==='[data-publishing]'?[{dataset:{publishing:'review1'}}]:[];
- f.c.InternalAssessmentPublishing={refresh:()=>ui.run().withSuccessHandler(()=>{
+ vm.runInContext('SystemStatusActions',f.c).recheckAll=()=>ui.run().withSuccessHandler(()=>{
   ui.run().withSuccessHandler(()=>{}).utilityFollowup();
- }).publishingRead()};
+ }).publishingRead();
  f.click('guide');ui.initializeLoading();
  f.done('loadCoordinatorSystemStatus');f.done('loadDashboardRoleContent');await f.settle();
  f.done('publishingRead');f.tick();assert.equal(f.requests.at(-1).args[0],'reviewer');
@@ -674,7 +673,7 @@ test('readiness cards render server rubric and overall states and preserve both 
 function configurationCardsFixture(){
  const f=fixture(),{document}=require('linkedom').parseHTML('<html><body></body></html>');
  const viewContext=vm.createContext({});vm.runInContext(fs.readFileSync('system-status-view.js','utf8'),viewContext);
- viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>'<span>Skeleton</span>'}),()=>null,()=>null,{style:()=>""}).render(document.body,{publishing:{configured:false,items:[]}});
+ viewContext.systemStatusViewBrowser_(null,()=>({renderIcon:()=>'',renderSkeleton:()=>'<span>Skeleton</span>'}),()=>null,{style:()=>""}).render(document.body,{publishing:{configured:false,items:[]}});
  const original=f.c.document.getElementById;f.c.document.getElementById=id=>document.getElementById(id)||original(id);f.c.document.createElement=tag=>document.createElement(tag);
  return {...f,document,ui:vm.runInContext('DashboardUI',f.c),actions:vm.runInContext('SystemStatusActions',f.c),node:id=>document.getElementById(id)};
 }

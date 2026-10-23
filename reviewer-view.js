@@ -1,5 +1,5 @@
 /** Reviewer dashboard view. The DTO and review actions remain authoritative. */
-function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
+function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests, table) {
   'use strict';
   const delegated = new WeakSet();
   const PAGE_SIZES = [10, 25, 50, 'all'];
@@ -11,9 +11,7 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
   const BUTTON = 'inline-flex min-h-10 items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50';
   const SECONDARY = 'inline-flex min-h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50 disabled:opacity-50';
   const FIELD = 'min-w-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900';
-  const PILL = 'inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700';
   const TAG = 'inline-flex rounded bg-gray-100 px-2 py-1 text-xs text-gray-700';
-  const tone = {success:'bg-green-100 text-green-800', warning:'bg-amber-100 text-amber-800', neutral:'bg-gray-100 text-gray-700'};
 
   function stages() { return [{key:'title', label:'Title approval'}, ...state.dto.reviews.map(r => ({key:r.key, label:r.label}))]; }
   function review(team, key) { return team.reviews.find(r => r.key === key); }
@@ -29,15 +27,21 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
     if (!cell.enabled && team.titleApproval.status.label !== 'Approved') return 'Waiting for title';
     return cell.note && cell.note !== cell.actionLabel ? cell.note : '—';
   }
+  /** The standard badge tone of a team's status: the title uses the tone the server gave it; a review is read from its status text. */
+  function statusTone(team, key) {
+    if (key === 'title') return team.titleApproval.status.tone;
+    const text = displayStatus(team, key);
+    return /^(submitted|published|completed)$/i.test(text) ? 'success' : /^(draft|\d+\/\d+ students marked)$/i.test(text) ? 'warning' : /not eligible/i.test(text) ? 'warning' : /unavailable|error/i.test(text) ? 'danger' : 'neutral';
+  }
   function pending(team, key) { return key === 'title' ? team.titleApproval.canDecide : open(team, review(team, key)) && !['View marks', 'Edit marks'].includes(review(team, key).actionLabel); }
   function count(key) { return state.dto.teams.filter(team => pending(team, key)).length; }
+  /** A team is in a status chip when its status matches; "Enter marks" holds only the teams whose marks can be entered now. */
+  function inStatus(team, key, label) { return stageStatus(team, key) === label && (key === 'title' || label !== 'Enter marks' || open(team, review(team, key))); }
   function filters() { return ['All', ...new Set(state.dto.teams.map(team => stageStatus(team, state.stage)))]; }
-  function searchText(team) { return [team.teamId, team.guideName, ...team.registerNumbers, team.title, team.committee, team.titleApproval.status.label].join(' ').toLowerCase(); }
-  function matches() { const query = state.query.trim().toLowerCase(); return state.dto.teams.filter(team => searchText(team).includes(query) && (!state.guide || team.guideName === state.guide) && (state.status === 'All' || stageStatus(team, state.stage) === state.status)); }
+  function searchText(team) { return [team.teamId, team.guideName, ...team.registerNumbers, ...team.students.map(student => student.name), team.title, team.committee, team.titleApproval.status.label].join(' ').toLowerCase(); }
+  function matches() { const query = state.query.trim().toLowerCase(); return state.dto.teams.filter(team => searchText(team).includes(query) && (!state.guide || team.guideName === state.guide) && (state.status === 'All' || inStatus(team, state.stage, state.status))); }
   function pageBounds(total) { const size = state.size === 'all' ? Math.max(1,total) : state.size; const pages = Math.max(1,Math.ceil(total/size)); state.page = Math.min(Math.max(1,state.page),pages); return {size,pages,start:(state.page-1)*size,end:Math.min(state.page*size,total)}; }
   function folderMarkup(url) { return url ? '<div class="mt-4 text-sm"><a class="text-blue-600 underline" href="' + escape(safeUrl(url)) + '" target="_blank" rel="noopener">Open team folder</a></div>' : ''; }
-  function stageChips(team) { return stages().map(s => '<span class="' + TAG + '">' + escape(s.key === 'title' ? 'Title' : s.label) + ': ' + escape(displayStatus(team,s.key)) + '</span>').join(''); }
-  function registerTags(team) { return team.registerNumbers.length ? team.registerNumbers.map(r => '<span class="' + TAG + '">' + escape(r) + '</span>').join('') : '<span class="text-gray-500">—</span>'; }
   function actionMarkup(team, full) {
     const id = escape(team.teamId);
     if (state.stage === 'title') return '<button type="button" class="' + (full ? 'w-full ' : '') + SECONDARY + '" data-action="open-title" data-team="' + id + '">' + (team.titleApproval.canDecide ? 'Review title' : 'View') + '</button>';
@@ -45,17 +49,16 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
     if (!cell || !cell.enabled && team.titleApproval.status.label !== 'Approved') return '';
     return '<button type="button" class="' + (full ? 'w-full ' : '') + SECONDARY + '" data-action="marks" data-team="' + id + '" data-review="' + escape(state.stage) + '"' + (open(team, cell) ? '' : ' disabled') + '>' + escape(cell.actionLabel) + '</button>';
   }
-  function teamRow(team, next) {
-    const id = escape(team.teamId), status = displayStatus(team,state.stage), highlight = next === team.teamId ? 'bg-blue-50' : '';
-    const statusPill = '<span class="' + PILL + ' ' + (state.stage === 'title' ? tone[team.titleApproval.status.tone] || tone.neutral : '') + '">' + escape(status) + '</span>';
-    const registers = '<div class="flex flex-wrap gap-1">' + registerTags(team) + '</div>';
-    const row = '<tr class="border-b border-gray-200 ' + highlight + '" data-team-id="' + id + '">' +
-      '<td class="w-20 px-4 py-4 align-top"><div class="flex items-center gap-2"><strong class="text-sm text-gray-900">' + id + '</strong>' + spinner(team) + '</div></td>' +
-      '<td class="w-64 px-4 py-4 align-top"><div class="text-xs text-gray-500">Committee ' + escape(team.committee || '—') + '</div><div class="mt-1 text-sm text-gray-700">' + escape(team.guideName || '—') + '</div><div class="mt-2">' + registers + '</div><div class="mt-2 flex flex-wrap gap-1">' + stageChips(team) + '</div></td>' +
-      '<td class="px-4 py-4 align-top font-medium text-gray-900 break-words">' + escape(team.title || 'Not submitted') + '</td>' +
-      '<td class="w-40 px-4 py-4 align-top">' + statusPill + '</td>' +
-      '<td class="w-32 px-4 py-4 align-top">' + actionMarkup(team,false) + '</td></tr>';
-    const card = '<div class="border-b border-gray-200 p-4 ' + highlight + '" data-team-card="' + id + '"><div class="flex items-start justify-between gap-2"><div><div class="flex items-center gap-2"><strong class="text-sm text-gray-900">' + id + '</strong>' + spinner(team) + '</div><div class="text-xs text-gray-500">Committee ' + escape(team.committee || '—') + '</div></div>' + statusPill + '</div><p class="mt-3 font-medium text-gray-900 break-words">' + escape(team.title || 'Not submitted') + '</p><p class="mt-1 text-sm text-gray-500">' + escape(team.guideName || '—') + '</p><div class="mt-2">' + registers + '</div><div class="mt-3 flex flex-wrap gap-1">' + stageChips(team) + '</div><div class="mt-3">' + actionMarkup(team,true) + '</div></div>';
+  function teamRow(team) {
+    const id = escape(team.teamId), status = displayStatus(team,state.stage);
+    const statusPill = table.badge(statusTone(team, state.stage), escape(status));
+    const row = table.row([
+      ...table.teamCells({teamId:team.teamId, students:team.students, guide:team.guideName}, {after:spinner(team)}),
+      table.td('<span class="break-words font-medium">' + escape(team.title || 'Not submitted') + '</span>'),
+      table.td(statusPill),
+      table.td(actionMarkup(team,false))
+    ], {'data-team-id':team.teamId});
+    const card = '<div class="border-b border-gray-200 p-4" data-team-card="' + id + '"><div class="flex items-start justify-between gap-2"><div><div class="flex items-center gap-2"><strong class="text-sm text-gray-900">' + id + '</strong>' + spinner(team) + '</div><div class="text-xs text-gray-500">Committee ' + escape(team.committee || '—') + '</div></div>' + statusPill + '</div><p class="mt-3 font-medium text-gray-900 break-words">' + escape(team.title || 'Not submitted') + '</p><div class="mt-1 text-sm">' + table.studentList(team.students) + '</div><p class="mt-2 text-sm text-gray-500">' + escape(team.guideName || '—') + '</p><div class="mt-3">' + actionMarkup(team,true) + '</div></div>';
     return {row,card};
   }
   function paginationMarkup(total,bounds) {
@@ -63,7 +66,7 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
     let first = Math.max(1,state.page-2); const last = Math.min(bounds.pages,first+4); first = Math.max(1,last-4);
     const button = (label,page,disabled,active) => '<button type="button" class="rounded-md border border-gray-300 px-2 py-1 text-sm ' + (active ? 'bg-blue-600 text-white' : 'bg-white text-gray-900') + ' disabled:opacity-50" data-action="page" data-page="' + page + '"' + (disabled ? ' disabled' : '') + (active ? ' aria-current="page"' : '') + '>' + label + '</button>';
     const numbers=[]; for(let p=first;p<=last;p++) numbers.push(button(String(p),p,false,p===state.page));
-    return '<nav aria-label="Pagination" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 p-4 text-sm text-gray-500"><span id="reviewerAssignedPaginationInfo">Showing ' + start + ' - ' + bounds.end + ' of ' + total + ' teams</span><label class="flex items-center gap-2">Rows per page <select id="reviewerAssignedPageSize" data-action="size" class="' + FIELD + '">' + PAGE_SIZES.map(s => '<option value="' + s + '"' + (String(s)===String(state.size)?' selected':'') + '>' + (s==='all'?'All':s) + '</option>').join('') + '</select></label><div class="flex items-center gap-1">' + button('Previous',state.page-1,state.page===1,false) + numbers.join('') + button('Next',state.page+1,state.page===bounds.pages,false) + '</div></nav>';
+    return '<nav aria-label="Pagination" class="mt-3 flex flex-wrap items-center justify-between gap-3 px-4 pb-4 text-sm text-gray-500"><span id="reviewerAssignedPaginationInfo">Showing ' + start + ' - ' + bounds.end + ' of ' + total + ' teams</span><label class="flex items-center gap-2">Rows per page <select id="reviewerAssignedPageSize" data-action="size" class="' + FIELD + '">' + PAGE_SIZES.map(s => '<option value="' + s + '"' + (String(s)===String(state.size)?' selected':'') + '>' + (s==='all'?'All':s) + '</option>').join('') + '</select></label><div class="flex items-center gap-1">' + button('Previous',state.page-1,state.page===1,false) + numbers.join('') + button('Next',state.page+1,state.page===bounds.pages,false) + '</div></nav>';
   }
   function tabsMarkup() {
     return getTabs().markup({id:'reviewerStage', label:'Reviewer stages', activation:'auto', tabs:stages().map(s => ({
@@ -81,23 +84,22 @@ function reviewerViewBrowser_(bridge, getUi, getMarking, getTabs, getRequests) {
     };
     const chips=filters().map(label=>{
       const active=state.status===label;
-      const amount=label==='All'?state.dto.teams.length:state.dto.teams.filter(t=>stageStatus(t,state.stage)===label).length;
+      const amount=label==='All'?state.dto.teams.length:state.dto.teams.filter(t=>inStatus(t,state.stage,label)).length;
       return '<button type="button" aria-pressed="' + active + '" class="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium ' + (active?'border-blue-700 bg-blue-700 text-white':'border-gray-300 bg-white text-gray-900 hover:border-blue-400 hover:bg-blue-50') + '" data-action="filter" data-status="' + escape(label) + '">' + (label==='All'?'':'<span class="size-2 shrink-0 rounded-full ' + dotTone(label) + '"></span>') + '<span>' + escape(label) + '</span><span class="' + (active?'text-blue-100':'text-gray-500') + '">' + amount + '</span></button>';
     }).join('');
     return '<div class="space-y-4 p-4"><div class="flex min-w-0 items-center gap-2"><input type="search" id="reviewerAssignedSearch" aria-label="Search assigned teams" placeholder="Search teams" value="' + escape(state.query) + '" class="' + FIELD + ' w-full flex-1" data-action="search"><select aria-label="Filter by guide" class="' + FIELD + ' w-32 shrink-0 sm:w-48" data-action="guide"><option value="">All guides</option>' + guides.map(g=>'<option value="' + escape(g) + '"' + (g===state.guide?' selected':'') + '>' + escape(g) + '</option>').join('') + '</select><span class="hidden shrink-0 text-sm text-gray-500 lg:inline">Showing ' + found.length + ' of ' + state.dto.teams.length + '</span></div><div class="flex gap-2 overflow-x-auto whitespace-nowrap" aria-label="Status filters">' + chips + '</div></div>';
   }
   function listMarkup() {
     const found=matches(), bounds=pageBounds(found.length), shown=found.slice(bounds.start,bounds.end);
-    const next=found.find(t=>pending(t,state.stage))?.teamId;
     const empty='<div class="px-4 py-12 text-center text-sm text-gray-500">' + (state.dto.teams.length?'No teams match your filters.':'No teams are assigned to you.') + '</div>';
-    const rows=shown.map(t=>teamRow(t,next));
-    return toolbarMarkup(found) + '<div data-reviewer-list><div class="hidden md:block"><table class="w-full table-auto border-t border-gray-200 text-left text-sm"><thead class="bg-gray-50 text-xs uppercase text-gray-500"><tr><th class="w-20 px-4 py-3">ID</th><th class="w-64 px-4 py-3">Team</th><th class="px-4 py-3">Title</th><th class="w-40 px-4 py-3">Status</th><th class="w-32 px-4 py-3">Action</th></tr></thead><tbody data-reviewer-body>' + rows.map(item=>item.row).join('') + '</tbody></table></div><div class="md:hidden" data-reviewer-cards>' + rows.map(item=>item.card).join('') + '</div>' + (found.length?'':empty) + '</div><div data-reviewer-pagination>' + paginationMarkup(found.length,bounds) + '</div>';
+    const rows=shown.map(teamRow);
+    return toolbarMarkup(found) + '<div data-reviewer-list><div class="hidden px-4 md:block">' + table.table({label:'Assigned teams', head:table.head([...table.TEAM_COLUMNS, 'Title', 'Status', 'Action']), body:table.tbody(rows.map(item=>item.row).join(''), {'data-reviewer-body':true})}) + '</div><div class="md:hidden" data-reviewer-cards>' + rows.map(item=>item.card).join('') + '</div>' + (found.length?'':empty) + '</div><div data-reviewer-pagination>' + paginationMarkup(found.length,bounds) + '</div>';
   }
   function panelMarkup() {
     const team=state.dto.teams.find(t=>t.teamId===state.panelTeam); if(!team)return '';
     const t=team.titleApproval, id=escape(team.teamId), editable=t.canDecide;
     const choice=value=>'<button type="button" class="flex-1 rounded-md border p-3 text-left text-sm ' + (state.decision===value?'border-blue-600 bg-blue-50':'border-gray-300 bg-white') + (value==='Approved'&&!t.canApprove?' opacity-50':'') + '"' + (value==='Approved'&&!t.canApprove?' disabled':'') + ' data-action="choice" data-decision="' + value + '" aria-pressed="' + (state.decision===value) + '">' + (value==='Approved'?'Approve':'Request revision') + '</button>';
-    return '<div class="fixed inset-0 z-50 bg-black/50" data-action="close-panel"><section role="dialog" aria-modal="true" aria-label="Title decision" class="absolute inset-x-0 bottom-0 flex max-h-full flex-col rounded-t-lg bg-white shadow-xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg" data-title-panel><header class="flex items-center justify-between border-b border-gray-200 p-4"><div><strong>' + id + '</strong><div class="text-sm text-gray-500">Committee ' + escape(team.committee||'—') + '</div></div><button type="button" aria-label="Close" class="' + SECONDARY + '" data-action="close-panel">✕</button></header><div class="min-h-0 overflow-y-auto p-4"><h3 class="text-lg font-semibold text-gray-900">' + escape(t.submittedTitle||'Not submitted') + '</h3><p class="mt-2 text-sm text-gray-600">Guide: ' + escape(team.guideName||'—') + '</p><div class="mt-2 flex flex-wrap gap-1">' + registerTags(team) + '</div>' + folderMarkup(t.folderUrl) + (t.similarityFlag?'<p class="mt-4 text-sm text-amber-700">' + icon('triangle-alert') + ' ' + escape(t.similarityFlag) + '</p>':'') + '<p class="mt-4 text-sm text-gray-700">' + escape(t.status.label) + '</p>' + (t.approveBlockedReason?'<p class="mt-2 text-sm text-amber-700" data-approve-blocked>' + escape(t.approveBlockedReason) + '</p>':'') + (t.problem?'<p class="mt-3 text-sm text-gray-700">' + escape(t.problem) + '</p>':'') + (t.notes?'<p class="mt-2 text-sm text-gray-600">Latest note: ' + escape(t.notes) + '</p>':'') + (editable?'<div class="mt-5 flex gap-2">' + choice('Approved') + choice('Revise') + '</div><label class="mt-4 block text-sm font-medium" for="reviewer-notes-' + id + '">Reviewer notes' + (state.decision==='Revise'?' (required)':' (optional)') + '</label><textarea id="reviewer-notes-' + id + '" rows="3" class="mt-1 w-full ' + FIELD + '" data-action="notes">' + escape(state.notes) + '</textarea>':'') + '<p id="reviewer-status-' + id + '" class="mt-2 text-sm text-red-700" role="status"></p></div><footer class="flex justify-end gap-2 border-t border-gray-200 bg-white p-4"><button type="button" class="' + SECONDARY + '" data-action="close-panel">' + (editable?'Cancel':'Close') + '</button>' + (editable?'<button type="button" class="' + BUTTON + '" data-action="submit-decision"' + (!state.decision || state.decision==='Revise'&&!state.notes.trim()?' disabled':'') + '>Submit decision</button>':'') + '</footer></section></div>';
+    return '<div class="fixed inset-0 z-50 bg-black/50" data-action="close-panel"><section role="dialog" aria-modal="true" aria-label="Title decision" class="absolute inset-x-0 bottom-0 flex max-h-full flex-col rounded-t-lg bg-white shadow-xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg" data-title-panel><header class="flex items-center justify-between border-b border-gray-200 p-4"><div><strong>' + id + '</strong><div class="text-sm text-gray-500">Committee ' + escape(team.committee||'—') + '</div></div><button type="button" aria-label="Close" class="' + SECONDARY + '" data-action="close-panel">✕</button></header><div class="min-h-0 overflow-y-auto p-4"><h3 class="text-lg font-semibold text-gray-900">' + escape(t.submittedTitle||'Not submitted') + '</h3><p class="mt-2 text-sm text-gray-600">Guide: ' + escape(team.guideName||'—') + '</p><div class="mt-2 text-sm">' + table.studentList(team.students) + '</div>' + folderMarkup(t.folderUrl) + (t.similarityFlag?'<p class="mt-4 text-sm text-amber-700">' + icon('triangle-alert') + ' ' + escape(t.similarityFlag) + '</p>':'') + '<p class="mt-4 text-sm text-gray-700">' + escape(t.status.label) + '</p>' + (t.approveBlockedReason?'<p class="mt-2 text-sm text-amber-700" data-approve-blocked>' + escape(t.approveBlockedReason) + '</p>':'') + (t.problem?'<p class="mt-3 text-sm text-gray-700">' + escape(t.problem) + '</p>':'') + (t.notes?'<p class="mt-2 text-sm text-gray-600">Latest note: ' + escape(t.notes) + '</p>':'') + (editable?'<div class="mt-5 flex gap-2">' + choice('Approved') + choice('Revise') + '</div><label class="mt-4 block text-sm font-medium" for="reviewer-notes-' + id + '">Reviewer notes' + (state.decision==='Revise'?' (required)':' (optional)') + '</label><textarea id="reviewer-notes-' + id + '" rows="3" class="mt-1 w-full ' + FIELD + '" data-action="notes">' + escape(state.notes) + '</textarea>':'') + '<p id="reviewer-status-' + id + '" class="mt-2 text-sm text-red-700" role="status"></p></div><footer class="flex justify-end gap-2 border-t border-gray-200 bg-white p-4"><button type="button" class="' + SECONDARY + '" data-action="close-panel">' + (editable?'Cancel':'Close') + '</button>' + (editable?'<button type="button" class="' + BUTTON + '" data-action="submit-decision"' + (!state.decision || state.decision==='Revise'&&!state.notes.trim()?' disabled':'') + '>Submit decision</button>':'') + '</footer></section></div>';
   }
   function render(host,dto) {
     state.host=host;state.dto=dto;

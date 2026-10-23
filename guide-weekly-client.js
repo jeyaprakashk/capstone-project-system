@@ -1,5 +1,5 @@
 /* Serialized browser module; all reads use the common loading lifecycle. */
-function guideWeeklyBrowser_(bridge, getTabs) {
+function guideWeeklyBrowser_(bridge, getTabs, logs) {
   const host = ()=>document.getElementById('guideWeeklyProgress');
   const esc = value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const ATTENTION_BADGE='inline-flex items-center rounded-md bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/20';
@@ -14,6 +14,8 @@ function guideWeeklyBrowser_(bridge, getTabs) {
     node.querySelectorAll('button:not([data-answer-toggle]),select').forEach(control=>{control.disabled=disabled || control.dataset.weekBoundary==='true';});
   }
   let selectedTeam = '', selectedView = 'title';
+  // Documents waiting for the guide, per team, as the Documents screen reports them.
+  const documentCounts = {};
   // A locked Guide Evaluation tab stays clickable; it shows the availability card instead of opening the editor.
   function evaluationOpen(root) { const tab=root.querySelector('[data-guide-tab="evaluation"]'); return !!tab && !tab.disabled && !tab.hasAttribute('data-evaluation-locked'); }
   function workspace() { return document.querySelector('[data-guide-workspace]'); }
@@ -27,8 +29,10 @@ function guideWeeklyBrowser_(bridge, getTabs) {
     const pending=node.data?.entries.filter(entry=>entry.status==='PENDING' && node.data.weeks.includes(entry.weekId) && students.includes(String(entry.regNo).trim().toLowerCase())).length || 0;
     if(pending)actions.push({key:'weekly',label:'Weekly progress',count:pending});
     if(evaluationOpen(root) && root.evaluationAttention?.[team])actions.push({key:'evaluation',label:'Guide Evaluation',count:root.evaluationCounts?.[team] || 1});
+    if(documentCounts[team])actions.push({key:'documents',label:'Documents',count:documentCounts[team]});
     return actions;
   }
+  function setDocumentCount(team,count) {documentCounts[team]=count;updateAttention();}
   function updateAttention() {
     const root=workspace(),node=host();if(!root || !node)return;
     root.querySelectorAll('[data-guide-select]').forEach(button=>{
@@ -54,7 +58,7 @@ function guideWeeklyBrowser_(bridge, getTabs) {
     const actions=teamActions(selectedTeam);
     root.querySelectorAll('[data-guide-tab]').forEach(button=>{
       const action=actions.find(action=>action.key===button.dataset.guideTab);
-      getTabs().setBadge(button,action?action.count:0,action?(action.key==='documents'?'Documents supporting pending title review':action.label+' requiring action')+': '+action.count:'');
+      getTabs().setBadge(button,action?action.count:0,action?(action.key==='documents'?'Documents awaiting your approval':action.label+' requiring action')+': '+action.count:'');
     });
   }
   function evaluationStatus(team,statuses) {
@@ -142,6 +146,30 @@ function guideWeeklyBrowser_(bridge, getTabs) {
     host().hidden=view!=='weekly';
     selectTeam(selectedTeam,true);
   }
+  /** One student's submissions in the shared weekly logs drawer (the same drawer the student has). The guide's data holds the latest submission of each week. */
+  function openWeeklyLogs(register,name,trigger) {
+    const node=host(),data=node && node.data,title='All weekly logs'+(name?' · '+name:'');
+    if(!data || !Array.isArray(data.allWeeks)){logs.openMessage(title,node && node.busy?'Weekly progress is still loading. Try again in a moment.':'Weekly logs are unavailable. Use dashboard Refresh and try again.',trigger);if(node && !node.busy && !data)load();return;}
+    const mine=data.entries.filter(entry=>String(entry.regNo).trim().toLowerCase()===String(register).trim().toLowerCase());
+    logs.open({title,timezone:data.timezone,now:Date.parse(data.checkedAt) || Date.now(),evidenceTitle:'GitHub activity',
+      weeks:data.allWeeks.map(week=>{
+        const entries=mine.filter(entry=>entry.weekId===week.weekId);
+        return {weekId:week.weekId,opens:week.opens,deadline:week.deadline,evidence:entries[0] && entries[0].evidence,
+          entries:entries.map(entry=>({entryStatus:entry.submittedAt===entry.firstSubmittedAt?'SUBMITTED':'REVISED',timeliness:entry.timeliness,recordedAt:entry.submittedAt,firstSubmittedAt:entry.firstSubmittedAt,
+            aiScore:Number.isFinite(entry.score)?entry.score:null,workCompleted:entry.workCompleted,guideDiscussion:entry.guideDiscussion,blockers:entry.blockers,nextAction:entry.nextAction}))};
+      })},trigger);
+  }
+  /** The AI score of a student averaged over the weeks the AI has scored (a week without analysis is left out, never counted as zero); null until the weekly data has loaded. */
+  function aiScoreFor(register) {
+    const node=host(),data=node && node.data;if(!data)return null;
+    const scores=data.entries.filter(entry=>String(entry.regNo).trim().toLowerCase()===String(register).trim().toLowerCase() && Number.isFinite(entry.score)).map(entry=>entry.score);
+    return {weeks:scores.length,average:scores.length?scores.reduce((sum,score)=>sum+score,0)/scores.length:null,max:logs.AI_SCORE_MAX};
+  }
+  let dataWaiters=[];
+  /** Runs `fn` once the weekly data is in the page (at once when it already is). */
+  function whenData(fn) {
+    if(host() && host().data)fn();else dataWaiters.push(fn);
+  }
   function load() {
     const node=host();if(!node || node.busy)return;
     node.attentionLoading=true;
@@ -156,6 +184,7 @@ function guideWeeklyBrowser_(bridge, getTabs) {
           .sort((a,b)=>b.opensAt-a.opensAt).map(w=>w.weekId);
       }
       node.data=data;
+      const waiting=dataWaiters;dataWaiters=[];waiting.forEach(fn=>fn());
       node.attentionReadFailed=false;
       selectDefaultWeek(node);
       node.querySelector('[data-guide-weekly-status]').textContent='';
@@ -364,7 +393,7 @@ function guideWeeklyBrowser_(bridge, getTabs) {
     document.addEventListener('scroll',dismiss,true);
     popup.dismissListeners=()=>{window.removeEventListener('resize',dismiss);document.removeEventListener('scroll',dismiss,true);};
   }
-  return {load,selectTeam,selectView,evaluationStatus,positionTitleInfo};
+  return {load,selectTeam,selectView,evaluationStatus,positionTitleInfo,setDocumentCount,openWeeklyLogs,aiScoreFor,whenData};
 }
 function weeklyPhase2SetupBrowser_(bridge) {
   const host=()=>document.getElementById('weeklyPhase2Setup');
@@ -410,6 +439,6 @@ function weeklyPhase2SetupBrowser_(bridge) {
   }
   return {load};
 }
-function getGuideWeeklyClientScript_() { return 'const GuideWeekly = ('+guideWeeklyBrowser_.toString()+')(DataBridge, () => SharedTabs);'; }
+function getGuideWeeklyClientScript_() { return 'const GuideWeekly = ('+guideWeeklyBrowser_.toString()+')(DataBridge, () => SharedTabs, WeeklyLogsView);'; }
 /** Coordinator weekly setup, used by System Status; serialized separately from the Guide workspace. */
 function getWeeklySetupClientScript_() { return 'const WeeklyPhase2Setup = ('+weeklyPhase2SetupBrowser_.toString()+')(DataBridge);'; }

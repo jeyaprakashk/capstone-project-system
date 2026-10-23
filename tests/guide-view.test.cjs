@@ -19,8 +19,8 @@ function firstPaintFromServer(options) {
 
 function setup(dto = dtoFromServer()) {
   const { document, window } = parseHTML('<html><body><div id="guideContent"></div></body></html>');
-  const calls = { reads: [], weekly: [], loads: 0, refresh: 0, writes: [], toggles: [], github: 0 };
-  const c = loadSources(['data-bridge-client.js', 'avatar-color.js','shared-tabs.js', 'title-requests.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
+  const calls = { watchers: [], summaries: [], counts: [], reads: [], weekly: [], loads: 0, refresh: 0, writes: [], toggles: [], github: 0 };
+  const c = loadSources(['data-bridge-client.js', 'avatar-color.js','shared-tabs.js','shared-table.js', 'github-account-card.js', 'title-requests.js', 'guide-view.js', 'guide-weekly-client.js'], { document, Promise, setTimeout, clearTimeout, Date, JSON });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const s = { dto, writeError: null, readError: null };
   bridge.useTransport(async (method, args) => {
@@ -31,13 +31,14 @@ function setup(dto = dtoFromServer()) {
     return s.writeError ? JSON.stringify({ ok: false, error: { code: 'REJECTED', message: s.writeError } }) : JSON.stringify({ ok: true, data: { message: 'Saved' } });
   });
   const ui = { busy: require('./busy-fixture.cjs')(), renderIcon: () => '', renderSkeleton: (v, label) => '<span data-skeleton>' + label + '</span>', refreshRoleDashboard: () => calls.refresh++, beginContentLoading: () => () => {} };
-  const weekly = { selectTeam: (t) => calls.weekly.push(['team', t]), selectView: (v) => calls.weekly.push(['view', v]), load: () => calls.loads++, positionTitleInfo: (e, el) => calls.toggles.push(el.id) };
+  const documents = { mount: () => {}, watch: fn => { calls.watchers.push(fn); }, summarize: team => { calls.summaries.push(team); return Promise.resolve(); } };
+  const weekly = { setDocumentCount: (t, n) => calls.counts.push([t, n]), selectTeam: (t) => calls.weekly.push(['team', t]), selectView: (v) => calls.weekly.push(['view', v]), load: () => calls.loads++, positionTitleInfo: (e, el) => calls.toggles.push(el.id) };
   vm.runInContext('globalThis.__make = ' + c.guideViewBrowser_.toString(), c);
   const tabs = c.sharedTabsBrowser_(() => ui);
   const requests = c.titleRequestsBrowser_();
-  const view = c.__make(bridge, () => ui, () => weekly, () => tabs, () => requests, () => null, {style:()=>""});
+  const view = c.__make(bridge, () => ui, () => weekly, () => tabs, () => requests, () => documents, {style:()=>""}, c.githubAccountCardBrowser_());
   const host = document.getElementById('guideContent');
-  return { view, host, document, window, calls, s, ui, weekly, tabs, c, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), settle: () => new Promise(r => setImmediate(r)) };
+  return { view, host, document, window, calls, s, ui, weekly, documents, tabs, c, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
 const byAttr = (f, attr, value) => f.host.querySelector('[' + attr + '="' + value + '"]');
 
@@ -166,7 +167,7 @@ test('a normal load starts the weekly and GitHub reads with the dashboard read; 
   const bridge = vm.runInContext('(' + f.c.dataBridgeBrowser_.toString() + ')()', f.c);
   bridge.useTransport(async method => { sent.push(method); return JSON.stringify({ ok: true, data: method === 'API_guide_getGithub' ? github : method === 'API_guide_getDashboard' ? dto : { entries: [], weeks: [] } }); });
   vm.runInContext('globalThis.__make2 = ' + f.c.guideViewBrowser_.toString(), f.c);
-  const view = f.c.__make2(bridge, () => f.ui, () => f.weekly, () => f.tabs, () => f.c.titleRequestsBrowser_(), () => null, {style:()=>""});
+  const view = f.c.__make2(bridge, () => f.ui, () => f.weekly, () => f.tabs, () => f.c.titleRequestsBrowser_(), () => f.documents, {style:()=>""}, f.c.githubAccountCardBrowser_());
   const loaded = await view.load();
   assert.deepEqual(sent.slice().sort(), ['API_guide_getDashboard', 'API_guide_getGithub', 'API_guide_getWeekly']);
   view.render(f.host, loaded); await f.settle(); await f.settle();
@@ -322,4 +323,28 @@ test('the approval timing pill says how many days early or late the title was ap
   assert.equal(label(-1).text, '1 day earlier');
   assert.equal(label(0).text, 'On time');
   assert.equal(label(2).text, '2 days late');
+});
+
+test('each student in the GitHub status is a card like the student screen: register and name, the account, then the repository state', async () => {
+  const f = setup(); f.view.render(f.host, f.s.dto); await f.settle();
+  const members = Array.from(f.host.querySelectorAll('[data-github-member]'));
+  assert(members.length > 0);
+  for (const member of members) {
+    assert.equal(member.tagName, 'LI');
+    assert(member.querySelector('[data-member-register]'), 'register number');
+    assert(member.querySelector('[data-github-account]'), 'the shared account block');
+    assert(member.querySelector('[data-member-state]'), 'the state line');
+    assert(member.querySelector('[data-commit-count]') && member.querySelector('[data-commit-list]'), 'the commit hooks');
+  }
+  assert.match(members.map(m => m.querySelector('[data-member-state]').textContent).join(' '), /Repository joined|Submit GitHub Account|Accept Invitation Email/);
+});
+
+test('the Documents tab badge counts what waits for the guide: every team is read once, in order, and the Documents screen reports the count', async () => {
+  const f = setup(); f.view.render(f.host, f.s.dto); await f.settle(); await f.settle();
+  assert.deepEqual(f.calls.summaries, f.s.dto.teams.map(team => team.teamId));
+  assert.equal(f.calls.watchers.length, 1);
+  f.calls.watchers[0]('T1', 3);
+  assert.deepEqual(f.calls.counts, [['T1', 3]]);
+  f.view.render(f.host, f.s.dto); await f.settle();
+  assert.equal(f.calls.watchers.length, 1, 'watching is registered once');
 });

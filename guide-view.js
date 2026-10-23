@@ -7,7 +7,7 @@
  * The workspace tab strip, its styles and its keyboard handling come from SharedTabs.
  * Elements that GuideWeekly toggles with `hidden` carry no display utilities.
  */
-function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests, getDocuments, avatars) {
+function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests, getDocuments, avatars, accountCard) {
   'use strict';
   const delegated = new WeakSet();
   const state = {dto:null, host:null, busyTeam:null, commits:{}};
@@ -27,7 +27,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests, getDo
   const TIMING = {'on-time':['green', 'On time'], late:['red', 'Late'], overdue:['red', 'Overdue'], pending:['gray', 'Pending'], unknown:['gray', 'Timing unavailable']};
   const BUTTON = 'border-0 rounded-md bg-paper px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-inset ring-line hover:bg-tint disabled:opacity-50';
   const PRIMARY = 'border-0 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-paper hover:bg-primary-hover disabled:opacity-50';
-  const PILL = 'flex items-center gap-2 border-0 rounded-lg bg-transparent px-3 py-1.5 text-sm text-ink-2 aria-pressed:bg-paper aria-pressed:text-primary aria-pressed:shadow-selected';
+  const PILL = 'flex items-center gap-2 border-0 rounded-lg bg-transparent px-3 py-1.5 text-sm text-ink-2 aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-paper';
   const STEP = 'flex w-full flex-col gap-0.5 border-0 rounded-lg bg-transparent px-3 py-2 text-left text-sm hover:bg-tint aria-pressed:bg-tint disabled:opacity-60';
   const LINK = 'border-0 bg-transparent p-0 text-sm font-semibold text-primary underline';
   const TILE ='flex w-full flex-col gap-1 rounded-card border border-edge border-l-4 shadow-card border-l-transparent bg-paper p-3 text-left text-sm hover:bg-tint aria-pressed:border-l-primary aria-pressed:bg-tint disabled:opacity-60';
@@ -46,14 +46,10 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests, getDo
   }
   const commitCountText = n => n === null ? 'Commits unavailable' : n + (n === 1 ? ' commit' : ' commits');
   function githubMemberMarkup(m) {
-    const status = m.state === 'missing' ? ['Submit GitHub Account', 'triangle-alert'] : m.state === 'joined' ? ['Joined', 'check'] : ['Accept Invitation Email', 'clock'];
-    const regno = escape(m.regno);
-    return '<li data-member-status="' + m.state + '" data-github-member="' + regno + '" class="border-t border-edge first:border-t-0"><details class="group">' +
-      '<summary class="grid cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 py-3 sm:grid-cols-[1fr_1fr_auto] [&::-webkit-details-marker]:hidden">' +
-        '<span data-member-register class="min-w-0"><strong class="block font-semibold capitalize text-ink">' + escape(String(m.name || '').toLowerCase()) + '</strong><span class="font-mono text-xs text-muted">' + regno + '</span></span>' +
-        '<span data-member-state class="order-last col-span-2 inline-flex flex-wrap items-center gap-2 text-sm text-ink-2 sm:order-none sm:col-span-1">' + icon(status[1]) + '<span>' + status[0] + '</span>' + (m.timing ? memberTiming(m.timing) : '') + '</span>' +
-        '<span class="inline-flex items-center gap-2 text-sm text-ink-2"><span data-commit-count aria-live="polite"></span><span class="inline-flex group-open:rotate-180">' + icon('chevron-down') + '</span></span>' +
-      '</summary><div data-commit-list class="pb-3"></div></details></li>';
+    const status = m.state === 'missing' ? ['Submit GitHub Account', 'triangle-alert'] : m.state === 'joined' ? ['Repository joined', 'check'] : ['Accept Invitation Email', 'clock'];
+    const commits = '<details class="group"><summary class="flex cursor-pointer list-none items-center justify-between gap-2 text-sm text-ink-2 [&::-webkit-details-marker]:hidden"><span data-commit-count aria-live="polite"></span><span class="inline-flex group-open:rotate-180">' + icon('chevron-down') + '</span></summary><div data-commit-list class="pt-2"></div></details>';
+    return accountCard.memberCard({attrs:' data-member-status="' + m.state + '" data-github-member="' + escape(m.regno) + '"', register:m.regno, name:m.name, account:m.account, initials:initials(m.name),
+      state:icon(status[1]) + '<span>' + status[0] + '</span>' + (m.timing ? memberTiming(m.timing) : ''), after:commits});
   }
   function repositoryLine(repoUrl) {
     const match = String(repoUrl || '').match(/^https:\/\/github\.com\/([^/]+)\/([^/?#]+)/i);
@@ -66,7 +62,7 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests, getDo
     return '<aside><div class="flex flex-wrap items-center justify-between gap-2 border-b border-edge pb-3">' + repositoryLine(team.repoUrl) +
       '<span class="text-sm text-muted">Due ' + escape(githubDue || 'date unavailable') + '</span></div>' +
       (g === undefined ? '<div data-github-loading role="status" class="mt-2">' + getUi().renderSkeleton('inline', 'Reading GitHub status') + '</div>'
-        : g ? '<ul aria-label="Team GitHub status" class="m-0 list-none p-0">' + g.members.map(githubMemberMarkup).join('') + '</ul>' : '<p role="status" class="mt-2 text-sm text-muted">GitHub status unavailable. Refresh the dashboard to retry.</p>') + '</aside>';
+        : g ? '<ul aria-label="Team GitHub status" class="mt-3 grid list-none gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">' + g.members.map(githubMemberMarkup).join('') + '</ul>' : '<p role="status" class="mt-2 text-sm text-muted">GitHub status unavailable. Refresh the dashboard to retry.</p>') + '</aside>';
   }
   function expandable(text, max) {
     if (text.length <= max) return escape(text);
@@ -210,11 +206,25 @@ function guideViewBrowser_(bridge, getUi, getWeekly, getTabs, getRequests, getDo
     texts.forEach(text => problemObserver.observe(text));
   }
 
+  /** The Documents tab's badge counts what waits for the guide: every team is read once per render, one after the other, and each screen load keeps its count current. */
+  let documentsWatched = false;
+  function watchDocuments() {
+    if (documentsWatched) return;
+    documentsWatched = true;
+    getDocuments().watch((teamId, count) => getWeekly().setDocumentCount(teamId, count));
+  }
+  function loadDocumentCounts(dto) {
+    const teams = dto.teams.map(team => team.teamId);
+    let index = 0;
+    const next = () => { if (state.dto === dto && state.host && index < teams.length) getDocuments().summarize(teams[index++]).then(next, next); };
+    next();
+  }
   function render(host, dto) {
     state.host = host; state.dto = dto; state.commits = {};
     host.innerHTML = (dto.teams.length ? workspaceMarkup(dto) : headerMarkup([]) + '<p class="mt-4 text-sm text-muted">You have no teams assigned.</p>');
     watchProblems(host);
     if (dto.teams.some(team => team.github === undefined)) loadGithub(dto);
+    watchDocuments(); loadDocumentCounts(dto);
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); }
     getTabs().bind(host);
     if (!host.guideToggleBound) {

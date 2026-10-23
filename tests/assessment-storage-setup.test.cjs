@@ -13,7 +13,7 @@ test('committee assignment and directory require only assignment columns',()=>{
  const data=c.buildCommitteeData_([row],[['T1','C1']],columns,{TEAM_ID:0,COMMITTEE_NUMBER:1});
  assert.deepEqual(Object.keys(data[0]).sort(),['members','number','teams']);
  vm.runInContext(fs.readFileSync('system-status-view.js','utf8'),c);
- const html=c.systemStatusViewBrowser_(null,()=>({renderIcon:()=>''}),()=>null,()=>null,{style:()=>""}).committeeDirectory(data),{document}=require('linkedom').parseHTML(html);
+ const html=c.systemStatusViewBrowser_(null,()=>({renderIcon:()=>''}),()=>null,{style:()=>""}).committeeDirectory(data),{document}=require('linkedom').parseHTML(html);
  assert.match(document.textContent||html,/Reviewer One/);assert.match(html,/T1/);assert.equal(document.querySelectorAll('a').length,0);
  assert.equal(document.querySelector('summary').textContent,'Committee C11 reviewers · 1 teams');
 });

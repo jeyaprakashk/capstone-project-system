@@ -7,7 +7,7 @@ const { parseHTML } = require('linkedom');
 const { loadSources } = require('./invariants/golden.cjs');
 
 const team = (n, extra = {}) => ({
-  teamId: 'T' + n, guideName: 'Guide ' + n, registerNumbers: ['R' + n + 'a', 'R' + n + 'b'], title: 'Title ' + n, committee: 'C1',
+  teamId: 'T' + n, guideName: 'Guide ' + n, registerNumbers: ['R' + n + 'a', 'R' + n + 'b'], students: [{ name: 'Name ' + n + 'a', regNo: 'R' + n + 'a' }, { name: 'Name ' + n + 'b', regNo: 'R' + n + 'b' }], title: 'Title ' + n, committee: 'C1',
   titleApproval: { status: { tone: 'warning', label: 'Pending review' }, canDecide: true, canApprove: true, approveBlockedReason: '', revision: 3, submittedTitle: 'Title ' + n, problem: '', similarityFlag: '', folderUrl: '', notes: '' },
   reviews: [{ key: 'review1', enabled: true, actionLabel: 'Enter marks', note: 'Open' }, { key: 'review2', enabled: false, actionLabel: 'Enter marks', note: 'Not yet' }],
   ...extra
@@ -17,7 +17,7 @@ const dtoOf = teams => ({ summary: { pending: teams.length, approved: 0, awaitin
 function setup(dto) {
   const { document, window } = parseHTML('<html><body><div id="reviewerContent"></div></body></html>');
   const calls = { marks: [], refresh: 0, loading: 0, finished: 0, writes: [], requirements: [], inflight: 0, peak: 0 };
-  const c = loadSources(['data-bridge-client.js', 'avatar-color.js','shared-tabs.js', 'title-requests.js', 'reviewer-view.js'], { document, Promise, setTimeout, clearTimeout, Intl, Date });
+  const c = loadSources(['data-bridge-client.js', 'avatar-color.js','shared-tabs.js','shared-table.js', 'title-requests.js', 'reviewer-view.js'], { document, Promise, setTimeout, clearTimeout, Intl, Date });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const state = { dto: dto || dtoOf([team(1)]), writeResult: { message: 'Saved' }, writeError: null, readError: null, requirements: null };
   bridge.useTransport(async (method, args) => {
@@ -35,7 +35,7 @@ function setup(dto) {
   vm.runInContext('globalThis.__make = ' + c.reviewerViewBrowser_.toString(), c);
   const tabs = c.sharedTabsBrowser_(() => ui);
   const requests = c.titleRequestsBrowser_();
-  const view = c.__make(bridge, () => ui, () => ({ open: (...a) => calls.marks.push(a) }), () => tabs, () => requests);
+  const view = c.__make(bridge, () => ui, () => ({ open: (...a) => calls.marks.push(a) }), () => tabs, () => requests, c.sharedTableBrowser_());
   const host = document.getElementById('reviewerContent');
   return { view, host, document, window, calls, state, ui, click: el => el.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true })), fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), settle: () => new Promise(r => setImmediate(r)) };
 }
@@ -57,14 +57,15 @@ test('stage tabs use configured reviews and separate title status from action', 
   assert.equal(f.host.querySelector('[role=tablist]').getAttribute('aria-label'),'Reviewer stages');
   assert.equal(f.host.querySelectorAll('[role=tab] [data-tab-badge]').length,2);
   assert.equal(f.host.querySelector('[role=tab][data-stage=review2] [data-tab-badge]'),null,'nothing pending shows no badge');
-  assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(n=>n.textContent),['ID','Team','Title','Status','Action']);
+  assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(n=>n.textContent),['Team','Students','Guide','Title','Status','Action']);
   const titleCells=rows(f)[0].querySelectorAll('td');
   assert.equal(titleCells[0].textContent,'T1');
-  assert.match(titleCells[1].textContent,/Committee C1.*Guide 1.*R1a.*Title: Pending review/);
-  assert.equal(titleCells[2].textContent,'Title 1');
-  assert.match(titleCells[3].textContent,/Pending review/);
-  assert.equal(titleCells[3].querySelector('button'),null);
-  assert.equal(titleCells[4].querySelector('button').textContent,'Review title');
+  assert.equal(titleCells[1].textContent,'Name 1a (R1a)Name 1b (R1b)');
+  assert.equal(titleCells[2].textContent,'Guide 1');
+  assert.equal(titleCells[3].textContent,'Title 1');
+  assert.match(titleCells[4].textContent,/Pending review/);
+  assert.equal(titleCells[4].querySelector('button'),null);
+  assert.equal(titleCells[5].querySelector('button').textContent,'Review title');
   assert.equal(f.host.querySelectorAll('[data-team-card]').length,1);
   assert.equal(f.host.querySelector('[data-action=open-title]').textContent,'Review title');
   assert.equal(f.host.querySelector('[data-reviewer-list] [data-action=marks]'),null);
@@ -73,10 +74,10 @@ test('stage tabs use configured reviews and separate title status from action', 
   assert.equal(filters[0].querySelector('.rounded-full'),null);
   assert(filters[1].querySelector('.rounded-full'));
   stage(f,'review1');
-  assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(n=>n.textContent),['ID','Team','Title','Status','Action']);
-  assert.match(rows(f)[0].querySelectorAll('td')[3].textContent,/Open/);
-  assert.equal(rows(f)[0].querySelectorAll('td')[3].querySelector('button'),null);
-  assert.equal(rows(f)[0].querySelectorAll('td')[4].querySelector('button').textContent,'Enter marks');
+  assert.deepEqual(Array.from(f.host.querySelectorAll('thead th')).map(n=>n.textContent),['Team','Students','Guide','Title','Status','Action']);
+  assert.match(rows(f)[0].querySelectorAll('td')[4].textContent,/Open/);
+  assert.equal(rows(f)[0].querySelectorAll('td')[4].querySelector('button'),null);
+  assert.equal(rows(f)[0].querySelectorAll('td')[5].querySelector('button').textContent,'Enter marks');
   assert.equal(f.host.querySelector('[data-action=marks]').getAttribute('data-review'),'review1');
   assert.equal(f.host.querySelector('[data-action=open-title]'),null);
 });
@@ -173,12 +174,11 @@ test('review status and action stay separate for published and title-blocked tea
   const f=setup();f.view.render(f.host,dtoOf([published,blocked]));
   const cells=()=>Array.from(rows(f)).map(row=>row.querySelectorAll('td'));
   assert.equal(f.view.state.stage,'title');stage(f,'review1');
-  assert.equal(cells()[0][1].textContent.includes('Review 1: Published'),true);
-  assert.equal(cells()[0][1].textContent.includes('Review 2: Opens 2026-10-20'),true);
-  assert.equal(cells()[0][3].textContent,'Published');
-  assert.equal(cells()[0][4].textContent,'View marks');
-  assert.equal(cells()[1][3].textContent,'Waiting for title');
-  assert.equal(cells()[1][4].querySelector('button'),null);
+  assert.equal(/Review \d:/.test(cells()[0][1].textContent),false,'no stage chips under a team');
+  assert.equal(cells()[0][4].textContent,'Published');
+  assert.equal(cells()[0][5].textContent,'View marks');
+  assert.equal(cells()[1][4].textContent,'Waiting for title');
+  assert.equal(cells()[1][5].querySelector('button'),null);
   assert.match(f.host.querySelector('[data-team-card="T1"]').textContent,/Published/);
 });
 test('escapes interpolated content and uses compiled utilities',()=>{
@@ -282,4 +282,31 @@ test('a refreshed dashboard checks its teams again, and the older dashboard cann
   assert.equal(f.host.querySelectorAll('[data-reviewer-body] [data-team-spinner]').length, 2, 'the new dashboard starts with both teams being checked');
   await settleAll(f);
   assert.equal(f.host.querySelectorAll('[data-team-spinner]').length, 0);
+});
+
+test('the Enter marks chip counts and lists only teams whose marks can be entered now',async()=>{
+  const ready=team(1),waiting=team(2),viewed=team(3);
+  ready.reviews[0]={key:'review1',enabled:true,actionLabel:'Enter marks',note:''};
+  waiting.reviews[0]={key:'review1',enabled:false,actionLabel:'Enter marks',note:'Title approval required'};
+  viewed.reviews[0]={key:'review1',enabled:true,actionLabel:'View marks',note:'Published'};
+  const f=setup();f.view.render(f.host,dtoOf([ready,waiting,viewed]));await settleAll(f);stage(f,'review1');
+  const chip=label=>f.host.querySelector('[data-action=filter][data-status="'+label+'"]');
+  assert.equal(chip('All').textContent.trim().endsWith('3'),true);
+  assert.equal(chip('Enter marks').textContent.trim().endsWith('1'),true);
+  f.click(chip('Enter marks'));
+  assert.deepEqual(Array.from(rows(f)).map(r=>r.getAttribute('data-team-id')),['T1']);
+});
+
+test('status uses the standard badge tones and the students column keeps its width',async()=>{
+  const t1=team(1),t2=team(2),t3=team(3);
+  t1.reviews[0]={key:'review1',enabled:true,actionLabel:'View marks',note:'Submitted'};
+  t2.reviews[0]={key:'review1',enabled:true,actionLabel:'Enter marks',note:'Draft'};
+  t3.reviews[0]={key:'review1',enabled:false,actionLabel:'Enter marks',note:'Marks unavailable.'};
+  [t1,t2,t3].forEach(t=>{t.titleApproval.status={tone:'success',label:'Approved'};});
+  const f=setup();f.view.render(f.host,dtoOf([t1,t2,t3]));await settleAll(f);stage(f,'review1');
+  const badge=id=>f.host.querySelector('[data-team-id="'+id+'"] td:nth-child(5) span');
+  assert.match(badge('T1').className,/bg-success-tint/);
+  assert.match(badge('T2').className,/bg-warning-tint/);
+  assert.match(badge('T3').className,/bg-danger-tint/);
+  assert.match(f.host.querySelector('[data-team-id="T1"] td:nth-child(2)').className,/min-w-72/);
 });

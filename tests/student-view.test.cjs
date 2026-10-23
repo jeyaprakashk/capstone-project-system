@@ -22,7 +22,7 @@ async function setup(dto, options = {}) {
   };
   // The student modules StudentView drives, passed in as they are in the shell.
   const actions = {
-    weekly: { load: () => calls.weekly++ }, documents: { mount: (host, team) => calls.documents.push([host, team]) }, results: { all: () => calls.results++ },
+    weekly: { load: () => calls.weekly++, showAiScore: () => calls.aiScore = (calls.aiScore || 0) + 1 }, documents: { mount: (host, team) => calls.documents.push([host, team]) }, results: { all: () => calls.results++ },
     github: { focusGithubAccountForm: b => calls.jump.push(b), refreshGithubStatus: b => calls.refresh++, previewGithubAccount: (e, form) => calls.preview.push([e, form]) }
   };
   vm.runInContext('globalThis.__make = ' + c.studentViewBrowser_.toString() + '; globalThis.__makeTitle = ' + c.studentTitleBrowser_.toString(), c);

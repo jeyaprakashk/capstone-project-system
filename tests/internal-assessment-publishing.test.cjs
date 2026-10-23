@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),crypto=require('node:crypto');
 const {publishingFixture}=require('./internal-publishing-fixture.cjs');
 const plain=value=>JSON.parse(JSON.stringify(value));
-function browser(){const c=vm.createContext({Map,Set,window:{crypto},document:{},setTimeout,clearTimeout});for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js','internal-assessment-publishing-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);c.DashboardUI={renderIcon:c.renderLucideIcon_,renderAssessmentHistory:c.renderAssessmentHistory_};return c.internalAssessmentPublishingBrowser_();}
+function browser(){const c=vm.createContext({Map,Set,window:{crypto},document:{},setTimeout,clearTimeout});for(const file of ['assessment-history-view.js','lucide-icons.js','icon-renderer.js','shared-table.js','internal-assessment-publishing-client.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);c.DashboardUI={renderIcon:c.renderLucideIcon_,renderAssessmentHistory:c.renderAssessmentHistory_};return c.internalAssessmentPublishingBrowser_(null,c.sharedTableBrowser_());}
 const view=()=>({query:'',filter:'all',open:new Set(),outcomes:new Map()});
 
 function historyRenderer(){const c=vm.createContext({});vm.runInContext(fs.readFileSync('assessment-history-view.js','utf8'),c);return c.renderAssessmentHistory_;}
@@ -51,7 +51,7 @@ for(const key of ['review1','review2','guide_eval'])test(key+': current roster p
   assert.equal(team.totalStudents,3);assert.equal(team.students.length,3);assert.equal(team.students[0].name,'Alex One');assert.equal(team.students[0].register,'s1');
   assert.equal(team.publicationState,'AWAITING_EVALUATION');assert.equal(team.canPublishTeam,false);
   assert.equal(team.students[0].publicationStatus,'NOT_PUBLISHED');
-  const html=browser().markup(report,view());assert.match(html,/Alex One \(s1\)/);assert.match(html,/<th scope="col">Students<\/th><th scope="col">Result<\/th>/);assert.match(html,/Team, register number or name/);assert.match(html,/<th scope="col">Permission<\/th>/);
+  const html=browser().markup(report,view());assert.match(html,/Alex One \(s1\)/);assert.match(html,/>Guide<\/th><th scope="col" class="[^"]*">Result<\/th>/);assert.match(html,/Team, register number or name/);assert.match(html,/>Permission<\/th>/);
 });
 
 for(const key of ['review1','review2'])for(const scenario of ['COMPLETED','MAKEUP_PENDING'])test(key+': '+scenario+' retains native and individual publication policy',()=>{
@@ -160,4 +160,103 @@ test('publication endpoints delegate to the existing functions, keep their rules
   assert.equal(stale.ok,false);assert.equal(stale.error.code,'REJECTED');assert.match(stale.error.message,/changed/);
   for(const name of ['constructor','toString'])assert.equal(JSON.parse(f.c.API_publishing_run(name,input)).error.code,'INVALID_INPUT');
   f.actor('one@x');assert.match(JSON.parse(f.c.API_publishing_get('review1')).error.message,/Coordinator/);
+});
+
+test('the results download is read-only, coordinator-only, sorted by register number and published results only',()=>{
+  const f=publishingFixture('review1');vm.runInContext(fs.readFileSync('api-envelope.js','utf8'),f.c);
+  const read=()=>JSON.parse(f.c.API_publishing_export('review1'));
+  f.actor('one@x');assert.match(read().error.message,/Coordinator/);
+  f.actor('coord@x');
+  let data=read().data;
+  assert.deepEqual(plain(data.criteria.map(c=>c.pi)),['T','I']);
+  assert.deepEqual(plain(data.rows.map(r=>r.register)),['s1','s2','s3'],'sorted by register number');
+  assert(data.rows.every(r=>r.total==='NA'&&r.scores.T==='NA'&&r.scores.I==='NA'),'nothing is published yet');
+  const input=f.input();input.students[0].scores={};input.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true,reason:'Documented'};
+  f.submit(input);f.actor('coord@x');
+  assert(read().data.rows.every(r=>r.total==='NP'&&r.scores.T==='NP'),'submitted but not published is NP');
+  const before=JSON.stringify(f.tables);
+  f.publish();
+  data=read().data;
+  const by=Object.fromEntries(data.rows.map(r=>[r.register,r]));
+  assert.deepEqual(plain(by.s1),{register:'s1',name:'Alex One',team:'G18',scores:{T:'A',I:'A'},total:'A',comments:'Absence: Review-day absence, approved.'},'absent without a makeup is A everywhere');
+  assert.equal(by.s2.scores.T,48);assert.equal(by.s2.scores.I,32);assert.equal(by.s2.total,80);
+  assert.notEqual(JSON.stringify(f.tables),before,'publishing changed the journal, reading it does not');
+  const after=JSON.stringify(f.tables);read();assert.equal(JSON.stringify(f.tables),after);
+});
+
+test('the results download marks a roster that cannot be read as ERR and an unapproved absence as A',()=>{
+  const f=publishingFixture('review1');vm.runInContext(fs.readFileSync('api-envelope.js','utf8'),f.c);f.actor('coord@x');
+  const input=f.input();input.students[0].scores={};input.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:false};
+  f.submit(input);f.publish();
+  const rows=JSON.parse(f.c.API_publishing_export('review1')).data.rows;
+  assert.equal(rows.find(r=>r.register==='s1').total,'A');
+  const real=f.c.publicationRoster_;f.c.publicationRoster_=()=>{throw new Error('Team is missing or ambiguous.');};
+  assert(JSON.parse(f.c.API_publishing_export('review1')).data.rows.every(r=>r.total==='ERR'&&r.scores.I==='ERR'));
+  f.c.publicationRoster_=real;
+});
+
+test('the results download separates a team that is not eligible yet (NE) from an eligible team with nothing published (NA), and names the team',()=>{
+  const f=publishingFixture('review2');vm.runInContext(fs.readFileSync('api-envelope.js','utf8'),f.c);
+  const definitions=f.c.getAssessmentDefinitions_().map(d=>d.key==='review2'?{...d,sequence:2}:d);
+  f.c.getAssessmentDefinitions_=()=>definitions;f.c.requireAssessmentDefinitions_=()=>definitions;
+  f.actor('coord@x');
+  let rows=JSON.parse(f.c.API_publishing_export('review2')).data.rows;
+  assert(rows.every(r=>r.team==='G18'&&r.total==='NE'&&r.scores.T==='NE'&&r.scores.I==='NE'),'Review 1 is not recorded, so Review 2 is not open for the team');
+  // Recording Review 1 for the team opens Review 2.
+  f.c.reviewWrite_('submit',(()=>{const loaded=f.c.getReviewEvaluation_('G18','review1');return {team:'G18',revision:loaded.revision,token:loaded.token,requestId:'11111111-1111-4111-8111-111111111111',teamScores:{T:{level:3,marks:48,remark:''}},students:f.students.map(s=>({register:s.regNo.toLowerCase(),absence:{type:'NORMAL'},scores:{I:{level:3,marks:32,remark:''}}}))};})(),'review1');
+  f.actor('coord@x');
+  rows=JSON.parse(f.c.API_publishing_export('review2')).data.rows;
+  assert(rows.every(r=>r.total==='NA'),'eligible, nothing published');
+});
+
+test('the results download tells NA (not assessed), NS (draft), NP (submitted) apart, and carries the definitions',()=>{
+  const f=publishingFixture('review1');vm.runInContext(fs.readFileSync('api-envelope.js','utf8'),f.c);
+  const read=()=>{f.actor('coord@x');return JSON.parse(f.c.API_publishing_export('review1')).data;};
+  let data=read();
+  assert(data.rows.every(r=>r.total==='NA'),'eligible, not assessed');
+  assert.deepEqual(plain(data.legend.map(item=>item.code)),['A','NE','NA','NS','NP','ERR']);
+  assert(data.legend.every(item=>item.meaning.length>10));
+  f.actor('reviewer@x');f.c.reviewWrite_('draft',f.input(),'review1');
+  data=read();assert(data.rows.every(r=>r.total==='NS'&&r.scores.I==='NS'),'a saved draft is NS');
+  f.submit();
+  data=read();assert(data.rows.every(r=>r.total==='NP'),'submitted, not published is NP');
+  f.publish();
+  data=read();assert(data.rows.every(r=>r.total===80),'published shows the marks');
+});
+
+test('the results download lists every remark of the team and of the student in one comments cell, one line per PI',()=>{
+  const f=publishingFixture('review1');vm.runInContext(fs.readFileSync('api-envelope.js','utf8'),f.c);
+  const input=f.input();
+  input.teamScores.T.remark='Strong design.';
+  input.students[0].scores.I.remark='Presented well.';
+  input.students[1].scores.I.remark='  ';
+  f.submit(input);f.publish();f.actor('coord@x');
+  const by=Object.fromEntries(JSON.parse(f.c.API_publishing_export('review1')).data.rows.map(r=>[r.register,r]));
+  assert.equal(by.s1.comments,'T: Strong design.\nI: Presented well.');
+  assert.equal(by.s2.comments,'T: Strong design.','a blank remark adds nothing, the team remark is shared');
+  assert.equal(by.s3.comments,'T: Strong design.');
+});
+
+test('an absent student with no makeup gets the absence details, not the team remarks',()=>{
+  const f=publishingFixture('review1');vm.runInContext(fs.readFileSync('api-envelope.js','utf8'),f.c);
+  const input=f.input();input.teamScores.T.remark='Strong design.';
+  input.students[0].scores={};input.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true,reason:'Documented'};
+  f.submit(input);f.publish();f.actor('coord@x');
+  const by=Object.fromEntries(JSON.parse(f.c.API_publishing_export('review1')).data.rows.map(r=>[r.register,r]));
+  assert.equal(by.s1.total,'A');assert.equal(by.s1.comments,'Absence: Review-day absence, approved.');
+  assert.equal(by.s2.comments,'T: Strong design.');
+});
+
+test('absence details say the kind, approval, contribution and supporting evidence in words',()=>{
+  const f=publishingFixture('review1');vm.runInContext(fs.readFileSync('api-envelope.js','utf8'),f.c);
+  const input=f.input();
+  input.students[0].scores={};input.students[0].absence={type:'REVIEW_DAY_ABSENCE',approved:true,supportingEvidence:['MEDICAL_DOCUMENT','OTHER'],otherEvidenceText:'Hospital letter'};
+  input.students[1].scores={};input.students[1].absence={type:'REVIEW_DAY_ABSENCE',approved:false};
+  f.submit(input);f.publish();f.actor('coord@x');
+  const by=Object.fromEntries(JSON.parse(f.c.API_publishing_export('review1')).data.rows.map(r=>[r.register,r]));
+  assert.equal(by.s1.comments,'Absence: Review-day absence, approved. Supporting evidence: Medical document; Other: Hospital letter.');
+  assert.equal(by.s2.comments,'Absence: Review-day absence, not approved.');
+  assert.equal(by.s3.comments,'');
+  assert.equal(f.c.publicationAbsenceNote_({assessment:{facts:{type:'PROLONGED',approved:true,verifiedContribution:true,attended:false}}}),'Absence: Prolonged absence, approved, contribution established.');
+  assert.equal(f.c.publicationAbsenceNote_({assessment:{facts:{type:'PROLONGED',approved:null,verifiedContribution:false,attended:true}}}),'','a prolonged absence that still attended the Review is not an absence');
 });

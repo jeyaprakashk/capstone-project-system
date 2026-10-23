@@ -5,7 +5,7 @@
  * goes through the bridge (API_coordinator_*); DashboardUI only forwards to this module and owns the
  * shared loading overlay. It never calls google.script.run.
  */
-function systemStatusActionsBrowser_(bridge, getUi) {
+function systemStatusActionsBrowser_(bridge, getUi, table) {
   'use strict';
   const byId = id => document.getElementById(id);
   const setText = (id, text) => { const el = byId(id); if (el) el.textContent = text; };
@@ -294,7 +294,7 @@ function systemStatusActionsBrowser_(bridge, getUi) {
       const rows = Array.from(results.values());
       host.querySelector('[data-resend-log]').hidden = !rows.length;
       const bounds = renderTeamPagination(rows.length, host.resendPagination, 'studentInvitations', render, 'students');
-      output.innerHTML = rows.length ? '<table class="w-full border-collapse text-sm [&_th]:border-b [&_td]:border-b [&_th]:border-edge [&_td]:border-edge [&_th]:px-2 [&_td]:px-2 [&_th]:py-1 [&_td]:py-1 [&_th]:text-left [&_td]:text-left [&_td]:align-top [&_thead_th]:bg-soft [&_thead_th]:text-xs [&_thead_th]:font-semibold [&_thead_th]:text-ink-2"><thead><tr><th>Team</th><th>Student</th><th>GitHub</th><th>Result</th><th>Details</th></tr></thead><tbody>' + rows.slice(bounds.start, bounds.end).map(row => '<tr>' + [row.teamId,row.student,row.username,row.status,row.reason].map(value => '<td>' + escapeClientHtml(value || '') + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '';
+      output.innerHTML = rows.length ? table.table({label:'Student invitation results', head:table.head(['Team', 'Student', 'GitHub', 'Result', 'Details']), body:table.tbody(rows.slice(bounds.start, bounds.end).map(row => table.row([row.teamId, row.student, row.username, row.status, row.reason].map(value => table.td(escapeClientHtml(value || ''))))).join(''))}) : '';
       return ['invited','already joined','pending','skipped','failed'].map(kind => rows.filter(row => row.status === kind).length + ' ' + kind).join(' · ');
     }
     host.renderResendLog = render;

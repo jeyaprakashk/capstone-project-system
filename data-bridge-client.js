@@ -108,23 +108,26 @@ function getMigratedViewsClientScript_(roles) {
   return [
     `const DataBridge = (${dataBridgeBrowser_.toString()})();
 const SharedTabs = (${sharedTabsBrowser_.toString()})(() => DashboardUI);
+const SharedTable = (${sharedTableBrowser_.toString()})();
 const TitleRequests = (${titleRequestsBrowser_.toString()})();
 const AvatarColor = (${avatarColorBrowser_.toString()})();
+const GithubAccountCard = (${githubAccountCardBrowser_.toString()})();
 const DocumentsView = (${documentsViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TitleRequests);`,
-    has('reviewer') ? `const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations, () => SharedTabs, () => TitleRequests);` : '',
-    has('coord') ? `const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => InternalAssessmentPublishing, () => SystemStatusActions, AvatarColor);
-const CoordinatorView = (${coordinatorViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TeamDrawerView);
-const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TitleRequests, () => DocumentsView);` : '',
+    has('reviewer') ? `const ReviewerView = (${reviewerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => ReviewEvaluations, () => SharedTabs, () => TitleRequests, SharedTable);` : '',
+    has('coord') ? `const SystemStatusView = (${systemStatusViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => SystemStatusActions, AvatarColor);
+const CoordinatorView = (${coordinatorViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TeamDrawerView, () => InternalAssessmentPublishing, SharedTable, () => SharedTabs);
+const TeamDrawerView = (${teamDrawerViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => TitleRequests, () => DocumentsView, SharedTable);` : '',
     `const SharedTimelineView = (${sharedTimelineViewBrowser_.toString()})(() => DashboardUI);
 const SharedRubricsView = (${sharedRubricsViewBrowser_.toString()})(() => DashboardUI);`,
-    has('coord') ? `const SystemStatusActions = (${systemStatusActionsBrowser_.toString()})(DataBridge, () => DashboardUI);` : '',
-    has('student') ? `const GithubAccountCard = (${githubAccountCardBrowser_.toString()})();
-const StudentGithub = (${studentGithubBrowser_.toString()})(DataBridge, () => DashboardUI, () => StudentView, () => GithubAccountCard);
+    has('coord') ? `const XlsxWriter = (${xlsxWriterBrowser_.toString()})();
+const SystemStatusActions = (${systemStatusActionsBrowser_.toString()})(DataBridge, () => DashboardUI, SharedTable);` : '',
+    has('student') || has('guide') ? `const WeeklyLogsView = (${weeklyLogsViewBrowser_.toString()})(() => DashboardUI);` : '',
+    has('student') ? `const StudentGithub = (${studentGithubBrowser_.toString()})(DataBridge, () => DashboardUI, () => StudentView, () => GithubAccountCard);
 const StudentResults = (${studentResultsViewBrowser_.toString()})(DataBridge, () => DashboardUI);
-const StudentWeekly = (${studentWeeklyViewBrowser_.toString()})(DataBridge, () => DashboardUI);
+const StudentWeekly = (${studentWeeklyViewBrowser_.toString()})(DataBridge, () => DashboardUI, WeeklyLogsView);
 const StudentTitle = (${studentTitleBrowser_.toString()})(DataBridge, () => DashboardUI, () => TitleRequests, () => StudentView);
 const StudentView = (${studentViewBrowser_.toString()})(DataBridge, () => DashboardUI, {weekly: StudentWeekly, results: StudentResults, github: StudentGithub, title: StudentTitle, documents: DocumentsView}, GithubAccountCard, AvatarColor);` : '',
-    has('guide') ? `const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly, () => SharedTabs, () => TitleRequests, () => DocumentsView, AvatarColor);` : ''
+    has('guide') ? `const GuideView = (${guideViewBrowser_.toString()})(DataBridge, () => DashboardUI, () => GuideWeekly, () => SharedTabs, () => TitleRequests, () => DocumentsView, AvatarColor, GithubAccountCard);` : ''
   ].filter(Boolean).join('\n');
 }
 

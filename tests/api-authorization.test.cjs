@@ -54,7 +54,7 @@ const DELEGATED = {
   API_coordinator_reopenDocument: ['titleTeamRowFor_', 'titleAuthorizer_'],
   API_guide_decideTitle: ['titleTeamRowFor_', 'titleAuthorizer_'], API_reviewer_decideTitle: ['titleTeamRowFor_', 'titleAuthorizer_'],
   API_coordinator_reopenTitle: ['titleTeamRowFor_', 'titleAuthorizer_'], API_coordinator_cancelReopen: ['titleTeamRowFor_', 'titleAuthorizer_'],
-  API_publishing_get: 'loadInternalAssessmentPublishing_', API_publishing_run: ['publishInternalAssessment_', 'reopenInternalAssessment_'],
+  API_publishing_get: 'loadInternalAssessmentPublishing_', API_publishing_export: 'internalPublishingExport_', API_publishing_run: ['publishInternalAssessment_', 'reopenInternalAssessment_'],
   API_review_getEvaluation: 'getReviewEvaluation_', API_review_save: ['reviewWrite_'],
   API_student_getWeekly: 'loadStudentWeeklyProgress_', API_student_submitWeekly: 'submitWeeklyProgress_',
   API_student_getReviewResult: 'loadPublishedAssessment_', API_student_getGuideResult: 'loadPublishedAssessment_',

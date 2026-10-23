@@ -55,6 +55,7 @@ const ENDPOINTS = {
   API_review_getEvaluation: [[TEAM, 'review1'], ['outsider@example.com', 'one@example.com']],
   API_review_save: [['draft', { ...REQUEST, scores: {} }], ['outsider@example.com', 'one@example.com']],
   API_publishing_get: [['review1'], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
+  API_publishing_export: [['review1'], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
   API_publishing_run: [['publishInternalAssessment_', { ...REQUEST }], [...OUTSIDER, 'one@example.com', 'guide@example.com']],
   API_title_get: [[TEAM], OUTSIDER],
   API_student_submitTitle: [[{ requestId: 'request_123456789', expectedRevision: 0, title: 'A title', problem: 'A problem' }], [...OUTSIDER, 'guide@example.com']],

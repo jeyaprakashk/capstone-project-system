@@ -5,7 +5,7 @@
  * drawer closed or moved to another team are ignored. Opening, closing, focus and the backdrop stay with
  * DashboardUI's shared drawer; this module never calls google.script.run.
  */
-function teamDrawerViewBrowser_(bridge, getUi, getRequests, getDocuments) {
+function teamDrawerViewBrowser_(bridge, getUi, getRequests, getDocuments, table) {
   'use strict';
   const delegated = new WeakSet();
   const READ = {timeoutMs:120000};
@@ -61,15 +61,14 @@ function teamDrawerViewBrowser_(bridge, getUi, getRequests, getDocuments) {
       return '<div class="mb-2"><div class="text-xs font-semibold text-muted">' + escape(key) + '</div>' + (result.requirements.length ? result.requirements.map(item =>
         row(escape(item.label), '<span class="' + (item.met ? TONE.success : TONE.warning) + '">' + (item.met ? 'Met' : escape(item.reason || 'Not met')) + '</span>' + (item.diagnostic ? ' <span class="text-xs text-muted">' + escape(item.diagnostic) + '</span>' : ''))).join('') : '<p class="' + NOTE + '">' + escape(result.reason) + '</p>') + '</div>';
     }).join('');
-    const history = (title.history || []).slice().reverse().map(item => '<tr><td class="pr-2 align-top text-muted">' + escape(item.revision) + '</td><td class="pr-2 align-top">' + escape(ACTION_LABEL[item.action] || item.action) +
-      '</td><td class="pr-2 align-top break-all">' + escape(item.actor) + '</td><td class="pr-2 align-top whitespace-nowrap">' + escape(when(item.at)) + '</td><td class="align-top break-words">' + escape(item.notes) + '</td></tr>').join('');
+    const history = (title.history || []).slice().reverse().map(item => table.row([table.td(escape(item.revision)), table.td(escape(ACTION_LABEL[item.action] || item.action)), table.td('<span class="break-all">' + escape(item.actor) + '</span>'), table.td('<span class="whitespace-nowrap">' + escape(when(item.at)) + '</span>'), table.td('<span class="break-words">' + escape(item.notes) + '</span>')])).join('');
     const controls = (title.can.reopen.allowed ? '<label class="text-xs font-semibold text-muted" for="title-reason-' + id + '">Reason for reopening</label><textarea id="title-reason-' + id + '" rows="2" maxlength="500" class="' + FIELD + '" data-title-reason></textarea>' +
         '<div class="mt-2"><button type="button" class="' + PRIMARY + '" data-action="title-reopen" data-team="' + id + '" data-revision="' + escape(title.revision) + '">Reopen title</button></div>' : '') +
       (title.can.cancel.allowed ? '<label class="text-xs font-semibold text-muted" for="title-reason-' + id + '">Reason for cancelling the reopening</label><textarea id="title-reason-' + id + '" rows="2" maxlength="500" class="' + FIELD + '" data-title-reason></textarea>' +
         '<div class="mt-2"><button type="button" class="' + PRIMARY + '" data-action="title-cancel" data-team="' + id + '" data-revision="' + escape(title.revision) + '">Cancel reopening</button></div>' : '');
     return block('Title', summary + (controls ? '<div class="mt-3">' + controls + '</div><p class="mt-2 text-sm text-danger" role="status" data-title-status></p>' : '')) +
       (checklist || errors.length ? block('Submission requirements', (errors.length ? '<p class="text-sm text-danger">' + errors.map(escape).join('<br>') + '</p>' : '') + checklist) : '') +
-      (history ? block('Title history', '<table class="w-full text-xs"><tbody>' + history + '</tbody></table>') : '');
+      (history ? block('Title history', table.table({label:'Title history', head:table.head(['Rev', 'Action', 'By', 'When', 'Notes']), body:table.tbody(history)})) : '');
   }
 
   /** The markup for one section from its DTO. */
