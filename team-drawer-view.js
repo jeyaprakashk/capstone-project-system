@@ -30,8 +30,15 @@ function teamDrawerViewBrowser_(bridge, getUi, getRequests, getDocuments, table)
   const CARD_VALUE = 'mt-1 text-sm font-semibold text-ink break-words';
   const NOTE = 'text-sm text-muted';
 
-  const block = (title, body) => '<div class="' + BLOCK + '"><h4 class="' + HEADING + '">' + title + '</h4>' + body + '</div>';
+  const block = (title, body, card) => '<div class="' + BLOCK + '"><h4 class="' + HEADING + '">' + title + '</h4>' + (card ? '<div class="' + CARD + ' p-4">' + body + '</div>' : body) + '</div>';
   const person = (primary, secondary) => '<div class="py-1.5 text-sm"><div class="font-semibold text-ink">' + escape(primary) + '</div><div class="text-xs text-muted">' + secondary + '</div></div>';
+  const personCard = (primary, lines) => '<li class="' + CARD + ' min-w-0"><div class="text-sm font-semibold text-ink break-words">' + escape(primary) + '</div>' +
+    lines.filter(Boolean).map(line => '<div class="mt-0.5 text-xs text-muted break-all">' + escape(line) + '</div>').join('') + '</li>';
+  const PEOPLE = '<ul class="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">';
+  const PEOPLE_NARROW = '<ul class="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 lg:grid-cols-1">';
+  /** Where each section sits in the page grid (lg and up; below lg the sections stack). The Title section spans the rows of Progress and This Week beside it. */
+  const PLACE = {basic:'lg:col-span-2', title:'lg:col-start-1 lg:row-span-2', progress:'lg:col-start-2', activity:'lg:col-start-2'};
+  const PLACE_DOCUMENTS = 'lg:col-span-2';
   const row = (label, value) => '<div class="' + ROW + '"><span class="text-muted">' + label + '</span><span class="text-right font-semibold text-ink">' + value + '</span></div>';
   const stat = (label, value) => '<div class="' + CARD + '"><div class="' + CARD_LABEL + '">' + label + '</div><div class="' + CARD_VALUE + '">' + escape(value) + '</div></div>';
   const health = value => value === 'ontrack' ? ['success', 'On Track'] : value === 'monitor' ? ['warning', 'Monitor'] : ['danger', 'Attention'];
@@ -86,23 +93,24 @@ function teamDrawerViewBrowser_(bridge, getUi, getRequests, getDocuments, table)
       return block('This Week', '<div class="grid grid-cols-2 gap-3">' + stat('Daily Logs', data.weekLogs) + stat('GitHub Commits', data.weekCommits) + '</div>');
     }
     const students = data.students && data.students.length
-      ? data.students.map(s => person(s.name || 'Student', escape(s.regNo || '') + (s.regNo && s.email ? ' · ' : '') + escape(s.email || ''))).join('')
+      ? PEOPLE + data.students.map(s => personCard(s.name || 'Student', [s.regNo, s.email])).join('') + '</ul>'
       : '<p class="' + NOTE + '">No student details available.</p>';
     const reviewers = data.reviewers && data.reviewers.length
-      ? data.reviewers.map(r => person(r.name || 'Reviewer', escape(r.email || ''))).join('')
+      ? PEOPLE_NARROW + data.reviewers.map(r => personCard(r.name || 'Reviewer', [r.email])).join('') + '</ul>'
       : '<p class="' + NOTE + '">Committee details not available.</p>';
     const repository = data.repoUrl
       ? '<a class="' + LINK + '" href="' + escape(data.repoUrl) + '" target="_blank" rel="noopener">' + escape(data.repoUrl) + '</a>'
       : '<span class="' + NOTE + '">Pending</span>';
-    return block('Project', '<div class="text-sm font-semibold text-ink">' + escape(data.title || '(Title not submitted)') + '</div>' +
-        (data.problem ? '<div class="mt-1 text-sm text-ink-2">' + getUi().renderExpandableText(data.problem) + '</div>' : '')) +
-      block('Guide', '<div class="grid grid-cols-2 gap-3">' + stat('Guide', data.guideName || '—') + stat('Email', data.guideEmail || '—') + '</div>') +
-      block('Students', students) +
+    const guide = '<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">' + stat('Guide', data.guideName || '—') + stat('Email', data.guideEmail || '—') + '</div>';
+    return '<div class="grid gap-x-6 lg:grid-cols-3">' + '<div class="lg:col-span-2">' + block('Project', '<div class="text-base font-semibold text-ink">' + escape(data.title || '(Title not submitted)') + '</div>' +
+        (data.problem ? '<div class="mt-2 text-sm text-ink-2">' + getUi().renderExpandableText(data.problem) + '</div>' : ''), true) +
+      '</div>' + block('Guide', guide) +
+      '<div class="lg:col-span-2">' + block('Students', students) + '</div>' +
       block('Review Committee' + (data.committeeNumber ? ' · ' + escape(data.committeeNumber) : ''), reviewers) +
-      block('Repository', repository);
+      '<div class="lg:col-span-3">' + block('Repository', repository) + '</div></div>';
   }
 
-  const skeletonMarkup = section => '<div data-drawer-section="' + section + '" aria-busy="true">' +
+  const skeletonMarkup = section => '<div class="min-w-0 ' + PLACE[section] + '" data-drawer-section="' + section + '" aria-busy="true">' +
     SECTIONS[section].map(label => block(escape(label), getUi().renderSkeleton('panel', 'Loading ' + label))).join('') + '</div>';
 
   /** Reopen or cancel a reopening: one write with the revision the section showed; success reloads the section. */
@@ -137,8 +145,8 @@ function teamDrawerViewBrowser_(bridge, getUi, getRequests, getDocuments, table)
   /** Fills `content` with the three sections of `teamId`; `isOpen()` says whether the drawer still shows them. */
   function mount(content, teamId, isOpen) {
     const request = ++generation, pending = new Set();
-    content.innerHTML = Object.keys(SECTIONS).map(skeletonMarkup).join('') + '<div data-documents-host></div>';
-    getDocuments().mount(content.querySelector('[data-documents-host]'), teamId);
+    content.innerHTML = Object.keys(SECTIONS).map(skeletonMarkup).join('') + '<div class="min-w-0 ' + PLACE_DOCUMENTS + '" data-documents-host></div>';
+    getDocuments().mount(content.querySelector('[data-documents-host]'), teamId, {single:true});
     if (!delegated.has(content)) { delegated.add(content); content.addEventListener('click', onClick); }
     const sectionHost = section => content.querySelector('[data-drawer-section="' + section + '"]');
 

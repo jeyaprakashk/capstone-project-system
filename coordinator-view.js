@@ -263,7 +263,7 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer, getPublishing, ta
     return '<section id="coordinatorTeamPage" class="flex flex-col gap-4" data-team-page aria-labelledby="teamPageTitle" hidden>' +
       '<div class="flex items-center gap-3"><button type="button" class="inline-flex items-center gap-1 ' + BUTTON + '" data-action="close-team">' + icon('chevron-left') + 'Back to dashboard</button>' +
       '<div><div class="text-xs font-bold tracking-wider text-muted">TEAM DETAILS</div><h2 id="teamPageTitle" class="text-xl font-semibold text-ink" tabindex="-1">Team</h2></div></div>' +
-      '<div id="teamPageContent" class="team-drawer-content max-w-3xl" data-team-content></div></section>';
+      '<div id="teamPageContent" class="team-drawer-content grid max-w-7xl items-start gap-x-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" data-team-content></div></section>';
   }
   function headerMarkup() {
     return '<h2 class="text-xl font-semibold text-ink">Coordinator Dashboard</h2>' +

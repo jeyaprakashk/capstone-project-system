@@ -55,7 +55,7 @@ test('mounting shows a skeleton per section and requests all four at once', asyn
 test('each section renders its own DTO and settles independently', async () => {
   const f = setup(); f.view.mount(f.host, 'T1', () => f.open.value); await f.flush();
   const basic = text(section(f, 'basic'));
-  for (const expected of ['Smart Farming', 'Dr. A', 'a@example.com', 'One', '001 · one@example.com', 'Review Committee · C1', 'Rev', 'https://github.com/org/t1']) assert(basic.includes(expected), expected);
+  for (const expected of ['Smart Farming', 'Dr. A', 'a@example.com', 'One', '001', 'one@example.com', 'Review Committee · C1', 'Rev', 'https://github.com/org/t1']) assert(basic.includes(expected), expected);
   assert(section(f, 'basic').querySelector('[data-expandable]'));
   assert.equal(section(f, 'basic').querySelector('a').getAttribute('rel'), 'noopener');
   const progress = text(section(f, 'progress'));

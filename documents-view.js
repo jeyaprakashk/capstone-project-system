@@ -273,13 +273,13 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
       '<div class="min-w-0"><h2 class="m-0 text-hero font-semibold text-ink">' + complete + ' of ' + total + ' complete</h2>' + (sub ? '<p class="m-0 text-sm text-muted">' + escape(sub) + '</p>' : '') + '</div></div></section>';
   }
 
-  function detailMarkup(group, dto) {
+  function detailMarkup(group, dto, single) {
     const heading = group.id === OTHER_GROUP ? group.label : group.id === ALL_GROUP ? 'Documents' : 'Needed for ' + group.label;
     return '<section aria-label="' + escape(group.label) + '">' +
-      '<div class="mb-3 xl:hidden"><button type="button" class="inline-flex items-center gap-1 ' + BUTTON + '" data-doc-action="back">' + icon('chevron-left') + 'All activities</button></div>' +
+      '<div class="mb-3' + (single ? '' : ' xl:hidden') + '"><button type="button" class="inline-flex items-center gap-1 ' + BUTTON + '" data-doc-action="back">' + icon('chevron-left') + 'All activities</button></div>' +
       '<div class="flex flex-wrap items-center justify-between gap-2"><h3 class="m-0 text-h1 font-semibold text-ink">' + escape(heading) + '</h3>' +
       '<span class="' + TONE[groupChip(group).tone === 'done' ? 'done' : 'waiting'] + '">' + completeCount(group) + ' of ' + group.documents.length + ' complete</span></div>' +
-      '<div class="mt-3 grid gap-3 sm:grid-cols-2">' + group.documents.map(doc => documentMarkup(doc, dto)).join('') + '</div></section>';
+      '<div class="mt-3 grid gap-3' + (single ? ' items-start grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))]' : ' sm:grid-cols-2') + '">' + group.documents.map(doc => documentMarkup(doc, dto)).join('') + '</div></section>';
   }
 
   /** The first Review that still needs the team, else the first. */
@@ -287,20 +287,20 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
     return (groups.find(group => groupChip(group).tone === 'active') || groups[0]).id;
   }
 
-  /** `view` = {selected: a group id, mode: 'list'|'detail'} (the mode only matters below xl). */
+  /** `view` = {selected: a group id, mode: 'list'|'detail'} (the mode only matters below xl, or at every width when `single`: one column, the activity list and an activity's documents one after the other). */
   function listMarkup(dto, notice, view) {
     const banner = notice ? '<p class="' + NOTICE + '" role="status" data-doc-notice>' + escape(notice) + '</p>' : '';
     if (!dto.documents.length) return banner + p('No documents are listed yet.', 'text-muted');
     const groups = groupDocuments(dto.documents);
     const selectedId = view && groups.some(group => group.id === view.selected) ? view.selected : defaultSelection(groups);
     const mode = view && view.mode === 'detail' ? 'detail' : 'list';
-    const selected = groups.find(group => group.id === selectedId);
+    const selected = groups.find(group => group.id === selectedId), single = !!(view && view.single);
     return banner + '<div class="group/docs" data-doc-shell data-doc-view="' + mode + '">' +
-      '<div class="grid gap-4 xl:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] xl:items-start">' +
-      '<div class="flex min-w-0 flex-col gap-4 group-data-[doc-view=detail]/docs:max-xl:hidden" data-doc-list>' + summaryMarkup(dto) +
+      '<div class="grid gap-4' + (single ? '' : ' xl:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] xl:items-start') + '">' +
+      '<div class="flex min-w-0 flex-col gap-4 ' + (single ? 'group-data-[doc-view=detail]/docs:hidden' : 'group-data-[doc-view=detail]/docs:max-xl:hidden') + '" data-doc-list>' + summaryMarkup(dto) +
       '<section aria-labelledby="docListHeading"><h3 id="docListHeading" class="m-0 mb-2 px-1 text-sm font-semibold text-ink-2">Activities</h3>' +
       '<ul class="m-0 list-none divide-y divide-edge overflow-hidden p-0 ' + CARD + '">' + groups.map(group => rowMarkup(group, group.id === selectedId)).join('') + '</ul></section></div>' +
-      '<div class="min-w-0 group-data-[doc-view=list]/docs:max-xl:hidden" data-doc-detail>' + detailMarkup(selected, dto) + '</div></div></div>';
+      '<div class="min-w-0 ' + (single ? 'group-data-[doc-view=list]/docs:hidden' : 'group-data-[doc-view=list]/docs:max-xl:hidden') + '" data-doc-detail>' + detailMarkup(selected, dto, single) + '</div></div></div>';
   }
 
   function errorMessage(error) {
@@ -340,8 +340,8 @@ function documentsViewBrowser_(bridge, getUi, getRequests) {
   }
 
   /** Starts showing a team's documents in a host. teamId is blank for a student (the server uses the signed-in student's team). */
-  function mount(host, teamId) {
-    hosts.set(host, {teamId: teamId || '', dto: null, busy: false, notice: '', selected: '', mode: 'list'});
+  function mount(host, teamId, options) {
+    hosts.set(host, {teamId: teamId || '', dto: null, busy: false, notice: '', selected: '', mode: 'list', single: !!(options && options.single)});
     host.innerHTML = getUi().renderSkeleton('panel', 'Loading documents');
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); }
     return load(host);
