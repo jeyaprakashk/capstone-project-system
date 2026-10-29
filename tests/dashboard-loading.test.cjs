@@ -340,19 +340,6 @@ test('rubric drawer escapes text, traps focus, closes on Escape and excludes tea
  f.ui.openRubricDrawer('review1',trigger);vm.runInContext('CoordinatorView',f.c).openTeam('1');assert(!f.nodes.rubricDrawer.classList.contains('open'));
  assert.equal(f.requests.filter(r=>r.key==='loadSharedRubrics_').length,1);
 });
-test('coordinator drawer shares focus trap, Escape and trigger focus return',async()=>{
- const f=rubricClientFixture(),trigger={isConnected:true,focus(){f.c.document.activeElement=this;}};
- f.c.document.activeElement=trigger;
- vm.runInContext('CoordinatorView',f.c).openTeam('1');
- assert(f.nodes.teamDrawer.classList.contains('open'));
- assert.equal(f.nodes.teamDrawer.attrs['aria-hidden'],'false');
- assert.equal(f.c.document.activeElement,f.nodes.teamDrawerClose);
- f.fire('keydown',{key:'Escape',preventDefault(){}});
- assert.equal(f.nodes.teamDrawer.inert,true);
- assert.equal(f.c.document.activeElement,trigger);
- const source=fs.readFileSync('coordinator-view.js','utf8');
- assert.match(source,/id="teamDrawer"[\s\S]*?role="dialog" aria-modal="true" aria-labelledby="teamDrawerTitle"/);
-});
 test('all roles preload in order and are reused',async()=>{
  const f=fixture();f.click('guide');vm.runInContext('DashboardUI.initializeLoading()',f.c);
  assert.deepEqual(f.requests.map(r=>r.key),['loadDashboardRoleContent']);

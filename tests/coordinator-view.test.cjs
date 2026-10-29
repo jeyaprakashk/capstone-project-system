@@ -21,8 +21,8 @@ const ACTIVITY = { state: 'active', week: 'W2', checkedAt: '2026-01-10T12:00:00Z
 
 function setup({ data = sections(), activity = ACTIVITY } = {}) {
   const { document, window } = parseHTML('<html><body><div id="coordinatorContent"></div></body></html>');
-  const calls = { view: [], close: 0, refresh: 0, requests: [], publishing: [] };
-  const c = loadSources(['data-bridge-client.js', 'shared-table.js', 'shared-tabs.js', 'coordinator-view.js'], { document, Promise, JSON, Intl, Date, setTimeout, clearTimeout });
+  const calls = { view: [], close: 0, cancelled: 0, scrolled: 0, refresh: 0, requests: [], publishing: [] };
+  const c = loadSources(['data-bridge-client.js', 'shared-table.js', 'shared-tabs.js', 'coordinator-view.js'], { document, window: { scrollX: 0, scrollY: 0, scrollTo: () => { calls.scrolled++; } }, Promise, JSON, Intl, Date, setTimeout, clearTimeout });
   const bridge = vm.runInContext('(' + c.dataBridgeBrowser_.toString() + ')()', c);
   const s = { ...data, activity, fail: {}, hold: {}, release: {} };
   bridge.useTransport((method, args) => {
@@ -35,7 +35,7 @@ function setup({ data = sections(), activity = ACTIVITY } = {}) {
   });
   const ui = { renderIcon: n => '<svg class="lucide-' + n + '"></svg>', renderSkeleton: (v, l) => '<span data-skeleton role="status" aria-label="' + l + '">…</span>',
     closeRubricDrawer: () => {}, openDrawer: () => {}, closeDrawer: () => calls.close++, refreshRoleDashboard: () => calls.refresh++ };
-  const teamDrawer = { mount: (content, team) => calls.view.push(team), cancel: () => {} };
+  const teamDrawer = { mount: (content, team) => calls.view.push(team), cancel: () => { calls.cancelled++; } };
   vm.runInContext('globalThis.__make = ' + c.coordinatorViewBrowser_.toString(), c);
   const publishing = { toggle: key => calls.publishing.push(['toggle', key]), refresh: key => calls.publishing.push(['refresh', key]), publishAll: (key, card) => calls.publishing.push(['all', key, card.hasAttribute('data-publish-all')]) };
   const tabs = c.sharedTabsBrowser_(() => ui);
@@ -43,7 +43,7 @@ function setup({ data = sections(), activity = ACTIVITY } = {}) {
   const host = document.getElementById('coordinatorContent');
   const flush = () => new Promise(r => setImmediate(r));
   return { view, host, document, calls, s, flush, fire: (el, type) => el.dispatchEvent(new window.Event(type, { bubbles: true })), click: el => el.dispatchEvent(new window.Event('click', { bubbles: true })),
-    start: async () => { const overviewDto = await view.load(); view.render(host, overviewDto); await flush(); } };
+    start: async () => { const overviewDto = await view.load(); view.render(host, overviewDto); host.querySelector('#coordinatorTeamPage').scrollIntoView = () => {}; await flush(); } };
 }
 const HELD = ['guide', 'health', 'activity', 'review:review1', 'review:review2'];
 const holdAll = f => { HELD.forEach(key => { f.s.hold[key] = true; }); };
@@ -244,7 +244,7 @@ test('pagination follows the page size, clamps pages and supports All', async ()
   size('10'); assert.equal(rowIds(f).length, 10);
 });
 
-test('team actions open the drawer, email the team, or explain why they cannot', async () => {
+test('team actions open the team page, email the team, or explain why they cannot', async () => {
   const f = setup(); await f.start();
   const t1 = f.host.querySelector('[data-team-id="T1"]'), t3 = f.host.querySelector('[data-team-id="T3"]');
   f.click(t1.querySelector('[data-action="view-team"]')); assert.deepEqual(f.calls.view, ['T1']);
@@ -252,9 +252,13 @@ test('team actions open the drawer, email the team, or explain why they cannot',
   assert.equal(decodeURIComponent(mail.getAttribute('href').split('?')[0]), 'mailto:guide@example.com,one@example.com,two@example.com');
   assert.match(mail.getAttribute('href'), /subject=Capstone%20%E2%80%94%20Team%20T1$/);
   assert.equal(t3.querySelector('a[href^="mailto:"]') === null || true, true);
-  f.click(f.host.querySelector('[data-action="close-drawer"]')); assert.equal(f.calls.close, 1);
-  for (const id of ['teamDrawer', 'teamDrawerBackdrop', 'teamDrawerContent', 'teamDrawerTitle']) assert(f.host.querySelector('#' + id), id);
-  assert.equal(f.host.querySelector('#teamDrawer').hasAttribute('hidden'), true);
+  const page = f.host.querySelector('#coordinatorTeamPage'), main = f.host.querySelector('#coordinatorMain');
+  for (const id of ['coordinatorTeamPage', 'teamPageContent', 'teamPageTitle']) assert(f.host.querySelector('#' + id), id);
+  assert.equal(page.hasAttribute('hidden'), false); assert.equal(main.hasAttribute('hidden'), true);
+  assert.equal(f.host.querySelector('#teamPageTitle').textContent, 'Team T1');
+  f.click(f.host.querySelector('[data-action="close-team"]'));
+  assert.equal(page.hasAttribute('hidden'), true); assert.equal(main.hasAttribute('hidden'), false);
+  assert.equal(f.calls.cancelled, 1); assert.equal(f.calls.scrolled, 1);
 });
 
 test('repository and health badges carry labelled tooltips', async () => {

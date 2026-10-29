@@ -115,7 +115,7 @@ Contract tests: `tests/reviewer-migration.test.cjs` (snapshots in `tests/invaria
 The overview renders first. Then one `getReviewProgress` per `reviewColumns` entry, `getGuideProgress`, `getHealth` and weekly
 activity run in parallel and settle independently: each fills only its own card and tracker column, and a failure or
 timeout is isolated to that section, with its own message and Retry. Percentages, tones and badge labels are derived in the view.
-The team drawer is rendered by `TeamDrawerView` (three sections read independently; each fails and retries on its own); DashboardUI only opens, closes and focuses it. Contract tests: `tests/coordinator-migration.test.cjs`
+The team details open as an in-page view of the Coordinator dashboard (a Back button returns to the list, as the reviewer's marking page does), rendered by `TeamDrawerView` (three sections read independently; each fails and retries on its own). Contract tests: `tests/coordinator-migration.test.cjs`
 (snapshot `tests/invariants/snapshots/coordinator-legacy-facts.json`, captured from the removed HTML for the overview,
 progress and no-reviews cases, with explicit expectations for the removed deadline alerts).
 

@@ -320,11 +320,14 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   const {parseHTML}=require('linkedom');
   const settle=()=>new Promise(resolve=>setImmediate(resolve));
   const {c}=fixture();const requests=[];
-  const {document,window}=parseHTML('<html><body><div id="teamDrawerBackdrop" hidden></div><aside id="teamDrawer" hidden aria-hidden="true"><button type="button" data-drawer-close></button><h2 id="teamDrawerTitle"></h2><div id="teamDrawerContent"></div></aside></body></html>');
+  const {document,window}=parseHTML('<html><body><div id="coordinatorHost"></div></body></html>');
   const script={get run(){const handlers={};const chain={withSuccessHandler(fn){handlers.success=fn;return chain;},withFailureHandler(fn){handlers.failure=fn;return chain;},API_coordinator_getTeamDrawer(teamId,section){const {success}=handlers;requests.push({...handlers,success:data=>success(JSON.stringify({ok:true,data})),teamId,section});}};return chain;}};
-  const browser=createSheetReadContext({window:{},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
+  const browser=createSheetReadContext({window:{scrollX:0,scrollY:0,scrollTo(){}},performance:{now:()=>Date.now()},setTimeout,clearTimeout,document,google:{script},console});
   for(const file of ['data-bridge-client.js','weekly-logs-view.js','title-requests.js','documents-view.js','reviewer-view.js','guide-view.js','student-view.js','student-title.js','coordinator-view.js','team-drawer-view.js','shared-timeline-view.js','shared-rubrics-view.js','avatar-color.js','shared-tabs.js','shared-table.js','xlsx-writer.js','system-status-actions.js','student-github-actions.js','github-account-card.js','system-status-view.js','student-weekly-view.js','student-results-view.js'])vm.runInContext(fs.readFileSync(file,'utf8'),browser);vm.runInContext(browser.getMigratedViewsClientScript_(),browser);vm.runInContext(c.getDashboardClientScript_(),browser);vm.runInContext(c.getDashboardStartScript_(),browser);
   const section=name=>document.querySelector('[data-drawer-section="'+name+'"]');
+  browser.__host=document.getElementById('coordinatorHost');
+  vm.runInContext("CoordinatorView.render(__host,{reviewColumns:[],publishing:{configured:true,items:[]},teams:[],stats:{reviews:[]}});",browser);
+  document.getElementById('coordinatorTeamPage').scrollIntoView=()=>{};
   vm.runInContext("CoordinatorView.openTeam('A'); CoordinatorView.openTeam('B');",browser);
   assert.deepEqual(requests.map(r=>r.section),['basic','title','progress','activity','basic','title','progress','activity']);
   requests[4].success({title:'Team B project',students:[],reviewers:[]});await settle();
@@ -342,7 +345,7 @@ test('drawer sections load independently, retry alone and ignore stale callbacks
   const expected=section('basic').innerHTML;
   requests[0].success(null);await settle();requests[0].failure({message:'A response'});await settle();
   assert.equal(section('basic').innerHTML,expected);
-  vm.runInContext("DashboardUI.closeDrawer('teamDrawer')",browser);
+  document.querySelector('[data-action="close-team"]').dispatchEvent(new window.Event('click',{bubbles:true}));
   requests[4].success(null);await settle();
   assert.equal(section('basic').innerHTML,expected);
   // Release every held read so the bridge leaves no timers behind.

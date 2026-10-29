@@ -12,7 +12,7 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer, getPublishing, ta
   const READ = {timeoutMs:120000};
   const persistent = {sort:{column:null, direction:'ascending', type:'text'}, size:10};
   const state = {};
-  let generation = 0, pending = null, host = null;
+  let generation = 0, pending = null, host = null, openTeamId = null, listScroll = null, teamTrigger = null;
   const delegated = new WeakSet();
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const icon = (name, label) => getUi().renderIcon(name, label);
@@ -258,12 +258,12 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer, getPublishing, ta
   }
 
   // ---- frame ----
-  function drawerMarkup() {
-    return '<div id="teamDrawerBackdrop" class="fixed inset-0 z-40 bg-scrim animate-[fade-in_.15s_cubic-bezier(.2,0,0,1)]" hidden></div>' +
-      '<aside id="teamDrawer" class="fixed inset-y-0 right-0 z-40 flex w-full max-w-[420px] flex-col bg-paper shadow-overlay animate-[slide-in-right_.25s_cubic-bezier(.2,0,0,1)]" data-tooltip-boundary role="dialog" aria-modal="true" aria-labelledby="teamDrawerTitle" aria-hidden="true" inert hidden>' +
-      '<div class="flex items-center justify-between gap-3 border-b border-edge px-5 py-4"><div><div class="text-xs font-bold tracking-wider text-muted">TEAM DETAILS</div><div id="teamDrawerTitle" class="text-base font-semibold">Team</div></div>' +
-      '<button type="button" class="' + SMALL + '" data-drawer-close data-action="close-drawer" aria-label="Close">' + icon('x') + '</button></div>' +
-      '<div id="teamDrawerContent" class="team-drawer-content flex-1 overflow-auto p-5" data-drawer-content></div><div class="flex justify-end gap-2 border-t border-edge px-5 py-3" hidden></div></aside>';
+  /** The team details page: it replaces the dashboard in place (as the reviewer's marking page does) and has a Back button. */
+  function teamPageMarkup() {
+    return '<section id="coordinatorTeamPage" class="flex flex-col gap-4" data-team-page aria-labelledby="teamPageTitle" hidden>' +
+      '<div class="flex items-center gap-3"><button type="button" class="inline-flex items-center gap-1 ' + BUTTON + '" data-action="close-team">' + icon('chevron-left') + 'Back to dashboard</button>' +
+      '<div><div class="text-xs font-bold tracking-wider text-muted">TEAM DETAILS</div><h2 id="teamPageTitle" class="text-xl font-semibold text-ink" tabindex="-1">Team</h2></div></div>' +
+      '<div id="teamPageContent" class="team-drawer-content max-w-3xl" data-team-content></div></section>';
   }
   function headerMarkup() {
     return '<h2 class="text-xl font-semibold text-ink">Coordinator Dashboard</h2>' +
@@ -315,9 +315,10 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer, getPublishing, ta
     host = target;
     const wasPending = pending && pending.gen === generation ? pending : null;
     Object.assign(state, {overview, reviews:{}, reviewErrors:{}, guide:null, guideError:null, health:null, healthError:null, activity:null, filter:'all', query:'', page:1});
-    host.innerHTML = headerMarkup() + '<div id="coordinatorAsyncRoot" class="mt-4 flex flex-col gap-4 max-md:pb-16"><div id="coordinatorOverviewStatus" role="status"></div>' +
+    if (openTeamId !== null) closeTeam(false);
+    host.innerHTML = '<div id="coordinatorMain">' + headerMarkup() + '<div id="coordinatorAsyncRoot" class="mt-4 flex flex-col gap-4 max-md:pb-16"><div id="coordinatorOverviewStatus" role="status"></div>' +
       (overview.reviewConfigurationError ? '<p role="status" class="text-sm text-warning">Review configuration unavailable. Check System Status.</p>' : '') +
-      '<div id="coordinatorStats"></div>' + publishingMarkup(overview.publishing) + '<div id="coordinatorProgressStatus" role="status"></div><div id="coordinatorTracker">' + trackerMarkup() + '</div></div>' + drawerMarkup();
+      '<div id="coordinatorStats"></div>' + publishingMarkup(overview.publishing) + '<div id="coordinatorProgressStatus" role="status"></div><div id="coordinatorTracker">' + trackerMarkup() + '</div></div></div>' + teamPageMarkup();
     getTabs().bind(host);
     if (!delegated.has(host)) { delegated.add(host); host.addEventListener('click', onClick); host.addEventListener('input', onInput); host.addEventListener('change', onChange); }
     renderStats(); updateTracker();
@@ -396,7 +397,7 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer, getPublishing, ta
     else if (action === 'page') { state.page = Number(target.getAttribute('data-page')); updateTracker(); }
     else if (action === 'reset') { state.query = ''; state.filter = 'all'; state.page = 1; const box = q('#trackerSearch'); if (box) box.value = ''; updateTracker(); }
     else if (action === 'view-team') openTeam(target.getAttribute('data-team'));
-    else if (action === 'close-drawer') ui.closeDrawer('teamDrawer');
+    else if (action === 'close-team') closeTeam(true);
     else if (action === 'progress-retry') retryProgress();
     else if (action === 'activity-retry') retryActivity();
     else if (action === 'publishing-toggle') getPublishing().toggle(target.getAttribute('data-key'));
@@ -406,19 +407,31 @@ function coordinatorViewBrowser_(bridge, getUi, getTeamDrawer, getPublishing, ta
     }
   }
 
-  // Team drawer: DashboardUI owns the drawer frame (focus, Escape, scrim); TeamDrawerView fills its sections.
-  // Closing the drawer by any route cancels its reads.
+  // Team details page: the dashboard is hidden while it shows and comes back at the same scroll position on Back.
+  // TeamDrawerView fills its sections; closing the page by any route cancels its reads.
   function openTeam(teamId) {
-    const ui = getUi();
-    ui.closeRubricDrawer(false);
-    const drawer = document.getElementById('teamDrawer');
-    const backdrop = document.getElementById('teamDrawerBackdrop');
-    const content = document.getElementById('teamDrawerContent');
-    const title = document.getElementById('teamDrawerTitle');
-    if (!drawer || !backdrop || !content) return;
-    if (title) title.textContent = 'Team ' + teamId;
-    ui.openDrawer('teamDrawer', 'teamDrawerBackdrop', document.activeElement, () => getTeamDrawer().cancel());
-    getTeamDrawer().mount(content, teamId, () => drawer.dataset.open === 'true');
+    getUi().closeRubricDrawer(false);
+    const page = q('#coordinatorTeamPage'), main = q('#coordinatorMain'), content = q('#teamPageContent');
+    if (!page || !main || !content) return;
+    if (openTeamId === null) {
+      teamTrigger = document.activeElement; listScroll = {x:window.scrollX, y:window.scrollY};
+      main.hidden = true; page.hidden = false;
+    }
+    openTeamId = teamId;
+    const title = q('#teamPageTitle');
+    if (title) { title.textContent = 'Team ' + teamId; title.focus({preventScroll:true}); }
+    page.scrollIntoView({block:'start'});
+    getTeamDrawer().mount(content, teamId, () => openTeamId === teamId && !page.hidden);
+  }
+  function closeTeam(restore) {
+    const page = q('#coordinatorTeamPage'), main = q('#coordinatorMain');
+    getTeamDrawer().cancel();
+    openTeamId = null;
+    if (page) page.hidden = true;
+    if (main) main.hidden = false;
+    if (restore && listScroll) window.scrollTo(listScroll.x, listScroll.y);
+    if (restore && teamTrigger && teamTrigger.isConnected) teamTrigger.focus();
+    listScroll = teamTrigger = null;
   }
 
   return {load, render, openTeam, publishingCard, state, persistent};
